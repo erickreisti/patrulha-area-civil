@@ -1,10 +1,6 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+"use client";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +13,6 @@ import {
   FaBullseye,
   FaClock,
 } from "react-icons/fa";
-import Link from "next/link";
 
 export default function OperacoesPage() {
   const operacoes = [
@@ -60,7 +55,7 @@ export default function OperacoesPage() {
   const getStatusBadge = (status: string) => {
     const variants = {
       Concluída: "bg-emerald-500 hover:bg-emerald-600",
-      "Em Andamento": "bg-navy-light hover:bg-navy",
+      "Em Andamento": "bg-blue-600 hover:bg-blue-700",
       Planejada: "bg-amber-500 hover:bg-amber-600",
     };
     return variants[status as keyof typeof variants] || "bg-gray-600";
@@ -77,31 +72,30 @@ export default function OperacoesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate to-offwhite">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Hero Section */}
-      <section className="relative bg-slate text-white pt-40 pb-24">
+      <section className="relative bg-gray-800 text-white pt-32 pb-20">
         <div className="absolute inset-0 bg-black/60"></div>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-4xl mx-auto">
-            <Button variant="ghost" asChild className="mb-8">
-              <Link
-                href="/atividades"
-                className="flex items-center text-navy-light hover:text-white transition-colors"
-              >
-                <FaArrowLeft className="mr-2 h-4 w-4" />
-                Voltar para Atividades
-              </Link>
+            <Button
+              variant="ghost"
+              onClick={() => window.history.back()}
+              className="mb-6 text-blue-400 hover:text-white transition-colors"
+            >
+              <FaArrowLeft className="mr-2 h-4 w-4" />
+              Voltar para Atividades
             </Button>
 
-            <Badge className="mb-8 bg-navy-light hover:bg-navy text-white border-none text-sm py-2 px-4">
+            <Badge className="mb-6 bg-blue-600 hover:bg-blue-700 text-white border-none text-sm py-2 px-4">
               <FaBullseye className="w-4 h-4 mr-2" />
               Operações em Tempo Real
             </Badge>
 
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-8 font-bebas tracking-wide">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 font-bebas tracking-wide">
               OPERAÇÕES DA PAC
             </h1>
-            <p className="text-xl md:text-2xl text-blue-100 max-w-3xl leading-relaxed">
+            <p className="text-lg md:text-xl text-blue-100 max-w-3xl leading-relaxed">
               Acompanhe nossas operações em tempo real e o histórico de ações
               realizadas em prol da segurança e proteção ambiental.
             </p>
@@ -110,10 +104,10 @@ export default function OperacoesPage() {
       </section>
 
       {/* Conteúdo Principal */}
-      <section className="py-20 bg-white -mt-2 relative z-20">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[
               {
                 title: "Total de Operações",
@@ -144,16 +138,16 @@ export default function OperacoesPage() {
               return (
                 <Card
                   key={index}
-                  className="border-gray-200 shadow-xl border-2 text-center hover-lift"
+                  className="border-gray-200 shadow-lg border-2 text-center hover:shadow-xl transition-all duration-300"
                 >
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                    <CardTitle className="text-sm font-medium text-gray-600">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-xs font-medium text-gray-600">
                       {stat.title}
                     </CardTitle>
-                    <Icon className="h-5 w-5 text-navy-light" />
+                    <Icon className="h-4 w-4 text-blue-600" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-slate mb-2 font-bebas tracking-wide">
+                  <CardContent className="p-4">
+                    <div className="text-xl font-bold text-gray-800 mb-1 font-bebas tracking-wide">
                       {stat.value}
                     </div>
                     <p className="text-xs text-gray-600">{stat.change}</p>
@@ -164,31 +158,33 @@ export default function OperacoesPage() {
           </div>
 
           {/* Operações List */}
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bebas tracking-wide text-slate mb-6">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl md:text-3xl font-bebas tracking-wide text-gray-800 mb-4">
               OPERAÇÕES EM DESTAQUE
             </h2>
-            <div className="w-32 h-1.5 bg-navy-light mx-auto rounded-full"></div>
+            <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full"></div>
           </div>
 
-          <div className="grid gap-8">
+          <div className="grid gap-4">
             {operacoes.map((operacao) => (
               <Card
                 key={operacao.id}
-                className="border-gray-200 shadow-xl hover-lift border-2"
+                className="border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 border-2"
               >
-                <CardHeader className="pb-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardHeader className="pb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex-1">
-                      <CardTitle className="text-2xl flex items-center gap-3 mb-3 font-bebas tracking-wide">
+                      <CardTitle className="text-lg flex items-center gap-2 mb-2 font-bebas tracking-wide">
                         {operacao.titulo}
-                        <Badge className={getTipoBadge(operacao.tipo)}>
+                        <Badge
+                          className={`text-xs ${getTipoBadge(operacao.tipo)}`}
+                        >
                           {operacao.tipo}
                         </Badge>
                       </CardTitle>
-                      <div className="flex flex-wrap items-center gap-4 text-base text-gray-600 mt-2">
-                        <span className="flex items-center gap-2">
-                          <FaCalendar className="h-5 w-5" />
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <FaCalendar className="h-4 w-4" />
                           {new Date(operacao.data).toLocaleDateString("pt-BR", {
                             weekday: "long",
                             year: "numeric",
@@ -196,35 +192,37 @@ export default function OperacoesPage() {
                             day: "numeric",
                           })}
                         </span>
-                        <span className="flex items-center gap-2">
-                          <FaMapMarkerAlt className="h-5 w-5" />
+                        <span className="flex items-center gap-1">
+                          <FaMapMarkerAlt className="h-4 w-4" />
                           {operacao.local}
                         </span>
-                        <span className="flex items-center gap-2">
-                          <FaUsers className="h-5 w-5" />
+                        <span className="flex items-center gap-1">
+                          <FaUsers className="h-4 w-4" />
                           {operacao.equipe} agentes
                         </span>
                       </div>
                     </div>
                     <Badge
-                      className={`text-white text-lg py-2 px-4 ${getStatusBadge(operacao.status)}`}
+                      className={`text-white text-sm py-1 px-3 ${getStatusBadge(
+                        operacao.status
+                      )}`}
                     >
                       {operacao.status}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-600 text-lg leading-relaxed mb-6">
+                  <p className="text-gray-600 text-sm leading-relaxed mb-4">
                     {operacao.descricao}
                   </p>
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <span className="text-lg text-slate font-medium">
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <span className="text-sm text-gray-800 font-medium">
                       <strong>Resultado:</strong> {operacao.resultado}
                     </span>
                     <Button
                       variant="outline"
-                      size="lg"
-                      className="border-2 border-navy-light text-navy-light hover:bg-navy-light hover:text-white font-bold transition-all duration-300"
+                      size="sm"
+                      className="border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-semibold transition-all duration-300"
                     >
                       Ver Detalhes
                     </Button>
@@ -235,22 +233,22 @@ export default function OperacoesPage() {
           </div>
 
           {/* CTA */}
-          <div className="text-center mt-16">
-            <Card className="bg-gradient-to-r from-navy-light to-navy text-white shadow-2xl border-2 border-navy-light">
-              <CardContent className="p-12">
-                <h3 className="text-3xl md:text-4xl font-bold mb-4 font-bebas tracking-wide">
+          <div className="text-center mt-8">
+            <Card className="border-blue-600 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-xl border-2">
+              <CardContent className="p-8">
+                <h3 className="text-xl md:text-2xl font-bold mb-3 font-bebas tracking-wide">
                   PARTICIPE DAS OPERAÇÕES
                 </h3>
-                <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto leading-relaxed">
+                <p className="opacity-90 mb-4 max-w-2xl mx-auto leading-relaxed text-sm">
                   Junte-se à nossa equipe e faça parte das operações de proteção
                   e segurança. Sua contribuição pode fazer a diferença.
                 </p>
                 <Button
                   variant="secondary"
                   size="lg"
-                  className="bg-white text-navy-light hover:bg-offwhite font-bold py-4 px-12 text-lg transition-all duration-300 hover:scale-105 shadow-xl"
+                  className="bg-white text-blue-600 hover:bg-gray-100 font-semibold py-2 px-6 transition-all duration-300 hover:scale-105 shadow-xl"
                 >
-                  <FaUsers className="mr-3 h-5 w-5" />
+                  <FaUsers className="mr-2 h-4 w-4" />
                   Tornar-se Voluntário
                 </Button>
               </CardContent>
