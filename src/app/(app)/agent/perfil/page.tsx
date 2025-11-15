@@ -1,15 +1,16 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO COMPLETA CORRIGIDA
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO CENTRALIZADA E RESPONSIVA
 "use client";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import Image from "next/image";
 import {
   FaUser,
   FaIdCard,
-  FaShieldAlt,
   FaTint,
   FaCheckCircle,
   FaTimesCircle,
@@ -18,6 +19,9 @@ import {
   FaCamera,
   FaExclamationTriangle,
   FaSync,
+  FaArrowLeft,
+  FaShieldAlt,
+  FaChartBar,
 } from "react-icons/fa";
 
 interface ProfileData {
@@ -35,113 +39,29 @@ interface ProfileData {
   updated_at: string;
 }
 
-// Componente auxiliar para exibir informações
-const InfoItem = ({
-  label,
-  value,
-  icon: Icon,
-  isDate = false,
-}: {
-  label: string;
-  value: string;
-  icon?: any;
-  isDate?: boolean;
-}) => (
-  <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-    <div className="flex items-center space-x-2">
-      {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-      <span className="text-gray-600 font-medium">{label}:</span>
-    </div>
-    <span
-      className={`font-semibold ${
-        isDate && value !== "Não definida" ? "text-blue-600" : "text-gray-800"
-      }`}
-    >
-      {value}
-    </span>
-  </div>
-);
-
 export default function AgentPerfil() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
-      console.log("🔄 === INICIANDO BUSCA DO PERFIL ===");
-
       try {
         setError(null);
         setLoading(true);
 
-        // 🔥 SOLUÇÃO: Criar client Supabase diretamente e aguardar inicialização
-        let supabase;
-        let attempts = 0;
-        const maxAttempts = 3;
+        const supabase = createClient();
 
-        while (attempts < maxAttempts) {
-          try {
-            console.log(
-              `🔧 Tentativa ${attempts + 1} de inicializar Supabase...`
-            );
-            supabase = createClient();
-
-            // 🔥 AGUARDAR o client estar pronto
-            await new Promise((resolve) => setTimeout(resolve, 200));
-
-            // Testar se o client está funcionando
-            const {
-              data: { session },
-              error: sessionError,
-            } = await supabase.auth.getSession();
-
-            if (!sessionError) {
-              console.log("✅ Supabase inicializado com sucesso");
-              break;
-            } else {
-              console.log("❌ Erro na inicialização:", sessionError);
-            }
-          } catch (error) {
-            console.log(`❌ Tentativa ${attempts + 1} falhou:`, error);
-          }
-
-          attempts++;
-          if (attempts < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
-          }
-        }
-
-        if (!supabase) {
-          throw new Error("Não foi possível inicializar o cliente Supabase");
-        }
-
-        console.log("🔐 Verificando autenticação...");
-
-        // 1. Verificar usuário autenticado
         const {
           data: { user },
           error: userError,
         } = await supabase.auth.getUser();
 
-        console.log("👤 Resultado do usuário:", user);
-        console.log("❌ Erro do usuário:", userError);
-
-        if (userError) {
-          throw new Error(`Erro de autenticação: ${userError.message}`);
+        if (userError || !user) {
+          throw new Error("Nenhum usuário autenticado encontrado");
         }
-
-        if (!user) {
-          throw new Error(
-            "Nenhum usuário autenticado encontrado. Faça login novamente."
-          );
-        }
-
-        console.log("✅ Usuário autenticado:", user.id);
-
-        // 2. Buscar perfil com retry
-        console.log("🔍 Buscando perfil na tabela profiles...");
 
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
@@ -149,57 +69,28 @@ export default function AgentPerfil() {
           .eq("id", user.id)
           .single();
 
-        console.log("📊 Dados retornados:", profileData);
-        console.log("❌ Erro da query:", profileError);
-
         if (profileError) {
-          console.error("💥 Erro detalhado:", {
-            code: profileError.code,
-            message: profileError.message,
-            details: profileError.details,
-            hint: profileError.hint,
-          });
-
-          if (profileError.code === "PGRST116") {
-            throw new Error("Perfil não encontrado na base de dados.");
-          } else if (profileError.code === "42501") {
-            throw new Error("Permissão negada. Verifique as políticas RLS.");
-          } else {
-            throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
-          }
+          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
         }
 
-        if (!profileData) {
-          throw new Error("Perfil não encontrado (retorno vazio)");
-        }
-
-        console.log("🎉 PERFIL ENCONTRADO:", profileData.full_name);
         setProfile(profileData);
+
+        // VERIFICAÇÃO ROBUSTA DE ADMIN
+        const userRole = profileData.role?.toLowerCase().trim();
+        setIsAdmin(userRole === "admin");
       } catch (err: any) {
-        console.error("💥 ERRO NO PROCESSO:", err);
+        console.error("Erro ao carregar perfil:", err);
         setError(err.message);
       } finally {
-        console.log("🏁 Finalizando processo de busca");
         setLoading(false);
       }
     };
 
     fetchProfile();
-  }, [retryCount]); // Recarregar quando retryCount mudar
+  }, [retryCount]);
 
   const handleRetry = () => {
-    console.log("🔄 Tentando novamente...");
     setRetryCount((prev) => prev + 1);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      window.location.href = "/login";
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
-    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -207,272 +98,298 @@ export default function AgentPerfil() {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
-  const getStatusInfo = (status: boolean) => {
-    return {
-      text: status ? "Ativo" : "Inativo",
-      color: status ? "bg-green-500" : "bg-red-500",
-      icon: status ? FaCheckCircle : FaTimesCircle,
-    };
-  };
+  // Componente de Layout Base
+  const BaseLayout = ({ children }: { children: React.ReactNode }) => (
+    <div className="min-h-screen bg-navy-dark relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 bg-navy-dark z-0"></div>
 
-  const getRoleInfo = (role: string) => {
-    return {
-      text: role === "admin" ? "Administrador" : "Agente",
-      color: role === "admin" ? "bg-purple-500" : "bg-blue-500",
-    };
-  };
-
-  // Estados de renderização
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-            <div className="text-center mb-6">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-light mx-auto mb-4"></div>
-              <h2 className="text-xl font-semibold text-gray-800">
-                Carregando perfil...
-              </h2>
-              <p className="text-gray-600 mt-2">Inicializando sistema</p>
-            </div>
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-20 bg-gray-200 rounded"></div>
-                ))}
-              </div>
-            </div>
-          </div>
+      {/* Marca d'água */}
+      <div className="absolute inset-0 opacity-20 flex items-center justify-center z-10">
+        <div className="w-full max-w-4xl aspect-square relative">
+          <Image
+            src="/images/logos/logo-pattern.svg"
+            alt="Marca d'água"
+            fill
+            className="object-contain"
+            priority
+          />
         </div>
       </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
-            <FaExclamationTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Erro ao carregar perfil
-            </h2>
-            <p className="text-gray-600 mb-6">{error}</p>
-
-            <div className="space-y-4">
-              <Button
-                onClick={handleRetry}
-                className="bg-navy-light hover:bg-navy text-white"
-              >
-                <FaSync className="w-4 h-4 mr-2" />
-                Tentar Novamente
-              </Button>
-
-              <Button
-                onClick={handleSignOut}
-                variant="outline"
-                className="ml-2 border-red-300 text-red-600 hover:bg-red-50"
-              >
-                Fazer Login Novamente
-              </Button>
-            </div>
-
-            <div className="mt-6 text-sm text-gray-500">
-              <p>
-                Se o problema persistir, entre em contato com o administrador.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
-            <FaTimesCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Perfil Não Encontrado
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Não foi possível carregar os dados do seu perfil.
-            </p>
-            <Button
-              onClick={handleRetry}
-              className="bg-navy-light hover:bg-navy text-white"
-            >
-              <FaSync className="w-4 h-4 mr-2" />
-              Tentar Novamente
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ✅ RENDERIZAÇÃO DO PERFIL
-  console.log("🎨 Renderizando perfil:", profile.full_name);
-
-  const statusInfo = getStatusInfo(profile.status);
-  const roleInfo = getRoleInfo(profile.role);
-  const StatusIcon = statusInfo.icon;
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
-      <div className="container mx-auto px-4 py-8">
-        {/* Banner de sucesso */}
-        <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg">
-          <p className="text-green-800 text-sm font-medium">
-            ✅ Perfil carregado com sucesso:{" "}
-            <strong>{profile.full_name}</strong> - {profile.matricula}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-          {/* Cabeçalho do Perfil */}
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-6 border-b border-gray-200">
-            <div className="flex items-center space-x-6 mb-4 md:mb-0">
-              <div className="relative">
-                <div className="w-24 h-24 bg-navy-light rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt="Foto de perfil"
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <FaUser className="w-10 h-10" />
-                  )}
-                </div>
-                <button className="absolute bottom-0 right-0 bg-navy-light text-white p-2 rounded-full hover:bg-navy transition-colors">
-                  <FaCamera className="w-4 h-4" />
-                </button>
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  {profile.full_name}
-                </h1>
-                <div className="flex flex-wrap gap-2">
-                  <Badge className={`${roleInfo.color} text-white`}>
-                    {roleInfo.text}
-                  </Badge>
-                  <Badge
-                    className={`${statusInfo.color} text-white flex items-center gap-1`}
-                  >
-                    <StatusIcon className="w-3 h-3" />
-                    {statusInfo.text}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            <Button className="bg-navy-light hover:bg-navy text-white">
-              <FaEdit className="w-4 h-4 mr-2" />
-              Editar Perfil
-            </Button>
-          </div>
-
-          {/* Grid de Informações */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Informações Pessoais */}
-            <Card className="border-0 shadow-md">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center text-lg">
-                  <FaUser className="w-5 h-5 text-navy-light mr-2" />
-                  Informações Pessoais
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <InfoItem label="Nome Completo" value={profile.full_name} />
-                <InfoItem label="Email" value={profile.email} />
-                <InfoItem
-                  label="Tipo Sanguíneo"
-                  value={profile.tipo_sanguineo || "Não definido"}
-                  icon={FaTint}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Informações de Serviço */}
-            <Card className="border-0 shadow-md">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center text-lg">
-                  <FaShieldAlt className="w-5 h-5 text-navy-light mr-2" />
-                  Informações de Serviço
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <InfoItem
-                  label="Matrícula"
-                  value={profile.matricula}
-                  icon={FaIdCard}
-                />
-                <InfoItem
-                  label="Graduação"
-                  value={profile.graduacao || "Não definida"}
-                />
-                <InfoItem
-                  label="Validade da Certificação"
-                  value={formatDate(profile.validade_certificacao)}
-                  icon={FaCalendarAlt}
-                  isDate={true}
-                />
-              </CardContent>
-            </Card>
-
-            {/* Status do Sistema */}
-            <Card className="border-0 shadow-md md:col-span-2">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center text-lg">
-                  <FaCheckCircle className="w-5 h-5 text-navy-light mr-2" />
-                  Status do Sistema
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg">
-                    <FaCheckCircle className="w-6 h-6 text-green-600 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        Conta Verificada
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Sistema autenticado
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg">
-                    <StatusIcon
-                      className={`w-6 h-6 ${
-                        profile.status ? "text-green-600" : "text-red-600"
-                      } flex-shrink-0`}
-                    />
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        Status do Agente
-                      </p>
-                      <p className="text-sm text-gray-600">{statusInfo.text}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3 p-4 bg-purple-50 rounded-lg">
-                    <FaShieldAlt className="w-6 h-6 text-purple-600 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold text-gray-800">
-                        Nível de Acesso
-                      </p>
-                      <p className="text-sm text-gray-600">{roleInfo.text}</p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+      {children}
     </div>
   );
+
+  // Componente de Loading
+  const LoadingState = () => (
+    <BaseLayout>
+      <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-light mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-800">
+            Carregando perfil...
+          </h2>
+        </div>
+      </div>
+    </BaseLayout>
+  );
+
+  // Componente de Erro
+  const ErrorState = () => (
+    <BaseLayout>
+      <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+          <FaExclamationTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            {error ? "Erro ao carregar perfil" : "Perfil Não Encontrado"}
+          </h2>
+          <p className="text-gray-600 mb-6">
+            {error || "Não foi possível carregar os dados do perfil."}
+          </p>
+          <Button
+            onClick={handleRetry}
+            className="bg-navy-light hover:bg-navy text-white w-full sm:w-auto"
+          >
+            <FaSync className="w-4 h-4 mr-2" />
+            Tentar Novamente
+          </Button>
+        </div>
+      </div>
+    </BaseLayout>
+  );
+
+  // Componente Principal do Perfil
+  const ProfileContent = () => (
+    <BaseLayout>
+      <div className="min-h-screen flex items-center justify-center p-4 relative z-20">
+        <div className="w-full max-w-6xl">
+          {/* Header */}
+          <div className="flex flex-col items-center mb-8">
+            {/* Logo, Título e Bandeira */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 mb-6 w-full">
+              {/* Logo */}
+              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-white rounded-full shadow-lg overflow-hidden flex-shrink-0">
+                <Image
+                  src="/images/logos/logo.webp"
+                  alt="Patrulha Aérea Civil"
+                  width={96}
+                  height={96}
+                  className="w-full h-full object-cover"
+                  priority
+                />
+              </div>
+
+              {/* Títulos - Centralizado */}
+              <div className="text-center flex-1 max-w-2xl">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white font-bebas tracking-wide uppercase">
+                  Patrulha Aérea Civil
+                </h1>
+                <p className="text-white/90 text-base sm:text-lg lg:text-xl font-roboto mt-1">
+                  Comando Integrado do Estado do Rio de Janeiro
+                </p>
+              </div>
+
+              {/* Bandeira do Brasil */}
+              <div className="w-16 h-12 sm:w-20 sm:h-15 lg:w-24 lg:h-18 border-2 border-white rounded shadow-lg flex-shrink-0">
+                <Image
+                  src="/images/logos/flag-br.webp"
+                  alt="Bandeira do Brasil"
+                  width={96}
+                  height={72}
+                  className="w-full h-full object-cover rounded"
+                  priority
+                />
+              </div>
+            </div>
+
+            {/* Título "Informações do Patrulheiro" */}
+            <div className="text-center w-full max-w-2xl">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-bebas tracking-wide uppercase border-b-2 border-white pb-2">
+                Informações do Patrulheiro
+              </h2>
+            </div>
+          </div>
+
+          {/* Card do Perfil */}
+          <div className="flex justify-center">
+            <Card className="bg-white rounded-2xl shadow-2xl overflow-hidden h-[75vh] w-full max-w-4xl border-0">
+              <CardContent className="p-4 sm:p-6 lg:p-8">
+                {/* Layout Principal */}
+                <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-center lg:items-start">
+                  {/* Lado Esquerdo - Informações Textuais */}
+                  <div className="flex-1 w-full space-y-4 sm:space-y-6 text-center lg:text-left">
+                    {/* Nome */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        Nome Completo
+                      </label>
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 leading-tight break-words">
+                        {profile!.full_name}
+                      </h1>
+                    </div>
+
+                    {/* Graduação */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        Graduação
+                      </label>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-red-600 uppercase break-words">
+                        {profile!.graduacao
+                          ? `${profile!.graduacao.toUpperCase()} - PAC`
+                          : "NÃO DEFINIDO - PAC"}
+                      </p>
+                    </div>
+
+                    {/* Matrícula */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        Matrícula
+                      </label>
+                      <div className="flex items-center justify-center lg:justify-start space-x-2">
+                        <FaIdCard className="w-5 h-5 sm:w-6 sm:h-6 text-navy-light flex-shrink-0" />
+                        <p className="text-lg sm:text-xl lg:text-2xl font-mono font-bold text-gray-700 break-all">
+                          {profile!.matricula} RJ
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Validade da Certificação */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        Validade da Certificação
+                      </label>
+                      <div className="flex items-center justify-center lg:justify-start space-x-2">
+                        <FaCalendarAlt className="w-5 h-5 sm:w-6 sm:h-6 text-navy-light flex-shrink-0" />
+                        <p className="text-lg sm:text-xl lg:text-2xl font-semibold text-gray-700">
+                          {formatDate(profile!.validade_certificacao)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Divisor Vertical - Apenas em desktop */}
+                  <div className="hidden lg:block w-px h-80 bg-gray-300"></div>
+
+                  {/* Lado Direito - Foto e Tipo Sanguíneo */}
+                  <div className="flex-1 w-full space-y-6 flex flex-col items-center">
+                    {/* Foto de Perfil 3x4 */}
+                    <div className="space-y-3 w-full max-w-xs">
+                      <label className="text-sm font-medium text-gray-500 uppercase tracking-wide block text-center">
+                        Foto de Identificação
+                      </label>
+                      <div className="flex justify-center">
+                        <div className="relative">
+                          <div className="w-48 h-60 sm:w-56 sm:h-72 bg-gray-200 rounded-xl border-4 border-navy-light shadow-2xl flex items-center justify-center overflow-hidden">
+                            {profile!.avatar_url ? (
+                              <img
+                                src={profile!.avatar_url}
+                                alt="Foto de perfil"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <FaUser className="w-20 h-20 sm:w-24 sm:h-24 text-gray-400" />
+                            )}
+                          </div>
+                          <button className="absolute -bottom-2 -right-2 bg-navy-light text-white p-2 sm:p-3 rounded-full hover:bg-navy transition-colors shadow-xl border-2 border-white">
+                            <FaCamera className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tipo Sanguíneo */}
+                    <div className="space-y-2 text-center w-full">
+                      <label className="text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        Tipo Sanguíneo
+                      </label>
+                      <div className="flex justify-center items-center space-x-2">
+                        <FaTint className="w-6 h-6 sm:w-7 sm:h-7 text-red-600 flex-shrink-0" />
+                        <p className="text-2xl sm:text-3xl font-bold text-red-600">
+                          {profile!.tipo_sanguineo || "N/D"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Divisor Horizontal */}
+                <div className="my-6 lg:my-8 border-t border-gray-200"></div>
+
+                {/* Status e Botões */}
+                <div className="flex flex-col items-center space-y-6">
+                  {/* Status do Agente */}
+                  <div className="text-center">
+                    <label className="text-sm font-medium text-gray-500 uppercase tracking-wide block mb-2">
+                      Situação do Agente
+                    </label>
+                    <Badge
+                      className={`
+                        text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 font-bold rounded-lg
+                        ${
+                          profile!.status
+                            ? "bg-green-500 text-white hover:bg-green-600"
+                            : "bg-red-500 text-white hover:bg-red-600"
+                        }
+                        transition-all duration-300 transform hover:scale-105
+                        shadow-lg min-w-[140px] text-center
+                      `}
+                    >
+                      <div className="flex items-center justify-center space-x-2">
+                        {profile!.status ? (
+                          <FaCheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                        ) : (
+                          <FaTimesCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                        )}
+                        <span className="text-sm sm:text-base">
+                          {profile!.status ? "ATIVO" : "INATIVO"}
+                        </span>
+                      </div>
+                    </Badge>
+                  </div>
+
+                  {/* Botões de Ação */}
+                  <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
+                    {/* Botão de Editar */}
+                    <Button className="bg-navy-light hover:bg-navy text-white px-6 py-3 text-base font-semibold shadow-md w-full sm:w-auto">
+                      <FaEdit className="w-4 h-4 mr-2" />
+                      Editar Perfil
+                    </Button>
+
+                    {/* Botões de Navegação */}
+                    <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                      {/* Link "Voltar ao Site" */}
+                      <Link
+                        href="/"
+                        className="flex items-center justify-center gap-2 text-navy-light hover:bg-navy-light hover:text-white transition-colors duration-300 font-medium px-4 py-3 border border-navy-light rounded-lg text-sm w-full sm:w-auto text-center"
+                      >
+                        <FaArrowLeft className="w-4 h-4" />
+                        Voltar ao Site
+                      </Link>
+
+                      {/* Botão "Ir ao Dashboard" para Admin */}
+                      {isAdmin && (
+                        <Link
+                          href="/admin/dashboard"
+                          className="flex items-center justify-center gap-2 bg-navy-light text-white hover:bg-navy transition-colors duration-300 font-medium px-4 py-3 border border-navy-light rounded-lg hover:shadow-md text-sm w-full sm:w-auto text-center"
+                        >
+                          <FaChartBar className="w-4 h-4" />
+                          Dashboard
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    </BaseLayout>
+  );
+
+  // Renderização condicional
+  if (loading) return <LoadingState />;
+  if (error || !profile) return <ErrorState />;
+  return <ProfileContent />;
 }

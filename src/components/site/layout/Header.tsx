@@ -1,3 +1,4 @@
+// src/components/site/layout/Header.tsx - VERSÃO OTIMIZADA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -18,7 +19,7 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/hooks/useAuth"; // ✅ USANDO HOOK UNIFICADO
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -55,68 +56,6 @@ const SOCIAL_ICONS = [
     hoverColor: "hover:bg-green-600",
   },
 ];
-
-// Hook de autenticação simplificado
-const useAuth = () => {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
-  useEffect(() => {
-    const getAuthData = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        setUser(user);
-
-        if (user) {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .single();
-          setProfile(profileData);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar dados de autenticação:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    getAuthData();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-        setProfile(profileData);
-      } else {
-        setProfile(null);
-      }
-
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    window.location.href = "/";
-  };
-
-  return { user, profile, loading, signOut };
-};
 
 const useScrollDetection = (threshold = 30) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -275,10 +214,9 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// Botão de Área do Agente/Admin atualizado
-// Botão de Área do Agente/Admin atualizado - VERSÃO CORRIGIDA
+// ✅ COMPONENTE USER MENU OTIMIZADO - USANDO HOOK UNIFICADO
 const UserMenuButton = () => {
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut, isAdmin } = useAuth(); // ✅ Hook unificado
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const pathname = usePathname();
 
@@ -343,7 +281,7 @@ const UserMenuButton = () => {
                     : user.email}
                 </p>
                 <p className="text-xs text-navy-light font-medium capitalize">
-                  {profile?.role === "admin" ? "Administrador" : "Agente"}
+                  {isAdmin ? "Administrador" : "Agente"}
                 </p>
               </div>
             </div>
@@ -364,7 +302,7 @@ const UserMenuButton = () => {
             )}
 
             {/* Para admin: Painel Admin (sempre visível) */}
-            {profile?.role === "admin" && (
+            {isAdmin && (
               <Link
                 href="/admin/dashboard"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
@@ -376,7 +314,7 @@ const UserMenuButton = () => {
             )}
 
             {/* Para agente: Meu Perfil (apenas se não estiver mostrando "Voltar ao Perfil") */}
-            {profile?.role !== "admin" && isOnProfilePage && (
+            {!isAdmin && isOnProfilePage && (
               <Link
                 href="/agent/perfil"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
@@ -388,11 +326,7 @@ const UserMenuButton = () => {
             )}
 
             <Link
-              href={
-                profile?.role === "admin"
-                  ? "/admin/configuracoes"
-                  : "/agent/configuracoes"
-              }
+              href={isAdmin ? "/admin/configuracoes" : "/agent/configuracoes"}
               className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
               onClick={() => setIsDropdownOpen(false)}
             >
@@ -434,7 +368,7 @@ const MobileMenu = ({
   onClose: () => void;
   pathname: string;
 }) => {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isAdmin } = useAuth(); // ✅ Hook unificado
   const isOnProfilePage = pathname === "/agent/perfil";
 
   if (!isOpen) return null;
@@ -472,7 +406,7 @@ const MobileMenu = ({
                       {profile?.full_name || "Agente PAC"}
                     </p>
                     <p className="text-xs text-gray-600">
-                      {profile?.role === "admin" ? "Administrador" : "Agente"}
+                      {isAdmin ? "Administrador" : "Agente"}
                     </p>
                   </div>
                 </div>
@@ -491,7 +425,7 @@ const MobileMenu = ({
               )}
 
               {/* Para admin: Painel Admin */}
-              {profile?.role === "admin" && (
+              {isAdmin && (
                 <Link
                   href="/admin/dashboard"
                   className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
@@ -502,7 +436,7 @@ const MobileMenu = ({
               )}
 
               {/* Para agente: Meu Perfil (apenas se não estiver mostrando "Voltar ao Perfil") */}
-              {profile?.role !== "admin" && isOnProfilePage && (
+              {!isAdmin && isOnProfilePage && (
                 <Link
                   href="/agent/perfil"
                   className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"

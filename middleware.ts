@@ -3,6 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  console.log("🛡️ Middleware: Processando rota", request.nextUrl.pathname);
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -30,43 +32,129 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    // Verificar autenticação
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  // 🛡️ PROTEÇÃO DAS ROTAS DE ADMINISTRADOR
-  if (request.nextUrl.pathname.startsWith("/admin")) {
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
+    if (authError) {
+      console.error("❌ Middleware: Erro de autenticação:", authError);
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
+    console.log("👤 Middleware: Usuário encontrado:", user?.id);
 
-    if (profile?.role !== "admin") {
+    // 🛡️ PROTEÇÃO DAS ROTAS DE ADMINISTRADOR
+    if (request.nextUrl.pathname.startsWith("/admin")) {
+      console.log("🛡️ Middleware: Protegendo rota admin...");
+
+      if (!user) {
+        console.log(
+          "❌ Middleware: Usuário não autenticado, redirecionando para login"
+        );
+        const redirectUrl = new URL("/login", request.url);
+        redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      // Verificar perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, status")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) {
+        console.error("❌ Middleware: Erro ao buscar perfil:", profileError);
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+
+      console.log(
+        "📊 Middleware: Perfil encontrado - Role:",
+        profile?.role,
+        "Status:",
+        profile?.status
+      );
+
+      if (profile?.role !== "admin") {
+        console.log("🚫 Middleware: Acesso negado - usuário não é admin");
+        return NextResponse.redirect(new URL("/agent/perfil", request.url));
+      }
+
+      if (!profile?.status) {
+        console.log("🚫 Middleware: Acesso negado - conta inativa");
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+
+      console.log("✅ Middleware: Acesso admin permitido");
+    }
+
+    // 🛡️ PROTEÇÃO DAS ROTAS DE AGENTE
+    if (request.nextUrl.pathname.startsWith("/agent")) {
+      console.log("🛡️ Middleware: Protegendo rota agent...");
+
+      if (!user) {
+        console.log(
+          "❌ Middleware: Usuário não autenticado, redirecionando para login"
+        );
+        const redirectUrl = new URL("/login", request.url);
+        redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      // Verificar perfil do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, status")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError) {
+        console.error("❌ Middleware: Erro ao buscar perfil:", profileError);
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+
+      if (!profile?.status) {
+        console.log("🚫 Middleware: Acesso negado - conta inativa");
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+
+      console.log("✅ Middleware: Acesso agent permitido");
+    }
+
+    // 🔄 REDIRECIONAMENTO PARA LOGIN
+    if (request.nextUrl.pathname === "/login" && user) {
+      console.log(
+        "🔄 Middleware: Usuário logado acessando login, redirecionando..."
+      );
+
+      // Buscar perfil para redirecionamento correto
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      // ✅ SEMPRE redirecionar para /agent/perfil (consistente com o Header)
       return NextResponse.redirect(new URL("/agent/perfil", request.url));
     }
-  }
 
-  // 🛡️ PROTEÇÃO DAS ROTAS DE AGENTE
-  if (request.nextUrl.pathname.startsWith("/agent")) {
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
+    // 🔄 REDIRECIONAMENTO DE ROTA RAIZ
+    if (request.nextUrl.pathname === "/" && user) {
+      console.log(
+        "🔄 Middleware: Usuário logado acessando raiz, redirecionando para perfil..."
+      );
+      return NextResponse.redirect(new URL("/agent/perfil", request.url));
     }
+  } catch (error) {
+    console.error("💥 Middleware: Erro inesperado:", error);
   }
 
-  // 🔄 REDIRECIONAMENTO CORRIGIDO - AMBOS VÃO PARA /agent/perfil
-  if (request.nextUrl.pathname === "/login" && user) {
-    // ✅ AMBOS admin e user vão para a MESMA página
-    return NextResponse.redirect(new URL("/agent/perfil", request.url));
-  }
-
+  console.log("✅ Middleware: Processamento concluído");
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/agent/:path*", "/login"],
+  matcher: ["/admin/:path*", "/agent/:path*", "/login", "/"],
 };
