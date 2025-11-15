@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO DEBUG COMPLETO
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO COMPLETA CORRIGIDA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -35,6 +35,7 @@ interface ProfileData {
   updated_at: string;
 }
 
+// Componente auxiliar para exibir informações
 const InfoItem = ({
   label,
   value,
@@ -65,15 +66,60 @@ export default function AgentPerfil() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const fetchProfile = async () => {
-      try {
-        console.log("🔄 === INICIANDO BUSCA DO PERFIL ===");
+      console.log("🔄 === INICIANDO BUSCA DO PERFIL ===");
 
-        // 1. Verificar autenticação
+      try {
+        setError(null);
+        setLoading(true);
+
+        // 🔥 SOLUÇÃO: Criar client Supabase diretamente e aguardar inicialização
+        let supabase;
+        let attempts = 0;
+        const maxAttempts = 3;
+
+        while (attempts < maxAttempts) {
+          try {
+            console.log(
+              `🔧 Tentativa ${attempts + 1} de inicializar Supabase...`
+            );
+            supabase = createClient();
+
+            // 🔥 AGUARDAR o client estar pronto
+            await new Promise((resolve) => setTimeout(resolve, 200));
+
+            // Testar se o client está funcionando
+            const {
+              data: { session },
+              error: sessionError,
+            } = await supabase.auth.getSession();
+
+            if (!sessionError) {
+              console.log("✅ Supabase inicializado com sucesso");
+              break;
+            } else {
+              console.log("❌ Erro na inicialização:", sessionError);
+            }
+          } catch (error) {
+            console.log(`❌ Tentativa ${attempts + 1} falhou:`, error);
+          }
+
+          attempts++;
+          if (attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+        }
+
+        if (!supabase) {
+          throw new Error("Não foi possível inicializar o cliente Supabase");
+        }
+
         console.log("🔐 Verificando autenticação...");
+
+        // 1. Verificar usuário autenticado
         const {
           data: { user },
           error: userError,
@@ -87,13 +133,16 @@ export default function AgentPerfil() {
         }
 
         if (!user) {
-          throw new Error("Nenhum usuário autenticado encontrado");
+          throw new Error(
+            "Nenhum usuário autenticado encontrado. Faça login novamente."
+          );
         }
 
-        console.log("✅ Usuário autenticado:", user.id, user.email);
+        console.log("✅ Usuário autenticado:", user.id);
 
-        // 2. Buscar perfil
+        // 2. Buscar perfil com retry
         console.log("🔍 Buscando perfil na tabela profiles...");
+
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("*")
@@ -112,9 +161,9 @@ export default function AgentPerfil() {
           });
 
           if (profileError.code === "PGRST116") {
-            throw new Error(
-              "Perfil não encontrado na base de dados. O usuário existe no auth mas não na tabela profiles."
-            );
+            throw new Error("Perfil não encontrado na base de dados.");
+          } else if (profileError.code === "42501") {
+            throw new Error("Permissão negada. Verifique as políticas RLS.");
           } else {
             throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
           }
@@ -136,28 +185,22 @@ export default function AgentPerfil() {
     };
 
     fetchProfile();
-  }, [supabase]);
+  }, [retryCount]); // Recarregar quando retryCount mudar
 
-  // Teste alternativo - buscar todos os perfis
-  useEffect(() => {
-    const testAllProfiles = async () => {
-      try {
-        const { data: allProfiles, error } = await supabase
-          .from("profiles")
-          .select("id, matricula, full_name")
-          .limit(5);
+  const handleRetry = () => {
+    console.log("🔄 Tentando novamente...");
+    setRetryCount((prev) => prev + 1);
+  };
 
-        console.log("📋 TODOS OS PERFIS (primeiros 5):", allProfiles);
-        console.log("❌ Erro todos perfis:", error);
-      } catch (err) {
-        console.error("Erro ao buscar todos perfis:", err);
-      }
-    };
-
-    if (error) {
-      testAllProfiles();
+  const handleSignOut = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
     }
-  }, [error, supabase]);
+  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Não definida";
@@ -179,19 +222,27 @@ export default function AgentPerfil() {
     };
   };
 
+  // Estados de renderização
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
         <div className="container mx-auto px-4 py-8">
           <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-            <div className="text-center">
+            <div className="text-center mb-6">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-light mx-auto mb-4"></div>
               <h2 className="text-xl font-semibold text-gray-800">
                 Carregando perfil...
               </h2>
-              <p className="text-gray-600 mt-2">
-                Verificando autenticação e dados
-              </p>
+              <p className="text-gray-600 mt-2">Inicializando sistema</p>
+            </div>
+            <div className="animate-pulse">
+              <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-20 bg-gray-200 rounded"></div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -208,41 +259,29 @@ export default function AgentPerfil() {
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
               Erro ao carregar perfil
             </h2>
-            <p className="text-gray-600 mb-4">{error}</p>
+            <p className="text-gray-600 mb-6">{error}</p>
 
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
-              <h3 className="font-semibold text-yellow-800 mb-2">
-                Informações para diagnóstico:
-              </h3>
-              <ul className="text-sm text-yellow-700 list-disc list-inside space-y-1">
-                <li>Verifique se o perfil existe na tabela profiles</li>
-                <li>
-                  Confirme que o ID do usuário auth corresponde ao ID do profile
-                </li>
-                <li>Verifique as políticas RLS no Supabase</li>
-              </ul>
-            </div>
-
-            <div className="space-y-3">
+            <div className="space-y-4">
               <Button
-                onClick={() => window.location.reload()}
+                onClick={handleRetry}
                 className="bg-navy-light hover:bg-navy text-white"
               >
                 <FaSync className="w-4 h-4 mr-2" />
                 Tentar Novamente
               </Button>
+
               <Button
-                onClick={() => (window.location.href = "/login")}
+                onClick={handleSignOut}
                 variant="outline"
-                className="ml-2"
+                className="ml-2 border-red-300 text-red-600 hover:bg-red-50"
               >
                 Fazer Login Novamente
               </Button>
             </div>
 
-            <div className="mt-6 text-xs text-gray-500">
+            <div className="mt-6 text-sm text-gray-500">
               <p>
-                Abra o console do navegador (F12) para mais detalhes técnicos.
+                Se o problema persistir, entre em contato com o administrador.
               </p>
             </div>
           </div>
@@ -261,11 +300,10 @@ export default function AgentPerfil() {
               Perfil Não Encontrado
             </h2>
             <p className="text-gray-600 mb-6">
-              O usuário foi autenticado, mas não há um perfil correspondente na
-              base de dados.
+              Não foi possível carregar os dados do seu perfil.
             </p>
             <Button
-              onClick={() => window.location.reload()}
+              onClick={handleRetry}
               className="bg-navy-light hover:bg-navy text-white"
             >
               <FaSync className="w-4 h-4 mr-2" />
@@ -287,15 +325,16 @@ export default function AgentPerfil() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
       <div className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-          {/* Banner de sucesso */}
-          <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg">
-            <p className="text-green-800 text-sm font-medium">
-              ✅ Perfil carregado com sucesso:{" "}
-              <strong>{profile.full_name}</strong> - {profile.matricula}
-            </p>
-          </div>
+        {/* Banner de sucesso */}
+        <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg">
+          <p className="text-green-800 text-sm font-medium">
+            ✅ Perfil carregado com sucesso:{" "}
+            <strong>{profile.full_name}</strong> - {profile.matricula}
+          </p>
+        </div>
 
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
+          {/* Cabeçalho do Perfil */}
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-6 border-b border-gray-200">
             <div className="flex items-center space-x-6 mb-4 md:mb-0">
               <div className="relative">
@@ -337,7 +376,9 @@ export default function AgentPerfil() {
             </Button>
           </div>
 
+          {/* Grid de Informações */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Informações Pessoais */}
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center text-lg">
@@ -356,6 +397,7 @@ export default function AgentPerfil() {
               </CardContent>
             </Card>
 
+            {/* Informações de Serviço */}
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center text-lg">
@@ -382,6 +424,7 @@ export default function AgentPerfil() {
               </CardContent>
             </Card>
 
+            {/* Status do Sistema */}
             <Card className="border-0 shadow-md md:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center text-lg">
