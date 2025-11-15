@@ -15,6 +15,7 @@ import {
   FaSignOutAlt,
   FaCog,
   FaChartBar,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { createClient } from "@/lib/supabase/client";
@@ -275,9 +276,16 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
 );
 
 // Botão de Área do Agente/Admin atualizado
+// Botão de Área do Agente/Admin atualizado - VERSÃO CORRIGIDA
 const UserMenuButton = () => {
   const { user, profile, loading, signOut } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Verifica se está na página de perfil
+  const isOnProfilePage = pathname === "/agent/perfil";
+  // Verifica se está no dashboard admin
+  const isOnAdminDashboard = pathname === "/admin/dashboard";
 
   if (loading) {
     return (
@@ -343,7 +351,20 @@ const UserMenuButton = () => {
 
           {/* Links do Dropdown */}
           <div className="p-2">
-            {profile?.role === "admin" ? (
+            {/* Opção "Voltar ao Perfil" - aparece apenas se NÃO estiver na página de perfil */}
+            {!isOnProfilePage && (
+              <Link
+                href="/agent/perfil" // SEMPRE vai para o perfil
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                onClick={() => setIsDropdownOpen(false)}
+              >
+                <FaArrowLeft className="w-4 h-4 text-navy-light" />
+                Voltar ao Perfil
+              </Link>
+            )}
+
+            {/* Para admin: Painel Admin (sempre visível) */}
+            {profile?.role === "admin" && (
               <Link
                 href="/admin/dashboard"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
@@ -352,7 +373,10 @@ const UserMenuButton = () => {
                 <FaChartBar className="w-4 h-4 text-navy-light" />
                 Painel Admin
               </Link>
-            ) : (
+            )}
+
+            {/* Para agente: Meu Perfil (apenas se não estiver mostrando "Voltar ao Perfil") */}
+            {profile?.role !== "admin" && isOnProfilePage && (
               <Link
                 href="/agent/perfil"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
@@ -411,6 +435,7 @@ const MobileMenu = ({
   pathname: string;
 }) => {
   const { user, profile, signOut } = useAuth();
+  const isOnProfilePage = pathname === "/agent/perfil";
 
   if (!isOpen) return null;
 
@@ -453,7 +478,20 @@ const MobileMenu = ({
                 </div>
               </div>
 
-              {profile?.role === "admin" ? (
+              {/* Opção "Voltar ao Perfil" no mobile - SEMPRE vai para /agent/perfil */}
+              {!isOnProfilePage && (
+                <Link
+                  href="/agent/perfil"
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
+                  onClick={onClose}
+                >
+                  <FaArrowLeft className="w-4 h-4" />
+                  Voltar ao Perfil
+                </Link>
+              )}
+
+              {/* Para admin: Painel Admin */}
+              {profile?.role === "admin" && (
                 <Link
                   href="/admin/dashboard"
                   className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
@@ -461,7 +499,10 @@ const MobileMenu = ({
                 >
                   Painel Administrativo
                 </Link>
-              ) : (
+              )}
+
+              {/* Para agente: Meu Perfil (apenas se não estiver mostrando "Voltar ao Perfil") */}
+              {profile?.role !== "admin" && isOnProfilePage && (
                 <Link
                   href="/agent/perfil"
                   className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
