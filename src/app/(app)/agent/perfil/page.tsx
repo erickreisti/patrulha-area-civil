@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO FUNCIONAL
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,6 +16,8 @@ import {
   FaCalendarAlt,
   FaEdit,
   FaCamera,
+  FaExclamationTriangle,
+  FaSync,
 } from "react-icons/fa";
 
 interface ProfileData {
@@ -62,6 +64,7 @@ const InfoItem = ({
 export default function AgentPerfil() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -71,32 +74,41 @@ export default function AgentPerfil() {
 
         const {
           data: { user },
+          error: userError,
         } = await supabase.auth.getUser();
 
-        if (!user) {
-          console.log("❌ Nenhum usuário encontrado");
-          setLoading(false);
-          return;
+        if (userError) {
+          throw new Error(`Erro de autenticação: ${userError.message}`);
         }
 
-        console.log("👤 Usuário:", user.id);
+        if (!user) {
+          throw new Error("Nenhum usuário autenticado");
+        }
 
-        const { data: profileData, error } = await supabase
+        console.log("👤 Usuário encontrado:", user.id);
+
+        const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
           .single();
 
-        console.log("📊 Resultado:", profileData);
-        console.log("❌ Erro:", error);
+        console.log("📊 Dados do perfil:", profileData);
+        console.log("❌ Erro do perfil:", profileError);
 
-        if (error) {
-          console.error("Erro ao buscar perfil:", error);
-        } else {
-          setProfile(profileData);
+        if (profileError) {
+          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
         }
-      } catch (error) {
-        console.error("Erro inesperado:", error);
+
+        if (!profileData) {
+          throw new Error("Perfil não encontrado na base de dados");
+        }
+
+        setProfile(profileData);
+        console.log("✅ Perfil definido no estado");
+      } catch (err: any) {
+        console.error("💥 Erro:", err);
+        setError(err.message);
       } finally {
         setLoading(false);
         console.log("🏁 Loading finalizado");
@@ -106,15 +118,16 @@ export default function AgentPerfil() {
     fetchProfile();
   }, [supabase]);
 
-  // 🔥 SIMULAÇÃO - Forçar renderização dos dados após 2 segundos
+  // Fallback para garantir que loading seja false
   useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => {
+    const timer = setTimeout(() => {
+      if (loading) {
         console.log("⏰ Fallback: Forçando fim do loading");
         setLoading(false);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
   }, [loading]);
 
   const formatDate = (dateString: string | null) => {
@@ -137,10 +150,8 @@ export default function AgentPerfil() {
     };
   };
 
-  // ⚠️ MOSTRAR DADOS MESMO SE loading for true (após timeout)
-  const shouldShowProfile = !loading || profile;
-
-  if (loading && !profile) {
+  // ⚠️ ESTADOS DE RENDERIZAÇÃO - ORDEM CORRETA
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
         <div className="container mx-auto px-4 py-8">
@@ -150,9 +161,7 @@ export default function AgentPerfil() {
               <h2 className="text-xl font-semibold text-gray-800">
                 Carregando perfil...
               </h2>
-              <p className="text-gray-600 mt-2">
-                Isso pode levar alguns segundos
-              </p>
+              <p className="text-gray-600 mt-2">Buscando suas informações</p>
             </div>
           </div>
         </div>
@@ -160,22 +169,21 @@ export default function AgentPerfil() {
     );
   }
 
-  if (!shouldShowProfile) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
         <div className="container mx-auto px-4 py-8">
           <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
-            <FaTimesCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <FaExclamationTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Perfil Não Encontrado
+              Erro ao carregar perfil
             </h2>
-            <p className="text-gray-600 mb-4">
-              Não foi possível carregar os dados do seu perfil.
-            </p>
+            <p className="text-gray-600 mb-6">{error}</p>
             <Button
               onClick={() => window.location.reload()}
               className="bg-navy-light hover:bg-navy text-white"
             >
+              <FaSync className="w-4 h-4 mr-2" />
               Tentar Novamente
             </Button>
           </div>
@@ -184,19 +192,46 @@ export default function AgentPerfil() {
     );
   }
 
-  // 🔥 RENDERIZAÇÃO PRINCIPAL - mesmo se loading for true
-  const statusInfo = getStatusInfo(profile!.status);
-  const roleInfo = getRoleInfo(profile!.role);
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
+            <FaTimesCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Perfil Não Encontrado
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Não foi possível carregar os dados do seu perfil.
+            </p>
+            <Button
+              onClick={() => window.location.reload()}
+              className="bg-navy-light hover:bg-navy text-white"
+            >
+              <FaSync className="w-4 h-4 mr-2" />
+              Tentar Novamente
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ AGORA SIM - profile garantidamente não é null
+  console.log("🎨 Renderizando perfil:", profile.full_name);
+
+  const statusInfo = getStatusInfo(profile.status);
+  const roleInfo = getRoleInfo(profile.role);
   const StatusIcon = statusInfo.icon;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
       <div className="container mx-auto px-4 py-8">
-        {/* Banner de DEBUG */}
+        {/* Banner de sucesso */}
         <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg">
           <p className="text-green-800 text-sm font-medium">
-            ✅ Dados carregados: <strong>{profile!.full_name}</strong> -{" "}
-            {profile!.matricula}
+            ✅ Perfil carregado com sucesso:{" "}
+            <strong>{profile.full_name}</strong>
           </p>
         </div>
 
@@ -206,9 +241,9 @@ export default function AgentPerfil() {
             <div className="flex items-center space-x-6 mb-4 md:mb-0">
               <div className="relative">
                 <div className="w-24 h-24 bg-navy-light rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {profile!.avatar_url ? (
+                  {profile.avatar_url ? (
                     <img
-                      src={profile!.avatar_url}
+                      src={profile.avatar_url}
                       alt="Foto de perfil"
                       className="w-full h-full rounded-full object-cover"
                     />
@@ -222,7 +257,7 @@ export default function AgentPerfil() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  {profile!.full_name}
+                  {profile.full_name}
                 </h1>
                 <div className="flex flex-wrap gap-2">
                   <Badge className={`${roleInfo.color} text-white`}>
@@ -253,11 +288,11 @@ export default function AgentPerfil() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <InfoItem label="Nome Completo" value={profile!.full_name} />
-                <InfoItem label="Email" value={profile!.email} />
+                <InfoItem label="Nome Completo" value={profile.full_name} />
+                <InfoItem label="Email" value={profile.email} />
                 <InfoItem
                   label="Tipo Sanguíneo"
-                  value={profile!.tipo_sanguineo || "Não definido"}
+                  value={profile.tipo_sanguineo || "Não definido"}
                   icon={FaTint}
                 />
               </CardContent>
@@ -273,16 +308,16 @@ export default function AgentPerfil() {
               <CardContent className="space-y-4">
                 <InfoItem
                   label="Matrícula"
-                  value={profile!.matricula}
+                  value={profile.matricula}
                   icon={FaIdCard}
                 />
                 <InfoItem
                   label="Graduação"
-                  value={profile!.graduacao || "Não definida"}
+                  value={profile.graduacao || "Não definida"}
                 />
                 <InfoItem
                   label="Validade da Certificação"
-                  value={formatDate(profile!.validade_certificacao)}
+                  value={formatDate(profile.validade_certificacao)}
                   icon={FaCalendarAlt}
                   isDate={true}
                 />
@@ -312,7 +347,7 @@ export default function AgentPerfil() {
                   <div className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg">
                     <StatusIcon
                       className={`w-6 h-6 ${
-                        profile!.status ? "text-green-600" : "text-red-600"
+                        profile.status ? "text-green-600" : "text-red-600"
                       } flex-shrink-0`}
                     />
                     <div>
