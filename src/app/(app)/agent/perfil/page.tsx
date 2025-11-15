@@ -35,7 +35,6 @@ interface ProfileData {
   updated_at: string;
 }
 
-// Componente auxiliar MOVIDO para fora do componente principal
 const InfoItem = ({
   label,
   value,
@@ -68,49 +67,87 @@ export default function AgentPerfil() {
   const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
+  // DEBUG do estado
   useEffect(() => {
+    console.log(
+      "🎯 ESTADO ATUAL - loading:",
+      loading,
+      "error:",
+      error,
+      "profile:",
+      profile
+    );
+  });
+
+  useEffect(() => {
+    let mounted = true;
+
     const fetchProfile = async () => {
       try {
-        console.log("🔍 Buscando perfil no Vercel...");
+        console.log("🚀 INICIANDO FETCH PROFILE");
+        setError(null);
 
         const {
           data: { user },
           error: userError,
         } = await supabase.auth.getUser();
-        console.log("👤 Usuário:", user);
 
-        if (userError) {
-          throw new Error(`Erro de autenticação: ${userError.message}`);
+        if (!mounted) return;
+
+        if (userError || !user) {
+          throw new Error(userError?.message || "Usuário não autenticado");
         }
 
-        if (!user) {
-          throw new Error("Nenhum usuário autenticado");
-        }
-
+        console.log("🔍 Buscando perfil para:", user.id);
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
           .single();
 
-        console.log("📊 Perfil encontrado:", profileData);
-        console.log("❌ Erro do perfil:", profileError);
+        if (!mounted) return;
 
         if (profileError) {
-          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+          console.error("❌ Erro na query:", profileError);
+          throw new Error(`Falha ao carregar perfil: ${profileError.message}`);
         }
 
-        setProfile(profileData);
+        if (profileData) {
+          console.log("✅ PERFIL ENCONTRADO:", profileData.full_name);
+          setProfile(profileData);
+        } else {
+          throw new Error("Perfil não encontrado");
+        }
       } catch (err: any) {
-        console.error("💥 Erro:", err);
-        setError(err.message);
+        console.error("💥 Erro no fetch:", err);
+        if (mounted) {
+          setError(err.message);
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          console.log("🏁 FETCH FINALIZADO - loading: false");
+        }
       }
     };
 
     fetchProfile();
+
+    return () => {
+      mounted = false;
+    };
   }, [supabase]);
+
+  // 🔥 SIMPLES - Forçar re-render com setTimeout como fallback
+  useEffect(() => {
+    if (profile && loading) {
+      const timer = setTimeout(() => {
+        setLoading(false);
+        console.log("⏰ Fallback: Forçando loading false");
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [profile, loading]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Não definida";
@@ -132,69 +169,22 @@ export default function AgentPerfil() {
     };
   };
 
-  // ⚠️ IMPORTANTE: Sempre retorne o JSX de forma consistente
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-20 bg-gray-200 rounded"></div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
-            <FaExclamationTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Erro ao carregar perfil
-            </h2>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <Button
-              onClick={() => window.location.reload()}
-              className="bg-navy-light hover:bg-navy text-white"
-            >
-              <FaSync className="w-4 h-4 mr-2" />
-              Tentar Novamente
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ErrorState error={error} onRetry={() => window.location.reload()} />
     );
   }
 
   if (!profile) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
-        <div className="container mx-auto px-4 py-8">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
-            <FaTimesCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Perfil Não Encontrado
-            </h2>
-            <p className="text-gray-600">
-              Não foi possível carregar os dados do seu perfil.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <NoProfileState onRetry={() => window.location.reload()} />;
   }
 
-  // ⚠️ CERTIFIQUE-SE de que este return está no final
+  console.log("🎨 RENDERIZANDO PERFIL:", profile.full_name);
+
   const statusInfo = getStatusInfo(profile.status);
   const roleInfo = getRoleInfo(profile.role);
   const StatusIcon = statusInfo.icon;
@@ -203,7 +193,14 @@ export default function AgentPerfil() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
       <div className="container mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-          {/* Cabeçalho do Perfil */}
+          {/* Cabeçalho com DEBUG visível */}
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg">
+            <p className="text-green-800 text-sm font-medium">
+              ✅ Dados carregados: <strong>{profile.full_name}</strong> -{" "}
+              {profile.matricula}
+            </p>
+          </div>
+
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-6 border-b border-gray-200">
             <div className="flex items-center space-x-6 mb-4 md:mb-0">
               <div className="relative">
@@ -224,7 +221,7 @@ export default function AgentPerfil() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                  {profile.full_name || "Nome não definido"}
+                  {profile.full_name}
                 </h1>
                 <div className="flex flex-wrap gap-2">
                   <Badge className={`${roleInfo.color} text-white`}>
@@ -245,9 +242,7 @@ export default function AgentPerfil() {
             </Button>
           </div>
 
-          {/* Grid de Informações */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Informações Pessoais */}
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center text-lg">
@@ -256,10 +251,7 @@ export default function AgentPerfil() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <InfoItem
-                  label="Nome Completo"
-                  value={profile.full_name || "Não definido"}
-                />
+                <InfoItem label="Nome Completo" value={profile.full_name} />
                 <InfoItem label="Email" value={profile.email} />
                 <InfoItem
                   label="Tipo Sanguíneo"
@@ -269,7 +261,6 @@ export default function AgentPerfil() {
               </CardContent>
             </Card>
 
-            {/* Informações de Serviço */}
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center text-lg">
@@ -296,7 +287,6 @@ export default function AgentPerfil() {
               </CardContent>
             </Card>
 
-            {/* Status do Sistema */}
             <Card className="border-0 shadow-md md:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center text-lg">
@@ -348,3 +338,78 @@ export default function AgentPerfil() {
     </div>
   );
 }
+
+const LoadingState = () => (
+  <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
+    <div className="container mx-auto px-4 py-8">
+      <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
+        <div className="text-center mb-6">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-light mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-800">
+            Carregando perfil...
+          </h2>
+          <p className="text-gray-600 mt-2">Buscando suas informações</p>
+        </div>
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded w-1/2 mb-8"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-20 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ErrorState = ({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry: () => void;
+}) => (
+  <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
+    <div className="container mx-auto px-4 py-8">
+      <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
+        <FaExclamationTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          Erro ao carregar perfil
+        </h2>
+        <p className="text-gray-600 mb-6">{error}</p>
+        <Button
+          onClick={onRetry}
+          className="bg-navy-light hover:bg-navy text-white"
+        >
+          <FaSync className="w-4 h-4 mr-2" />
+          Tentar Novamente
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
+const NoProfileState = ({ onRetry }: { onRetry: () => void }) => (
+  <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
+    <div className="container mx-auto px-4 py-8">
+      <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
+        <FaTimesCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">
+          Perfil Não Encontrado
+        </h2>
+        <p className="text-gray-600 mb-6">
+          Não foi possível carregar os dados do seu perfil.
+        </p>
+        <Button
+          onClick={onRetry}
+          className="bg-navy-light hover:bg-navy text-white"
+        >
+          <FaSync className="w-4 h-4 mr-2" />
+          Tentar Novamente
+        </Button>
+      </div>
+    </div>
+  </div>
+);
