@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - PÁGINA DE PERFIL COMPLETA
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,6 +16,8 @@ import {
   FaCalendarAlt,
   FaEdit,
   FaCamera,
+  FaExclamationTriangle,
+  FaSync,
 } from "react-icons/fa";
 
 interface ProfileData {
@@ -33,33 +35,75 @@ interface ProfileData {
   updated_at: string;
 }
 
+// Componente auxiliar MOVIDO para fora do componente principal
+const InfoItem = ({
+  label,
+  value,
+  icon: Icon,
+  isDate = false,
+}: {
+  label: string;
+  value: string;
+  icon?: any;
+  isDate?: boolean;
+}) => (
+  <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
+    <div className="flex items-center space-x-2">
+      {Icon && <Icon className="w-4 h-4 text-gray-400" />}
+      <span className="text-gray-600 font-medium">{label}:</span>
+    </div>
+    <span
+      className={`font-semibold ${
+        isDate && value !== "Não definida" ? "text-blue-600" : "text-gray-800"
+      }`}
+    >
+      {value}
+    </span>
+  </div>
+);
+
 export default function AgentPerfil() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
+        console.log("🔍 Buscando perfil no Vercel...");
+
         const {
           data: { user },
+          error: userError,
         } = await supabase.auth.getUser();
+        console.log("👤 Usuário:", user);
 
-        if (user) {
-          const { data: profileData, error } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .single();
-
-          if (error) {
-            console.error("Erro ao buscar perfil:", error);
-          } else {
-            setProfile(profileData);
-          }
+        if (userError) {
+          throw new Error(`Erro de autenticação: ${userError.message}`);
         }
-      } catch (error) {
-        console.error("Erro ao carregar perfil:", error);
+
+        if (!user) {
+          throw new Error("Nenhum usuário autenticado");
+        }
+
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+
+        console.log("📊 Perfil encontrado:", profileData);
+        console.log("❌ Erro do perfil:", profileError);
+
+        if (profileError) {
+          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+        }
+
+        setProfile(profileData);
+      } catch (err: any) {
+        console.error("💥 Erro:", err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -88,6 +132,7 @@ export default function AgentPerfil() {
     };
   };
 
+  // ⚠️ IMPORTANTE: Sempre retorne o JSX de forma consistente
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
@@ -108,6 +153,29 @@ export default function AgentPerfil() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
+        <div className="container mx-auto px-4 py-8">
+          <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
+            <FaExclamationTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Erro ao carregar perfil
+            </h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <Button
+              onClick={() => window.location.reload()}
+              className="bg-navy-light hover:bg-navy text-white"
+            >
+              <FaSync className="w-4 h-4 mr-2" />
+              Tentar Novamente
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!profile) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
@@ -115,7 +183,7 @@ export default function AgentPerfil() {
           <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto text-center">
             <FaTimesCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Erro ao carregar perfil
+              Perfil Não Encontrado
             </h2>
             <p className="text-gray-600">
               Não foi possível carregar os dados do seu perfil.
@@ -126,6 +194,7 @@ export default function AgentPerfil() {
     );
   }
 
+  // ⚠️ CERTIFIQUE-SE de que este return está no final
   const statusInfo = getStatusInfo(profile.status);
   const roleInfo = getRoleInfo(profile.role);
   const StatusIcon = statusInfo.icon;
@@ -279,30 +348,3 @@ export default function AgentPerfil() {
     </div>
   );
 }
-
-// Componente auxiliar para exibir informações
-const InfoItem = ({
-  label,
-  value,
-  icon: Icon,
-  isDate = false,
-}: {
-  label: string;
-  value: string;
-  icon?: any;
-  isDate?: boolean;
-}) => (
-  <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-    <div className="flex items-center space-x-2">
-      {Icon && <Icon className="w-4 h-4 text-gray-400" />}
-      <span className="text-gray-600 font-medium">{label}:</span>
-    </div>
-    <span
-      className={`font-semibold ${
-        isDate && value !== "Não definida" ? "text-blue-600" : "text-gray-800"
-      }`}
-    >
-      {value}
-    </span>
-  </div>
-);
