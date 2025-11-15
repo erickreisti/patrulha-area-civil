@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO CORRIGIDA
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO DEBUG COMPLETO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -70,65 +70,94 @@ export default function AgentPerfil() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        console.log("🔄 Buscando perfil...");
+        console.log("🔄 === INICIANDO BUSCA DO PERFIL ===");
 
+        // 1. Verificar autenticação
+        console.log("🔐 Verificando autenticação...");
         const {
           data: { user },
           error: userError,
         } = await supabase.auth.getUser();
+
+        console.log("👤 Resultado do usuário:", user);
+        console.log("❌ Erro do usuário:", userError);
 
         if (userError) {
           throw new Error(`Erro de autenticação: ${userError.message}`);
         }
 
         if (!user) {
-          throw new Error("Nenhum usuário autenticado");
+          throw new Error("Nenhum usuário autenticado encontrado");
         }
 
-        console.log("👤 Usuário encontrado:", user.id);
+        console.log("✅ Usuário autenticado:", user.id, user.email);
 
+        // 2. Buscar perfil
+        console.log("🔍 Buscando perfil na tabela profiles...");
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", user.id)
           .single();
 
-        console.log("📊 Dados do perfil:", profileData);
-        console.log("❌ Erro do perfil:", profileError);
+        console.log("📊 Dados retornados:", profileData);
+        console.log("❌ Erro da query:", profileError);
 
         if (profileError) {
-          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+          console.error("💥 Erro detalhado:", {
+            code: profileError.code,
+            message: profileError.message,
+            details: profileError.details,
+            hint: profileError.hint,
+          });
+
+          if (profileError.code === "PGRST116") {
+            throw new Error(
+              "Perfil não encontrado na base de dados. O usuário existe no auth mas não na tabela profiles."
+            );
+          } else {
+            throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+          }
         }
 
         if (!profileData) {
-          throw new Error("Perfil não encontrado na base de dados");
+          throw new Error("Perfil não encontrado (retorno vazio)");
         }
 
+        console.log("🎉 PERFIL ENCONTRADO:", profileData.full_name);
         setProfile(profileData);
-        console.log("✅ Perfil definido no estado");
       } catch (err: any) {
-        console.error("💥 Erro:", err);
+        console.error("💥 ERRO NO PROCESSO:", err);
         setError(err.message);
       } finally {
+        console.log("🏁 Finalizando processo de busca");
         setLoading(false);
-        console.log("🏁 Loading finalizado");
       }
     };
 
     fetchProfile();
   }, [supabase]);
 
-  // Fallback para garantir que loading seja false
+  // Teste alternativo - buscar todos os perfis
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (loading) {
-        console.log("⏰ Fallback: Forçando fim do loading");
-        setLoading(false);
-      }
-    }, 3000);
+    const testAllProfiles = async () => {
+      try {
+        const { data: allProfiles, error } = await supabase
+          .from("profiles")
+          .select("id, matricula, full_name")
+          .limit(5);
 
-    return () => clearTimeout(timer);
-  }, [loading]);
+        console.log("📋 TODOS OS PERFIS (primeiros 5):", allProfiles);
+        console.log("❌ Erro todos perfis:", error);
+      } catch (err) {
+        console.error("Erro ao buscar todos perfis:", err);
+      }
+    };
+
+    if (error) {
+      testAllProfiles();
+    }
+  }, [error, supabase]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return "Não definida";
@@ -150,7 +179,6 @@ export default function AgentPerfil() {
     };
   };
 
-  // ⚠️ ESTADOS DE RENDERIZAÇÃO - ORDEM CORRETA
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
@@ -161,7 +189,9 @@ export default function AgentPerfil() {
               <h2 className="text-xl font-semibold text-gray-800">
                 Carregando perfil...
               </h2>
-              <p className="text-gray-600 mt-2">Buscando suas informações</p>
+              <p className="text-gray-600 mt-2">
+                Verificando autenticação e dados
+              </p>
             </div>
           </div>
         </div>
@@ -178,14 +208,43 @@ export default function AgentPerfil() {
             <h2 className="text-2xl font-bold text-gray-800 mb-2">
               Erro ao carregar perfil
             </h2>
-            <p className="text-gray-600 mb-6">{error}</p>
-            <Button
-              onClick={() => window.location.reload()}
-              className="bg-navy-light hover:bg-navy text-white"
-            >
-              <FaSync className="w-4 h-4 mr-2" />
-              Tentar Novamente
-            </Button>
+            <p className="text-gray-600 mb-4">{error}</p>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+              <h3 className="font-semibold text-yellow-800 mb-2">
+                Informações para diagnóstico:
+              </h3>
+              <ul className="text-sm text-yellow-700 list-disc list-inside space-y-1">
+                <li>Verifique se o perfil existe na tabela profiles</li>
+                <li>
+                  Confirme que o ID do usuário auth corresponde ao ID do profile
+                </li>
+                <li>Verifique as políticas RLS no Supabase</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                onClick={() => window.location.reload()}
+                className="bg-navy-light hover:bg-navy text-white"
+              >
+                <FaSync className="w-4 h-4 mr-2" />
+                Tentar Novamente
+              </Button>
+              <Button
+                onClick={() => (window.location.href = "/login")}
+                variant="outline"
+                className="ml-2"
+              >
+                Fazer Login Novamente
+              </Button>
+            </div>
+
+            <div className="mt-6 text-xs text-gray-500">
+              <p>
+                Abra o console do navegador (F12) para mais detalhes técnicos.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -202,7 +261,8 @@ export default function AgentPerfil() {
               Perfil Não Encontrado
             </h2>
             <p className="text-gray-600 mb-6">
-              Não foi possível carregar os dados do seu perfil.
+              O usuário foi autenticado, mas não há um perfil correspondente na
+              base de dados.
             </p>
             <Button
               onClick={() => window.location.reload()}
@@ -217,7 +277,7 @@ export default function AgentPerfil() {
     );
   }
 
-  // ✅ AGORA SIM - profile garantidamente não é null
+  // ✅ RENDERIZAÇÃO DO PERFIL
   console.log("🎨 Renderizando perfil:", profile.full_name);
 
   const statusInfo = getStatusInfo(profile.status);
@@ -227,16 +287,15 @@ export default function AgentPerfil() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 pt-32">
       <div className="container mx-auto px-4 py-8">
-        {/* Banner de sucesso */}
-        <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg">
-          <p className="text-green-800 text-sm font-medium">
-            ✅ Perfil carregado com sucesso:{" "}
-            <strong>{profile.full_name}</strong>
-          </p>
-        </div>
-
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-4xl mx-auto">
-          {/* Cabeçalho do Perfil */}
+          {/* Banner de sucesso */}
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 rounded-lg">
+            <p className="text-green-800 text-sm font-medium">
+              ✅ Perfil carregado com sucesso:{" "}
+              <strong>{profile.full_name}</strong> - {profile.matricula}
+            </p>
+          </div>
+
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 pb-6 border-b border-gray-200">
             <div className="flex items-center space-x-6 mb-4 md:mb-0">
               <div className="relative">
@@ -278,7 +337,6 @@ export default function AgentPerfil() {
             </Button>
           </div>
 
-          {/* Grid de Informações */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="border-0 shadow-md">
               <CardHeader className="pb-3">
