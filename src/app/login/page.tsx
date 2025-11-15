@@ -1,4 +1,4 @@
-// src/app/login/page.tsx - VERSÃO COMPLETA CORRIGIDA
+// src/app/login/page.tsx - VERSÃO COMPLETA COM LOGS
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,40 +15,43 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  // Debug das variáveis de ambiente
   useEffect(() => {
-    console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log("🔧 === INICIANDO PÁGINA DE LOGIN ===");
+    console.log("🔧 Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
     console.log(
-      "Supabase Key:",
+      "🔧 Supabase Key:",
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 10) + "..."
     );
+    console.log("🔧 Client criado:", !!supabase);
   }, []);
 
   // Verificar se usuário já está logado
   useEffect(() => {
     const checkUser = async () => {
       try {
+        console.log("🔍 Verificando se usuário já está logado...");
         const {
           data: { user },
         } = await supabase.auth.getUser();
+
         if (user) {
-          console.log(
-            "Usuário já logado, redirecionando para perfil...",
-            user.id
-          );
-          // ✅ AMBOS vão para a MESMA página de perfil
+          console.log("✅ Usuário já logado, ID:", user.id);
+          console.log("🔄 Redirecionando para perfil...");
           window.location.href = "/agent/perfil";
+        } else {
+          console.log("❌ Nenhum usuário logado");
         }
       } catch (error) {
-        console.error("Erro ao verificar usuário:", error);
+        console.error("💥 Erro ao verificar usuário:", error);
       }
     };
 
     checkUser();
   }, [router, supabase]);
 
-  // ✅ FUNÇÃO SIMPLIFICADA - AMBOS vão para /agent/perfil
   const redirectToProfile = () => {
-    console.log("Redirecionando para página de perfil...");
+    console.log("🎯 Redirecionando para página de perfil...");
     window.location.href = "/agent/perfil";
   };
 
@@ -81,24 +84,56 @@ export default function LoginPage() {
     setError("");
 
     try {
+      console.log("🔄 === INICIANDO PROCESSO DE LOGIN ===");
+
       // Remover formatação da matrícula para login
       const matriculaLimpa = matricula.replace(/\D/g, "");
+      console.log("📝 Matrícula formatada:", matricula);
+      console.log("🔢 Matrícula limpa (11 dígitos):", matriculaLimpa);
 
       // Garantir que temos 11 dígitos para o email
       if (matriculaLimpa.length !== 11) {
+        console.log("❌ Matrícula não tem 11 dígitos");
         setError("Matrícula deve ter 11 dígitos");
         setLoading(false);
         return;
       }
 
       const email = `${matriculaLimpa}@pac.org.br`;
+      console.log("📧 Email gerado para login:", email);
 
-      console.log("Tentando login com:", {
-        matriculaFormatada: matricula,
-        matriculaLimpa,
-        email,
-      });
+      // TESTE 1: Verificar se o usuário existe na tabela profiles
+      console.log("🔍 TESTE 1 - Verificando usuário na tabela profiles...");
+      const { data: userCheck, error: checkError } = await supabase
+        .from("profiles")
+        .select("id, matricula, email, role, status")
+        .eq("matricula", matricula)
+        .single();
 
+      console.log("📊 Resultado da verificação do profile:", userCheck);
+      console.log("❌ Erro na verificação do profile:", checkError);
+
+      if (checkError) {
+        console.log("💥 Usuário não encontrado na tabela profiles");
+        setError("Matrícula não cadastrada no sistema");
+        setLoading(false);
+        return;
+      }
+
+      console.log("✅ Usuário encontrado no profile:", userCheck);
+
+      // TESTE 2: Verificar se o usuário existe no Auth
+      console.log("🔍 TESTE 2 - Verificando usuário no Auth system...");
+      const { data: authCheck, error: authCheckError } = await supabase
+        .from("auth.users")
+        .select("id, email, email_confirmed_at")
+        .eq("email", email)
+        .single();
+
+      console.log("📊 Resultado da verificação do Auth:", authCheck);
+      console.log("❌ Erro na verificação do Auth:", authCheckError);
+
+      console.log("🔐 TESTE 3 - Tentando autenticação...");
       const { data, error: authError } = await supabase.auth.signInWithPassword(
         {
           email,
@@ -106,32 +141,47 @@ export default function LoginPage() {
         }
       );
 
+      console.log("📊 Resultado do signInWithPassword - DATA:", data);
+      console.log("❌ Resultado do signInWithPassword - ERROR:", authError);
+
       if (authError) {
-        console.error("Erro de autenticação:", authError);
-        setError(
-          authError.message === "Invalid login credentials"
-            ? "Matrícula ou senha incorretas"
-            : `Erro: ${authError.message}`
-        );
+        console.error("💥 Erro de autenticação completo:", authError);
+
+        if (authError.message === "Invalid login credentials") {
+          console.log(
+            "🔑 Credenciais inválidas - senha incorreta ou usuário não existe no Auth"
+          );
+          setError("Matrícula ou senha incorretas");
+        } else if (authError.message.includes("database")) {
+          console.log("🗄️ Erro de banco de dados na autenticação");
+          setError("Erro de conexão com o sistema. Tente novamente.");
+        } else {
+          console.log("🚨 Outro erro de autenticação:", authError.message);
+          setError(`Erro: ${authError.message}`);
+        }
         return;
       }
 
       if (data.user) {
-        console.log(
-          "✅ Login bem-sucedido! Redirecionando para perfil...",
-          data.user
-        );
+        console.log("🎉 ✅ LOGIN BEM-SUCEDIDO!");
+        console.log("👤 Usuário autenticado:", data.user);
+        console.log("🔄 Aguardando 100ms antes do redirecionamento...");
 
         // Aguardar um pouco para garantir que a sessão está estabelecida
         await new Promise((resolve) => setTimeout(resolve, 100));
 
-        // ✅ AMBOS vão para a MESMA página de perfil
+        console.log("🎯 Iniciando redirecionamento para perfil...");
         redirectToProfile();
+      } else {
+        console.log("❌ Nenhum usuário retornado do auth");
+        setError("Erro inesperado no login");
       }
-    } catch (err) {
-      console.error("Erro inesperado no login:", err);
+    } catch (err: any) {
+      console.error("💥💥 ERRO CATCH NO LOGIN:", err);
+      console.error("💥 Stack trace:", err.stack);
       setError("Erro inesperado ao fazer login. Tente novamente.");
     } finally {
+      console.log("🏁 Finalizando processo de login");
       setLoading(false);
     }
   };
