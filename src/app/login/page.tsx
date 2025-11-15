@@ -1,11 +1,56 @@
+// src/app/login/page.tsx - VERSÃO COMPLETA CORRIGIDA
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const [matricula, setMatricula] = useState("");
+  const [senha, setSenha] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    console.log("Supabase URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log(
+      "Supabase Key:",
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.substring(0, 10) + "..."
+    );
+  }, []);
+
+  // Verificar se usuário já está logado
+  useEffect(() => {
+    const checkUser = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          console.log(
+            "Usuário já logado, redirecionando para perfil...",
+            user.id
+          );
+          // ✅ AMBOS vão para a MESMA página de perfil
+          window.location.href = "/agent/perfil";
+        }
+      } catch (error) {
+        console.error("Erro ao verificar usuário:", error);
+      }
+    };
+
+    checkUser();
+  }, [router, supabase]);
+
+  // ✅ FUNÇÃO SIMPLIFICADA - AMBOS vão para /agent/perfil
+  const redirectToProfile = () => {
+    console.log("Redirecionando para página de perfil...");
+    window.location.href = "/agent/perfil";
+  };
 
   const formatMatricula = (value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -30,6 +75,67 @@ export default function LoginPage() {
     setMatricula(formatted);
   };
 
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      // Remover formatação da matrícula para login
+      const matriculaLimpa = matricula.replace(/\D/g, "");
+
+      // Garantir que temos 11 dígitos para o email
+      if (matriculaLimpa.length !== 11) {
+        setError("Matrícula deve ter 11 dígitos");
+        setLoading(false);
+        return;
+      }
+
+      const email = `${matriculaLimpa}@pac.org.br`;
+
+      console.log("Tentando login com:", {
+        matriculaFormatada: matricula,
+        matriculaLimpa,
+        email,
+      });
+
+      const { data, error: authError } = await supabase.auth.signInWithPassword(
+        {
+          email,
+          password: senha,
+        }
+      );
+
+      if (authError) {
+        console.error("Erro de autenticação:", authError);
+        setError(
+          authError.message === "Invalid login credentials"
+            ? "Matrícula ou senha incorretas"
+            : `Erro: ${authError.message}`
+        );
+        return;
+      }
+
+      if (data.user) {
+        console.log(
+          "✅ Login bem-sucedido! Redirecionando para perfil...",
+          data.user
+        );
+
+        // Aguardar um pouco para garantir que a sessão está estabelecida
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        // ✅ AMBOS vão para a MESMA página de perfil
+        redirectToProfile();
+      }
+    } catch (err) {
+      console.error("Erro inesperado no login:", err);
+      setError("Erro inesperado ao fazer login. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 via-offwhite to-navy-light/10 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -46,6 +152,7 @@ export default function LoginPage() {
                 width={64}
                 height={64}
                 className="object-contain rounded-md"
+                priority
               />
             </div>
             <div className="text-left">
@@ -65,13 +172,19 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Formulário SIMPLES */}
+        {/* Formulário */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-lg p-6 backdrop-blur-sm">
           <h2 className="text-2xl font-bebas text-gray-800 text-center mb-6 tracking-wide">
             ACESSO DO AGENTE
           </h2>
 
-          <form className="space-y-4">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="space-y-4">
             {/* Campo Matrícula */}
             <div>
               <label className="block text-gray-800 text-sm font-semibold mb-2">
@@ -85,6 +198,8 @@ export default function LoginPage() {
                   placeholder="000.000.000-00"
                   maxLength={14}
                   className="w-full border-2 border-gray-200 focus:border-navy-light focus:ring-2 focus:ring-navy-light/20 text-base py-3 px-4 rounded-xl transition-all duration-200 font-medium tracking-wider"
+                  required
+                  disabled={loading}
                 />
               </div>
               <p className="text-gray-500 text-xs mt-1">
@@ -107,8 +222,12 @@ export default function LoginPage() {
               </div>
               <input
                 type="password"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
                 placeholder="Digite sua senha"
                 className="w-full border-2 border-gray-200 focus:border-navy-light focus:ring-2 focus:ring-navy-light/20 text-base py-3 px-4 rounded-xl transition-all duration-200 font-medium"
+                required
+                disabled={loading}
               />
             </div>
 
@@ -118,6 +237,7 @@ export default function LoginPage() {
                 type="checkbox"
                 id="remember"
                 className="w-4 h-4 text-navy-light border-gray-200 rounded focus:ring-navy-light focus:ring-2"
+                disabled={loading}
               />
               <label
                 htmlFor="remember"
@@ -130,9 +250,36 @@ export default function LoginPage() {
             {/* Botão Entrar */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-navy-light to-navy hover:from-navy hover:to-navy-dark text-white font-semibold py-3.5 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-navy-light to-navy hover:from-navy hover:to-navy-dark text-white font-semibold py-3.5 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              Entrar no Sistema
+              {loading ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Entrando...
+                </>
+              ) : (
+                "Entrar no Sistema"
+              )}
             </button>
           </form>
 

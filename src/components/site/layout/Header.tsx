@@ -3,11 +3,21 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { FaFacebook, FaInstagram, FaWhatsapp, FaBars } from "react-icons/fa";
+import {
+  FaFacebook,
+  FaInstagram,
+  FaWhatsapp,
+  FaBars,
+  FaUser,
+  FaSignOutAlt,
+  FaCog,
+  FaChartBar,
+} from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
+import { createClient } from "@/lib/supabase/client";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -44,6 +54,68 @@ const SOCIAL_ICONS = [
     hoverColor: "hover:bg-green-600",
   },
 ];
+
+// Hook de autenticação simplificado
+const useAuth = () => {
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const getAuthData = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        setUser(user);
+
+        if (user) {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+          setProfile(profileData);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados de autenticação:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getAuthData();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+        setProfile(profileData);
+      } else {
+        setProfile(null);
+      }
+
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/";
+  };
+
+  return { user, profile, loading, signOut };
+};
 
 const useScrollDetection = (threshold = 30) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -202,17 +274,132 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-const HeroButton = () => (
-  <Button
-    className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
-    asChild
-  >
-    <Link href="/login">
-      <span className="relative z-10">Área do Agente</span>
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
-    </Link>
-  </Button>
-);
+// Botão de Área do Agente/Admin atualizado
+const UserMenuButton = () => {
+  const { user, profile, loading, signOut } = useAuth();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <Button
+        className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 min-h-[44px] opacity-50"
+        disabled
+      >
+        Carregando...
+      </Button>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Button
+        className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
+        asChild
+      >
+        <Link href="/login">
+          <span className="relative z-10">Área do Agente</span>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
+        </Link>
+      </Button>
+    );
+  }
+
+  // Usuário logado - mostrar menu dropdown
+  return (
+    <div className="relative">
+      <Button
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] flex items-center gap-2"
+      >
+        <FaUser className="w-4 h-4" />
+        <span className="relative z-10">{profile?.graduacao || "Agente"}</span>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
+      </Button>
+
+      {/* Dropdown Menu */}
+      {isDropdownOpen && (
+        <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-50 animate-scale-in">
+          {/* Header do Dropdown */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-navy-light rounded-full flex items-center justify-center">
+                <FaUser className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">
+                  {profile?.full_name || "Agente PAC"}
+                </p>
+                <p className="text-xs text-gray-600 truncate">
+                  {profile?.matricula
+                    ? `Matrícula: ${profile.matricula}`
+                    : user.email}
+                </p>
+                <p className="text-xs text-navy-light font-medium capitalize">
+                  {profile?.role === "admin" ? "Administrador" : "Agente"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Links do Dropdown */}
+          <div className="p-2">
+            {profile?.role === "admin" ? (
+              <Link
+                href="/admin/dashboard"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                onClick={() => setIsDropdownOpen(false)}
+              >
+                <FaChartBar className="w-4 h-4 text-navy-light" />
+                Painel Admin
+              </Link>
+            ) : (
+              <Link
+                href="/agent/perfil"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                onClick={() => setIsDropdownOpen(false)}
+              >
+                <FaUser className="w-4 h-4 text-navy-light" />
+                Meu Perfil
+              </Link>
+            )}
+
+            <Link
+              href={
+                profile?.role === "admin"
+                  ? "/admin/configuracoes"
+                  : "/agent/configuracoes"
+              }
+              className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              onClick={() => setIsDropdownOpen(false)}
+            >
+              <FaCog className="w-4 h-4 text-navy-light" />
+              Configurações
+            </Link>
+          </div>
+
+          {/* Footer do Dropdown */}
+          <div className="p-2 border-t border-gray-200">
+            <button
+              onClick={signOut}
+              className="flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors w-full"
+            >
+              <FaSignOutAlt className="w-4 h-4" />
+              Sair do Sistema
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Overlay para fechar o dropdown */}
+      {isDropdownOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setIsDropdownOpen(false)}
+        />
+      )}
+    </div>
+  );
+};
 
 const MobileMenu = ({
   isOpen,
@@ -223,6 +410,8 @@ const MobileMenu = ({
   onClose: () => void;
   pathname: string;
 }) => {
+  const { user, profile, signOut } = useAuth();
+
   if (!isOpen) return null;
 
   return (
@@ -245,17 +434,66 @@ const MobileMenu = ({
             </Link>
           ))}
 
-          <div className="pt-4 border-t border-gray-200">
-            <Button
-              className="w-full bg-navy-light hover:bg-navy text-white font-medium py-3 text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300"
-              asChild
-            >
-              <Link href="/login" onClick={onClose}>
-                <span className="relative z-10">Área do Agente</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
-              </Link>
-            </Button>
-          </div>
+          {/* Seção do usuário logado no mobile */}
+          {user ? (
+            <>
+              <div className="pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
+                  <div className="w-8 h-8 bg-navy-light rounded-full flex items-center justify-center">
+                    <FaUser className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">
+                      {profile?.full_name || "Agente PAC"}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {profile?.role === "admin" ? "Administrador" : "Agente"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {profile?.role === "admin" ? (
+                <Link
+                  href="/admin/dashboard"
+                  className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
+                  onClick={onClose}
+                >
+                  Painel Administrativo
+                </Link>
+              ) : (
+                <Link
+                  href="/agent/perfil"
+                  className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
+                  onClick={onClose}
+                >
+                  Meu Perfil
+                </Link>
+              )}
+
+              <button
+                onClick={() => {
+                  signOut();
+                  onClose();
+                }}
+                className="px-4 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 text-left border-l-4 border-transparent"
+              >
+                Sair do Sistema
+              </button>
+            </>
+          ) : (
+            <div className="pt-4 border-t border-gray-200">
+              <Button
+                className="w-full bg-navy-light hover:bg-navy text-white font-medium py-3 text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300"
+                asChild
+              >
+                <Link href="/login" onClick={onClose}>
+                  <span className="relative z-10">Área do Agente</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
+                </Link>
+              </Button>
+            </div>
+          )}
 
           <div className="pt-4 border-t border-gray-200">
             <div className="flex justify-center gap-3">
@@ -322,7 +560,7 @@ export function Header() {
           <div className="hidden xl:flex items-center justify-between w-full py-4">
             <DesktopLogo />
             <DesktopNavigation pathname={pathname} />
-            <HeroButton />
+            <UserMenuButton />
           </div>
         </div>
       </div>
