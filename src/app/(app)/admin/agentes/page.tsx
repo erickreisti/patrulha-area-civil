@@ -1,4 +1,4 @@
-// src/app/(app)/admin/agentes/page.tsx - VERSÃO COM NAVEGAÇÃO E ESTATÍSTICAS COMPLETAS
+// src/app/(app)/admin/agentes/page.tsx - VERSÃO ATUALIZADA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,9 +24,9 @@ import {
   FaArrowLeft,
   FaChartBar,
   FaHome,
+  FaBan,
 } from "react-icons/fa";
 
-// Interface baseada no SEU schema
 interface AgentProfile {
   id: string;
   matricula: string;
@@ -34,7 +34,7 @@ interface AgentProfile {
   full_name: string | null;
   avatar_url: string | null;
   graduacao: string | null;
-  validade_certificacao: string | null; // date no schema
+  validade_certificacao: string | null;
   tipo_sanguineo: string | null;
   status: boolean;
   role: "admin" | "agent";
@@ -62,21 +62,93 @@ export default function AgentsPage() {
   const fetchAgents = async () => {
     try {
       setLoading(true);
-
-      // Buscar TODOS os perfis (incluindo admins)
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-
       setAgents(data || []);
     } catch (error) {
       console.error("Erro ao buscar agentes:", error);
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ VERIFICAÇÃO DE CERTIFICAÇÃO VÁLIDA (APENAS PARA ATIVOS)
+  const isCertificationValid = (agent: AgentProfile) => {
+    // ❗ Agente INATIVO nunca tem certificação válida
+    if (!agent.status) return false;
+
+    // Agente ATIVO: verifica data
+    if (!agent.validade_certificacao) return false;
+    return new Date(agent.validade_certificacao) >= new Date();
+  };
+
+  // ✅ ATUALIZADA: Ativar/Desativar agente COM CANCELAMENTO DE CERTIFICAÇÃO
+  const toggleAgentStatus = async (agentId: string, currentStatus: boolean) => {
+    try {
+      const updateData: any = {
+        status: !currentStatus,
+        updated_at: new Date().toISOString(),
+      };
+
+      // ✅ SE ESTÁ DESATIVANDO (tornando inativo), CANCELAR CERTIFICAÇÃO
+      if (currentStatus === true) {
+        updateData.validade_certificacao = null; // Cancela a certificação
+        console.log(`🔴 Certificação cancelada para agente ${agentId}`);
+      }
+      // ❗ SE ESTÁ ATIVANDO (tornando ativo), mantém a certificação como estava
+
+      const { error } = await supabase
+        .from("profiles")
+        .update(updateData)
+        .eq("id", agentId);
+
+      if (error) throw error;
+
+      // Atualizar estado local
+      setAgents((prev) =>
+        prev.map((agent) =>
+          agent.id === agentId
+            ? {
+                ...agent,
+                ...updateData, // Aplica tanto status quanto certificação
+              }
+            : agent
+        )
+      );
+
+      console.log(
+        `✅ Agente ${agentId} ${
+          !currentStatus ? "ativado" : "desativado"
+        } com sucesso`
+      );
+    } catch (error) {
+      console.error("Erro ao alterar status:", error);
+    }
+  };
+
+  // Reset de senha
+  const resetPassword = async (agentEmail: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(agentEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (error) throw error;
+      alert(`Email de reset enviado para: ${agentEmail}`);
+    } catch (error) {
+      console.error("Erro ao resetar senha:", error);
+      alert("Erro ao enviar email de reset");
+    }
+  };
+
+  // Formatar data
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Não definida";
+    return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
   // Filtros combinados
@@ -96,73 +168,13 @@ export default function AgentsPage() {
     return matchesSearch && matchesStatus && matchesRole;
   });
 
-  // Ativar/Desativar agente
-  const toggleAgentStatus = async (agentId: string, currentStatus: boolean) => {
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          status: !currentStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", agentId);
-
-      if (error) throw error;
-
-      // Atualizar estado local
-      setAgents((prev) =>
-        prev.map((agent) =>
-          agent.id === agentId
-            ? {
-                ...agent,
-                status: !currentStatus,
-                updated_at: new Date().toISOString(),
-              }
-            : agent
-        )
-      );
-    } catch (error) {
-      console.error("Erro ao alterar status:", error);
-    }
-  };
-
-  // Reset de senha (via Supabase Auth)
-  const resetPassword = async (agentEmail: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(agentEmail, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) throw error;
-
-      alert(`Email de reset enviado para: ${agentEmail}`);
-    } catch (error) {
-      console.error("Erro ao resetar senha:", error);
-      alert("Erro ao enviar email de reset");
-    }
-  };
-
-  // Formatar data
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Não definida";
-    return new Date(dateString).toLocaleDateString("pt-BR");
-  };
-
-  // Verificar se certificação está expirada
-  const isCertificationExpired = (validade: string | null) => {
-    if (!validade) return true;
-    return new Date(validade) < new Date();
-  };
-
-  // Calcular estatísticas
+  // ✅ ATUALIZADA: Calcular estatísticas - Certificações válidas apenas para ATIVOS
   const stats = {
     total: agents.length,
     active: agents.filter((a) => a.status).length,
     inactive: agents.filter((a) => !a.status).length,
     admins: agents.filter((a) => a.role === "admin").length,
-    validCertifications: agents.filter(
-      (a) => !isCertificationExpired(a.validade_certificacao)
-    ).length,
+    validCertifications: agents.filter(isCertificationValid).length, // ✅ Só conta ativos com data válida
   };
 
   return (
@@ -217,7 +229,7 @@ export default function AgentsPage() {
           </div>
         </div>
 
-        {/* Estatísticas Baseadas no Schema - AGORA COM INATIVOS */}
+        {/* Estatísticas - ATUALIZADA com certificações válidas apenas para ativos */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <Card className="border-0 shadow-md">
             <CardContent className="p-4">
@@ -287,6 +299,13 @@ export default function AgentsPage() {
                   <p className="text-2xl font-bold text-blue-600">
                     {stats.validCertifications}
                   </p>
+                  <p className="text-xs text-gray-500">
+                    {stats.active > 0
+                      ? `${Math.round(
+                          (stats.validCertifications / stats.active) * 100
+                        )}% dos ativos`
+                      : "Nenhum ativo"}
+                  </p>
                 </div>
                 <FaCalendarAlt className="w-8 h-8 text-blue-500" />
               </div>
@@ -298,7 +317,6 @@ export default function AgentsPage() {
         <Card className="border-0 shadow-md mb-6">
           <CardContent className="p-6">
             <div className="flex flex-col sm:flex-row gap-4">
-              {/* Busca */}
               <div className="flex-1">
                 <div className="relative">
                   <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -312,7 +330,6 @@ export default function AgentsPage() {
                 </div>
               </div>
 
-              {/* Filtros */}
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   value={filterStatus}
@@ -445,7 +462,7 @@ export default function AgentsPage() {
                           </div>
                         </td>
 
-                        {/* Coluna Informações */}
+                        {/* Coluna Informações - ATUALIZADA para mostrar certificação cancelada */}
                         <td className="py-3 px-4">
                           <div className="space-y-1">
                             <div className="flex items-center space-x-2">
@@ -455,17 +472,33 @@ export default function AgentsPage() {
                               </span>
                             </div>
                             <div className="flex items-center space-x-2">
-                              <FaCalendarAlt className="w-3 h-3 text-blue-500" />
+                              <FaCalendarAlt
+                                className={`w-3 h-3 ${
+                                  !agent.status
+                                    ? "text-red-500"
+                                    : !agent.validade_certificacao
+                                    ? "text-gray-400"
+                                    : new Date(agent.validade_certificacao) <
+                                      new Date()
+                                    ? "text-red-500"
+                                    : "text-green-500"
+                                }`}
+                              />
                               <span
                                 className={`text-sm ${
-                                  isCertificationExpired(
-                                    agent.validade_certificacao
-                                  )
+                                  !agent.status
+                                    ? "text-red-600 font-medium"
+                                    : !agent.validade_certificacao
+                                    ? "text-gray-500"
+                                    : new Date(agent.validade_certificacao) <
+                                      new Date()
                                     ? "text-red-600 font-medium"
                                     : "text-gray-600"
                                 }`}
                               >
-                                {formatDate(agent.validade_certificacao)}
+                                {!agent.status
+                                  ? "CERTIFICAÇÃO CANCELADA"
+                                  : formatDate(agent.validade_certificacao)}
                               </span>
                             </div>
                           </div>
@@ -515,11 +548,16 @@ export default function AgentsPage() {
                               className="w-full sm:w-auto"
                             >
                               {agent.status ? (
-                                <FaToggleOff className="w-3 h-3 mr-1 text-red-500" />
+                                <>
+                                  <FaBan className="w-3 h-3 mr-1 text-red-500" />
+                                  Desativar
+                                </>
                               ) : (
-                                <FaToggleOn className="w-3 h-3 mr-1 text-green-500" />
+                                <>
+                                  <FaToggleOn className="w-3 h-3 mr-1 text-green-500" />
+                                  Ativar
+                                </>
                               )}
-                              {agent.status ? "Desativar" : "Ativar"}
                             </Button>
                             <Button
                               variant="outline"

@@ -1,4 +1,4 @@
-// src/components/site/layout/Header.tsx - VERSÃO OTIMIZADA
+// src/components/site/layout/Header.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,7 +19,7 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import { useAuth } from "@/hooks/useAuth"; // ✅ USANDO HOOK UNIFICADO
+import { createClient } from "@/lib/supabase/client";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -70,6 +70,92 @@ const useScrollDetection = (threshold = 30) => {
   }, [threshold]);
 
   return isScrolled;
+};
+
+// ✅ HOOK SIMPLIFICADO PARA O HEADER
+const useHeaderAuth = () => {
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setLoading(true);
+
+        // Primeiro, verificar dados locais (mais rápido e confiável)
+        const localData = localStorage.getItem("pac_user_data");
+        if (localData) {
+          const profileData = JSON.parse(localData);
+          console.log("✅ Header: Usando dados locais", profileData);
+          setProfile(profileData);
+          setUser({ id: profileData.id, email: profileData.email });
+          setLoading(false);
+          return;
+        }
+
+        // Se não tem dados locais, tentar auth (com fallback)
+        try {
+          const {
+            data: { user: authUser },
+            error,
+          } = await supabase.auth.getUser();
+
+          if (!error && authUser) {
+            setUser(authUser);
+
+            // Buscar perfil do banco
+            const { data: profileData } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", authUser.id)
+              .single();
+
+            if (profileData) {
+              setProfile(profileData);
+              // Salvar no localStorage para próxima vez
+              localStorage.setItem(
+                "pac_user_data",
+                JSON.stringify(profileData)
+              );
+            }
+          }
+        } catch (authError) {
+          console.log("⚠️ Header: Auth falhou, continuando sem usuário");
+        }
+      } catch (err) {
+        console.error("❌ Header: Erro ao verificar auth:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [supabase]);
+
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem("pac_user_data");
+      localStorage.removeItem("supabase.auth.token");
+      setUser(null);
+      setProfile(null);
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    }
+  };
+
+  const isAdmin = profile?.role?.toLowerCase().trim() === "admin";
+
+  return {
+    user,
+    profile,
+    loading,
+    signOut,
+    isAdmin,
+  };
 };
 
 const TopBar = () => {
@@ -214,9 +300,9 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// ✅ COMPONENTE USER MENU OTIMIZADO - USANDO HOOK UNIFICADO
+// ✅ COMPONENTE USER MENU CORRIGIDO
 const UserMenuButton = () => {
-  const { user, profile, loading, signOut, isAdmin } = useAuth(); // ✅ Hook unificado
+  const { user, profile, loading, signOut, isAdmin } = useHeaderAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const pathname = usePathname();
 
@@ -231,7 +317,7 @@ const UserMenuButton = () => {
         className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 min-h-[44px] opacity-50"
         disabled
       >
-        Carregando...
+        ...
       </Button>
     );
   }
@@ -292,7 +378,7 @@ const UserMenuButton = () => {
             {/* Opção "Voltar ao Perfil" - aparece apenas se NÃO estiver na página de perfil */}
             {!isOnProfilePage && (
               <Link
-                href="/agent/perfil" // SEMPRE vai para o perfil
+                href="/agent/perfil"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
                 onClick={() => setIsDropdownOpen(false)}
               >
@@ -313,18 +399,7 @@ const UserMenuButton = () => {
               </Link>
             )}
 
-            {/* Para agente: Meu Perfil (apenas se não estiver mostrando "Voltar ao Perfil") */}
-            {!isAdmin && isOnProfilePage && (
-              <Link
-                href="/agent/perfil"
-                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <FaUser className="w-4 h-4 text-navy-light" />
-                Meu Perfil
-              </Link>
-            )}
-
+            {/* Configurações */}
             <Link
               href={isAdmin ? "/admin/configuracoes" : "/agent/configuracoes"}
               className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
@@ -368,7 +443,7 @@ const MobileMenu = ({
   onClose: () => void;
   pathname: string;
 }) => {
-  const { user, profile, signOut, isAdmin } = useAuth(); // ✅ Hook unificado
+  const { user, profile, signOut, isAdmin } = useHeaderAuth();
   const isOnProfilePage = pathname === "/agent/perfil";
 
   if (!isOpen) return null;
@@ -412,7 +487,7 @@ const MobileMenu = ({
                 </div>
               </div>
 
-              {/* Opção "Voltar ao Perfil" no mobile - SEMPRE vai para /agent/perfil */}
+              {/* Opção "Voltar ao Perfil" no mobile */}
               {!isOnProfilePage && (
                 <Link
                   href="/agent/perfil"
@@ -432,17 +507,6 @@ const MobileMenu = ({
                   onClick={onClose}
                 >
                   Painel Administrativo
-                </Link>
-              )}
-
-              {/* Para agente: Meu Perfil (apenas se não estiver mostrando "Voltar ao Perfil") */}
-              {!isAdmin && isOnProfilePage && (
-                <Link
-                  href="/agent/perfil"
-                  className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
-                  onClick={onClose}
-                >
-                  Meu Perfil
                 </Link>
               )}
 
