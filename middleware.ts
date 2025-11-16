@@ -1,4 +1,3 @@
-// middleware.ts
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -79,7 +78,7 @@ export async function middleware(request: NextRequest) {
 
       if (profile?.role !== "admin") {
         console.log("🚫 Middleware: Acesso negado - usuário não é admin");
-        return NextResponse.redirect(new URL("/agent/perfil", request.url));
+        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ ATUALIZADO
       }
 
       if (!profile?.status) {
@@ -90,7 +89,7 @@ export async function middleware(request: NextRequest) {
       console.log("✅ Middleware: Acesso admin permitido");
     }
 
-    // 🛡️ PROTEÇÃO DAS ROTAS DE AGENTE
+    // 🛡️ PROTEÇÃO DAS ROTAS DE AGENTE (nova área)
     if (request.nextUrl.pathname.startsWith("/agent")) {
       console.log("🛡️ Middleware: Protegendo rota agent...");
 
@@ -136,8 +135,8 @@ export async function middleware(request: NextRequest) {
         .eq("id", user.id)
         .single();
 
-      // ✅ SEMPRE redirecionar para /agent/perfil (consistente com o Header)
-      return NextResponse.redirect(new URL("/agent/perfil", request.url));
+      // ✅ SEMPRE redirecionar para /perfil (nova rota)
+      return NextResponse.redirect(new URL("/perfil", request.url));
     }
 
     // 🔄 REDIRECIONAMENTO DE ROTA RAIZ
@@ -145,7 +144,7 @@ export async function middleware(request: NextRequest) {
       console.log(
         "🔄 Middleware: Usuário logado acessando raiz, redirecionando para perfil..."
       );
-      return NextResponse.redirect(new URL("/agent/perfil", request.url));
+      return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ ATUALIZADO
     }
   } catch (error) {
     console.error("💥 Middleware: Erro inesperado:", error);
@@ -156,5 +155,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/agent/:path*", "/login", "/"],
+  matcher: [
+    "/admin/:path*",
+    "/agent/:path*", // ✅ ADICIONADO
+    "/perfil/:path*", // ✅ ADICIONADO
+    "/login",
+    "/",
+  ],
 };

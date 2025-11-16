@@ -11,6 +11,7 @@ import {
   Settings,
   LogOut,
   BarChart3,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -164,6 +165,18 @@ export function AdminSidebar() {
             </p>
             <p className="text-xs text-gray-500 truncate">Sistema PAC</p>
           </div>
+
+          {/* Link para Perfil */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/perfil")} // ✅ ATUALIZADO
+            className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+            title="Meu Perfil"
+          >
+            <User className="h-4 w-4" />
+          </Button>
+
           <Button
             variant="ghost"
             size="sm"

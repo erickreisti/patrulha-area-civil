@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Menu, Bell, User, Search, Settings, LogOut } from "lucide-react"; // ✅ Adicionado LogOut
+import { Menu, Bell, User, Search, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -118,7 +118,7 @@ export function AdminHeader() {
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => router.push("/agent/perfil")}
+                onClick={() => router.push("/perfil")} // ✅ ATUALIZADO
                 className="cursor-pointer"
               >
                 <User className="mr-2 h-4 w-4" />
@@ -136,7 +136,7 @@ export function AdminHeader() {
                 onClick={handleSignOut}
                 className="text-red-600 cursor-pointer focus:text-red-600"
               >
-                <LogOut className="mr-2 h-4 w-4" /> {/* ✅ Agora funciona */}
+                <LogOut className="mr-2 h-4 w-4" />
                 Sair do Sistema
               </DropdownMenuItem>
             </DropdownMenuContent>

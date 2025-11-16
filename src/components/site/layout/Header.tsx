@@ -1,4 +1,3 @@
-// src/components/site/layout/Header.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -72,7 +71,7 @@ const useScrollDetection = (threshold = 30) => {
   return isScrolled;
 };
 
-// ✅ HOOK SIMPLIFICADO PARA O HEADER
+// ✅ HOOK CORRIGIDO PARA O HEADER
 const useHeaderAuth = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -84,33 +83,50 @@ const useHeaderAuth = () => {
       try {
         setLoading(true);
 
-        // Primeiro, verificar dados locais (mais rápido e confiável)
+        // Primeiro, verificar dados locais
         const localData = localStorage.getItem("pac_user_data");
         if (localData) {
-          const profileData = JSON.parse(localData);
-          console.log("✅ Header: Usando dados locais", profileData);
-          setProfile(profileData);
-          setUser({ id: profileData.id, email: profileData.email });
-          setLoading(false);
-          return;
+          try {
+            const profileData = JSON.parse(localData);
+            console.log("✅ Header: Usando dados locais", profileData);
+            setProfile(profileData);
+            setUser({ id: profileData.id, email: profileData.email });
+            setLoading(false);
+            return;
+          } catch (parseError) {
+            console.error("❌ Erro ao parsear dados locais:", parseError);
+            localStorage.removeItem("pac_user_data");
+          }
         }
 
-        // Se não tem dados locais, tentar auth (com fallback)
+        // Se não tem dados locais, tentar auth
         try {
           const {
             data: { user: authUser },
             error,
           } = await supabase.auth.getUser();
 
-          if (!error && authUser) {
+          if (error) {
+            console.log("⚠️ Header: Nenhum usuário autenticado");
+            setLoading(false);
+            return;
+          }
+
+          if (authUser) {
             setUser(authUser);
 
             // Buscar perfil do banco
-            const { data: profileData } = await supabase
+            const { data: profileData, error: profileError } = await supabase
               .from("profiles")
               .select("*")
               .eq("id", authUser.id)
               .single();
+
+            if (profileError) {
+              console.error("❌ Erro ao buscar perfil:", profileError);
+              setLoading(false);
+              return;
+            }
 
             if (profileData) {
               setProfile(profileData);
@@ -132,6 +148,31 @@ const useHeaderAuth = () => {
     };
 
     checkAuth();
+
+    // Listen for auth state changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+
+        if (profileData) {
+          setProfile(profileData);
+          setUser(session.user);
+          localStorage.setItem("pac_user_data", JSON.stringify(profileData));
+        }
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setProfile(null);
+        localStorage.removeItem("pac_user_data");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [supabase]);
 
   const signOut = async () => {
@@ -300,14 +341,14 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// ✅ COMPONENTE USER MENU CORRIGIDO
+// ✅ COMPONENTE USER MENU ATUALIZADO
 const UserMenuButton = () => {
   const { user, profile, loading, signOut, isAdmin } = useHeaderAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const pathname = usePathname();
 
-  // Verifica se está na página de perfil
-  const isOnProfilePage = pathname === "/agent/perfil";
+  // Verifica se está na página de perfil (nova rota)
+  const isOnProfilePage = pathname === "/perfil";
   // Verifica se está no dashboard admin
   const isOnAdminDashboard = pathname === "/admin/dashboard";
 
@@ -378,7 +419,7 @@ const UserMenuButton = () => {
             {/* Opção "Voltar ao Perfil" - aparece apenas se NÃO estiver na página de perfil */}
             {!isOnProfilePage && (
               <Link
-                href="/agent/perfil"
+                href="/perfil"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
                 onClick={() => setIsDropdownOpen(false)}
               >
@@ -401,7 +442,7 @@ const UserMenuButton = () => {
 
             {/* Configurações */}
             <Link
-              href={isAdmin ? "/admin/configuracoes" : "/agent/configuracoes"}
+              href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
               className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
               onClick={() => setIsDropdownOpen(false)}
             >
@@ -444,7 +485,7 @@ const MobileMenu = ({
   pathname: string;
 }) => {
   const { user, profile, signOut, isAdmin } = useHeaderAuth();
-  const isOnProfilePage = pathname === "/agent/perfil";
+  const isOnProfilePage = pathname === "/perfil";
 
   if (!isOpen) return null;
 
@@ -490,7 +531,7 @@ const MobileMenu = ({
               {/* Opção "Voltar ao Perfil" no mobile */}
               {!isOnProfilePage && (
                 <Link
-                  href="/agent/perfil"
+                  href="/perfil"
                   className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
                   onClick={onClose}
                 >
