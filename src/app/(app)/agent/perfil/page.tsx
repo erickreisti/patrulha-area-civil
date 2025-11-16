@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO CENTRALIZADA E RESPONSIVA
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO COM BOTÕES APENAS PARA ADMIN
 "use client";
 
 import { useState, useEffect } from "react";
@@ -75,7 +75,7 @@ export default function AgentPerfil() {
 
         setProfile(profileData);
 
-        // VERIFICAÇÃO ROBUSTA DE ADMIN
+        // VERIFICAÇÃO DE ADMIN
         const userRole = profileData.role?.toLowerCase().trim();
         setIsAdmin(userRole === "admin");
       } catch (err: any) {
@@ -291,9 +291,12 @@ export default function AgentPerfil() {
                               <FaUser className="w-20 h-20 sm:w-24 sm:h-24 text-gray-400" />
                             )}
                           </div>
-                          <button className="absolute -bottom-2 -right-2 bg-navy-light text-white p-2 sm:p-3 rounded-full hover:bg-navy transition-colors shadow-xl border-2 border-white">
-                            <FaCamera className="w-4 h-4 sm:w-5 sm:h-5" />
-                          </button>
+                          {/* Botão de câmera apenas para admin */}
+                          {isAdmin && (
+                            <button className="absolute -bottom-2 -right-2 bg-navy-light text-white p-2 sm:p-3 rounded-full hover:bg-navy transition-colors shadow-xl border-2 border-white">
+                              <FaCamera className="w-4 h-4 sm:w-5 sm:h-5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -350,15 +353,19 @@ export default function AgentPerfil() {
 
                   {/* Botões de Ação */}
                   <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
-                    {/* Botão de Editar */}
-                    <Button className="bg-navy-light hover:bg-navy text-white px-6 py-3 text-base font-semibold shadow-md w-full sm:w-auto">
-                      <FaEdit className="w-4 h-4 mr-2" />
-                      Editar Perfil
-                    </Button>
+                    {/* Botão de Editar - APENAS PARA ADMIN */}
+                    {isAdmin && (
+                      <Link href={`/admin/agentes/${profile!.id}`}>
+                        <Button className="bg-navy-light hover:bg-navy text-white px-6 py-3 text-base font-semibold shadow-md w-full sm:w-auto">
+                          <FaEdit className="w-4 h-4 mr-2" />
+                          Editar Perfil
+                        </Button>
+                      </Link>
+                    )}
 
                     {/* Botões de Navegação */}
                     <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                      {/* Link "Voltar ao Site" */}
+                      {/* Link "Voltar ao Site" - SEMPRE VISÍVEL */}
                       <Link
                         href="/"
                         className="flex items-center justify-center gap-2 text-navy-light hover:bg-navy-light hover:text-white transition-colors duration-300 font-medium px-4 py-3 border border-navy-light rounded-lg text-sm w-full sm:w-auto text-center"
@@ -367,7 +374,7 @@ export default function AgentPerfil() {
                         Voltar ao Site
                       </Link>
 
-                      {/* Botão "Ir ao Dashboard" para Admin */}
+                      {/* Botão "Ir ao Dashboard" - APENAS PARA ADMIN */}
                       {isAdmin && (
                         <Link
                           href="/admin/dashboard"
