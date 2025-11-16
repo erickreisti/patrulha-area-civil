@@ -1,7 +1,8 @@
+// src/app/(site)/noticias/[slug]/page.tsx - ATUALIZADO
 "use client";
 
-import { useState } from "react";
-import { notFound, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { notFound, useRouter, useParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,107 +15,77 @@ import {
   FaNewspaper,
 } from "react-icons/fa";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { NoticiaWithAutor } from "@/types/noticias";
 
-// Dados mock COMPLETOS
-const noticias = [
-  {
-    id: 1,
-    slug: "operacao-resgate-florestal",
-    titulo: "Operação de Resgate em Área Florestal Concluída com Sucesso",
-    resumo:
-      "Equipe da PAC realiza resgate de excursionistas perdidos na Serra do Mar",
-    conteudo: `
-      <p>A Patrulha Aérea Civil realizou com sucesso uma operação de resgate na Serra do Mar, onde dois excursionistas estavam desaparecidos há mais de 48 horas. A operação envolveu equipes terrestres e aéreas trabalhando em conjunto.</p>
-      
-      <h2>Detalhes da Operação</h2>
-      <p>Os agentes do Grupamento de Operações Ambientais foram acionados na tarde de sexta-feira após receberem informações sobre dois excursionistas que não haviam retornado de uma trilha na região.</p>
-      
-      <p>As buscas iniciaram imediatamente com apoio de drones equipados com câmeras térmicas e uma equipe terrestre especializada em resgate em áreas de difícil acesso.</p>
-      
-      <h2>Resultado Positivo</h2>
-      <p>Após 6 horas de buscas intensivas, os excursionistas foram localizados em bom estado de saúde em uma área remota da serra. Eles receberam atendimento médico inicial no local e foram transportados em segurança para a base operacional.</p>
-      
-      <h2>Cooperação entre Equipes</h2>
-      <p>A operação contou com a integração perfeita entre as equipes terrestres e aéreas, demonstrando a eficiência do treinamento conjunto realizado pela PAC.</p>
-    `,
-    imagem: "/images/site/operacao-resgate.jpg",
-    categoria: "Operações",
-    autor: "Comandante Silva",
-    dataPublicacao: "2024-01-15",
-    tempoLeitura: "3 min",
-    destaque: true,
-  },
-  {
-    id: 2,
-    slug: "treinamento-capacitacao",
-    titulo: "Novo Programa de Treinamento para Agentes",
-    resumo: "Capacitação em técnicas avançadas de busca e salvamento",
-    conteudo: `
-      <p>A PAC iniciou um novo programa de capacitação para seus agentes, focando em técnicas avançadas de busca e salvamento em ambientes complexos.</p>
-      
-      <h2>Objetivos do Programa</h2>
-      <p>O programa tem como objetivo principal aprimorar as habilidades dos nossos agentes em situações de alta complexidade, incluindo operações noturnas, condições climáticas adversas e ambientes de difícil acesso.</p>
-      
-      <h2>Módulos de Treinamento</h2>
-      <p>O curso é dividido em módulos especializados que incluem navegação terrestre avançada, técnicas de rapel, primeiros socorros em ambiente hostil e comunicação tática.</p>
-      
-      <h2>Instrutores Especializados</h2>
-      <p>Contamos com instrutores altamente qualificados, incluindo veteranos de forças especiais e especialistas em resgate em áreas remotas.</p>
-    `,
-    imagem: "/images/site/treinamento.jpg",
-    categoria: "Treinamento",
-    autor: "Capitão Oliveira",
-    dataPublicacao: "2024-01-10",
-    tempoLeitura: "4 min",
-    destaque: false,
-  },
-  {
-    id: 3,
-    slug: "parceria-folared",
-    titulo: "PAC Fortalece Parceria com FOLARED",
-    resumo: "Cooperação internacional para resposta a emergências",
-    conteudo: `
-      <p>A Patrulha Aérea Civil reforçou sua participação na FOLARED (Federação de Organismos Latino Americanos de Resposta a Emergências), ampliando a cooperação internacional em operações de resgate.</p>
-      
-      <h2>Expansão da Cooperação</h2>
-      <p>A parceria permitirá o intercâmbio de conhecimentos, técnicas e melhores práticas entre as organizações membros, além de facilitar operações conjuntas em situações de desastres regionais.</p>
-      
-      <h2>Benefícios para a Comunidade</h2>
-      <p>Esta cooperação trará benefícios diretos para as comunidades atendidas, com acesso a recursos e expertise internacional em resposta a emergências.</p>
-      
-      <h2>Treinamentos Conjuntos</h2>
-      <p>Estão programados exercícios conjuntos e intercâmbios de equipes para compartilhar experiências e aprimorar os protocolos operacionais.</p>
-    `,
-    imagem: "/images/site/folared-parceria.jpg",
-    categoria: "Cooperação",
-    autor: "Tenente Costa",
-    dataPublicacao: "2024-01-05",
-    tempoLeitura: "5 min",
-    destaque: true,
-  },
-];
-
-interface PageProps {
-  params: {
-    slug: string;
-  };
-}
-
-export default function NoticiaPage({ params }: PageProps) {
+export default function NoticiaPage() {
   const router = useRouter();
+  const params = useParams();
+  const [noticia, setNoticia] = useState<NoticiaWithAutor | null>(null);
+  const [noticiasRelacionadas, setNoticiasRelacionadas] = useState<
+    NoticiaWithAutor[]
+  >([]);
+  const [loading, setLoading] = useState(true);
   const [isSharing, setIsSharing] = useState(false);
-  const noticia = noticias.find((n) => n.slug === params.slug);
 
-  if (!noticia) {
-    notFound();
-  }
+  const supabase = createClient();
 
-  const noticiasRelacionadas = noticias
-    .filter((n) => n.id !== noticia.id && n.categoria === noticia.categoria)
-    .slice(0, 2);
+  useEffect(() => {
+    const fetchNoticia = async () => {
+      try {
+        setLoading(true);
+
+        // Buscar notícia pelo slug
+        const { data: noticiaData, error } = await supabase
+          .from("noticias")
+          .select(
+            `
+            *,
+            autor:profiles(full_name, graduacao)
+          `
+          )
+          .eq("slug", params.slug)
+          .eq("status", "publicado") // Apenas notícias publicadas
+          .single();
+
+        if (error || !noticiaData) {
+          notFound();
+          return;
+        }
+
+        setNoticia(noticiaData);
+
+        // Buscar notícias relacionadas (mesma categoria)
+        const { data: relacionadasData } = await supabase
+          .from("noticias")
+          .select(
+            `
+            *,
+            autor:profiles(full_name, graduacao)
+          `
+          )
+          .eq("categoria", noticiaData.categoria)
+          .eq("status", "publicado")
+          .neq("id", noticiaData.id)
+          .limit(2)
+          .order("data_publicacao", { ascending: false });
+
+        setNoticiasRelacionadas(relacionadasData || []);
+      } catch (error) {
+        console.error("Erro ao carregar notícia:", error);
+        notFound();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (params.slug) {
+      fetchNoticia();
+    }
+  }, [params.slug, supabase]);
 
   const handleShare = async () => {
-    if (navigator.share) {
+    if (navigator.share && noticia) {
       try {
         await navigator.share({
           title: noticia.titulo,
@@ -129,6 +100,26 @@ export default function NoticiaPage({ params }: PageProps) {
       setTimeout(() => setIsSharing(false), 2000);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mb-8"></div>
+            <div className="h-96 bg-gray-200 rounded mb-8"></div>
+            <div className="h-4 bg-gray-200 rounded mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!noticia) {
+    notFound();
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -158,12 +149,14 @@ export default function NoticiaPage({ params }: PageProps) {
             <div className="flex flex-wrap items-center gap-6 text-blue-100">
               <div className="flex items-center text-lg">
                 <FaUser className="h-5 w-5 mr-2" />
-                <span className="font-medium">{noticia.autor}</span>
+                <span className="font-medium">
+                  {noticia.autor?.full_name || "Autor não definido"}
+                </span>
               </div>
               <div className="flex items-center text-lg">
                 <FaCalendar className="h-5 w-5 mr-2" />
                 <span>
-                  {new Date(noticia.dataPublicacao).toLocaleDateString(
+                  {new Date(noticia.data_publicacao).toLocaleDateString(
                     "pt-BR",
                     {
                       day: "numeric",
@@ -175,7 +168,9 @@ export default function NoticiaPage({ params }: PageProps) {
               </div>
               <div className="flex items-center text-lg">
                 <FaClock className="h-5 w-5 mr-2" />
-                <span>{noticia.tempoLeitura} de leitura</span>
+                <span>
+                  {Math.ceil(noticia.conteudo.length / 1000)} min de leitura
+                </span>
               </div>
             </div>
           </div>
@@ -187,11 +182,15 @@ export default function NoticiaPage({ params }: PageProps) {
         <div className="container mx-auto px-4">
           <article className="max-w-4xl mx-auto">
             {/* Imagem de destaque */}
-            <div className="h-96 bg-gray-200 rounded-lg flex items-center justify-center mb-8 shadow-lg border border-gray-200">
-              <span className="text-gray-600 text-xl">
-                Imagem: {noticia.titulo}
-              </span>
-            </div>
+            {noticia.imagem && (
+              <div className="h-96 bg-gray-200 rounded-lg flex items-center justify-center mb-8 shadow-lg border border-gray-200 overflow-hidden">
+                <img
+                  src={noticia.imagem}
+                  alt={noticia.titulo}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
 
             {/* Conteúdo */}
             <Card className="border-gray-200 shadow-lg mb-8 border-2">

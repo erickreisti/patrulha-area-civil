@@ -1,3 +1,4 @@
+// src/components/site/sections/NewsSection.tsx - ATUALIZADO
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -12,36 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { FaCalendar, FaArrowRight, FaClock } from "react-icons/fa";
 import Link from "next/link";
 import { motion } from "framer-motion";
-
-const ULTIMAS_NOTICIAS = [
-  {
-    id: 1,
-    slug: "operacao-resgate-florestal",
-    titulo: "Operação de Resgate em Área Florestal",
-    resumo:
-      "Equipe da PAC realiza resgate de excursionistas na Serra do Mar com sucesso total",
-    categoria: "Operações",
-    dataPublicacao: "2024-01-15",
-  },
-  {
-    id: 2,
-    slug: "treinamento-capacitacao",
-    titulo: "Novo Programa de Treinamento",
-    resumo:
-      "Capacitação em técnicas avançadas de busca e salvamento para novos voluntários",
-    categoria: "Treinamento",
-    dataPublicacao: "2024-01-10",
-  },
-  {
-    id: 3,
-    slug: "parceria-folared",
-    titulo: "PAC Fortalece Parceria com FOLARED",
-    resumo:
-      "Cooperação internacional para resposta a emergências em grande escala",
-    categoria: "Cooperação",
-    dataPublicacao: "2024-01-05",
-  },
-];
+import { useNoticias } from "@/hooks/useNoticias";
 
 const SectionHeader = () => (
   <motion.div
@@ -69,13 +41,7 @@ const SectionHeader = () => (
   </motion.div>
 );
 
-const NewsCard = ({
-  noticia,
-  index,
-}: {
-  noticia: (typeof ULTIMAS_NOTICIAS)[0];
-  index: number;
-}) => (
+const NewsCard = ({ noticia, index }: { noticia: any; index: number }) => (
   <motion.div
     initial={{ opacity: 0, y: 30 }}
     whileInView={{ opacity: 1, y: 0 }}
@@ -93,7 +59,7 @@ const NewsCard = ({
           </Badge>
           <div className="flex items-center text-gray-500 text-xs font-roboto">
             <FaCalendar className="h-3 w-3 mr-1" />
-            {new Date(noticia.dataPublicacao).toLocaleDateString("pt-BR")}
+            {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR")}
           </div>
         </div>
         <CardTitle className="text-gray-800 text-lg font-bold leading-tight line-clamp-2">
@@ -120,9 +86,9 @@ const NewsCard = ({
   </motion.div>
 );
 
-const NewsGrid = () => (
+const NewsGrid = ({ noticias }: { noticias: any[] }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
-    {ULTIMAS_NOTICIAS.map((noticia, index) => (
+    {noticias.slice(0, 3).map((noticia, index) => (
       <NewsCard key={noticia.id} noticia={noticia} index={index} />
     ))}
   </div>
@@ -151,12 +117,64 @@ const CTAButton = () => (
 );
 
 export function NewsSection() {
+  const { noticias, loading, error } = useNoticias();
+
+  if (loading) {
+    return (
+      <section className="w-full bg-white py-16 lg:py-20">
+        <div className="container mx-auto px-4">
+          <SectionHeader />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="border-gray-200 bg-white animate-pulse">
+                <CardHeader className="pb-4">
+                  <div className="h-4 bg-gray-200 rounded w-1/4 mb-3"></div>
+                  <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <CTAButton />
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="w-full bg-white py-16 lg:py-20">
+        <div className="container mx-auto px-4 text-center">
+          <SectionHeader />
+          <p className="text-red-600 mb-8">
+            Erro ao carregar notícias: {error}
+          </p>
+          <CTAButton />
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="w-full bg-white py-16 lg:py-20">
       <div className="container mx-auto px-4">
         <SectionHeader />
-        <NewsGrid />
-        <CTAButton />
+        {noticias.length > 0 ? (
+          <>
+            <NewsGrid noticias={noticias} />
+            <CTAButton />
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-8">
+              Nenhuma notícia publicada ainda.
+            </p>
+            <CTAButton />
+          </div>
+        )}
       </div>
     </section>
   );

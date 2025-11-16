@@ -1,4 +1,3 @@
-// src/app/layout.tsx - ATUALIZADO COM TOAST PROVIDER
 import type { Metadata, Viewport } from "next";
 import { Inter, Roboto } from "next/font/google";
 import "./globals.css";

@@ -1,6 +1,4 @@
-"use client";
-
-import { useState } from "react";
+import { createClient } from "@/lib/supabase/server";
 import {
   Card,
   CardContent,
@@ -10,7 +8,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
   FaFolder,
   FaImages,
@@ -18,98 +15,77 @@ import {
   FaCalendar,
   FaArrowRight,
   FaCamera,
-  FaSearch,
 } from "react-icons/fa";
 import Link from "next/link";
+import { SearchAndFilter } from "./components/SearchAndFilter";
 
-// Dados mock das categorias da galeria
-const categoriasGaleria = [
-  {
-    id: 1,
-    slug: "operacoes-resgate",
-    titulo: "Operações de Resgate",
-    descricao: "Registros das nossas operações de busca e salvamento",
-    imagem: "/images/gallery/operacoes-thumb.jpg",
-    quantidade: 24,
-    tipo: "fotos",
-    dataAtualizacao: "2024-01-15",
-  },
-  {
-    id: 2,
-    slug: "treinamentos",
-    titulo: "Treinamentos",
-    descricao: "Capacitação e exercícios práticos da nossa equipe",
-    imagem: "/images/gallery/treinamentos-thumb.jpg",
-    quantidade: 18,
-    tipo: "fotos",
-    dataAtualizacao: "2024-01-10",
-  },
-  {
-    id: 3,
-    slug: "equipamentos",
-    titulo: "Equipamentos",
-    descricao: "Nossa frota e equipamentos de última geração",
-    imagem: "/images/gallery/equipamentos-thumb.jpg",
-    quantidade: 12,
-    tipo: "fotos",
-    dataAtualizacao: "2024-01-08",
-  },
-  {
-    id: 4,
-    slug: "eventos-comunitarios",
-    titulo: "Eventos Comunitários",
-    descricao: "Participação em eventos e ações sociais",
-    imagem: "/images/gallery/eventos-thumb.jpg",
-    quantidade: 15,
-    tipo: "fotos",
-    dataAtualizacao: "2023-12-20",
-  },
-  {
-    id: 5,
-    slug: "patrulheiro-mirim",
-    titulo: "Patrulheiro Mirim",
-    descricao: "Atividades do projeto social para jovens",
-    imagem: "/images/gallery/mirim-thumb.jpg",
-    quantidade: 20,
-    tipo: "fotos",
-    dataAtualizacao: "2023-12-15",
-  },
-  {
-    id: 6,
-    slug: "videos-operacionais",
-    titulo: "Vídeos Operacionais",
-    descricao: "Registros em vídeo das nossas operações",
-    imagem: "/images/gallery/videos-thumb.jpg",
-    quantidade: 8,
-    tipo: "videos",
-    dataAtualizacao: "2024-01-12",
-  },
-];
+export default async function GaleriaPage({
+  searchParams,
+}: {
+  searchParams: { search?: string; tipo?: string };
+}) {
+  const supabase = await createClient();
 
-export default function GaleriaPage() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedType, setSelectedType] = useState("Todas");
+  // Buscar categorias ativas do banco
+  const { data: categorias, error } = await supabase
+    .from("galeria_categorias")
+    .select(
+      `
+      *,
+      galeria_itens(count)
+    `
+    )
+    .eq("status", true)
+    .order("ordem", { ascending: true })
+    .order("nome", { ascending: true });
 
-  const tipos = ["Todas", "Fotos", "Vídeos"];
+  if (error) {
+    console.error("Erro ao carregar categorias:", error);
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Erro ao carregar galeria
+          </h1>
+          <p className="text-gray-600">
+            Tente recarregar a página ou volte mais tarde.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-  const categoriasFiltradas = categoriasGaleria.filter((categoria) => {
-    const matchesSearch =
-      categoria.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      categoria.descricao.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType =
-      selectedType === "Todas" ||
-      (selectedType === "Fotos" && categoria.tipo === "fotos") ||
-      (selectedType === "Vídeos" && categoria.tipo === "videos");
-    return matchesSearch && matchesType;
-  });
+  // Aplicar filtros do searchParams
+  let categoriasFiltradas = categorias || [];
 
-  const totalFotos = categoriasGaleria
-    .filter((cat) => cat.tipo === "fotos")
-    .reduce((sum, cat) => sum + cat.quantidade, 0);
+  if (searchParams.search) {
+    const searchTerm = searchParams.search.toLowerCase();
+    categoriasFiltradas = categoriasFiltradas.filter(
+      (categoria) =>
+        categoria.nome.toLowerCase().includes(searchTerm) ||
+        categoria.descricao?.toLowerCase().includes(searchTerm)
+    );
+  }
 
-  const totalVideos = categoriasGaleria
-    .filter((cat) => cat.tipo === "videos")
-    .reduce((sum, cat) => sum + cat.quantidade, 0);
+  if (searchParams.tipo && searchParams.tipo !== "Todas") {
+    const tipoFiltro = searchParams.tipo === "Fotos" ? "fotos" : "videos";
+    categoriasFiltradas = categoriasFiltradas.filter(
+      (categoria) => categoria.tipo === tipoFiltro
+    );
+  }
+
+  // Calcular estatísticas reais
+  const totalFotos =
+    categorias
+      ?.filter((cat) => cat.tipo === "fotos")
+      .reduce((sum, cat) => sum + (cat.galeria_itens?.[0]?.count || 0), 0) || 0;
+
+  const totalVideos =
+    categorias
+      ?.filter((cat) => cat.tipo === "videos")
+      .reduce((sum, cat) => sum + (cat.galeria_itens?.[0]?.count || 0), 0) || 0;
+
+  const totalItens = totalFotos + totalVideos;
 
   const estatisticas = [
     {
@@ -124,12 +100,12 @@ export default function GaleriaPage() {
     },
     {
       icon: FaFolder,
-      valor: categoriasGaleria.length,
+      valor: categorias?.length || 0,
       label: "Categorias",
     },
     {
       icon: FaCalendar,
-      valor: "2024",
+      valor: new Date().getFullYear(),
       label: "Atualizado",
     },
   ];
@@ -157,40 +133,10 @@ export default function GaleriaPage() {
       </section>
 
       {/* Filtros e Busca */}
-      <section className="py-8 bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex-1 max-w-md">
-              <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  type="text"
-                  placeholder="Buscar categorias..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-2 border-gray-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 py-2 rounded-lg transition-all duration-300"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {tipos.map((tipo) => (
-                <Button
-                  key={tipo}
-                  variant={selectedType === tipo ? "default" : "outline"}
-                  onClick={() => setSelectedType(tipo)}
-                  className={`${
-                    selectedType === tipo
-                      ? "bg-blue-600 hover:bg-blue-700 text-white"
-                      : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                  } transition-all duration-300`}
-                >
-                  {tipo}
-                </Button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+      <SearchAndFilter
+        initialSearch={searchParams.search || ""}
+        initialTipo={searchParams.tipo || "Todas"}
+      />
 
       {/* Conteúdo Principal */}
       <section className="py-16 bg-white">
@@ -231,10 +177,13 @@ export default function GaleriaPage() {
                   className="border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 group border-2 overflow-hidden h-full flex flex-col"
                 >
                   {/* Thumbnail da Categoria */}
-                  <div className="h-48 bg-gray-200 flex items-center justify-center relative">
-                    <span className="text-gray-600">
-                      Imagem: {categoria.titulo}
-                    </span>
+                  <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
+                    <div className="text-center p-4">
+                      <FaImages className="h-12 w-12 text-gray-800/50 mx-auto mb-3" />
+                      <span className="text-gray-800 font-medium">
+                        {categoria.nome}
+                      </span>
+                    </div>
                     <Badge
                       variant={
                         categoria.tipo === "videos" ? "default" : "secondary"
@@ -251,7 +200,7 @@ export default function GaleriaPage() {
 
                   <CardHeader className="pb-4 flex-grow">
                     <CardTitle className="text-gray-800 text-xl font-bebas tracking-wide group-hover:text-blue-600 transition-colors leading-tight">
-                      {categoria.titulo}
+                      {categoria.nome}
                     </CardTitle>
                     <CardDescription className="text-gray-600 leading-relaxed">
                       {categoria.descricao}
@@ -262,14 +211,16 @@ export default function GaleriaPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center text-gray-600 text-sm">
                         <FaImages className="h-4 w-4 mr-1" />
-                        <span>{categoria.quantidade} itens</span>
+                        <span>
+                          {categoria.galeria_itens?.[0]?.count || 0} itens
+                        </span>
                       </div>
                       <div className="flex items-center text-gray-600 text-sm">
                         <FaCalendar className="h-4 w-4 mr-1" />
                         <span>
-                          {new Date(
-                            categoria.dataAtualizacao
-                          ).toLocaleDateString("pt-BR")}
+                          {new Date(categoria.created_at).toLocaleDateString(
+                            "pt-BR"
+                          )}
                         </span>
                       </div>
                     </div>

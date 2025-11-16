@@ -1,6 +1,7 @@
+// src/app/(site)/noticias/page.tsx - ATUALIZADO
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -20,108 +21,53 @@ import {
   FaSearch,
 } from "react-icons/fa";
 import Link from "next/link";
-
-// Dados mock das notícias
-const noticias = [
-  {
-    id: 1,
-    slug: "operacao-resgate-florestal",
-    titulo: "Operação de Resgate em Área Florestal Concluída com Sucesso",
-    resumo:
-      "Equipe da PAC realiza resgate de excursionistas perdidos na Serra do Mar",
-    conteudo:
-      "A Patrulha Aérea Civil realizou com sucesso uma operação de resgate na Serra do Mar...",
-    imagem: "/images/site/operacao-resgate.jpg",
-    categoria: "Operações",
-    autor: "Comandante Silva",
-    dataPublicacao: "2024-01-15",
-    tempoLeitura: "3 min",
-    destaque: true,
-  },
-  {
-    id: 2,
-    slug: "treinamento-capacitacao",
-    titulo: "Novo Programa de Treinamento para Agentes",
-    resumo: "Capacitação em técnicas avançadas de busca e salvamento",
-    conteudo:
-      "A PAC iniciou um novo programa de capacitação para seus agentes...",
-    imagem: "/images/site/treinamento.jpg",
-    categoria: "Treinamento",
-    autor: "Capitão Oliveira",
-    dataPublicacao: "2024-01-10",
-    tempoLeitura: "4 min",
-    destaque: false,
-  },
-  {
-    id: 3,
-    slug: "parceria-folared",
-    titulo: "PAC Fortalece Parceria com FOLARED",
-    resumo: "Cooperação internacional para resposta a emergências",
-    conteudo: "A Patrulha Aérea Civil reforçou sua participação na FOLARED...",
-    imagem: "/images/site/folared-parceria.jpg",
-    categoria: "Cooperação",
-    autor: "Tenente Costa",
-    dataPublicacao: "2024-01-05",
-    tempoLeitura: "5 min",
-    destaque: true,
-  },
-  {
-    id: 4,
-    slug: "patrulheiro-mirim-formatura",
-    titulo: "Formatura da Turma 2023 do Patrulheiro Mirim",
-    resumo: "Jovens concluem programa de formação cívica e disciplinar",
-    conteudo:
-      "Foi realizada no último sábado a formatura da turma 2023 do projeto Patrulheiro Mirim...",
-    imagem: "/images/site/formatura-mirim.jpg",
-    categoria: "Projetos Sociais",
-    autor: "Sargento Santos",
-    dataPublicacao: "2023-12-20",
-    tempoLeitura: "3 min",
-    destaque: false,
-  },
-  {
-    id: 5,
-    slug: "equipamentos-novos",
-    titulo: "PAC Adquire Novos Equipamentos de Resgate",
-    resumo: "Investimento em tecnologia para melhorar eficiência nas operações",
-    conteudo:
-      "A Patrulha Aérea Civil recebeu novos equipamentos de última geração...",
-    imagem: "/images/site/equipamentos.jpg",
-    categoria: "Equipamentos",
-    autor: "Comandante Silva",
-    dataPublicacao: "2023-12-15",
-    tempoLeitura: "2 min",
-    destaque: false,
-  },
-  {
-    id: 6,
-    slug: "operacao-inundacao",
-    titulo: "Resposta Rápida a Inundações no Litoral",
-    resumo:
-      "Equipes terrestres e aéreas atuam no socorro a vítimas de enchentes",
-    conteudo:
-      "Diante das fortes chuvas que atingiram o litoral, a PAC mobilizou suas equipes...",
-    imagem: "/images/site/inundacao.jpg",
-    categoria: "Operações",
-    autor: "Capitão Oliveira",
-    dataPublicacao: "2023-12-10",
-    tempoLeitura: "4 min",
-    destaque: true,
-  },
-];
+import { createClient } from "@/lib/supabase/client";
+import { NoticiaWithAutor } from "@/types/noticias";
 
 export default function NoticiasPage() {
+  const [noticias, setNoticias] = useState<NoticiaWithAutor[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Todas");
 
-  const noticiasDestaque = noticias.filter((noticia) => noticia.destaque);
-  const noticiasRecentes = noticias.filter((noticia) => !noticia.destaque);
+  const supabase = createClient();
 
+  useEffect(() => {
+    const fetchNoticias = async () => {
+      try {
+        setLoading(true);
+
+        const { data, error } = await supabase
+          .from("noticias")
+          .select(
+            `
+            *,
+            autor:profiles(full_name, graduacao)
+          `
+          )
+          .eq("status", "publicado") // Apenas notícias publicadas
+          .order("data_publicacao", { ascending: false });
+
+        if (error) throw error;
+
+        setNoticias(data || []);
+      } catch (error) {
+        console.error("Erro ao buscar notícias:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNoticias();
+  }, []);
+
+  // Extrair categorias únicas
   const categorias = [
     "Todas",
     ...new Set(noticias.map((noticia) => noticia.categoria)),
   ];
 
+  // Filtrar notícias
   const noticiasFiltradas = noticias.filter((noticia) => {
     const matchesSearch =
       noticia.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -131,12 +77,39 @@ export default function NoticiasPage() {
     return matchesSearch && matchesCategory;
   });
 
-  const noticiasDestaqueFiltradas = noticiasFiltradas.filter(
+  const noticiasDestaque = noticiasFiltradas.filter(
     (noticia) => noticia.destaque
   );
-  const noticiasRecentesFiltradas = noticiasFiltradas.filter(
+  const noticiasRecentes = noticiasFiltradas.filter(
     (noticia) => !noticia.destaque
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-1/4 mx-auto mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto mb-8"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Card key={i} className="border-gray-200">
+                  <CardHeader>
+                    <div className="h-6 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -202,7 +175,7 @@ export default function NoticiasPage() {
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           {/* Notícias em Destaque */}
-          {noticiasDestaqueFiltradas.length > 0 && (
+          {noticiasDestaque.length > 0 && (
             <div className="mb-16">
               <div className="text-center mb-12">
                 <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4 font-bebas tracking-wide">
@@ -212,15 +185,23 @@ export default function NoticiasPage() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {noticiasDestaqueFiltradas.map((noticia) => (
+                {noticiasDestaque.map((noticia) => (
                   <Card
                     key={noticia.id}
                     className="border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 group border-2 overflow-hidden"
                   >
                     <div className="h-64 bg-gray-200 flex items-center justify-center relative">
-                      <span className="text-gray-600">
-                        Imagem: {noticia.titulo}
-                      </span>
+                      {noticia.imagem ? (
+                        <img
+                          src={noticia.imagem}
+                          alt={noticia.titulo}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-gray-600">
+                          Imagem: {noticia.titulo}
+                        </span>
+                      )}
                       <Badge className="absolute top-4 left-4 bg-blue-600 text-white">
                         Destaque
                       </Badge>
@@ -232,7 +213,7 @@ export default function NoticiasPage() {
                         </Badge>
                         <div className="flex items-center text-gray-600 text-sm">
                           <FaClock className="h-4 w-4 mr-1" />
-                          {noticia.tempoLeitura}
+                          {Math.ceil(noticia.conteudo.length / 1000)} min
                         </div>
                       </div>
                       <CardTitle className="text-gray-800 text-xl font-bebas tracking-wide leading-tight">
@@ -247,12 +228,12 @@ export default function NoticiasPage() {
                         <div className="flex items-center space-x-4 text-sm text-gray-600">
                           <div className="flex items-center">
                             <FaUser className="h-4 w-4 mr-1" />
-                            {noticia.autor}
+                            {noticia.autor?.full_name || "Autor não definido"}
                           </div>
                           <div className="flex items-center">
                             <FaCalendar className="h-4 w-4 mr-1" />
                             {new Date(
-                              noticia.dataPublicacao
+                              noticia.data_publicacao
                             ).toLocaleDateString("pt-BR")}
                           </div>
                         </div>
@@ -278,14 +259,14 @@ export default function NoticiasPage() {
           <div>
             <div className="text-center mb-12">
               <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-4 font-bebas tracking-wide">
-                TODAS AS NOTÍCIAS
+                TODAS AS NOTÍCIAS ({noticiasRecentes.length})
               </h2>
               <div className="w-24 h-1 bg-blue-600 mx-auto rounded-full"></div>
             </div>
 
-            {noticiasRecentesFiltradas.length > 0 ? (
+            {noticiasRecentes.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {noticiasRecentesFiltradas.map((noticia) => (
+                {noticiasRecentes.map((noticia) => (
                   <Card
                     key={noticia.id}
                     className="border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300 group border-2 h-full flex flex-col"
@@ -300,7 +281,7 @@ export default function NoticiasPage() {
                         </Badge>
                         <div className="flex items-center text-gray-600 text-xs">
                           <FaClock className="h-3 w-3 mr-1" />
-                          {noticia.tempoLeitura}
+                          {Math.ceil(noticia.conteudo.length / 1000)} min
                         </div>
                       </div>
                       <CardTitle className="text-gray-800 text-lg font-bebas tracking-wide leading-tight mb-3">
@@ -313,7 +294,7 @@ export default function NoticiasPage() {
                     <CardContent className="pt-0">
                       <div className="flex items-center justify-between">
                         <div className="text-xs text-gray-600">
-                          {new Date(noticia.dataPublicacao).toLocaleDateString(
+                          {new Date(noticia.data_publicacao).toLocaleDateString(
                             "pt-BR"
                           )}
                         </div>
@@ -335,7 +316,9 @@ export default function NoticiasPage() {
             ) : (
               <div className="text-center py-12">
                 <p className="text-gray-600 text-lg">
-                  Nenhuma notícia encontrada para os filtros selecionados.
+                  {noticias.length === 0
+                    ? "Nenhuma notícia publicada ainda."
+                    : "Nenhuma notícia encontrada para os filtros selecionados."}
                 </p>
               </div>
             )}
