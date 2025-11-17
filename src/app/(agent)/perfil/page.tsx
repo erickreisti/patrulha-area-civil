@@ -419,7 +419,7 @@ export default function AgentPerfil() {
                           />
                           <Badge
                             variant={certificationInfo.badgeVariant}
-                            className={`text-xs sm:text-sm px-3 py-1 font-semibold ${certificationInfo.className}`}
+                            className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-mono font-bold px-4 py-2 ${certificationInfo.className}`}
                           >
                             {certificationInfo.text}
                           </Badge>
@@ -430,16 +430,6 @@ export default function AgentPerfil() {
                             automaticamente
                           </p>
                         )}
-                      </div>
-
-                      {/* Email */}
-                      <div className="space-y-2">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block">
-                          Email
-                        </label>
-                        <p className="text-sm sm:text-base lg:text-lg font-medium text-gray-600 break-all">
-                          {profile!.email}
-                        </p>
                       </div>
 
                       {/* Badge de Admin */}

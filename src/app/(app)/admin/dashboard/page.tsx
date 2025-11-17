@@ -1,4 +1,4 @@
-// src/app/(app)/admin/dashboard/page.tsx - VERSÃO CORRIGIDA
+// src/app/(app)/admin/dashboard/page.tsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,12 +16,12 @@ import {
   FaExclamationTriangle,
   FaCheckCircle,
   FaClock,
-  FaArrowLeft,
   FaUser,
   FaServer,
   FaFolder,
   FaVideo,
-  FaCamera, // Usando FaCamera no lugar de FaPhoto
+  FaCamera,
+  FaGlobe,
 } from "react-icons/fa";
 
 interface DashboardStats {
@@ -245,7 +245,7 @@ export default function AdminDashboard() {
         <div className="flex items-center gap-2">
           <FaServer className="w-3 h-3 text-gray-600" />
           <span className="text-xs text-gray-600 font-medium hidden sm:inline">
-            Status do Sistema:
+            Status:
           </span>
           <div className="flex items-center gap-2">
             <div className="relative group">
@@ -273,21 +273,18 @@ export default function AdminDashboard() {
     value,
     icon: Icon,
     description,
-    trend,
-    color = "blue",
+    color = "navy",
   }: {
     title: string;
     value: number;
     icon: any;
     description: string;
-    trend?: string;
-    color?: "blue" | "green" | "purple" | "red" | "navy";
+    color?: "blue" | "green" | "purple" | "navy";
   }) => {
     const colorClasses = {
       blue: "from-blue-500 to-blue-600",
       green: "from-green-500 to-green-600",
       purple: "from-purple-500 to-purple-600",
-      red: "from-red-500 to-red-600",
       navy: "from-navy-light to-navy",
     };
 
@@ -303,11 +300,6 @@ export default function AdminDashboard() {
                 {loading ? "..." : value}
               </p>
               <p className="text-xs text-gray-500 truncate">{description}</p>
-              {trend && (
-                <p className="text-xs text-green-600 font-medium mt-1">
-                  {trend}
-                </p>
-              )}
             </div>
             <div
               className={`p-2 sm:p-3 rounded-full bg-gradient-to-br ${colorClasses[color]} text-white group-hover:scale-110 transition-transform duration-300 flex-shrink-0 ml-3`}
@@ -331,12 +323,11 @@ export default function AdminDashboard() {
     description: string;
     icon: any;
     href: string;
-    color?: "blue" | "green" | "red" | "navy";
+    color?: "navy" | "green" | "blue";
   }) => {
     const colorClasses = {
       navy: "bg-navy-light hover:bg-navy text-white",
       green: "bg-green-600 hover:bg-green-700 text-white",
-      red: "bg-red-600 hover:bg-red-700 text-white",
       blue: "bg-blue-600 hover:bg-blue-700 text-white",
     };
 
@@ -484,52 +475,62 @@ export default function AdminDashboard() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              {/* Status do Sistema e Botão de Configurações */}
+              {/* Status do Sistema */}
               <div className="flex items-center gap-3 order-2 sm:order-1">
                 <StatusIndicator />
-                <Button className="bg-navy-light hover:bg-navy text-white font-medium px-4 sm:px-6 py-2.5">
-                  <FaCog className="w-4 h-4 mr-2" />
-                  Configurações
+                <Button
+                  asChild
+                  className="bg-navy-light hover:bg-navy text-white font-medium px-4 sm:px-6 py-2.5"
+                >
+                  <Link href="/admin/configuracoes">
+                    <FaCog className="w-4 h-4 mr-2" />
+                    Configurações
+                  </Link>
                 </Button>
               </div>
 
               {/* Links de Navegação */}
               <div className="flex gap-3 order-1 sm:order-2">
-                <Link
-                  href="/agent/perfil"
-                  className="flex items-center gap-2 text-navy-light hover:bg-navy-light hover:text-white transition-colors duration-300 font-roboto font-medium px-3 sm:px-4 py-2 border border-navy-light rounded-lg"
+                <Button
+                  asChild
+                  variant="outline"
+                  className="text-navy-light border-navy-light hover:bg-navy-light hover:text-white"
                 >
-                  <FaUser className="w-4 h-4" />
-                  <span className="hidden sm:inline">Perfil</span>
-                </Link>
-                <Link
-                  href="/"
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors duration-300 font-roboto font-medium px-3 sm:px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  {/* ✅ CORRIGIDO: /perfil em vez de /agent/perfil */}
+                  <Link href="/perfil">
+                    <FaUser className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Perfil</span>
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
                 >
-                  <FaArrowLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Site</span>
-                </Link>
+                  <Link href="/">
+                    <FaGlobe className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Site</span>
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Grid de Estatísticas - COM DADOS REAIS */}
+        {/* Grid de Estatísticas */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <StatCard
             title="Total de Agentes"
             value={stats.totalAgents}
             icon={FaUsers}
             description={`${stats.activeAgents} ativos`}
-            trend={stats.totalAgents > 0 ? "+2 este mês" : undefined}
             color="blue"
           />
           <StatCard
             title="Notícias Publicadas"
             value={stats.totalNews}
             icon={FaNewspaper}
-            description={`${stats.publishedNews} publicadas, ${stats.featuredNews} em destaque`}
-            trend={stats.totalNews > 0 ? "+5 esta semana" : undefined}
+            description={`${stats.publishedNews} publicadas`}
             color="green"
           />
           <StatCard
@@ -537,7 +538,6 @@ export default function AdminDashboard() {
             value={stats.totalGalleryItems}
             icon={FaImages}
             description={`${stats.photoItems} fotos, ${stats.videoItems} vídeos`}
-            trend={stats.totalGalleryItems > 0 ? "+12 este mês" : undefined}
             color="purple"
           />
           <StatCard
@@ -545,7 +545,6 @@ export default function AdminDashboard() {
             value={stats.totalCategories}
             icon={FaFolder}
             description={`${stats.photoCategories} fotos, ${stats.videoCategories} vídeos`}
-            trend="Organizadas"
             color="navy"
           />
         </div>
@@ -573,7 +572,7 @@ export default function AdminDashboard() {
                     title="Criar Notícia"
                     description="Publicar nova notícia no site"
                     icon={FaNewspaper}
-                    href="/admin/noticias"
+                    href="/admin/noticias/criar"
                     color="green"
                   />
                   <QuickAction
@@ -584,18 +583,18 @@ export default function AdminDashboard() {
                     color="blue"
                   />
                   <QuickAction
-                    title="Relatórios"
-                    description="Gerar relatórios do sistema"
+                    title="Ver Relatórios"
+                    description="Acessar relatórios do sistema"
                     icon={FaChartBar}
                     href="/admin/relatorios"
-                    color="red"
+                    color="navy"
                   />
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Atividade Recente - COM DADOS REAIS */}
+          {/* Atividade Recente */}
           <div>
             <RecentActivity />
           </div>

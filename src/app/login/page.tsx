@@ -29,7 +29,7 @@ export default function LoginPage() {
         } = await supabase.auth.getUser();
 
         if (user) {
-          window.location.href = "/agent/perfil";
+          window.location.href = "/perfil";
         }
       } catch (error) {
         console.error("Erro ao verificar usuário:", error);
@@ -153,7 +153,7 @@ export default function LoginPage() {
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Redirecionar para o perfil
-      window.location.href = "/agent/perfil";
+      window.location.href = "/perfil";
     } catch (err: any) {
       console.error("Erro no login:", err);
       showAlert("error", "Erro inesperado ao fazer login. Tente novamente.");

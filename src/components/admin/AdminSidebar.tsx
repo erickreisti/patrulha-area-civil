@@ -1,3 +1,4 @@
+// src/components/admin/AdminSidebar.tsx - CORRIGIDO
 "use client";
 
 import Link from "next/link";
@@ -12,6 +13,7 @@ import {
   LogOut,
   BarChart3,
   User,
+  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -45,21 +47,11 @@ const navigation = [
         icon: Folder,
       },
       {
-        name: "Todos os Itens",
-        href: "/admin/galeria/itens",
-        icon: Images,
-      },
-      {
-        name: "Nova Categoria",
+        name: "Criar Categoria",
         href: "/admin/galeria/categorias/criar",
-        icon: Folder,
+        icon: Plus,
       },
     ],
-  },
-  {
-    name: "Relatórios",
-    href: "/admin/relatorios",
-    icon: BarChart3,
   },
 ];
 
@@ -102,7 +94,7 @@ export function AdminSidebar() {
                   className={cn(
                     "group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 border",
                     isActive
-                      ? "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
+                      ? "bg-navy-light/10 text-navy border-navy-light/20 shadow-sm"
                       : "text-gray-700 hover:bg-gray-50 hover:text-gray-900 border-transparent hover:border-gray-200"
                   )}
                 >
@@ -110,7 +102,7 @@ export function AdminSidebar() {
                     className={cn(
                       "mr-3 flex-shrink-0 h-5 w-5 transition-colors",
                       isActive
-                        ? "text-blue-600"
+                        ? "text-navy"
                         : "text-gray-400 group-hover:text-gray-500"
                     )}
                   />
@@ -132,7 +124,7 @@ export function AdminSidebar() {
                           className={cn(
                             "group flex items-center px-3 py-2 text-sm rounded-lg transition-all duration-200 border",
                             isChildActive
-                              ? "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
+                              ? "bg-navy-light/10 text-navy border-navy-light/20 shadow-sm"
                               : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-transparent hover:border-gray-200"
                           )}
                         >
@@ -140,7 +132,7 @@ export function AdminSidebar() {
                             className={cn(
                               "mr-3 flex-shrink-0 h-4 w-4 transition-colors",
                               isChildActive
-                                ? "text-blue-600"
+                                ? "text-navy"
                                 : "text-gray-400 group-hover:text-gray-500"
                             )}
                           />
@@ -166,26 +158,28 @@ export function AdminSidebar() {
             <p className="text-xs text-gray-500 truncate">Sistema PAC</p>
           </div>
 
-          {/* Link para Perfil */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.push("/perfil")} // ✅ ATUALIZADO
-            className="text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-            title="Meu Perfil"
-          >
-            <User className="h-4 w-4" />
-          </Button>
+          <div className="flex space-x-1">
+            {/* ✅ CORRIGIDO: /perfil em vez de /agent/perfil */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/perfil")}
+              className="text-gray-400 hover:text-navy hover:bg-navy/10 transition-colors"
+              title="Meu Perfil"
+            >
+              <User className="h-4 w-4" />
+            </Button>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-            title="Sair do sistema"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+              title="Sair do sistema"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>

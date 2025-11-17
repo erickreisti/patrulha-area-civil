@@ -341,15 +341,13 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// ✅ COMPONENTE USER MENU ATUALIZADO
+// ✅ COMPONENTE USER MENU CORRIGIDO
 const UserMenuButton = () => {
   const { user, profile, loading, signOut, isAdmin } = useHeaderAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const pathname = usePathname();
 
-  // Verifica se está na página de perfil (nova rota)
   const isOnProfilePage = pathname === "/perfil";
-  // Verifica se está no dashboard admin
   const isOnAdminDashboard = pathname === "/admin/dashboard";
 
   if (loading) {

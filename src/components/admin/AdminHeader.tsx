@@ -1,7 +1,16 @@
+// src/components/admin/AdminHeader.tsx - CORRIGIDO
 "use client";
 
 import { useState } from "react";
-import { Menu, Bell, User, Search, Settings, LogOut } from "lucide-react";
+import {
+  Menu,
+  Bell,
+  User,
+  Search,
+  Settings,
+  LogOut,
+  Globe,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,7 +37,6 @@ export function AdminHeader() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Implementar busca
     console.log("Buscar:", searchQuery);
   };
 
@@ -53,7 +61,7 @@ export function AdminHeader() {
                 placeholder="Buscar no sistema..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 w-64 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
+                className="pl-10 w-64 border-gray-300 focus:border-navy-light focus:ring-navy-light rounded-lg"
               />
             </div>
           </form>
@@ -63,12 +71,13 @@ export function AdminHeader() {
         <div className="flex items-center space-x-3">
           {/* Link para Site Público */}
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             asChild
-            className="text-gray-600 hover:text-gray-900"
+            className="text-gray-600 hover:text-navy-light border-gray-300 hover:border-navy-light"
           >
             <Link href="/" target="_blank">
+              <Globe className="h-4 w-4 mr-2" />
               Ver Site
             </Link>
           </Button>
@@ -117,8 +126,9 @@ export function AdminHeader() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {/* ✅ CORRIGIDO: /perfil em vez de /agent/perfil */}
               <DropdownMenuItem
-                onClick={() => router.push("/perfil")} // ✅ ATUALIZADO
+                onClick={() => router.push("/perfil")}
                 className="cursor-pointer"
               >
                 <User className="mr-2 h-4 w-4" />
