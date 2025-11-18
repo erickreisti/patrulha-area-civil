@@ -8,6 +8,7 @@ import {
   FaClock,
   FaExclamationTriangle,
   FaArrowRight,
+  FaClipboardList,
 } from "react-icons/fa";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -58,28 +59,46 @@ const STATS = [
 
 const SectionHeader = () => (
   <motion.div
-    className="text-center mb-12"
+    className="text-center mb-16"
     initial={{ opacity: 0, y: 30 }}
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.6 }}
     viewport={{ once: true }}
   >
-    <div className="flex items-center justify-center gap-4 mb-4">
-      <div className="w-12 h-1 bg-navy-light"></div>
-      <div className="w-10 h-10 bg-navy-light rounded-full flex items-center justify-center shadow-lg">
-        <FaCrosshairs className="h-5 w-5 text-white" />
-      </div>
-      <div className="w-12 h-1 bg-navy-light"></div>
+    <div className="flex items-center justify-center gap-4 mb-6">
+      <div className="w-16 h-1 bg-navy"></div>
+      <motion.div
+        className="w-12 h-12 bg-navy rounded-full flex items-center justify-center shadow-lg"
+        initial={{ scale: 0, rotate: -180 }}
+        whileInView={{ scale: 1, rotate: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+        viewport={{ once: true }}
+      >
+        <FaClipboardList className="h-6 w-6 text-white" />
+      </motion.div>
+      <div className="w-16 h-1 bg-navy"></div>
     </div>
 
-    <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-4 tracking-normal uppercase">
-      NOSSAS <span className="text-navy-dark">ATIVIDADES</span>
-    </h1>
+    <motion.h1
+      className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-800 mb-6 tracking-normal uppercase"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.3 }}
+      viewport={{ once: true }}
+    >
+      NOSSAS <span className="text-navy">ATIVIDADES</span>
+    </motion.h1>
 
-    <p className="text-base text-gray-800 max-w-4xl mx-auto leading-relaxed font-medium">
+    <motion.p
+      className="text-lg text-slate-700 max-w-4xl mx-auto leading-relaxed font-medium"
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, delay: 0.4 }}
+      viewport={{ once: true }}
+    >
       Registro operacional das principais atividades executadas pela Patrulha
       Aérea Civil
-    </p>
+    </motion.p>
   </motion.div>
 );
 
@@ -94,7 +113,7 @@ const ActivityCard = ({
 
   return (
     <motion.div
-      className="text-center p-6 bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-105"
+      className="text-center p-6 bg-white border border-slate-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-105"
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -110,11 +129,11 @@ const ActivityCard = ({
         {activity.count}
       </div>
 
-      <h3 className="text-lg font-bold text-gray-800 mb-3 font-roboto uppercase tracking-wide">
+      <h3 className="text-lg font-bold text-slate-800 mb-3 font-roboto uppercase tracking-wide">
         {activity.title}
       </h3>
 
-      <p className="text-gray-800 font-roboto text-xs leading-relaxed">
+      <p className="text-slate-700 font-roboto text-xs leading-relaxed">
         {activity.description}
       </p>
     </motion.div>
@@ -137,12 +156,12 @@ const StatsSection = () => (
     transition={{ duration: 0.6, delay: 0.3 }}
     viewport={{ once: true }}
   >
-    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg">
+    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-lg">
       <div className="flex items-center justify-center gap-3 mb-6">
         <div className="w-8 h-8 bg-navy rounded-lg flex items-center justify-center">
           <FaShieldAlt className="h-4 w-4 text-white" />
         </div>
-        <h3 className="text-xl font-bold text-gray-800 font-bebas uppercase tracking-wide">
+        <h3 className="text-xl font-bold text-slate-800 font-bebas uppercase tracking-wide">
           INDICADORES OPERACIONAIS
         </h3>
       </div>
@@ -151,7 +170,7 @@ const StatsSection = () => (
         {STATS.map((stat, index) => (
           <motion.div
             key={stat.label}
-            className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-navy/50 transition-colors duration-300"
+            className="text-center p-3 bg-slate-50 rounded-lg border border-slate-200 hover:border-navy/50 transition-colors duration-300"
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.4, delay: index * 0.1 }}
@@ -167,7 +186,7 @@ const StatsSection = () => (
               {stat.number}
             </div>
 
-            <div className="text-xs text-gray-800 font-roboto uppercase tracking-wide font-semibold">
+            <div className="text-xs text-slate-800 font-roboto uppercase tracking-wide font-semibold">
               {stat.label}
             </div>
           </motion.div>
@@ -175,7 +194,7 @@ const StatsSection = () => (
       </div>
 
       <motion.div
-        className="text-center mt-6 pt-4 border-t border-gray-200"
+        className="text-center mt-6 pt-4 border-t border-slate-200"
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.4 }}
@@ -183,7 +202,7 @@ const StatsSection = () => (
       >
         <Button
           asChild
-          className="bg-navy hover:bg-navy-dark text-white px-6 py-3 font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl text-sm"
+          className="bg-navy hover:bg-navy-700 text-white px-6 py-3 font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl text-sm"
         >
           <Link
             href="/atividades"
@@ -200,7 +219,7 @@ const StatsSection = () => (
 
 export function ActivitiesShowcase() {
   return (
-    <section className="w-full bg-offwhite py-12 lg:py-16">
+    <section className="w-full bg-offwhite py-16 lg:py-20">
       <div className="container mx-auto px-4">
         <SectionHeader />
         <ActivitiesGrid />

@@ -126,7 +126,6 @@ export function AdminHeader() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {/* ✅ CORRIGIDO: /perfil em vez de /agent/perfil */}
               <DropdownMenuItem
                 onClick={() => router.push("/perfil")}
                 className="cursor-pointer"

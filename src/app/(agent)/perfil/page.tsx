@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO CORRIGIDA E RESPONSIVA
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO ESTILO PASSAPORTE COM BOTÕES PADRONIZADOS
 "use client";
 
 import { useState, useEffect } from "react";
@@ -23,7 +23,9 @@ import {
   FaShieldAlt,
   FaChartBar,
   FaBan,
+  FaHome,
 } from "react-icons/fa";
+import { motion } from "framer-motion";
 
 interface ProfileData {
   id: string;
@@ -175,8 +177,8 @@ export default function AgentPerfil() {
     if (!profile.status) {
       return {
         text: "CERTIFICAÇÃO CANCELADA",
-        className: "text-red-600 font-semibold",
-        iconColor: "text-red-600",
+        className: "text-alert font-semibold",
+        iconColor: "text-alert",
         badgeVariant: "destructive" as const,
       };
     }
@@ -185,8 +187,8 @@ export default function AgentPerfil() {
     if (!profile.validade_certificacao) {
       return {
         text: "NÃO DEFINIDA",
-        className: "text-gray-700",
-        iconColor: "text-gray-600",
+        className: "text-slate-600",
+        iconColor: "text-slate-500",
         badgeVariant: "secondary" as const,
       };
     }
@@ -198,8 +200,8 @@ export default function AgentPerfil() {
     if (certificationDate < today) {
       return {
         text: `EXPIRADA - ${certificationDate.toLocaleDateString("pt-BR")}`,
-        className: "text-red-600 font-semibold",
-        iconColor: "text-red-600",
+        className: "text-alert font-semibold",
+        iconColor: "text-alert",
         badgeVariant: "destructive" as const,
       };
     } else {
@@ -212,15 +214,15 @@ export default function AgentPerfil() {
           text: `EXPIRA EM ${daysUntilExpiry} DIAS - ${certificationDate.toLocaleDateString(
             "pt-BR"
           )}`,
-          className: "text-orange-600 font-semibold",
-          iconColor: "text-orange-600",
+          className: "text-warning font-semibold",
+          iconColor: "text-warning",
           badgeVariant: "secondary" as const,
         };
       } else {
         return {
           text: certificationDate.toLocaleDateString("pt-BR"),
-          className: "text-green-600 font-semibold",
-          iconColor: "text-green-600",
+          className: "text-success font-semibold",
+          iconColor: "text-success",
           badgeVariant: "default" as const,
         };
       }
@@ -233,24 +235,40 @@ export default function AgentPerfil() {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
+  // 🎯 COMPONENTE DE LOADING PADRONIZADO
+  const LoadingSpinner = () => (
+    <div className="flex items-center justify-center space-x-3">
+      <div className="relative w-6 h-6">
+        <motion.div
+          className="absolute inset-0 border-2 border-navy/30 rounded-full"
+          animate={{ rotate: 360 }}
+          transition={{
+            duration: 1,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        />
+        <motion.div
+          className="absolute inset-0 border-2 border-transparent border-t-navy rounded-full"
+          animate={{ rotate: 360 }}
+          transition={{
+            duration: 1,
+            repeat: Infinity,
+            ease: "linear",
+          }}
+        />
+      </div>
+      <span className="text-slate-700 font-medium">Carregando...</span>
+    </div>
+  );
+
   // Componente de Layout Base
   const BaseLayout = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-gradient-to-br from-navy-dark to-navy relative overflow-hidden">
-      {/* Background com gradiente suave */}
-      <div className="absolute inset-0 bg-gradient-to-br from-navy-dark via-navy to-navy-light/20 z-0"></div>
-
-      {/* Marca d'água responsiva */}
-      <div className="absolute inset-0 opacity-[0.03] flex items-center justify-center z-10">
-        <div className="w-full max-w-6xl aspect-square relative">
-          <Image
-            src="/images/logos/logo-pattern.svg"
-            alt="Marca d'água"
-            fill
-            className="object-contain"
-            priority
-          />
-        </div>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-navy to-navy-700 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
+      <div className="absolute top-0 left-0 w-72 h-72 bg-navy-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-alert/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
 
       {children}
     </div>
@@ -260,13 +278,21 @@ export default function AgentPerfil() {
   const LoadingState = () => (
     <BaseLayout>
       <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-navy-light border-t-transparent mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
+        >
+          <div className="flex justify-center mb-6">
+            <LoadingSpinner />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-3 font-bebas">
             Carregando Perfil
           </h2>
-          <p className="text-gray-600 text-lg">Buscando suas informações...</p>
-        </div>
+          <p className="text-slate-600 text-lg font-roboto">
+            Buscando suas informações...
+          </p>
+        </motion.div>
       </div>
     </BaseLayout>
   );
@@ -275,38 +301,44 @@ export default function AgentPerfil() {
   const ErrorState = () => (
     <BaseLayout>
       <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
-        <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20">
-          <FaExclamationTriangle className="w-20 h-20 text-red-500 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
+        >
+          <FaExclamationTriangle className="w-16 h-16 text-alert mx-auto mb-6" />
+          <h2 className="text-2xl font-bold text-slate-800 mb-3 font-bebas">
             {error ? "Erro ao Carregar" : "Perfil Não Encontrado"}
           </h2>
-          <p className="text-gray-600 text-lg mb-6">
+          <p className="text-slate-600 text-lg mb-6 font-roboto">
             {error || "Não foi possível carregar os dados do perfil."}
           </p>
           <div className="flex flex-col gap-4">
             <Button
               onClick={handleRetry}
-              className="bg-navy-light hover:bg-navy text-white py-3 text-lg font-semibold"
+              className="bg-navy hover:bg-navy-700 text-white py-3 text-lg font-semibold font-roboto transition-all duration-300 hover:scale-105 group relative overflow-hidden"
               size="lg"
             >
-              <FaSync className="w-5 h-5 mr-3" />
-              Tentar Novamente
+              {/* Efeito de brilho */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+              <FaSync className="w-5 h-5 mr-3 relative z-10" />
+              <span className="relative z-10">Tentar Novamente</span>
             </Button>
             <Button
               onClick={handleSignOut}
               variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 py-3 text-lg"
+              className="border-slate-300 text-slate-700 hover:bg-slate-50 py-3 text-lg font-roboto transition-all duration-300 hover:scale-105"
               size="lg"
             >
               Fazer Login Novamente
             </Button>
           </div>
-        </div>
+        </motion.div>
       </div>
     </BaseLayout>
   );
 
-  // Componente Principal do Perfil
+  // Componente Principal do Perfil - ESTILO PASSAPORTE
   const ProfileContent = () => {
     const certificationInfo = formatCertificationDate(profile!);
 
@@ -315,12 +347,20 @@ export default function AgentPerfil() {
         <div className="min-h-screen flex items-center justify-center p-4 relative z-20">
           <div className="w-full max-w-6xl">
             {/* Header Responsivo */}
-            <div className="flex flex-col items-center mb-6 sm:mb-8 lg:mb-12">
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              className="flex flex-col items-center mb-6 sm:mb-8 lg:mb-12"
+            >
               {/* Layout responsivo para logo, título e bandeira */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 lg:gap-8 mb-6 w-full max-w-4xl mx-auto">
                 {/* Logo - Esquerda */}
                 <div className="order-2 sm:order-1 flex-shrink-0">
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-white rounded-full shadow-2xl overflow-hidden border-4 border-white">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-white rounded-full shadow-2xl overflow-hidden border-4 border-white"
+                  >
                     <Image
                       src="/images/logos/logo.webp"
                       alt="Patrulha Aérea Civil"
@@ -329,10 +369,10 @@ export default function AgentPerfil() {
                       className="w-full h-full object-cover"
                       priority
                     />
-                  </div>
+                  </motion.div>
                 </div>
 
-                {/* Títulos - Centro (ocupando espaço disponível) */}
+                {/* Títulos - Centro */}
                 <div className="order-1 sm:order-2 flex-1 text-center min-w-0 px-2 sm:px-4">
                   <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-white font-bebas tracking-wide uppercase leading-tight">
                     Patrulha Aérea Civil
@@ -344,7 +384,10 @@ export default function AgentPerfil() {
 
                 {/* Bandeira - Direita */}
                 <div className="order-3 flex-shrink-0">
-                  <div className="w-12 h-9 sm:w-16 sm:h-12 lg:w-20 lg:h-15 border-2 border-white rounded shadow-lg">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    className="w-12 h-9 sm:w-16 sm:h-12 lg:w-20 lg:h-15 border-2 border-white rounded shadow-lg"
+                  >
                     <Image
                       src="/images/logos/flag-br.webp"
                       alt="Bandeira do Brasil"
@@ -353,42 +396,64 @@ export default function AgentPerfil() {
                       className="w-full h-full object-cover rounded"
                       priority
                     />
-                  </div>
+                  </motion.div>
                 </div>
               </div>
 
               {/* Título "Informações do Patrulheiro" */}
               <div className="text-center w-full max-w-2xl">
                 <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-bebas tracking-wide uppercase border-b-2 border-white/30 pb-2 sm:pb-3">
-                  Informações do Patrulheiro
+                  Identificação de Agente
                 </h2>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Card do Perfil Responsivo */}
-            <div className="flex justify-center">
-              <Card className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl overflow-hidden w-full max-w-4xl border-0">
-                <CardContent className="p-4 sm:p-6 lg:p-8">
+            {/* Card do Perfil - ESTILO PASSAPORTE */}
+            <motion.div
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.2 }}
+              className="flex justify-center"
+            >
+              <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-4xl border-2 border-slate-200/80">
+                {/* MARCA D'ÁGUA DO PASSAPORTE - Logo Pattern Central */}
+                <div className="absolute inset-0 opacity-[0.03] flex items-center justify-center pointer-events-none z-0">
+                  <div className="w-full h-full max-w-[400px] max-h-[400px] relative">
+                    <Image
+                      src="/images/logos/logo-pattern.svg"
+                      alt="Marca d'água Patrulha Aérea Civil"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
+                </div>
+
+                {/* BORDA DECORATIVA DO PASSAPORTE */}
+                <div className="absolute inset-2 border border-slate-300/50 rounded-xl pointer-events-none z-0" />
+                <div className="absolute inset-4 border border-slate-200/30 rounded-lg pointer-events-none z-0" />
+
+                <CardContent className="p-4 sm:p-6 lg:p-8 relative z-10">
                   {/* Layout Principal Responsivo */}
                   <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12 items-center lg:items-start">
                     {/* Lado Esquerdo - Informações Textuais */}
                     <div className="flex-1 w-full space-y-4 sm:space-y-6 text-center lg:text-left">
                       {/* Nome */}
                       <div className="space-y-2">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
                           Nome Completo
                         </label>
-                        <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-800 leading-tight break-words min-h-[1.2em]">
+                        <h1 className="text-lg sm:text-xl lg:text-2xl xl:text-3xl font-bold text-slate-800 leading-tight break-words min-h-[1.2em] font-bebas">
                           {profile!.full_name || "Nome não definido"}
                         </h1>
                       </div>
 
                       {/* Graduação */}
                       <div className="space-y-2">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
                           Graduação
                         </label>
-                        <p className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold text-red-600 uppercase break-words min-h-[1.2em]">
+                        <p className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold text-alert uppercase break-words min-h-[1.2em] font-bebas">
                           {profile!.graduacao
                             ? `${profile!.graduacao.toUpperCase()} - PAC`
                             : "GRADUAÇÃO NÃO DEFINIDA - PAC"}
@@ -397,12 +462,12 @@ export default function AgentPerfil() {
 
                       {/* Matrícula */}
                       <div className="space-y-2">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
                           Matrícula
                         </label>
                         <div className="flex items-center justify-center lg:justify-start space-x-2 sm:space-x-3">
-                          <FaIdCard className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-navy-light flex-shrink-0" />
-                          <p className="text-base sm:text-lg lg:text-xl xl:text-2xl font-mono font-bold text-gray-700 break-all">
+                          <FaIdCard className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-navy flex-shrink-0" />
+                          <p className="text-base sm:text-lg lg:text-xl xl:text-2xl font-mono font-bold text-slate-700 break-all">
                             {profile!.matricula} RJ
                           </p>
                         </div>
@@ -410,7 +475,7 @@ export default function AgentPerfil() {
 
                       {/* Validade da Certificação */}
                       <div className="space-y-2">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
                           Validade da Certificação
                         </label>
                         <div className="flex items-center justify-center lg:justify-start space-x-2 sm:space-x-3">
@@ -419,13 +484,13 @@ export default function AgentPerfil() {
                           />
                           <Badge
                             variant={certificationInfo.badgeVariant}
-                            className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-mono font-bold px-4 py-2 ${certificationInfo.className}`}
+                            className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-mono font-bold px-4 py-2 ${certificationInfo.className} transition-all duration-300`}
                           >
                             {certificationInfo.text}
                           </Badge>
                         </div>
                         {!profile!.status && (
-                          <p className="text-xs text-red-600 mt-1 text-center lg:text-left">
+                          <p className="text-xs text-alert mt-1 text-center lg:text-left font-roboto">
                             ⚠️ Agente inativo - certificação cancelada
                             automaticamente
                           </p>
@@ -435,7 +500,7 @@ export default function AgentPerfil() {
                       {/* Badge de Admin */}
                       {isAdmin && (
                         <div className="flex justify-center lg:justify-start pt-2">
-                          <Badge className="bg-purple-500 hover:bg-purple-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 font-semibold text-xs sm:text-sm transition-colors">
+                          <Badge className="bg-navy hover:bg-navy-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 font-semibold text-xs sm:text-sm transition-all duration-300 hover:scale-105 font-roboto">
                             <FaShieldAlt className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                             ADMINISTRADOR
                           </Badge>
@@ -444,28 +509,36 @@ export default function AgentPerfil() {
                     </div>
 
                     {/* Divisor Vertical - Apenas em desktop */}
-                    <div className="hidden lg:block w-px h-80 bg-gray-300/50"></div>
+                    <div className="hidden lg:block w-px h-80 bg-gradient-to-b from-transparent via-slate-300/50 to-transparent"></div>
 
                     {/* Lado Direito - Foto e Informações Adicionais */}
                     <div className="flex-1 w-full space-y-6 flex flex-col items-center">
                       {/* Foto de Perfil 3x4 Responsiva */}
                       <div className="space-y-3 w-full max-w-xs">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block text-center">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block text-center font-roboto">
                           Foto de Identificação
                         </label>
                         <div className="flex justify-center">
-                          <div className="relative">
-                            <div className="w-40 h-52 sm:w-48 sm:h-60 lg:w-52 lg:h-64 xl:w-56 xl:h-72 bg-gray-100 rounded-xl border-4 border-navy-light shadow-2xl flex items-center justify-center overflow-hidden">
+                          <motion.div
+                            className="relative"
+                            whileHover={{ scale: 1.02 }}
+                            transition={{ duration: 0.3 }}
+                          >
+                            {/* Moldura estilo passaporte */}
+                            <div className="w-40 h-52 sm:w-48 sm:h-60 lg:w-52 lg:h-64 xl:w-56 xl:h-72 bg-slate-100 rounded-lg border-4 border-navy shadow-xl flex items-center justify-center overflow-hidden relative">
+                              {/* Padrão de fundo sutil */}
+                              <div className="absolute inset-0 bg-gradient-to-br from-slate-200/30 to-slate-100/50"></div>
+
                               {profile!.avatar_url ? (
                                 <img
                                   src={profile!.avatar_url}
                                   alt="Foto de perfil"
-                                  className="w-full h-full object-cover"
+                                  className="w-full h-full object-cover relative z-10"
                                 />
                               ) : (
-                                <div className="flex flex-col items-center justify-center text-gray-400">
+                                <div className="flex flex-col items-center justify-center text-slate-400 relative z-10">
                                   <FaUser className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mb-2" />
-                                  <span className="text-xs sm:text-sm text-center px-2">
+                                  <span className="text-xs sm:text-sm text-center px-2 font-roboto">
                                     Sem foto
                                   </span>
                                 </div>
@@ -473,22 +546,26 @@ export default function AgentPerfil() {
                             </div>
                             {/* Botão de câmera apenas para admin */}
                             {isAdmin && (
-                              <button className="absolute -bottom-2 -right-2 bg-navy-light text-white p-2 sm:p-3 rounded-full hover:bg-navy transition-colors shadow-xl border-2 border-white">
+                              <motion.button
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 sm:p-3 rounded-full hover:bg-blue-700 transition-all duration-300 shadow-xl border-2 border-white z-20"
+                              >
                                 <FaCamera className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </button>
+                              </motion.button>
                             )}
-                          </div>
+                          </motion.div>
                         </div>
                       </div>
 
                       {/* Tipo Sanguíneo */}
                       <div className="space-y-2 text-center w-full">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
                           Tipo Sanguíneo
                         </label>
                         <div className="flex justify-center items-center space-x-2 sm:space-x-3">
-                          <FaTint className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-red-600 flex-shrink-0" />
-                          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600">
+                          <FaTint className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-alert flex-shrink-0" />
+                          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-alert font-bebas">
                             {profile!.tipo_sanguineo || "NÃO DEFINIDO"}
                           </p>
                         </div>
@@ -496,117 +573,149 @@ export default function AgentPerfil() {
 
                       {/* Data de Cadastro */}
                       <div className="space-y-2 text-center w-full">
-                        <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
                           Data de Cadastro
                         </label>
-                        <p className="text-sm font-medium text-gray-600">
+                        <p className="text-sm font-medium text-slate-600 font-roboto">
                           {formatDate(profile!.created_at)}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Divisor Horizontal */}
-                  <div className="my-6 lg:my-8 border-t border-gray-200/50"></div>
+                  {/* Divisor Horizontal com estilo de passaporte */}
+                  <div className="my-6 lg:my-8 border-t border-slate-300/50 relative">
+                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-navy/20 rounded-full"></div>
+                  </div>
 
                   {/* Status e Botões */}
                   <div className="flex flex-col items-center space-y-6">
                     {/* Status do Agente */}
                     <div className="text-center w-full">
-                      <label className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide block mb-3">
+                      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block mb-3 font-roboto">
                         Situação do Agente
                       </label>
                       <div className="flex justify-center">
-                        <Badge
-                          className={`
-                            text-sm sm:text-base px-6 sm:px-8 lg:px-10 py-3 sm:py-4 font-bold rounded-lg
-                            min-w-[180px] sm:min-w-[200px] max-w-[280px] w-full
-                            transition-all duration-300 transform hover:scale-105 cursor-default
-                            shadow-lg text-center
-                            ${
-                              profile!.status
-                                ? "bg-green-500 text-white hover:bg-green-600"
-                                : "bg-red-500 text-white hover:bg-red-600"
-                            }
-                          `}
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          transition={{ duration: 0.3 }}
                         >
-                          <div className="flex items-center justify-center space-x-2 sm:space-x-3">
-                            {profile!.status ? (
-                              <FaCheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                            ) : (
-                              <FaBan className="w-4 h-4 sm:w-5 sm:h-5" />
-                            )}
-                            <span className="text-xs sm:text-sm">
-                              {profile!.status ? "ATIVO" : "INATIVO"}
-                            </span>
-                          </div>
-                        </Badge>
+                          <Badge
+                            className={`
+                              text-sm sm:text-base px-6 sm:px-8 lg:px-10 py-3 sm:py-4 font-bold rounded-lg
+                              min-w-[180px] sm:min-w-[200px] max-w-[280px] w-full
+                              transition-all duration-300 cursor-default
+                              shadow-lg text-center font-roboto border-2
+                              ${
+                                profile!.status
+                                  ? "bg-success text-white hover:bg-success/90 border-success/50"
+                                  : "bg-alert text-white hover:bg-alert/90 border-alert/50"
+                              }
+                            `}
+                          >
+                            <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+                              {profile!.status ? (
+                                <FaCheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                              ) : (
+                                <FaBan className="w-4 h-4 sm:w-5 sm:h-5" />
+                              )}
+                              <span className="text-xs sm:text-sm">
+                                {profile!.status ? "ATIVO" : "INATIVO"}
+                              </span>
+                            </div>
+                          </Badge>
+                        </motion.div>
                       </div>
                       {!profile!.status && (
-                        <p className="text-xs sm:text-sm text-red-600 mt-2 max-w-md mx-auto">
+                        <p className="text-xs sm:text-sm text-alert mt-2 max-w-md mx-auto font-roboto">
                           ❗ Agente inativo - acesso limitado ao sistema
                         </p>
                       )}
                     </div>
 
-                    {/* Botões de Ação Responsivos */}
+                    {/* 🎯 BOTÕES DE AÇÃO PADRONIZADOS */}
                     <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
-                      {/* Botão de Editar - APENAS PARA ADMIN */}
+                      {/* 🔵 AZUL - Ações Administrativas (Editar Perfil) */}
                       {isAdmin && (
                         <Link
                           href={`/admin/agentes/${profile!.id}`}
                           className="w-full sm:w-auto"
                         >
-                          <Button className="bg-navy-light hover:bg-navy text-white px-4 sm:px-6 py-3 text-sm sm:text-base font-semibold shadow-md w-full">
-                            <FaEdit className="w-4 h-4 mr-2" />
-                            Editar Perfil
-                          </Button>
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <Button className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-3 text-sm sm:text-base font-semibold shadow-md w-full transition-all duration-300 font-roboto border-2 border-blue-500/50 group relative overflow-hidden">
+                              {/* Efeito de brilho */}
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                              <FaEdit className="w-4 h-4 mr-2 relative z-10" />
+                              <span className="relative z-10">
+                                Editar Perfil
+                              </span>
+                            </Button>
+                          </motion.div>
                         </Link>
                       )}
 
                       {/* Botões de Navegação */}
                       <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        {/* Link "Voltar ao Site" - SEMPRE VISÍVEL */}
+                        {/* ⚫ CINZA - Navegação Neutra (Voltar ao Site) */}
                         <Link
                           href="/"
-                          className="flex items-center justify-center gap-2 text-navy-light hover:bg-navy-light hover:text-white transition-colors duration-300 font-medium px-4 py-3 border border-navy-light rounded-lg text-xs sm:text-sm w-full sm:w-auto text-center"
+                          className="flex items-center justify-center gap-2 text-slate-700 hover:bg-slate-100 transition-all duration-300 font-medium px-4 py-3 border-2 border-slate-300 rounded-lg text-xs sm:text-sm w-full sm:w-auto text-center font-roboto hover:scale-105 group relative overflow-hidden"
                         >
-                          <FaArrowLeft className="w-3 h-3 sm:w-4 sm:h-4" />
-                          Voltar ao Site
+                          {/* Efeito de fundo sutil */}
+                          <div className="absolute inset-0 bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                          <FaHome className="w-3 h-3 sm:w-4 sm:h-4 relative z-10" />
+                          <span className="relative z-10">Voltar ao Site</span>
                         </Link>
 
-                        {/* Botão "Ir ao Dashboard" - APENAS PARA ADMIN */}
+                        {/* 🟣 ROXO - Funcionalidades Administrativas (Dashboard) */}
                         {isAdmin && (
                           <Link
                             href="/admin/dashboard"
-                            className="flex items-center justify-center gap-2 bg-navy-light text-white hover:bg-navy transition-colors duration-300 font-medium px-4 py-3 border border-navy-light rounded-lg hover:shadow-md text-xs sm:text-sm w-full sm:w-auto text-center"
+                            className="flex items-center justify-center gap-2 bg-purple-600 text-white hover:bg-purple-700 transition-all duration-300 font-medium px-4 py-3 border-2 border-purple-500/50 rounded-lg hover:shadow-md text-xs sm:text-sm w-full sm:w-auto text-center font-roboto hover:scale-105 group relative overflow-hidden"
                           >
-                            <FaChartBar className="w-3 h-3 sm:w-4 sm:h-4" />
-                            Dashboard
+                            {/* Efeito de brilho */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                            <FaChartBar className="w-3 h-3 sm:w-4 sm:h-4 relative z-10" />
+                            <span className="relative z-10">Dashboard</span>
                           </Link>
                         )}
                       </div>
                     </div>
 
-                    {/* Botão de Logout */}
-                    <Button
-                      onClick={handleSignOut}
-                      variant="outline"
-                      className="border-gray-300 text-gray-600 hover:bg-gray-50 mt-2 px-6 py-2 text-sm"
+                    {/* 🔴 VERMELHO - Ações Destrutivas (Sair do Sistema) */}
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      Sair do Sistema
-                    </Button>
+                      <Button
+                        onClick={handleSignOut}
+                        variant="outline"
+                        className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 mt-2 px-6 py-2 text-sm font-roboto transition-all duration-300 border-2 group relative overflow-hidden"
+                      >
+                        {/* Efeito de fundo sutil */}
+                        <div className="absolute inset-0 bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                        <span className="relative z-10">Sair do Sistema</span>
+                      </Button>
+                    </motion.div>
                   </div>
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
 
             {/* Footer com informações do sistema */}
-            <div className="text-center mt-6 sm:mt-8">
-              <p className="text-white/70 text-xs sm:text-sm">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.8 }}
+              className="text-center mt-6 sm:mt-8"
+            >
+              <p className="text-white/70 text-xs sm:text-sm font-roboto">
                 Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
               </p>
-            </div>
+            </motion.div>
           </div>
         </div>
       </BaseLayout>

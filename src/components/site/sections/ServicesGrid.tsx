@@ -14,6 +14,7 @@ import {
   FaCheckCircle,
   FaArrowRight,
   FaPhoneAlt,
+  FaCogs,
 } from "react-icons/fa";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -43,9 +44,9 @@ const SERVICES: Service[] = [
       "Resposta rápida 24/7",
       "Áreas de difícil acesso",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
   {
     icon: FaShieldAlt,
@@ -60,9 +61,9 @@ const SERVICES: Service[] = [
       "Coordenação de emergências",
       "Planos de contingência",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
   {
     icon: FaBullseye,
@@ -77,9 +78,9 @@ const SERVICES: Service[] = [
       "Cobertura estratégica",
       "Cenários complexos",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
   {
     icon: FaUsers,
@@ -93,9 +94,9 @@ const SERVICES: Service[] = [
       "Resposta a crises",
       "Treinamento contínuo",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
   {
     icon: FaMapMarkerAlt,
@@ -109,9 +110,9 @@ const SERVICES: Service[] = [
       "Reconhecimento territorial",
       "Equipes especializadas",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
   {
     icon: FaClock,
@@ -125,9 +126,9 @@ const SERVICES: Service[] = [
       "Estrutura operacional",
       "Situações urgentes",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
   {
     icon: FaBroadcastTower,
@@ -142,9 +143,9 @@ const SERVICES: Service[] = [
       "Comunicação em tempo real",
       "Infraestrutura robusta",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
   {
     icon: FaSatellite,
@@ -158,13 +159,12 @@ const SERVICES: Service[] = [
       "Suporte visual",
       "Tomada de decisão",
     ],
-    color: "bg-navy-light",
-    bgColor: "bg-navy-light/10",
-    borderColor: "border-navy-light/30",
+    color: "bg-navy",
+    bgColor: "bg-navy/10",
+    borderColor: "border-navy/30",
   },
 ];
 
-// Hook simplificado
 const useServiceNavigation = (servicesCount: number) => {
   const [activeService, setActiveService] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -178,40 +178,31 @@ const useServiceNavigation = (servicesCount: number) => {
     [isAnimating]
   );
 
-  // Scroll no card de detalhes (DESKTOP)
-  const handleDetailsScroll = useCallback(
-    (e: WheelEvent) => {
-      if (window.innerWidth < 1440 || isAnimating) return;
-
-      e.preventDefault();
-      setIsAnimating(true);
-
-      const direction = e.deltaY > 0 ? 1 : -1;
-      const newIndex = Math.max(
-        0,
-        Math.min(servicesCount - 1, activeService + direction)
-      );
-
-      if (newIndex !== activeService) {
-        setActiveService(newIndex);
-      }
-
-      setTimeout(() => setIsAnimating(false), 500);
-    },
-    [activeService, isAnimating, servicesCount]
-  );
-
-  // Event listener para scroll no card de detalhes
   useEffect(() => {
     const detailsElement = detailsRef.current;
     if (detailsElement && window.innerWidth >= 1440) {
-      detailsElement.addEventListener("wheel", handleDetailsScroll, {
-        passive: false,
-      });
-      return () =>
-        detailsElement.removeEventListener("wheel", handleDetailsScroll);
+      const handleWheel = (e: WheelEvent) => {
+        if (isAnimating) return;
+        e.preventDefault();
+        setIsAnimating(true);
+
+        const direction = e.deltaY > 0 ? 1 : -1;
+        const newIndex = Math.max(
+          0,
+          Math.min(servicesCount - 1, activeService + direction)
+        );
+
+        if (newIndex !== activeService) {
+          setActiveService(newIndex);
+        }
+
+        setTimeout(() => setIsAnimating(false), 500);
+      };
+
+      detailsElement.addEventListener("wheel", handleWheel, { passive: false });
+      return () => detailsElement.removeEventListener("wheel", handleWheel);
     }
-  }, [handleDetailsScroll]);
+  }, [activeService, isAnimating, servicesCount]);
 
   return {
     activeService,
@@ -221,19 +212,15 @@ const useServiceNavigation = (servicesCount: number) => {
   };
 };
 
-// Hook para observer mobile
 const useMobileObserver = (onServiceChange: (index: number) => void) => {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const lastChangeTime = useRef(0);
 
   useEffect(() => {
-    // Só executa em mobile/tablet
     if (window.innerWidth >= 1440) return;
 
     const handleIntersection: IntersectionObserverCallback = (entries) => {
       const now = Date.now();
-
-      // Debounce para evitar mudanças muito rápidas
       if (now - lastChangeTime.current < 500) return;
 
       const visibleEntries = entries.filter(
@@ -241,7 +228,6 @@ const useMobileObserver = (onServiceChange: (index: number) => void) => {
       );
 
       if (visibleEntries.length > 0) {
-        // Encontra o card mais visível
         const mostVisible = visibleEntries.reduce((prev, current) =>
           current.intersectionRatio > prev.intersectionRatio ? current : prev
         );
@@ -262,7 +248,6 @@ const useMobileObserver = (onServiceChange: (index: number) => void) => {
       rootMargin: "-10% 0px -10% 0px",
     });
 
-    // Observar todos os cards de serviço
     const serviceCards = document.querySelectorAll("[data-service-card]");
     serviceCards.forEach((card) => {
       observerRef.current?.observe(card);
@@ -274,7 +259,6 @@ const useMobileObserver = (onServiceChange: (index: number) => void) => {
   }, [onServiceChange]);
 };
 
-// Componentes
 const ServiceCard = ({
   service,
   index,
@@ -302,8 +286,8 @@ const ServiceCard = ({
         cursor-pointer transition-all duration-300 rounded-xl p-4 border-2 h-32
         ${
           activeService === index
-            ? "border-navy-light bg-navy-light/10 shadow-xl transform scale-105"
-            : "border-gray-200 bg-white shadow-lg hover:shadow-xl"
+            ? "border-navy bg-navy/10 shadow-xl transform scale-105"
+            : "border-slate-200 bg-white shadow-lg hover:shadow-xl"
         }
       `}
     >
@@ -314,8 +298,8 @@ const ServiceCard = ({
               w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
               ${
                 activeService === index
-                  ? "bg-navy-light text-white shadow-md"
-                  : "bg-gray-100 text-navy"
+                  ? "bg-navy text-white shadow-md"
+                  : "bg-slate-100 text-navy"
               }
             `}
           >
@@ -325,7 +309,7 @@ const ServiceCard = ({
             <h3
               className={`
                 font-bold text-xs leading-tight line-clamp-2
-                ${activeService === index ? "text-navy-light" : "text-gray-800"}
+                ${activeService === index ? "text-navy" : "text-slate-800"}
               `}
             >
               {service.title}
@@ -337,10 +321,10 @@ const ServiceCard = ({
           <div
             className={`
               w-2 h-2 rounded-full transition-all duration-300
-              ${activeService === index ? "bg-navy-light scale-125" : "bg-gray-300"}
+              ${activeService === index ? "bg-navy scale-125" : "bg-slate-300"}
             `}
           />
-          <span className="text-xs text-gray-500 font-medium">
+          <span className="text-xs text-slate-500 font-medium">
             {index + 1}/{SERVICES.length}
           </span>
         </div>
@@ -361,7 +345,6 @@ const ServiceDetails = ({ service }: { service: Service }) => {
       transition={{ duration: 0.4, ease: "easeOut" }}
       className="space-y-6"
     >
-      {/* Header do Serviço */}
       <div className="flex items-center gap-4">
         <div
           className={`
@@ -369,28 +352,26 @@ const ServiceDetails = ({ service }: { service: Service }) => {
             ${service.bgColor} shadow-lg flex-shrink-0
           `}
         >
-          <IconComponent className="h-7 w-7 text-navy-light" />
+          <IconComponent className="h-7 w-7 text-navy" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-gray-800 uppercase tracking-tight leading-tight">
+          <h2 className="text-lg font-bold text-slate-800 uppercase tracking-tight leading-tight">
             {service.title}
           </h2>
         </div>
       </div>
 
-      {/* Descrição */}
       <div>
-        <h3 className="text-base font-bold text-gray-800 mb-2">
+        <h3 className="text-base font-bold text-slate-800 mb-2">
           Descrição do Serviço
         </h3>
-        <p className="text-gray-800 leading-relaxed text-sm">
+        <p className="text-slate-700 leading-relaxed text-sm">
           {service.fullDescription}
         </p>
       </div>
 
-      {/* Características */}
       <div>
-        <h3 className="text-base font-bold text-gray-800 mb-3">
+        <h3 className="text-base font-bold text-slate-800 mb-3">
           Características Principais
         </h3>
         <div className="grid grid-cols-1 gap-2">
@@ -402,8 +383,8 @@ const ServiceDetails = ({ service }: { service: Service }) => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <FaCheckCircle className="h-4 w-4 text-navy-light flex-shrink-0" />
-              <span className="text-gray-800 text-sm font-medium leading-relaxed">
+              <FaCheckCircle className="h-4 w-4 text-navy flex-shrink-0" />
+              <span className="text-slate-700 text-sm font-medium leading-relaxed">
                 {feature}
               </span>
             </motion.div>
@@ -411,8 +392,7 @@ const ServiceDetails = ({ service }: { service: Service }) => {
         </div>
       </div>
 
-      {/* Botões de Ação */}
-      <div className="pt-4 border-t border-gray-200">
+      <div className="pt-4 border-t border-slate-200">
         <div className="flex flex-col sm:flex-row gap-3">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -420,7 +400,7 @@ const ServiceDetails = ({ service }: { service: Service }) => {
             transition={{ duration: 0.4, delay: 0.3 }}
           >
             <Button
-              className="bg-navy hover:bg-navy-dark text-white font-bold px-4 py-2 shadow-lg flex-1 text-sm min-h-[44px] transition-all duration-300 hover:scale-105"
+              className="bg-navy hover:bg-navy-700 text-white font-bold px-4 py-2 shadow-lg flex-1 text-sm min-h-[44px] transition-all duration-300 hover:scale-105"
               asChild
             >
               <Link
@@ -439,7 +419,7 @@ const ServiceDetails = ({ service }: { service: Service }) => {
           >
             <Button
               variant="outline"
-              className="border-2 border-navy-light text-navy-light hover:bg-navy-light hover:text-white font-bold px-4 py-2 flex-1 text-sm min-h-[44px] transition-all duration-300 hover:scale-105"
+              className="border-2 border-navy text-navy hover:bg-navy hover:text-white font-bold px-4 py-2 flex-1 text-sm min-h-[44px] transition-all duration-300 hover:scale-105"
               asChild
             >
               <Link
@@ -485,8 +465,8 @@ const MobileServiceCard = ({
         w-full text-left p-4 rounded-xl border-2 cursor-pointer transition-all duration-200
         ${
           activeService === index
-            ? "border-navy-light bg-navy-light/10 shadow-xl"
-            : "border-gray-200 bg-white shadow-lg hover:shadow-xl"
+            ? "border-navy bg-navy/10 shadow-xl"
+            : "border-slate-200 bg-white shadow-lg hover:shadow-xl"
         }
       `}
     >
@@ -494,7 +474,11 @@ const MobileServiceCard = ({
         <div
           className={`
             w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300
-            ${activeService === index ? "bg-navy-light text-white shadow-md" : "bg-gray-100 text-navy"}
+            ${
+              activeService === index
+                ? "bg-navy text-white shadow-md"
+                : "bg-slate-100 text-navy"
+            }
           `}
         >
           <IconComponent className="h-5 w-5" />
@@ -504,12 +488,12 @@ const MobileServiceCard = ({
           <h3
             className={`
               font-bold text-base mb-1 leading-tight
-              ${activeService === index ? "text-navy-light" : "text-gray-800"}
+              ${activeService === index ? "text-navy" : "text-slate-800"}
             `}
           >
             {service.title}
           </h3>
-          <p className="text-gray-600 text-sm leading-relaxed line-clamp-2">
+          <p className="text-slate-600 text-sm leading-relaxed line-clamp-2">
             {service.description}
           </p>
         </div>
@@ -517,7 +501,7 @@ const MobileServiceCard = ({
         <div
           className={`
             w-2 h-2 rounded-full flex-shrink-0 transition-all duration-300
-            ${activeService === index ? "bg-navy-light scale-125" : "bg-gray-300"}
+            ${activeService === index ? "bg-navy scale-125" : "bg-slate-300"}
           `}
         />
       </div>
@@ -529,19 +513,19 @@ const MobileServiceCard = ({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="mt-4 pt-4 border-t border-gray-200"
+            className="mt-4 pt-4 border-t border-slate-200"
           >
             <div className="mb-4">
-              <h4 className="font-semibold text-gray-800 text-base mb-2">
+              <h4 className="font-semibold text-slate-800 text-base mb-2">
                 Descrição Completa
               </h4>
-              <p className="text-gray-700 text-sm leading-relaxed">
+              <p className="text-slate-700 text-sm leading-relaxed">
                 {service.fullDescription}
               </p>
             </div>
 
             <div className="mb-4">
-              <h4 className="font-semibold text-gray-800 text-base mb-2">
+              <h4 className="font-semibold text-slate-800 text-base mb-2">
                 Características
               </h4>
               <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
@@ -553,8 +537,8 @@ const MobileServiceCard = ({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.3, delay: featureIndex * 0.1 }}
                   >
-                    <FaCheckCircle className="h-3 w-3 text-navy-light flex-shrink-0" />
-                    <span className="text-gray-700 text-xs">{feature}</span>
+                    <FaCheckCircle className="h-3 w-3 text-navy flex-shrink-0" />
+                    <span className="text-slate-700 text-xs">{feature}</span>
                   </motion.div>
                 ))}
               </div>
@@ -568,7 +552,7 @@ const MobileServiceCard = ({
                   transition={{ duration: 0.4, delay: 0.2 }}
                 >
                   <Button
-                    className="flex-1 w-full sm:w-[280px] bg-navy hover:bg-navy-dark text-white text-sm h-12 transition-all duration-300 hover:scale-105 min-h-[48px]"
+                    className="flex-1 w-full sm:w-[280px] bg-navy hover:bg-navy-700 text-white text-sm h-12 transition-all duration-300 hover:scale-105 min-h-[48px]"
                     asChild
                   >
                     <Link
@@ -587,7 +571,7 @@ const MobileServiceCard = ({
                 >
                   <Button
                     variant="outline"
-                    className="flex-1 w-full sm:w-[280px] border-navy-light text-navy-light hover:bg-navy-light hover:text-white text-sm h-12 transition-all duration-300 hover:scale-105 min-h-[48px]"
+                    className="flex-1 w-full sm:w-[280px] border-navy text-navy hover:bg-navy hover:text-white text-sm h-12 transition-all duration-300 hover:scale-105 min-h-[48px]"
                     asChild
                   >
                     <Link
@@ -628,7 +612,7 @@ const ServiceNavigation = ({
         onClick={() => onSelect(index)}
         className={`
           w-2 h-2 rounded-full transition-all duration-300
-          ${activeService === index ? "bg-navy-light w-6" : "bg-gray-300"}
+          ${activeService === index ? "bg-navy w-6" : "bg-slate-300"}
         `}
         aria-label={`Ir para serviço ${index + 1}`}
       />
@@ -644,15 +628,15 @@ const MobileCTASection = () => (
     transition={{ duration: 0.5, delay: 0.4 }}
     viewport={{ once: true }}
   >
-    <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-200">
-      <h3 className="font-bold text-gray-800 text-base mb-1">
+    <div className="bg-white rounded-xl p-4 shadow-lg border border-slate-200">
+      <h3 className="font-bold text-slate-800 text-base mb-1">
         Precisa de nossos serviços?
       </h3>
-      <p className="text-gray-600 text-xs mb-3">
+      <p className="text-slate-600 text-xs mb-3">
         Entre em contato para uma consultoria especializada
       </p>
       <Button
-        className="bg-navy hover:bg-navy-dark text-white w-full sm:w-auto text-xs h-9 transition-all duration-300 hover:scale-105"
+        className="bg-navy hover:bg-navy-700 text-white w-full sm:w-auto text-xs h-9 transition-all duration-300 hover:scale-105"
         asChild
       >
         <Link
@@ -667,12 +651,10 @@ const MobileCTASection = () => (
   </motion.div>
 );
 
-// Main Component
 export function ServicesGrid() {
   const { activeService, handleServiceSelect, detailsRef } =
     useServiceNavigation(SERVICES.length);
 
-  // Usar o observer mobile
   useMobileObserver(handleServiceSelect);
 
   return (
@@ -681,7 +663,6 @@ export function ServicesGrid() {
       className="w-full bg-offwhite py-16 lg:py-20"
     >
       <div className="container mx-auto px-4">
-        {/* Header */}
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: 30 }}
@@ -690,31 +671,31 @@ export function ServicesGrid() {
           viewport={{ once: true }}
         >
           <div className="flex items-center justify-center gap-4 mb-6">
-            <div className="w-16 h-1 bg-navy-light"></div>
+            <div className="w-16 h-1 bg-navy"></div>
             <motion.div
-              className="w-12 h-12 bg-navy-light rounded-full flex items-center justify-center shadow-lg"
+              className="w-12 h-12 bg-navy rounded-full flex items-center justify-center shadow-lg"
               initial={{ scale: 0, rotate: -180 }}
               whileInView={{ scale: 1, rotate: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
               viewport={{ once: true }}
             >
-              <FaBullseye className="h-6 w-6 text-white" />
+              <FaCogs className="h-6 w-6 text-white" />
             </motion.div>
-            <div className="w-16 h-1 bg-navy-light"></div>
+            <div className="w-16 h-1 bg-navy"></div>
           </div>
 
           <motion.h1
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-800 mb-6 tracking-normal uppercase"
+            className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-800 mb-6 tracking-normal uppercase"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.3 }}
             viewport={{ once: true }}
           >
-            NOSSOS <span className="text-navy-dark">SERVIÇOS</span>
+            NOSSOS <span className="text-navy">SERVIÇOS</span>
           </motion.h1>
 
           <motion.p
-            className="text-lg text-gray-800 max-w-4xl mx-auto leading-relaxed font-medium"
+            className="text-lg text-slate-700 max-w-4xl mx-auto leading-relaxed font-medium"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
@@ -725,7 +706,6 @@ export function ServicesGrid() {
           </motion.p>
         </motion.div>
 
-        {/* === LAYOUT DESKTOP - LADO A LADO (acima de 1440px) === */}
         <motion.div
           className="hidden 2xl:flex gap-8 max-w-7xl mx-auto"
           initial={{ opacity: 0 }}
@@ -733,7 +713,6 @@ export function ServicesGrid() {
           transition={{ duration: 0.8, delay: 0.2 }}
           viewport={{ once: true }}
         >
-          {/* Coluna Esquerda - Grid de Serviços */}
           <div className="flex-1 max-w-md">
             <motion.div
               className="flex items-center gap-3 mb-6"
@@ -750,7 +729,6 @@ export function ServicesGrid() {
               </span>
             </motion.div>
 
-            {/* Grid 2x2 */}
             <div className="grid grid-cols-2 gap-4">
               {SERVICES.map((service, index) => (
                 <ServiceCard
@@ -763,7 +741,6 @@ export function ServicesGrid() {
               ))}
             </div>
 
-            {/* Indicador de Progresso */}
             <div className="flex justify-center gap-2 mt-6">
               {SERVICES.map((_, index) => (
                 <button
@@ -771,7 +748,11 @@ export function ServicesGrid() {
                   onClick={() => handleServiceSelect(index)}
                   className={`
                     w-2 h-2 rounded-full transition-all duration-300
-                    ${activeService === index ? "bg-navy-light w-6" : "bg-gray-300 hover:bg-gray-400"}
+                    ${
+                      activeService === index
+                        ? "bg-navy w-6"
+                        : "bg-slate-300 hover:bg-slate-400"
+                    }
                   `}
                   aria-label={`Ir para serviço ${index + 1}`}
                 />
@@ -779,7 +760,6 @@ export function ServicesGrid() {
             </div>
           </div>
 
-          {/* Coluna Direita - Card de Detalhes */}
           <div className="flex-1 max-w-2xl">
             <motion.div
               className="sticky top-24"
@@ -790,7 +770,7 @@ export function ServicesGrid() {
             >
               <div
                 ref={detailsRef}
-                className="bg-white border-2 border-gray-200 rounded-xl p-6 shadow-lg h-[600px] overflow-hidden"
+                className="bg-white border-2 border-slate-200 rounded-xl p-6 shadow-lg h-[600px] overflow-hidden"
               >
                 <div className="overflow-y-auto h-full pr-2 custom-scrollbar">
                   <AnimatePresence mode="wait">
@@ -800,7 +780,6 @@ export function ServicesGrid() {
               </div>
             </motion.div>
 
-            {/* Instruções de Scroll */}
             <motion.div
               className="mt-4 text-center"
               initial={{ opacity: 0 }}
@@ -808,9 +787,9 @@ export function ServicesGrid() {
               transition={{ duration: 0.5, delay: 0.6 }}
               viewport={{ once: true }}
             >
-              <p className="text-sm text-gray-500 font-medium">
+              <p className="text-sm text-slate-500 font-medium">
                 <span className="block mb-1">🖱️ Use o scroll para navegar</span>
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-slate-400">
                   Role para cima/baixo no card para ver outros serviços
                 </span>
               </p>
@@ -818,7 +797,6 @@ export function ServicesGrid() {
           </div>
         </motion.div>
 
-        {/* === LAYOUT MOBILE & TABLET (até 1439px) === */}
         <motion.div
           className="2xl:hidden space-y-4 max-w-4xl mx-auto"
           initial={{ opacity: 0 }}
@@ -826,7 +804,6 @@ export function ServicesGrid() {
           transition={{ duration: 0.6, delay: 0.2 }}
           viewport={{ once: true }}
         >
-          {/* Cards de Serviços Interativos */}
           <div className="space-y-4">
             {SERVICES.map((service, index) => (
               <MobileServiceCard

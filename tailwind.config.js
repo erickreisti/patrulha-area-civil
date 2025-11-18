@@ -34,84 +34,181 @@ module.exports = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
 
-        // CORES PRINCIPAIS DA PATRULHA AÉREA CIVIL
+        // 🎨 CORES PRINCIPAIS DA PATRULHA AÉREA CIVIL - EXPANDIDAS
         navy: {
+          50: "#F0F5FF",
+          100: "#E6EFFF",
+          200: "#D6E4FF",
+          300: "#A6C5FF",
+          400: "#5A8DEB",
           DEFAULT: "#1A2873", // Azul marinho principal
-          dark: "#1E2759", // Azul marinho escuro
-          light: "#1B2C8C", // Azul marinho claro
+          600: "#1B2C8C", // Azul marinho claro
+          700: "#1E2759", // Azul marinho escuro
+          800: "#1A1F47",
+          900: "#131835",
+          hover: "#2A3A99",
+          focus: "#3A4AB3",
         },
         alert: {
+          50: "#FFE6E6",
+          100: "#FFCCCC",
+          200: "#FF9999",
+          300: "#FF6666",
+          400: "#FF3333",
           DEFAULT: "#bd0003", // Vermelho para alertas
+          600: "#990002",
+          700: "#660001",
+          800: "#330001",
+          900: "#1A0000",
         },
         slate: {
-          DEFAULT: "#1E293B", // Slate escuro
+          DEFAULT: "#1E293B",
+          50: "#F8FAFC",
+          100: "#F1F5F9",
+          200: "#E2E8F0",
+          300: "#CBD5E1",
+          400: "#94A3B8",
+          500: "#64748B",
+          600: "#475569",
+          700: "#334155",
+          800: "#1E293B",
+          900: "#0F172A",
         },
         offwhite: {
-          DEFAULT: "#FCFCFC", // Branco off
+          DEFAULT: "#FCFCFC",
+          50: "#FFFFFF",
+          100: "#FEFEFE",
+          200: "#FCFCFC",
+          300: "#FAFAFA",
+          400: "#F7F7F7",
+          500: "#F5F5F5",
         },
 
-        // CORES SEMÂNTICAS
+        // 🎯 CORES SEMÂNTICAS - EXPANDIDAS
         success: {
-          DEFAULT: "#00A859", // Verde sucesso
-          light: "#E6F7EF",
+          50: "#F0F9F4",
+          100: "#E6F7EF",
+          200: "#CEEEDF",
+          300: "#A6E0C5",
+          400: "#6DCFA1",
+          DEFAULT: "#00A859",
+          600: "#008745",
+          700: "#006633",
+          800: "#004422",
+          900: "#002211",
+          hover: "#009950",
+          focus: "#008A47",
         },
         warning: {
-          DEFAULT: "#FF6B00", // Laranja alerta
-          light: "#FFF2E8",
+          50: "#FFF8E6",
+          100: "#FFF2CC",
+          200: "#FFE699",
+          300: "#FFD966",
+          400: "#FFCC33",
+          DEFAULT: "#FF6B00",
+          600: "#E65C00",
+          700: "#CC4D00",
+          800: "#B33E00",
+          900: "#992F00",
+          hover: "#FF7A1A",
+          focus: "#FF8A33",
         },
         error: {
-          DEFAULT: "#bd0003", // Vermelho erro
-          light: "#FFE6E6",
+          50: "#FFE6E6",
+          100: "#FFCCCC",
+          200: "#FF9999",
+          300: "#FF6666",
+          400: "#FF3333",
+          DEFAULT: "#bd0003",
+          600: "#990002",
+          700: "#660001",
+          800: "#330001",
+          900: "#1A0000",
+          hover: "#CC0004",
+          focus: "#E60005",
         },
 
-        // CORES DE FUNDO PERSONALIZADAS
+        // 🏠 CORES DE FUNDO PERSONALIZADAS
         bg: {
-          primary: "#FCFCFC", // Offwhite
+          primary: "#FCFCFC",
           secondary: "#F0F5FF",
           tertiary: "#E6EFFF",
-          highlight: "#1A2873", // Navy
-          dark: "#1E293B", // Slate
+          highlight: "#1A2873",
+          dark: "#1E293B",
+          // Modo escuro
+          "dark-primary": "#0F172A",
+          "dark-secondary": "#1E293B",
+          "dark-tertiary": "#334155",
         },
 
-        // BORDAS E DIVISORES
+        // 📐 BORDAS E DIVISORES
         divider: {
           light: "#E9ECEF",
           medium: "#DEE2E6",
-          dark: "#1A2873", // Navy
+          dark: "#1A2873",
+          "dark-light": "#334155",
+          "dark-medium": "#475569",
         },
 
-        // CORES INTERATIVAS
+        // 🔗 CORES INTERATIVAS
         interactive: {
           link: {
-            normal: "#1A2873", // Navy
+            normal: "#1A2873",
             visited: "#6633CC",
-            hover: "#1B2C8C", // Navy light
+            hover: "#1B2C8C",
+            active: "#2A3A99",
+          },
+          button: {
+            primary: {
+              normal: "#1A2873",
+              hover: "#1B2C8C",
+              focus: "#2A3A99",
+              disabled: "#94A3B8",
+            },
+            secondary: {
+              normal: "#F0F5FF",
+              hover: "#E6EFFF",
+              focus: "#D6E4FF",
+              disabled: "#F1F5F9",
+            },
           },
         },
 
-        // ESCALA DE CINZAS
-        white: "#FFFFFF",
-        gray: {
-          50: "#F8F9FA",
-          100: "#F0F5FF",
-          200: "#E9ECEF",
-          300: "#DEE2E6",
-          400: "#6C757D",
-          500: "#495057",
-          600: "#333333",
-          700: "#212529",
-          800: "#000000",
-        },
-
-        // STATUS
+        // ⚡ STATUS
         status: {
-          active: "#00A859", // Success
-          inactive: "#FF0000", // Error
-          warning: "#FF6B00", // Warning
-          expired: "#6C757D", // Gray 400
+          active: "#00A859",
+          inactive: "#FF0000",
+          warning: "#FF6B00",
+          expired: "#6C757D",
+          pending: "#FFCC00",
+          completed: "#00A859",
+          cancelled: "#BD0003",
+          draft: "#6C757D",
+          published: "#00A859",
+          archived: "#8B5CF6",
         },
 
-        // Mantendo cores existentes para compatibilidade com shadcn
+        // 🔄 MODO ESCURO COMPLETO
+        dark: {
+          bg: {
+            primary: "#0F172A",
+            secondary: "#1E293B",
+            tertiary: "#334155",
+            highlight: "#1E2759",
+          },
+          text: {
+            primary: "#F8FAFC",
+            secondary: "#E2E8F0",
+            tertiary: "#CBD5E1",
+          },
+          border: {
+            primary: "#334155",
+            secondary: "#475569",
+            accent: "#6366F1",
+          },
+        },
+
+        // 🎭 MANTENDO COMPATIBILIDADE COM SHADCN/UI
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -145,6 +242,9 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 4px)",
+        "2xl": "calc(var(--radius) + 8px)",
+        "3xl": "calc(var(--radius) + 16px)",
       },
       keyframes: {
         "accordion-down": {
@@ -212,6 +312,26 @@ module.exports = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0" },
         },
+        "gradient-shift": {
+          "0%, 100%": { backgroundPosition: "0% 50%" },
+          "50%": { backgroundPosition: "100% 50%" },
+        },
+        wave: {
+          "0%": { transform: "rotate(0.0deg)" },
+          "10%": { transform: "rotate(14.0deg)" },
+          "20%": { transform: "rotate(-8.0deg)" },
+          "30%": { transform: "rotate(14.0deg)" },
+          "40%": { transform: "rotate(-4.0deg)" },
+          "50%": { transform: "rotate(10.0deg)" },
+          "60%": { transform: "rotate(0.0deg)" },
+          "100%": { transform: "rotate(0.0deg)" },
+        },
+        "ping-slow": {
+          "75%, 100%": {
+            transform: "scale(2)",
+            opacity: "0",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -230,12 +350,51 @@ module.exports = {
         "spin-slow": "spin-slow 3s linear infinite",
         typewriter: "typewriter 2s steps(40) forwards",
         blink: "blink 1s steps(2) infinite 2s",
+        "gradient-shift": "gradient-shift 3s ease infinite",
+        wave: "wave 2s linear infinite",
+        "ping-slow": "ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
         inter: ["var(--font-inter)", "system-ui", "sans-serif"],
         bebas: ["Bebas Neue", "system-ui", "sans-serif"],
         roboto: ["Roboto", "system-ui", "sans-serif"],
+      },
+      backgroundImage: {
+        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+        "gradient-conic":
+          "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+        "navy-gradient":
+          "linear-gradient(135deg, #1A2873 0%, #1B2C8C 50%, #1E2759 100%)",
+        "alert-gradient":
+          "linear-gradient(135deg, #bd0003 0%, #FF3333 50%, #990002 100%)",
+        "success-gradient":
+          "linear-gradient(135deg, #00A859 0%, #6DCFA1 50%, #008745 100%)",
+        "hero-pattern": "url('/images/site/hero-bg.webp')",
+      },
+      boxShadow: {
+        "navy-sm": "0 1px 2px 0 rgba(26, 40, 115, 0.05)",
+        navy: "0 4px 6px -1px rgba(26, 40, 115, 0.1), 0 2px 4px -1px rgba(26, 40, 115, 0.06)",
+        "navy-lg":
+          "0 10px 15px -3px rgba(26, 40, 115, 0.1), 0 4px 6px -2px rgba(26, 40, 115, 0.05)",
+        "navy-xl":
+          "0 20px 25px -5px rgba(26, 40, 115, 0.1), 0 10px 10px -5px rgba(26, 40, 115, 0.04)",
+        "glow-navy": "0 0 20px rgba(26, 40, 115, 0.3)",
+        "glow-success": "0 0 20px rgba(0, 168, 89, 0.3)",
+        "glow-alert": "0 0 20px rgba(189, 0, 3, 0.3)",
+      },
+      spacing: {
+        18: "4.5rem",
+        88: "22rem",
+        128: "32rem",
+        144: "36rem",
+      },
+      zIndex: {
+        60: "60",
+        70: "70",
+        80: "80",
+        90: "90",
+        100: "100",
       },
     },
   },

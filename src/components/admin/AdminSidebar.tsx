@@ -1,4 +1,4 @@
-// src/components/admin/AdminSidebar.tsx - CORRIGIDO
+// src/components/admin/AdminSidebar.tsx - CORRIGIDO COM LOGO PREENCHENDO O FUNDO
 "use client";
 
 import Link from "next/link";
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { motion } from "framer-motion";
 
 const navigation = [
   {
@@ -41,6 +43,16 @@ const navigation = [
     href: "/admin/galeria",
     icon: Images,
     children: [
+      {
+        name: "Todos os Itens",
+        href: "/admin/galeria/itens",
+        icon: Folder,
+      },
+      {
+        name: "Criar Item",
+        href: "/admin/galeria/itens/criar",
+        icon: Plus,
+      },
       {
         name: "Todas as Categorias",
         href: "/admin/galeria/categorias",
@@ -67,17 +79,40 @@ export function AdminSidebar() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-white border-r border-gray-200 shadow-lg">
-      {/* Logo */}
-      <div className="flex items-center justify-center h-20 flex-shrink-0 px-4 border-b border-gray-200 bg-gradient-to-r from-navy-light to-navy">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
-            <span className="text-navy font-bold text-lg">PAC</span>
+      {/* Logo - CORRIGIDA: IMAGEM PREENCHENDO O FUNDO REDONDO */}
+      <div className="flex items-center justify-center h-24 flex-shrink-0 px-4 border-b border-gray-200 bg-gradient-to-r from-navy-700 to-navy-900">
+        <Link href="/" className="flex items-center gap-4 group">
+          {/* ✅ CORREÇÃO: Logo preenchendo completamente o fundo redondo */}
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            transition={{ duration: 0.3 }}
+            className="relative"
+          >
+            {/* Container do fundo redondo - agora a imagem vai preencher ele */}
+            <div className="w-16 h-16 bg-white rounded-full shadow-xl overflow-hidden border-4 border-white">
+              {/* Imagem da logo preenchendo todo o espaço */}
+              <div className="w-full h-full flex items-center justify-center">
+                <Image
+                  src="/images/logos/logo.webp"
+                  alt="Patrulha Aérea Civil"
+                  width={64} // ✅ Mesmo tamanho do container (64px)
+                  height={64} // ✅ Mesmo tamanho do container (64px)
+                  className="object-cover w-full h-full p-1" // ✅ Preenche todo o espaço
+                  priority
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          <div className="text-left">
+            <h1 className="font-bebas text-xl text-white tracking-wider uppercase leading-tight drop-shadow-md">
+              PATRULHA AÉREA CIVIL
+            </h1>
+            <p className="text-blue-300 text-xs leading-tight mt-1 font-roboto font-medium">
+              Serviço Humanitário
+            </p>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-white">PAC Admin</h1>
-            <p className="text-xs text-blue-200">Patrulha Aérea Civil</p>
-          </div>
-        </div>
+        </Link>
       </div>
 
       {/* Navegação */}
@@ -159,7 +194,6 @@ export function AdminSidebar() {
           </div>
 
           <div className="flex space-x-1">
-            {/* ✅ CORRIGIDO: /perfil em vez de /agent/perfil */}
             <Button
               variant="ghost"
               size="sm"

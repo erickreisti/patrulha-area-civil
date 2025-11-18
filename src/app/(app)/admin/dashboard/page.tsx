@@ -22,6 +22,8 @@ import {
   FaVideo,
   FaCamera,
   FaGlobe,
+  FaEdit,
+  FaHome,
 } from "react-icons/fa";
 
 interface DashboardStats {
@@ -70,8 +72,6 @@ export default function AdminDashboard() {
     const checkDatabaseConnection = async () => {
       try {
         const startTime = Date.now();
-
-        // Teste real de conexão com o banco
         const { data, error, count } = await supabase
           .from("profiles")
           .select("*", { count: "exact", head: true })
@@ -79,11 +79,8 @@ export default function AdminDashboard() {
 
         const responseTime = Date.now() - startTime;
 
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
-        // Determinar status baseado no tempo de resposta
         if (responseTime < 500) {
           setSystemStatus({
             database: "online",
@@ -104,7 +101,7 @@ export default function AdminDashboard() {
           });
         }
 
-        return true; // Conexão bem-sucedida
+        return true;
       } catch (error: any) {
         console.error("Erro na conexão com o banco:", error);
         setSystemStatus({
@@ -112,51 +109,39 @@ export default function AdminDashboard() {
           status: "critical",
           message: "Erro na conexão com o banco",
         });
-        return false; // Conexão falhou
+        return false;
       }
     };
 
     const fetchStats = async () => {
       try {
         setLoading(true);
-
-        // Primeiro verifica a conexão com o banco
         const connectionOk = await checkDatabaseConnection();
 
         if (connectionOk) {
-          // Busca todas as estatísticas em paralelo
           const [
             agentsResponse,
             newsResponse,
             galleryResponse,
             categoriesResponse,
           ] = await Promise.all([
-            // Agentes - filtrando apenas agents (não admins)
             supabase
               .from("profiles")
               .select("id, status, role")
               .eq("role", "agent"),
-
-            // Notícias - com todos os dados relevantes
             supabase
               .from("noticias")
               .select("id, destaque, status, data_publicacao"),
-
-            // Itens da galeria - com tipo para separar fotos/vídeos
             supabase.from("galeria_itens").select("id, tipo, status"),
-
-            // Categorias da galeria - com tipo para separar fotos/vídeos
             supabase.from("galeria_categorias").select("id, tipo, status"),
           ]);
 
-          // Processa os dados dos agentes
           const agentsData = agentsResponse.data || [];
           const totalAgents = agentsData.length;
           const activeAgents = agentsData.filter(
             (agent) => agent.status
           ).length;
 
-          // Processa os dados das notícias
           const newsData = newsResponse.data || [];
           const totalNews = newsData.length;
           const featuredNews = newsData.filter((news) => news.destaque).length;
@@ -164,7 +149,6 @@ export default function AdminDashboard() {
             (news) => news.status === "publicado"
           ).length;
 
-          // Processa os dados da galeria
           const galleryData = galleryResponse.data || [];
           const totalGalleryItems = galleryData.length;
           const photoItems = galleryData.filter(
@@ -174,7 +158,6 @@ export default function AdminDashboard() {
             (item) => item.tipo === "video"
           ).length;
 
-          // Processa as categorias
           const categoriesData = categoriesResponse.data || [];
           const totalCategories = categoriesData.length;
           const photoCategories = categoriesData.filter(
@@ -206,8 +189,6 @@ export default function AdminDashboard() {
     };
 
     fetchStats();
-
-    // Verificar conexão a cada 30 segundos
     const interval = setInterval(checkDatabaseConnection, 30000);
     return () => clearInterval(interval);
   }, [supabase]);
@@ -285,7 +266,7 @@ export default function AdminDashboard() {
       blue: "from-blue-500 to-blue-600",
       green: "from-green-500 to-green-600",
       purple: "from-purple-500 to-purple-600",
-      navy: "from-navy-light to-navy",
+      navy: "from-navy to-navy-700",
     };
 
     return (
@@ -312,6 +293,7 @@ export default function AdminDashboard() {
     );
   };
 
+  // CORREÇÃO: Adicionar "purple" ao tipo de color
   const QuickAction = ({
     title,
     description,
@@ -323,12 +305,13 @@ export default function AdminDashboard() {
     description: string;
     icon: any;
     href: string;
-    color?: "navy" | "green" | "blue";
+    color?: "navy" | "green" | "blue" | "purple"; // CORRIGIDO: Adicionei "purple"
   }) => {
     const colorClasses = {
-      navy: "bg-navy-light hover:bg-navy text-white",
+      navy: "bg-navy hover:bg-navy-700 text-white",
       green: "bg-green-600 hover:bg-green-700 text-white",
       blue: "bg-blue-600 hover:bg-blue-700 text-white",
+      purple: "bg-purple-600 hover:bg-purple-700 text-white", // CORRIGIDO: Adicionei purple
     };
 
     return (
@@ -383,7 +366,6 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Atividades baseadas nos dados reais */}
           {stats.featuredNews > 0 && (
             <div className="flex items-center space-x-3 p-3 bg-purple-50 rounded-lg">
               <FaNewspaper className="w-4 h-4 text-purple-600 flex-shrink-0" />
@@ -478,9 +460,10 @@ export default function AdminDashboard() {
               {/* Status do Sistema */}
               <div className="flex items-center gap-3 order-2 sm:order-1">
                 <StatusIndicator />
+                {/* 🔵 AZUL - Ações Administrativas */}
                 <Button
                   asChild
-                  className="bg-navy-light hover:bg-navy text-white font-medium px-4 sm:px-6 py-2.5"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 sm:px-6 py-2.5"
                 >
                   <Link href="/admin/configuracoes">
                     <FaCog className="w-4 h-4 mr-2" />
@@ -491,25 +474,26 @@ export default function AdminDashboard() {
 
               {/* Links de Navegação */}
               <div className="flex gap-3 order-1 sm:order-2">
+                {/* 🔵 AZUL - Ações Administrativas */}
                 <Button
                   asChild
                   variant="outline"
-                  className="text-navy-light border-navy-light hover:bg-navy-light hover:text-white"
+                  className="text-blue-600 border-blue-600 hover:bg-blue-600 hover:text-white"
                 >
-                  {/* ✅ CORRIGIDO: /perfil em vez de /agent/perfil */}
                   <Link href="/perfil">
-                    <FaUser className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Perfil</span>
+                    <FaEdit className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Editar Perfil</span>
                   </Link>
                 </Button>
+                {/* ⚫ CINZA - Navegação Neutra */}
                 <Button
                   asChild
                   variant="outline"
-                  className="text-gray-600 border-gray-300 hover:bg-gray-50"
+                  className="text-slate-700 border-slate-300 hover:bg-slate-100"
                 >
                   <Link href="/">
-                    <FaGlobe className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">Site</span>
+                    <FaHome className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Voltar ao Site</span>
                   </Link>
                 </Button>
               </div>
@@ -587,7 +571,7 @@ export default function AdminDashboard() {
                     description="Acessar relatórios do sistema"
                     icon={FaChartBar}
                     href="/admin/relatorios"
-                    color="navy"
+                    color="purple" // AGORA FUNCIONA: "purple" está incluído no tipo
                   />
                 </div>
               </CardContent>

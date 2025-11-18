@@ -69,8 +69,8 @@ const BackgroundImage = () => {
         backgroundSize: "cover",
       }}
     >
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/25 to-black/50"></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/30 to-transparent"></div>
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-slate-900/25 to-slate-900/50"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 via-slate-900/30 to-transparent"></div>
     </div>
   );
 };
@@ -112,7 +112,7 @@ const Description = () => (
     <p
       className="text-base sm:text-lg md:text-xl 
                  text-white leading-relaxed
-                 bg-black/60 backdrop-blur-sm 
+                 bg-slate-900/60 backdrop-blur-sm 
                  rounded-xl lg:rounded-2xl 
                  p-4 sm:p-5 md:p-6 
                  border border-white/20 
@@ -147,7 +147,7 @@ const ActionButtons = () => (
         className="w-full text-sm sm:text-base md:text-lg 
                    px-6 sm:px-8 
                    py-3 sm:py-4 
-                   bg-navy-light text-white font-bold uppercase 
+                   bg-navy hover:bg-navy-700 text-white font-bold uppercase 
                    tracking-wider transition-all duration-300 
                    hover:shadow-xl 
                    font-roboto border-0 group/button relative overflow-hidden 
@@ -177,7 +177,7 @@ const ActionButtons = () => (
                    border-2 border-white bg-white/10 backdrop-blur-sm 
                    text-white font-bold uppercase tracking-wider 
                    transition-all duration-300 
-                   hover:bg-white hover:text-gray-800 hover:shadow-xl 
+                   hover:bg-white hover:text-slate-900 hover:shadow-xl 
                    font-roboto group/outline relative overflow-hidden 
                    shadow-lg 
                    min-h-[48px] sm:min-h-[52px]"
@@ -224,7 +224,7 @@ const ScrollIndicator = () => {
 
 export function HeroSection() {
   return (
-    <section className="relative bg-gray-800 text-white h-screen flex items-center justify-center overflow-hidden pt-16">
+    <section className="relative bg-slate-800 text-white h-screen flex items-center justify-center overflow-hidden pt-16">
       <BackgroundImage />
 
       <motion.div
@@ -244,7 +244,7 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-28 lg:h-32 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-28 lg:h-32 bg-gradient-to-t from-slate-900/50 to-transparent pointer-events-none"></div>
     </section>
   );
 }

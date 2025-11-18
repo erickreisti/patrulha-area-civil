@@ -19,22 +19,22 @@ const SOCIAL_LINKS = [
   {
     icon: FaFacebook,
     url: "https://facebook.com/patrulhaaereacivil",
-    color: "hover:bg-blue-600 hover:text-white",
+    color: "hover:bg-blue-600",
   },
   {
     icon: FaInstagram,
     url: "https://instagram.com/patrulhaaereacivil",
-    color: "hover:bg-pink-600 hover:text-white",
+    color: "hover:bg-pink-600",
   },
   {
     icon: FaXTwitter,
     url: "https://twitter.com/patrulhaaereacivil",
-    color: "hover:bg-black hover:text-white",
+    color: "hover:bg-black",
   },
   {
     icon: FaWhatsapp,
     url: "https://wa.me/5521999999999",
-    color: "hover:bg-green-600 hover:text-white",
+    color: "hover:bg-green-600",
   },
 ];
 
@@ -77,7 +77,7 @@ const BrandSection = () => {
           />
         </motion.div>
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 font-bebas tracking-wide">
+          <h2 className="text-2xl font-bold text-slate-800 font-bebas tracking-wide">
             Patrulha Aérea Civil
           </h2>
           <p className="text-navy font-roboto font-medium text-base">
@@ -86,7 +86,7 @@ const BrandSection = () => {
         </div>
       </Link>
       <motion.p
-        className="text-gray-800 max-w-md font-roboto leading-relaxed text-base"
+        className="text-slate-700 max-w-md font-roboto leading-relaxed text-base"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.2 }}
@@ -115,7 +115,7 @@ const SocialLinks = () => (
         href={social.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`text-gray-800 transition-all duration-300 hover:scale-110 bg-gray-100 rounded-full p-3 hover-lift border border-gray-200 ${social.color}`}
+        className={`text-slate-700 transition-all duration-300 hover:scale-110 bg-slate-100 rounded-full p-3 border border-slate-200 ${social.color} hover:text-white`}
         title={social.icon === FaXTwitter ? "X (Twitter)" : social.icon.name}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
@@ -149,12 +149,12 @@ const NavigationSection = () => (
         >
           <Link
             href={link.href}
-            className="text-navy text-base font-medium py-2 transition-all duration-300 uppercase tracking-wider font-roboto hover:text-navy-light hover:font-semibold block relative group/navlink w-fit"
+            className="text-slate-700 text-base font-medium py-2 transition-all duration-300 uppercase tracking-wider font-roboto hover:text-navy hover:font-semibold block relative group/navlink w-fit"
           >
             <span className="relative z-10 transition-colors duration-300">
               {link.label}
             </span>
-            <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-navy-light transition-all duration-300 group-hover/navlink:w-full" />
+            <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-navy transition-all duration-300 group-hover/navlink:w-full" />
           </Link>
         </motion.li>
       ))}
@@ -177,7 +177,7 @@ const ContactSection = () => (
 
 const SectionTitle = ({ title }: { title: string }) => (
   <motion.h3
-    className="text-xl font-bold text-gray-800 mb-6 font-bebas tracking-wide border-b-2 border-navy pb-2"
+    className="text-xl font-bold text-slate-800 mb-6 font-bebas tracking-wide border-b-2 border-navy pb-2"
     initial={{ opacity: 0, y: -10 }}
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
@@ -188,7 +188,7 @@ const SectionTitle = ({ title }: { title: string }) => (
 );
 
 const ContactInfo = () => (
-  <ul className="space-y-4 text-gray-800 font-roboto text-base">
+  <ul className="space-y-4 text-slate-700 font-roboto text-base">
     <ContactItem
       icon={FaEnvelope}
       text="contato@patrulhaaereacivil.org.br"
@@ -234,7 +234,11 @@ const ContactItem = ({
         isEmergency ? "text-alert" : "text-navy"
       }`}
     />
-    <span className={isEmergency ? "font-semibold" : ""}>{text}</span>
+    <span
+      className={isEmergency ? "font-semibold text-alert" : "text-slate-700"}
+    >
+      {text}
+    </span>
   </motion.li>
 );
 
@@ -263,7 +267,7 @@ const EmergencyButton = () => (
 const BottomFooter = () => {
   return (
     <motion.div
-      className="border-t border-gray-200 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center"
+      className="border-t border-slate-200 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.2 }}
@@ -283,7 +287,7 @@ const BottomFooter = () => {
             className="object-contain rounded w-full h-full"
           />
         </motion.div>
-        <p className="text-gray-800 text-sm font-roboto">
+        <p className="text-slate-700 text-sm font-roboto">
           © 2024 Patrulha Aérea Civil. Todos os direitos reservados.
         </p>
       </div>
@@ -313,7 +317,7 @@ const LegalLinks = () => (
           variant="ghost"
           size="sm"
           asChild
-          className="text-gray-800 hover:text-navy hover:bg-navy/10 text-sm font-roboto transition-all duration-300"
+          className="text-slate-700 hover:text-navy hover:bg-navy/10 text-sm font-roboto transition-all duration-300"
         >
           <Link href={link.href}>{link.label}</Link>
         </Button>
@@ -324,7 +328,7 @@ const LegalLinks = () => (
 
 export function Footer() {
   return (
-    <footer className="bg-white text-gray-800 border-t-2 border-navy">
+    <footer className="bg-white text-slate-700 border-t-2 border-navy">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           <BrandSection />

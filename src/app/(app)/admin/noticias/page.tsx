@@ -1,4 +1,4 @@
-// src/app/(app)/admin/noticias/page.tsx - LISTAGEM DE NOTÍCIAS
+// src/app/(app)/admin/noticias/page.tsx - PADRONIZADO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,10 +24,10 @@ import {
   FaTrash,
   FaArchive,
   FaRocket,
+  FaArrowLeft,
 } from "react-icons/fa";
 import { NoticiaWithAutor, NoticiaStatus } from "@/types/noticias";
 
-// Categorias pré-definidas baseadas no seu conteúdo
 const CATEGORIAS = [
   "Operações",
   "Treinamento",
@@ -59,8 +59,6 @@ export default function NoticiasPage() {
   const fetchNoticias = async () => {
     try {
       setLoading(true);
-
-      // Buscar notícias com JOIN no perfil do autor
       const { data, error } = await supabase
         .from("noticias")
         .select(
@@ -72,7 +70,6 @@ export default function NoticiasPage() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-
       setNoticias(data || []);
     } catch (error) {
       console.error("Erro ao buscar notícias:", error);
@@ -81,7 +78,6 @@ export default function NoticiasPage() {
     }
   };
 
-  // Filtros combinados
   const filteredNoticias = noticias.filter((noticia) => {
     const matchesSearch =
       noticia.titulo.toLowerCase().includes(search.toLowerCase()) ||
@@ -90,10 +86,8 @@ export default function NoticiasPage() {
 
     const matchesStatus =
       filterStatus === "all" || noticia.status === filterStatus;
-
     const matchesCategoria =
       filterCategoria === "all" || noticia.categoria === filterCategoria;
-
     const matchesDestaque =
       filterDestaque === "all" ||
       (filterDestaque === "destaque" && noticia.destaque) ||
@@ -104,15 +98,12 @@ export default function NoticiasPage() {
     );
   });
 
-  // Alterar status da notícia
   const toggleNoticiaStatus = async (
     noticiaId: string,
     currentStatus: NoticiaStatus
   ) => {
     try {
       let newStatus: NoticiaStatus;
-
-      // Lógica de transição de status
       if (currentStatus === "rascunho") {
         newStatus = "publicado";
       } else if (currentStatus === "publicado") {
@@ -131,7 +122,6 @@ export default function NoticiasPage() {
 
       if (error) throw error;
 
-      // Atualizar estado local
       setNoticias((prev) =>
         prev.map((noticia) =>
           noticia.id === noticiaId
@@ -143,14 +133,11 @@ export default function NoticiasPage() {
             : noticia
         )
       );
-
-      console.log(`✅ Notícia ${noticiaId} alterada para: ${newStatus}`);
     } catch (error) {
       console.error("Erro ao alterar status:", error);
     }
   };
 
-  // Toggle destaque
   const toggleDestaque = async (
     noticiaId: string,
     currentDestaque: boolean
@@ -182,7 +169,6 @@ export default function NoticiasPage() {
     }
   };
 
-  // Excluir notícia
   const deleteNoticia = async (noticiaId: string) => {
     if (
       !confirm(
@@ -197,22 +183,17 @@ export default function NoticiasPage() {
         .from("noticias")
         .delete()
         .eq("id", noticiaId);
-
       if (error) throw error;
-
       setNoticias((prev) => prev.filter((noticia) => noticia.id !== noticiaId));
-      console.log(`🗑️ Notícia ${noticiaId} excluída`);
     } catch (error) {
       console.error("Erro ao excluir notícia:", error);
     }
   };
 
-  // Formatar data
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
-  // Calcular estatísticas
   const stats = {
     total: noticias.length,
     rascunho: noticias.filter((n) => n.status === "rascunho").length,
@@ -221,7 +202,6 @@ export default function NoticiasPage() {
     destaque: noticias.filter((n) => n.destaque).length,
   };
 
-  // Obter badge color por status
   const getStatusBadge = (status: NoticiaStatus) => {
     const variants = {
       rascunho: "bg-yellow-500 text-white",
@@ -231,7 +211,6 @@ export default function NoticiasPage() {
     return variants[status];
   };
 
-  // Obter texto do status
   const getStatusText = (status: NoticiaStatus) => {
     const texts = {
       rascunho: "RASCUNHO",
@@ -257,35 +236,42 @@ export default function NoticiasPage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
-                className="border-navy-light text-navy-light hover:bg-navy-light hover:text-white"
+                className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
               >
                 <FaChartBar className="w-4 h-4 mr-2" />
                 Dashboard
               </Button>
             </Link>
-            <Link href="/agent/perfil">
+
+            {/* 🔵 AZUL - Ações Administrativas */}
+            <Link href="/perfil">
               <Button
                 variant="outline"
-                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
               >
                 <FaUser className="w-4 h-4 mr-2" />
                 Meu Perfil
               </Button>
             </Link>
+
+            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"
-                className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="border-slate-700 text-slate-700 hover:bg-slate-100"
               >
                 <FaHome className="w-4 h-4 mr-2" />
-                Site
+                Voltar ao Site
               </Button>
             </Link>
+
+            {/* 🟢 Verde para ações de criação */}
             <Link href="/admin/noticias/criar">
-              <Button className="bg-navy-light hover:bg-navy text-white">
+              <Button className="bg-green-600 hover:bg-green-700 text-white">
                 <FaPlus className="w-4 h-4 mr-2" />
                 Nova Notícia
               </Button>
@@ -304,7 +290,7 @@ export default function NoticiasPage() {
                     {stats.total}
                   </p>
                 </div>
-                <FaNewspaper className="w-8 h-8 text-navy-light" />
+                <FaNewspaper className="w-8 h-8 text-navy" />
               </div>
             </CardContent>
           </Card>
@@ -370,7 +356,6 @@ export default function NoticiasPage() {
         <Card className="border-0 shadow-md mb-6">
           <CardContent className="p-6">
             <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
-              {/* Busca */}
               <div className="flex-1 max-w-md">
                 <div className="relative">
                   <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -384,12 +369,11 @@ export default function NoticiasPage() {
                 </div>
               </div>
 
-              {/* Filtros */}
               <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy text-sm"
                 >
                   <option value="all">Todos os status</option>
                   <option value="rascunho">Rascunho</option>
@@ -400,7 +384,7 @@ export default function NoticiasPage() {
                 <select
                   value={filterCategoria}
                   onChange={(e) => setFilterCategoria(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy text-sm"
                 >
                   <option value="all">Todas categorias</option>
                   {CATEGORIAS.map((cat) => (
@@ -413,7 +397,7 @@ export default function NoticiasPage() {
                 <select
                   value={filterDestaque}
                   onChange={(e) => setFilterDestaque(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy text-sm"
                 >
                   <option value="all">Todos</option>
                   <option value="destaque">Em destaque</option>
@@ -428,14 +412,14 @@ export default function NoticiasPage() {
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <FaNewspaper className="w-5 h-5 mr-2 text-navy-light" />
+              <FaNewspaper className="w-5 h-5 mr-2 text-navy" />
               Lista de Notícias ({filteredNoticias.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-light mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
                 <p className="text-gray-600 mt-4">Carregando notícias...</p>
               </div>
             ) : filteredNoticias.length === 0 ? (
@@ -448,7 +432,7 @@ export default function NoticiasPage() {
                 </p>
                 {noticias.length === 0 && (
                   <Link href="/admin/noticias/criar">
-                    <Button className="bg-navy-light hover:bg-navy text-white mt-4">
+                    <Button className="bg-green-600 hover:bg-green-700 text-white mt-4">
                       <FaPlus className="w-4 h-4 mr-2" />
                       Criar Primeira Notícia
                     </Button>
@@ -486,7 +470,6 @@ export default function NoticiasPage() {
                         key={noticia.id}
                         className="border-b border-gray-100 hover:bg-gray-50"
                       >
-                        {/* Coluna Notícia */}
                         <td className="py-3 px-4">
                           <div className="flex items-start space-x-3">
                             <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
@@ -521,7 +504,6 @@ export default function NoticiasPage() {
                           </div>
                         </td>
 
-                        {/* Coluna Categoria */}
                         <td className="py-3 px-4">
                           <Badge
                             variant="secondary"
@@ -531,7 +513,6 @@ export default function NoticiasPage() {
                           </Badge>
                         </td>
 
-                        {/* Coluna Autor */}
                         <td className="py-3 px-4">
                           <div className="flex items-center space-x-2">
                             <FaUser className="w-4 h-4 text-gray-400" />
@@ -547,7 +528,6 @@ export default function NoticiasPage() {
                           </div>
                         </td>
 
-                        {/* Coluna Publicação */}
                         <td className="py-3 px-4">
                           <div className="flex items-center space-x-2">
                             <FaCalendarAlt className="w-4 h-4 text-gray-400" />
@@ -557,41 +537,41 @@ export default function NoticiasPage() {
                           </div>
                         </td>
 
-                        {/* Coluna Status */}
                         <td className="py-3 px-4">
                           <Badge className={getStatusBadge(noticia.status)}>
                             {getStatusText(noticia.status)}
                           </Badge>
                         </td>
 
-                        {/* Coluna Ações */}
                         <td className="py-3 px-4">
                           <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
+                            {/* 🔵 AZUL - Ações Administrativas */}
                             <Link href={`/admin/noticias/${noticia.id}`}>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                className="w-full sm:w-auto"
+                                className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
                               >
                                 <FaEdit className="w-3 h-3 mr-1" />
                                 Editar
                               </Button>
                             </Link>
 
+                            {/* 🟢 Verde para ações de status */}
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() =>
                                 toggleNoticiaStatus(noticia.id, noticia.status)
                               }
-                              className="w-full sm:w-auto"
+                              className="w-full sm:w-auto border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
                             >
                               {noticia.status === "rascunho" ? (
-                                <FaRocket className="w-3 h-3 mr-1 text-green-500" />
+                                <FaRocket className="w-3 h-3 mr-1" />
                               ) : noticia.status === "publicado" ? (
-                                <FaArchive className="w-3 h-3 mr-1 text-gray-500" />
+                                <FaArchive className="w-3 h-3 mr-1" />
                               ) : (
-                                <FaEye className="w-3 h-3 mr-1 text-blue-500" />
+                                <FaEye className="w-3 h-3 mr-1" />
                               )}
                               {noticia.status === "rascunho"
                                 ? "Publicar"
@@ -600,27 +580,29 @@ export default function NoticiasPage() {
                                 : "Republicar"}
                             </Button>
 
+                            {/* 🟡 Amarelo para ações de destaque */}
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() =>
                                 toggleDestaque(noticia.id, noticia.destaque)
                               }
-                              className="w-full sm:w-auto"
+                              className="w-full sm:w-auto border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white"
                             >
                               {noticia.destaque ? (
-                                <FaRegStar className="w-3 h-3 mr-1 text-gray-500" />
+                                <FaRegStar className="w-3 h-3 mr-1" />
                               ) : (
-                                <FaStar className="w-3 h-3 mr-1 text-yellow-500" />
+                                <FaStar className="w-3 h-3 mr-1" />
                               )}
                               {noticia.destaque ? "Remover" : "Destacar"}
                             </Button>
 
+                            {/* 🔴 VERMELHO - Ações Destrutivas */}
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => deleteNoticia(noticia.id)}
-                              className="w-full sm:w-auto text-red-600 border-red-200 hover:bg-red-50"
+                              className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
                             >
                               <FaTrash className="w-3 h-3 mr-1" />
                               Excluir

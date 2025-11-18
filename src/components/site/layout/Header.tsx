@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -16,9 +16,12 @@ import {
   FaCog,
   FaChartBar,
   FaArrowLeft,
+  FaEdit,
+  FaHome,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { createClient } from "@/lib/supabase/client";
+import { motion } from "framer-motion";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -40,7 +43,7 @@ const SOCIAL_ICONS = [
     icon: FaXTwitter,
     href: "https://twitter.com/patrulhaaereacivil",
     label: "X (Twitter)",
-    hoverColor: "hover:bg-black hover:text-white",
+    hoverColor: "hover:bg-slate-900",
   },
   {
     icon: FaInstagram,
@@ -55,6 +58,74 @@ const SOCIAL_ICONS = [
     hoverColor: "hover:bg-green-600",
   },
 ];
+
+// 🎯 COMPONENTE DE LOADING PROFISSIONAL
+const LoadingSpinner = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
+  const sizeClasses = {
+    sm: "w-4 h-4",
+    md: "w-5 h-5",
+    lg: "w-6 h-6",
+  };
+
+  return (
+    <div className={`relative ${sizeClasses[size]}`}>
+      {/* Spinner principal */}
+      <motion.div
+        className="absolute inset-0 border-2 border-white/30 rounded-full"
+        animate={{ rotate: 360 }}
+        transition={{
+          duration: 1,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+
+      {/* Ponteiro do spinner */}
+      <motion.div
+        className="absolute inset-0 border-2 border-transparent border-t-white rounded-full"
+        animate={{ rotate: 360 }}
+        transition={{
+          duration: 1,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+
+      {/* Ponto central */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-1 h-1 bg-white/50 rounded-full" />
+      </div>
+    </div>
+  );
+};
+
+// 🎯 BOTÃO DE LOADING COMPLETO
+const LoadingButton = () => {
+  return (
+    <Button
+      className="bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed"
+      disabled
+    >
+      {/* Efeito de shimmer sutil */}
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        initial={{ x: "-100%" }}
+        animate={{ x: "100%" }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+
+      {/* Conteúdo do botão */}
+      <div className="flex items-center justify-center gap-3 relative z-10">
+        <LoadingSpinner size="sm" />
+        <span className="text-white/90">Carregando...</span>
+      </div>
+    </Button>
+  );
+};
 
 const useScrollDetection = (threshold = 30) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -71,7 +142,6 @@ const useScrollDetection = (threshold = 30) => {
   return isScrolled;
 };
 
-// ✅ HOOK CORRIGIDO PARA O HEADER
 const useHeaderAuth = () => {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
@@ -82,24 +152,19 @@ const useHeaderAuth = () => {
     const checkAuth = async () => {
       try {
         setLoading(true);
-
-        // Primeiro, verificar dados locais
         const localData = localStorage.getItem("pac_user_data");
         if (localData) {
           try {
             const profileData = JSON.parse(localData);
-            console.log("✅ Header: Usando dados locais", profileData);
             setProfile(profileData);
             setUser({ id: profileData.id, email: profileData.email });
             setLoading(false);
             return;
           } catch (parseError) {
-            console.error("❌ Erro ao parsear dados locais:", parseError);
             localStorage.removeItem("pac_user_data");
           }
         }
 
-        // Se não tem dados locais, tentar auth
         try {
           const {
             data: { user: authUser },
@@ -107,15 +172,12 @@ const useHeaderAuth = () => {
           } = await supabase.auth.getUser();
 
           if (error) {
-            console.log("⚠️ Header: Nenhum usuário autenticado");
             setLoading(false);
             return;
           }
 
           if (authUser) {
             setUser(authUser);
-
-            // Buscar perfil do banco
             const { data: profileData, error: profileError } = await supabase
               .from("profiles")
               .select("*")
@@ -123,14 +185,12 @@ const useHeaderAuth = () => {
               .single();
 
             if (profileError) {
-              console.error("❌ Erro ao buscar perfil:", profileError);
               setLoading(false);
               return;
             }
 
             if (profileData) {
               setProfile(profileData);
-              // Salvar no localStorage para próxima vez
               localStorage.setItem(
                 "pac_user_data",
                 JSON.stringify(profileData)
@@ -149,7 +209,6 @@ const useHeaderAuth = () => {
 
     checkAuth();
 
-    // Listen for auth state changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -215,7 +274,7 @@ const TopBar = () => {
                 priority
               />
             </div>
-            <span className="text-blue-100 font-medium font-roboto">
+            <span className="text-slate-200 font-medium font-roboto">
               República Federativa do Brasil
             </span>
           </div>
@@ -261,10 +320,10 @@ const Logo = () => {
         />
       </div>
       <div className="text-left">
-        <h1 className="font-bebas text-xl sm:text-2xl bg-gradient-to-r from-navy-light to-navy bg-clip-text text-transparent tracking-wider uppercase leading-tight">
+        <h1 className="font-bebas text-xl sm:text-2xl bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight">
           PATRULHA AÉREA CIVIL
         </h1>
-        <p className="text-gray-600 text-xs sm:text-sm leading-tight mt-1 font-roboto">
+        <p className="text-slate-600 text-xs sm:text-sm leading-tight mt-1 font-roboto">
           Serviço Humanitário
         </p>
       </div>
@@ -286,10 +345,10 @@ const DesktopLogo = () => {
         />
       </div>
       <div className="text-left">
-        <h1 className="font-bebas text-2xl bg-gradient-to-r from-navy-light to-navy bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 group-hover:scale-105">
+        <h1 className="font-bebas text-2xl bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 group-hover:scale-105">
           PATRULHA AÉREA CIVIL
         </h1>
-        <p className="text-gray-600 text-sm leading-tight mt-1 font-roboto">
+        <p className="text-slate-600 text-sm leading-tight mt-1 font-roboto">
           Serviço Humanitário de Excelência
         </p>
       </div>
@@ -308,10 +367,10 @@ const NavigationItem = ({
     <Link
       href={item.href}
       className={cn(
-        "no-underline text-gray-800 font-medium py-2 px-1 transition-all duration-300 uppercase tracking-wider font-roboto relative group/navlink text-sm w-fit",
+        "no-underline text-slate-700 font-medium py-2 px-1 transition-all duration-300 uppercase tracking-wider font-roboto relative group/navlink text-sm w-fit",
         isActive
-          ? "text-navy-light font-semibold"
-          : "text-gray-700 hover:text-navy-light hover:font-semibold"
+          ? "text-navy font-semibold"
+          : "text-slate-600 hover:text-navy hover:font-semibold"
       )}
     >
       <span className="relative z-10 transition-colors duration-300">
@@ -319,7 +378,7 @@ const NavigationItem = ({
       </span>
       <div
         className={cn(
-          "absolute -bottom-1 left-0 w-0 h-0.5 bg-navy-light transition-all duration-300",
+          "absolute -bottom-1 left-0 w-0 h-0.5 bg-navy transition-all duration-300",
           isActive ? "w-full" : "group-hover/navlink:w-full"
         )}
       />
@@ -341,7 +400,6 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// ✅ COMPONENTE USER MENU CORRIGIDO
 const UserMenuButton = () => {
   const { user, profile, loading, signOut, isAdmin } = useHeaderAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -351,20 +409,13 @@ const UserMenuButton = () => {
   const isOnAdminDashboard = pathname === "/admin/dashboard";
 
   if (loading) {
-    return (
-      <Button
-        className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 min-h-[44px] opacity-50"
-        disabled
-      >
-        ...
-      </Button>
-    );
+    return <LoadingButton />;
   }
 
   if (!user) {
     return (
       <Button
-        className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
+        className="bg-navy hover:bg-navy-700 text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
         asChild
       >
         <Link href="/login">
@@ -375,85 +426,81 @@ const UserMenuButton = () => {
     );
   }
 
-  // Usuário logado - mostrar menu dropdown
   return (
     <div className="relative">
       <Button
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="bg-navy-light hover:bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] flex items-center gap-2"
+        className="bg-navy hover:bg-navy-700 text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] flex items-center gap-2"
       >
         <FaUser className="w-4 h-4" />
         <span className="relative z-10">{profile?.graduacao || "Agente"}</span>
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
       </Button>
 
-      {/* Dropdown Menu */}
       {isDropdownOpen && (
-        <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-xl z-50 animate-scale-in">
-          {/* Header do Dropdown */}
-          <div className="p-4 border-b border-gray-200">
+        <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 animate-scale-in">
+          <div className="p-4 border-b border-slate-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-navy-light rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-navy rounded-full flex items-center justify-center">
                 <FaUser className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">
+                <p className="text-sm font-semibold text-slate-800 truncate">
                   {profile?.full_name || "Agente PAC"}
                 </p>
-                <p className="text-xs text-gray-600 truncate">
+                <p className="text-xs text-slate-600 truncate">
                   {profile?.matricula
                     ? `Matrícula: ${profile.matricula}`
                     : user.email}
                 </p>
-                <p className="text-xs text-navy-light font-medium capitalize">
+                <p className="text-xs text-navy font-medium capitalize">
                   {isAdmin ? "Administrador" : "Agente"}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Links do Dropdown */}
-          <div className="p-2">
-            {/* Opção "Voltar ao Perfil" - aparece apenas se NÃO estiver na página de perfil */}
+          <div className="p-2 space-y-1">
+            {/* 🔵 AZUL - Ações Administrativas */}
             {!isOnProfilePage && (
               <Link
                 href="/perfil"
-                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors border border-transparent hover:border-blue-200"
                 onClick={() => setIsDropdownOpen(false)}
               >
-                <FaArrowLeft className="w-4 h-4 text-navy-light" />
+                <FaArrowLeft className="w-4 h-4" />
                 Voltar ao Perfil
               </Link>
             )}
 
-            {/* Para admin: Painel Admin (sempre visível) */}
+            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             {isAdmin && (
               <Link
                 href="/admin/dashboard"
-                className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                className="flex items-center gap-3 px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent hover:border-purple-200"
                 onClick={() => setIsDropdownOpen(false)}
               >
-                <FaChartBar className="w-4 h-4 text-navy-light" />
-                Painel Admin
+                <FaChartBar className="w-4 h-4" />
+                Ir ao Dashboard
               </Link>
             )}
 
-            {/* Configurações */}
+            {/* 🔵 AZUL - Ações Administrativas */}
             <Link
               href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
-              className="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              className="flex items-center gap-3 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors border border-transparent hover:border-blue-200"
               onClick={() => setIsDropdownOpen(false)}
             >
-              <FaCog className="w-4 h-4 text-navy-light" />
+              <FaCog className="w-4 h-4" />
               Configurações
             </Link>
           </div>
 
-          {/* Footer do Dropdown */}
-          <div className="p-2 border-t border-gray-200">
+          <div className="p-2 border-t border-slate-200">
+            {/* 🔴 VERMELHO - Ações Destrutivas */}
             <button
               onClick={signOut}
-              className="flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors w-full"
+              className="flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors w-full border border-transparent hover:border-red-200"
             >
               <FaSignOutAlt className="w-4 h-4" />
               Sair do Sistema
@@ -462,7 +509,6 @@ const UserMenuButton = () => {
         </div>
       )}
 
-      {/* Overlay para fechar o dropdown */}
       {isDropdownOpen && (
         <div
           className="fixed inset-0 z-40"
@@ -488,7 +534,7 @@ const MobileMenu = ({
   if (!isOpen) return null;
 
   return (
-    <div className="xl:hidden bg-white border-t border-gray-200 shadow-lg animate-slide-down">
+    <div className="xl:hidden bg-white border-t border-slate-200 shadow-lg animate-slide-down">
       <div className="container mx-auto px-4 py-4">
         <nav className="flex flex-col space-y-3">
           {NAVIGATION.map((item) => (
@@ -498,8 +544,8 @@ const MobileMenu = ({
               className={cn(
                 "px-4 py-3 rounded-lg text-base font-medium transition-all duration-300 border-l-4 font-roboto",
                 pathname.startsWith(item.href)
-                  ? "bg-navy-light/10 text-navy border-navy shadow-md"
-                  : "text-gray-700 hover:bg-gray-50 border-transparent hover:border-gray-300"
+                  ? "bg-navy/10 text-navy border-navy shadow-md"
+                  : "text-slate-700 hover:bg-slate-50 border-transparent hover:border-slate-300"
               )}
               onClick={onClose}
             >
@@ -507,30 +553,29 @@ const MobileMenu = ({
             </Link>
           ))}
 
-          {/* Seção do usuário logado no mobile */}
           {user ? (
             <>
-              <div className="pt-4 border-t border-gray-200">
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
-                  <div className="w-8 h-8 bg-navy-light rounded-full flex items-center justify-center">
+              <div className="pt-4 border-t border-slate-200">
+                <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
+                  <div className="w-8 h-8 bg-navy rounded-full flex items-center justify-center">
                     <FaUser className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 truncate">
+                    <p className="text-sm font-semibold text-slate-800 truncate">
                       {profile?.full_name || "Agente PAC"}
                     </p>
-                    <p className="text-xs text-gray-600">
+                    <p className="text-xs text-slate-600">
                       {isAdmin ? "Administrador" : "Agente"}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Opção "Voltar ao Perfil" no mobile */}
+              {/* 🔵 AZUL - Ações Administrativas */}
               {!isOnProfilePage && (
                 <Link
                   href="/perfil"
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
+                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-blue-50 text-blue-600 border-l-4 border-blue-600"
                   onClick={onClose}
                 >
                   <FaArrowLeft className="w-4 h-4" />
@@ -538,31 +583,42 @@ const MobileMenu = ({
                 </Link>
               )}
 
-              {/* Para admin: Painel Admin */}
+              {/* 🟣 ROXO - Funcionalidades Administrativas */}
               {isAdmin && (
                 <Link
                   href="/admin/dashboard"
-                  className="px-4 py-3 rounded-lg text-base font-medium bg-navy-light/10 text-navy border-l-4 border-navy"
+                  className="px-4 py-3 rounded-lg text-base font-medium bg-purple-50 text-purple-600 border-l-4 border-purple-600"
                   onClick={onClose}
                 >
-                  Painel Administrativo
+                  Ir ao Dashboard
                 </Link>
               )}
 
+              {/* 🔵 AZUL - Ações Administrativas */}
+              <Link
+                href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-blue-50 text-blue-600 border-l-4 border-blue-600"
+                onClick={onClose}
+              >
+                <FaCog className="w-4 h-4" />
+                Configurações
+              </Link>
+
+              {/* 🔴 VERMELHO - Ações Destrutivas */}
               <button
                 onClick={() => {
                   signOut();
                   onClose();
                 }}
-                className="px-4 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 text-left border-l-4 border-transparent"
+                className="px-4 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 text-left border-l-4 border-red-600"
               >
                 Sair do Sistema
               </button>
             </>
           ) : (
-            <div className="pt-4 border-t border-gray-200">
+            <div className="pt-4 border-t border-slate-200">
               <Button
-                className="w-full bg-navy-light hover:bg-navy text-white font-medium py-3 text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300"
+                className="w-full bg-navy hover:bg-navy-700 text-white font-medium py-3 text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300"
                 asChild
               >
                 <Link href="/login" onClick={onClose}>
@@ -573,7 +629,7 @@ const MobileMenu = ({
             </div>
           )}
 
-          <div className="pt-4 border-t border-gray-200">
+          <div className="pt-4 border-t border-slate-200">
             <div className="flex justify-center gap-3">
               {SOCIAL_ICONS.map((social) => {
                 const IconComponent = social.icon;
@@ -584,7 +640,7 @@ const MobileMenu = ({
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cn(
-                      "w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-700 no-underline transition-all duration-300 hover:shadow-lg",
+                      "w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 no-underline transition-all duration-300 hover:shadow-lg",
                       social.hoverColor,
                       "hover:text-white hover:scale-110"
                     )}
@@ -615,7 +671,7 @@ export function Header() {
     <header
       className={cn(
         "bg-white fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b",
-        isScrolled ? "shadow-lg border-gray-200" : "shadow-sm border-gray-100"
+        isScrolled ? "shadow-lg border-slate-200" : "shadow-sm border-slate-100"
       )}
     >
       <TopBar />
@@ -628,7 +684,7 @@ export function Header() {
               variant="ghost"
               size="icon"
               onClick={toggleMenu}
-              className="text-gray-800 hover:bg-gray-100 w-10 h-10 transition-all duration-300 hover:scale-110"
+              className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110"
               aria-label="Alternar menu"
             >
               <FaBars className="h-5 w-5" />

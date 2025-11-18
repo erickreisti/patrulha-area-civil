@@ -109,16 +109,16 @@ const SectionHeader = () => {
       viewport={{ once: true }}
     >
       <div className="flex items-center justify-center gap-4 mb-6">
-        <div className="w-16 h-1 bg-navy-light"></div>
-        <div className="w-12 h-12 bg-navy-light rounded-full flex items-center justify-center shadow-lg">
+        <div className="w-16 h-1 bg-navy"></div>
+        <div className="w-12 h-12 bg-navy rounded-full flex items-center justify-center shadow-lg">
           <FaShieldAlt className="h-6 w-6 text-white" />
         </div>
-        <div className="w-16 h-1 bg-navy-light"></div>
+        <div className="w-16 h-1 bg-navy"></div>
       </div>
-      <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-800 mb-6 tracking-normal uppercase">
-        SOBRE A <span className="text-navy-dark">PATRULHA</span>
+      <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-slate-800 mb-6 tracking-normal uppercase">
+        SOBRE A <span className="text-navy">PATRULHA</span>
       </h1>
-      <p className="text-lg text-gray-800 max-w-4xl mx-auto leading-relaxed font-medium">
+      <p className="text-lg text-slate-700 max-w-4xl mx-auto leading-relaxed font-medium">
         Organização civil de voluntários comprometida com o serviço humanitário,
         preparação para emergências e desenvolvimento de capacidades na aviação
         civil.
@@ -174,15 +174,15 @@ const Accordion = () => {
       {ACCORDION_ITEMS.map((item, index) => (
         <div
           key={index}
-          className="border border-gray-200 rounded-lg bg-gray-50"
+          className="border border-slate-200 rounded-lg bg-slate-50"
         >
           <button
             onClick={() => toggleAccordion(index)}
-            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-100 transition-colors duration-200"
+            className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-100 transition-colors duration-200"
           >
             <div className="flex items-center gap-3">
               <div className="w-2 h-2 bg-navy rounded-full"></div>
-              <span className="font-semibold text-gray-800">{item.title}</span>
+              <span className="font-semibold text-slate-800">{item.title}</span>
             </div>
             {openAccordion === index ? (
               <FaChevronUp className="h-4 w-4 text-navy" />
@@ -192,7 +192,7 @@ const Accordion = () => {
           </button>
           {openAccordion === index && (
             <div className="px-4 pb-3">
-              <p className="text-gray-600 text-sm leading-relaxed">
+              <p className="text-slate-600 text-sm leading-relaxed">
                 {item.content}
               </p>
             </div>
@@ -208,25 +208,25 @@ const MissionValuesGrid = () => (
     {MISSION_VALUES.map((item, index) => (
       <motion.div
         key={item.title}
-        className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-105"
+        className="bg-white border border-slate-200 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-105"
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: index * 0.1 }}
         viewport={{ once: true }}
       >
         <div className="flex items-center justify-between mb-4">
-          <div className="w-12 h-12 bg-navy-light rounded-lg flex items-center justify-center shadow-md">
+          <div className="w-12 h-12 bg-navy rounded-lg flex items-center justify-center shadow-md">
             <item.icon className="h-6 w-6 text-white" />
           </div>
-          <span className="text-xs font-bold text-white uppercase tracking-wide px-3 py-1 rounded-full bg-navy-light">
+          <span className="text-xs font-bold text-white uppercase tracking-wide px-3 py-1 rounded-full bg-navy">
             {item.badge}
           </span>
         </div>
 
-        <h3 className="text-xl font-bold text-gray-800 mb-3 uppercase tracking-wide">
+        <h3 className="text-xl font-bold text-slate-800 mb-3 uppercase tracking-wide">
           {item.title}
         </h3>
-        <p className="text-gray-800 leading-relaxed text-sm">
+        <p className="text-slate-700 leading-relaxed text-sm">
           {item.description}
         </p>
       </motion.div>
@@ -245,7 +245,7 @@ const StatsGrid = () => (
     {STATS.map((stat, index) => (
       <motion.div
         key={stat.label}
-        className="text-center p-6 bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+        className="text-center p-6 bg-white border border-slate-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
         initial={{ opacity: 0, scale: 0.9 }}
         whileInView={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.4, delay: index * 0.1 }}
@@ -259,7 +259,7 @@ const StatsGrid = () => (
         <div className="text-2xl md:text-3xl font-bold text-alert mb-2">
           {stat.number}
         </div>
-        <div className="text-xs text-gray-600 uppercase font-bold tracking-wider">
+        <div className="text-xs text-slate-600 uppercase font-bold tracking-wider">
           {stat.label}
         </div>
       </motion.div>
@@ -269,15 +269,15 @@ const StatsGrid = () => (
 
 const AreasAtuacao = () => (
   <motion.div
-    className="bg-white border border-gray-200 rounded-xl p-6 shadow-lg"
+    className="bg-white border border-slate-200 rounded-xl p-6 shadow-lg"
     initial={{ opacity: 0, x: 30 }}
     whileInView={{ opacity: 1, x: 0 }}
     transition={{ duration: 0.6, delay: 0.2 }}
     viewport={{ once: true }}
   >
-    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-gray-200">
+    <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-200">
       <FaMapMarkerAlt className="h-6 w-6 text-navy" />
-      <h3 className="text-xl font-bold text-gray-800 uppercase tracking-wide">
+      <h3 className="text-xl font-bold text-slate-800 uppercase tracking-wide">
         Áreas de Atuação
       </h3>
     </div>
@@ -286,20 +286,20 @@ const AreasAtuacao = () => (
       {AREAS_ATUACAO.map((area, index) => (
         <motion.div
           key={index}
-          className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-navy/50 transition-colors duration-300 group"
+          className="flex items-start gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-navy/50 transition-colors duration-300 group"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: index * 0.1 }}
           viewport={{ once: true }}
         >
-          <div className="w-12 h-12 bg-navy-light rounded-lg flex items-center justify-center flex-shrink-0 shadow-md group-hover:scale-110 transition-transform duration-300">
+          <div className="w-12 h-12 bg-navy rounded-lg flex items-center justify-center flex-shrink-0 shadow-md group-hover:scale-110 transition-transform duration-300">
             <area.icon className="h-6 w-6 text-white" />
           </div>
           <div className="flex-1">
-            <h4 className="font-bold text-gray-800 mb-2 text-lg">
+            <h4 className="font-bold text-slate-800 mb-2 text-lg">
               {area.title}
             </h4>
-            <p className="text-gray-600 text-sm leading-relaxed">
+            <p className="text-slate-600 text-sm leading-relaxed">
               {area.description}
             </p>
           </div>
@@ -335,18 +335,18 @@ export function AboutSection() {
               <div className="w-10 h-10 bg-navy rounded-lg flex items-center justify-center">
                 <FaFlag className="h-5 w-5 text-white" />
               </div>
-              <span className="text-navy-light font-bold tracking-wider uppercase text-sm">
+              <span className="text-navy font-bold tracking-wider uppercase text-sm">
                 Nossa Identidade
               </span>
             </div>
 
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-800 leading-snug">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-800 leading-snug">
               Serviço, <span className="text-navy">Honra</span> e{" "}
-              <span className="text-navy-dark">Compromisso</span>
+              <span className="text-navy-700">Compromisso</span>
             </h2>
 
             <div className="space-y-4">
-              <p className="text-gray-800 leading-relaxed">
+              <p className="text-slate-700 leading-relaxed">
                 A Patrulha Aérea Civil é uma organização de voluntários dedicada
                 à proteção civil, operações de resgate e desenvolvimento
                 comunitário. Atuamos com disciplina, organização e
@@ -384,18 +384,18 @@ export function AboutSection() {
                   </span>
                 </div>
 
-                <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-6 leading-snug">
+                <h2 className="text-3xl md:text-4xl font-bold text-slate-800 mb-6 leading-snug">
                   Tradição de <span className="text-navy">Serviço</span>
                 </h2>
 
                 <div className="space-y-4">
-                  <p className="text-gray-800 leading-relaxed">
+                  <p className="text-slate-700 leading-relaxed">
                     Fundada por veteranos e entusiastas da aviação civil, a
                     Patrulha Aérea Civil nasceu do desejo de servir à comunidade
                     através de operações especializadas e voluntariado
                     organizado.
                   </p>
-                  <p className="text-gray-800 leading-relaxed">
+                  <p className="text-slate-700 leading-relaxed">
                     Nossa trajetória é marcada por operações de resgate,
                     treinamentos de preparação para emergências e
                     desenvolvimento de capacidades técnicas entre nossos
@@ -415,7 +415,7 @@ export function AboutSection() {
               >
                 <Button
                   asChild
-                  className="bg-navy hover:bg-navy-dark text-white px-8 py-4 font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
+                  className="bg-navy hover:bg-navy-700 text-white px-8 py-4 font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl"
                 >
                   <Link href="/sobre" className="flex items-center gap-3">
                     Conheça Nossa Organização

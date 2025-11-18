@@ -1,4 +1,4 @@
-// src/app/(app)/admin/noticias/[id]/page.tsx - EDIÇÃO DE NOTÍCIA
+// src/app/(app)/admin/noticias/[id]/page.tsx - PADRONIZADO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,6 +24,8 @@ import {
   FaImage,
   FaHistory,
   FaTrash,
+  FaChartBar,
+  FaHome,
 } from "react-icons/fa";
 import {
   NoticiaFormData,
@@ -301,7 +303,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     );
   };
 
-  // Ver verão pública (se publicada)
+  // Ver versão pública (se publicada)
   const handleViewPublic = () => {
     if (formData.status === "publicado") {
       window.open(`/noticias/${formData.slug}`, "_blank");
@@ -317,7 +319,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
         <div className="container mx-auto px-4">
           <div className="text-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-light mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto mb-4"></div>
             <p className="text-gray-600">Carregando notícia...</p>
           </div>
         </div>
@@ -338,7 +340,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
               A notícia que você está tentando editar não existe.
             </p>
             <Link href="/admin/noticias">
-              <Button className="bg-navy-light hover:bg-navy text-white">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                 <FaArrowLeft className="w-4 h-4 mr-2" />
                 Voltar para Notícias
               </Button>
@@ -363,13 +365,36 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/admin/noticias">
               <Button
                 variant="outline"
-                className="border-navy-light text-navy-light hover:bg-navy-light hover:text-white"
+                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
               >
                 <FaArrowLeft className="w-4 h-4 mr-2" />
                 Voltar
+              </Button>
+            </Link>
+
+            {/* 🟣 ROXO - Funcionalidades Administrativas */}
+            <Link href="/admin/dashboard">
+              <Button
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+              >
+                <FaChartBar className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+
+            {/* ⚫ CINZA - Navegação Neutra */}
+            <Link href="/">
+              <Button
+                variant="outline"
+                className="border-slate-700 text-slate-700 hover:bg-slate-100"
+              >
+                <FaHome className="w-4 h-4 mr-2" />
+                Voltar ao Site
               </Button>
             </Link>
 
@@ -400,7 +425,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b border-gray-200">
                 <CardTitle className="flex items-center text-xl">
-                  <FaNewspaper className="w-5 h-5 mr-2 text-navy-light" />
+                  <FaNewspaper className="w-5 h-5 mr-2 text-navy" />
                   Editar Notícia
                 </CardTitle>
               </CardHeader>
@@ -494,10 +519,11 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
                   {/* Botões de Ação */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+                    {/* 🔵 AZUL - Ações Administrativas */}
                     <Button
                       type="submit"
                       disabled={saving}
-                      className="bg-navy-light hover:bg-navy text-white flex-1 py-3"
+                      className="bg-blue-600 hover:bg-blue-700 text-white flex-1 py-3"
                     >
                       {saving ? (
                         <>
@@ -512,21 +538,23 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       )}
                     </Button>
 
+                    {/* 🔴 VERMELHO - Ações Destrutivas */}
                     <Button
                       type="button"
                       onClick={handleDelete}
                       variant="outline"
-                      className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 py-3"
+                      className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white py-3"
                     >
                       <FaTrash className="w-4 h-4 mr-2" />
                       Excluir
                     </Button>
 
+                    {/* ⚫ CINZA - Navegação Neutra */}
                     <Button
                       type="button"
                       onClick={() => router.push("/admin/noticias")}
                       variant="outline"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50 py-3"
+                      className="border-slate-700 text-slate-700 hover:bg-slate-100 py-3"
                     >
                       <FaTimes className="w-4 h-4 mr-2" />
                       Cancelar
@@ -543,7 +571,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaCalendarAlt className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaCalendarAlt className="w-4 h-4 mr-2 text-navy" />
                   Publicação
                 </CardTitle>
               </CardHeader>
@@ -588,7 +616,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                               status: e.target.value as NoticiaStatus,
                             }))
                           }
-                          className="text-navy-light focus:ring-navy-light"
+                          className="text-navy focus:ring-navy"
                         />
                         <span className="text-sm capitalize">{status}</span>
                         {status === "rascunho" && (
@@ -640,7 +668,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaImage className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaImage className="w-4 h-4 mr-2 text-navy" />
                   Categoria e Mídia
                 </CardTitle>
               </CardHeader>
@@ -655,7 +683,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                     name="categoria"
                     value={formData.categoria}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
                   >
                     {CATEGORIAS.map((cat) => (
                       <option key={cat} value={cat}>
@@ -679,7 +707,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       variant="outline"
                       size="sm"
                       disabled
-                      className="text-xs"
+                      className="text-xs border-slate-700 text-slate-700 hover:bg-slate-100"
                     >
                       Selecionar Imagem
                     </Button>
@@ -695,7 +723,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaHistory className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaHistory className="w-4 h-4 mr-2 text-navy" />
                   Informações
                 </CardTitle>
               </CardHeader>

@@ -1,4 +1,4 @@
-// src/app/(app)/admin/noticias/criar/page.tsx - FORMULÁRIO DE CRIAÇÃO
+// src/app/(app)/admin/noticias/criar/page.tsx - PADRONIZADO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -22,10 +22,11 @@ import {
   FaUser,
   FaLink,
   FaImage,
+  FaHome,
+  FaChartBar,
 } from "react-icons/fa";
 import { NoticiaFormData, NoticiaStatus } from "@/types/noticias";
 
-// Categorias pré-definidas
 const CATEGORIAS = [
   "Operações",
   "Treinamento",
@@ -50,11 +51,10 @@ export default function CriarNoticiaPage() {
     imagem: null,
     categoria: "Operações",
     destaque: false,
-    data_publicacao: new Date().toISOString().split("T")[0], // Data atual
+    data_publicacao: new Date().toISOString().split("T")[0],
     status: "rascunho",
   });
 
-  // Buscar usuário logado para definir como autor
   useEffect(() => {
     const fetchUser = async () => {
       try {
@@ -72,7 +72,6 @@ export default function CriarNoticiaPage() {
     fetchUser();
   }, [supabase]);
 
-  // Gerar slug automaticamente a partir do título
   const generateSlug = (text: string) => {
     return text
       .toLowerCase()
@@ -83,7 +82,6 @@ export default function CriarNoticiaPage() {
       .substring(0, 100);
   };
 
-  // Atualizar slug quando o título mudar
   const handleTituloChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const titulo = e.target.value;
     setFormData((prev) => ({
@@ -93,7 +91,6 @@ export default function CriarNoticiaPage() {
     }));
   };
 
-  // Manipular mudanças nos campos
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -106,7 +103,6 @@ export default function CriarNoticiaPage() {
     }));
   };
 
-  // Manipular switch
   const handleSwitchChange = (name: string, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
@@ -114,31 +110,15 @@ export default function CriarNoticiaPage() {
     }));
   };
 
-  // Validar formulário
   const validateForm = (): string[] => {
     const errors: string[] = [];
-
-    if (!formData.titulo.trim()) {
-      errors.push("Título é obrigatório");
-    }
-
-    if (!formData.slug.trim()) {
-      errors.push("Slug é obrigatório");
-    }
-
-    if (!formData.resumo.trim()) {
-      errors.push("Resumo é obrigatório");
-    }
-
-    if (!formData.conteudo.trim()) {
-      errors.push("Conteúdo é obrigatório");
-    }
-
-    if (formData.slug.length < 3) {
+    if (!formData.titulo.trim()) errors.push("Título é obrigatório");
+    if (!formData.slug.trim()) errors.push("Slug é obrigatório");
+    if (!formData.resumo.trim()) errors.push("Resumo é obrigatório");
+    if (!formData.conteudo.trim()) errors.push("Conteúdo é obrigatório");
+    if (formData.slug.length < 3)
       errors.push("Slug deve ter pelo menos 3 caracteres");
-    }
 
-    // Validar formato do slug
     const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     if (!slugRegex.test(formData.slug)) {
       errors.push(
@@ -149,12 +129,10 @@ export default function CriarNoticiaPage() {
     return errors;
   };
 
-  // Salvar notícia
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    // Validar formulário
     const errors = validateForm();
     if (errors.length > 0) {
       alert("Erros no formulário:\n" + errors.join("\n"));
@@ -163,11 +141,8 @@ export default function CriarNoticiaPage() {
     }
 
     try {
-      if (!user) {
-        throw new Error("Usuário não autenticado");
-      }
+      if (!user) throw new Error("Usuário não autenticado");
 
-      // Verificar se slug já existe
       const { data: existingSlug } = await supabase
         .from("noticias")
         .select("id")
@@ -182,7 +157,6 @@ export default function CriarNoticiaPage() {
         return;
       }
 
-      // Preparar dados para inserção
       const noticiaData = {
         ...formData,
         autor_id: user.id,
@@ -190,7 +164,6 @@ export default function CriarNoticiaPage() {
         updated_at: new Date().toISOString(),
       };
 
-      // Inserir no banco
       const { data, error } = await supabase
         .from("noticias")
         .insert([noticiaData])
@@ -199,9 +172,6 @@ export default function CriarNoticiaPage() {
 
       if (error) throw error;
 
-      console.log("✅ Notícia criada com sucesso:", data);
-
-      // Redirecionar baseado no status
       if (formData.status === "publicado") {
         router.push("/admin/noticias");
       } else {
@@ -215,9 +185,7 @@ export default function CriarNoticiaPage() {
     }
   };
 
-  // Preview da notícia
   const handlePreview = () => {
-    // Em uma implementação real, isso abriria uma modal ou nova aba
     alert(
       "Preview da notícia:\n\n" +
         `Título: ${formData.titulo}\n` +
@@ -244,20 +212,43 @@ export default function CriarNoticiaPage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/admin/noticias">
               <Button
                 variant="outline"
-                className="border-navy-light text-navy-light hover:bg-navy-light hover:text-white"
+                className="border-slate-700 text-slate-700 hover:bg-slate-100"
               >
                 <FaArrowLeft className="w-4 h-4 mr-2" />
                 Voltar
               </Button>
             </Link>
 
+            {/* 🟣 ROXO - Funcionalidades Administrativas */}
+            <Link href="/admin/dashboard">
+              <Button
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+              >
+                <FaChartBar className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+
+            {/* ⚫ CINZA - Navegação Neutra */}
+            <Link href="/">
+              <Button
+                variant="outline"
+                className="border-slate-700 text-slate-700 hover:bg-slate-100"
+              >
+                <FaHome className="w-4 h-4 mr-2" />
+                Site
+              </Button>
+            </Link>
+
             <Button
               onClick={handlePreview}
               variant="outline"
-              className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+              className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
               disabled={!formData.titulo || !formData.conteudo}
             >
               <FaEye className="w-4 h-4 mr-2" />
@@ -272,7 +263,7 @@ export default function CriarNoticiaPage() {
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b border-gray-200">
                 <CardTitle className="flex items-center text-xl">
-                  <FaNewspaper className="w-5 h-5 mr-2 text-navy-light" />
+                  <FaNewspaper className="w-5 h-5 mr-2 text-navy" />
                   Dados da Notícia
                 </CardTitle>
               </CardHeader>
@@ -366,10 +357,11 @@ export default function CriarNoticiaPage() {
 
                   {/* Botões de Ação */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+                    {/* 🔵 AZUL - Ações Administrativas */}
                     <Button
                       type="submit"
                       disabled={loading}
-                      className="bg-navy-light hover:bg-navy text-white flex-1 py-3"
+                      className="bg-blue-600 hover:bg-blue-700 text-white flex-1 py-3"
                     >
                       {loading ? (
                         <>
@@ -384,6 +376,7 @@ export default function CriarNoticiaPage() {
                       )}
                     </Button>
 
+                    {/* 🟢 Verde para publicação */}
                     <Button
                       type="button"
                       onClick={() => {
@@ -391,7 +384,6 @@ export default function CriarNoticiaPage() {
                           ...prev,
                           status: "publicado",
                         }));
-                        // Usar setTimeout para garantir que o state foi atualizado
                         setTimeout(() => {
                           const form = document.querySelector("form");
                           if (form) form.requestSubmit();
@@ -404,11 +396,12 @@ export default function CriarNoticiaPage() {
                       Publicar Agora
                     </Button>
 
+                    {/* 🔴 VERMELHO - Ações Destrutivas */}
                     <Button
                       type="button"
                       onClick={() => router.push("/admin/noticias")}
                       variant="outline"
-                      className="border-gray-300 text-gray-700 hover:bg-gray-50 py-3"
+                      className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white py-3"
                     >
                       <FaTimes className="w-4 h-4 mr-2" />
                       Cancelar
@@ -425,12 +418,11 @@ export default function CriarNoticiaPage() {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaCalendarAlt className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaCalendarAlt className="w-4 h-4 mr-2 text-navy" />
                   Publicação
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Data de Publicação */}
                 <div className="space-y-2">
                   <Label
                     htmlFor="data_publicacao"
@@ -448,7 +440,6 @@ export default function CriarNoticiaPage() {
                   />
                 </div>
 
-                {/* Status */}
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Status</Label>
                   <div className="space-y-2">
@@ -470,7 +461,7 @@ export default function CriarNoticiaPage() {
                               status: e.target.value as NoticiaStatus,
                             }))
                           }
-                          className="text-navy-light focus:ring-navy-light"
+                          className="text-navy focus:ring-navy"
                         />
                         <span className="text-sm capitalize">{status}</span>
                         {status === "rascunho" && (
@@ -494,7 +485,6 @@ export default function CriarNoticiaPage() {
                   </div>
                 </div>
 
-                {/* Destaque */}
                 <div className="flex items-center justify-between">
                   <Label
                     htmlFor="destaque"
@@ -522,12 +512,11 @@ export default function CriarNoticiaPage() {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaImage className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaImage className="w-4 h-4 mr-2 text-navy" />
                   Categoria e Mídia
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Categoria */}
                 <div className="space-y-2">
                   <Label htmlFor="categoria" className="text-sm font-semibold">
                     Categoria
@@ -537,7 +526,7 @@ export default function CriarNoticiaPage() {
                     name="categoria"
                     value={formData.categoria}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
                   >
                     {CATEGORIAS.map((cat) => (
                       <option key={cat} value={cat}>
@@ -547,7 +536,6 @@ export default function CriarNoticiaPage() {
                   </select>
                 </div>
 
-                {/* Imagem (Placeholder para upload futuro) */}
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">
                     Imagem de Capa
@@ -577,7 +565,7 @@ export default function CriarNoticiaPage() {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaUser className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaUser className="w-4 h-4 mr-2 text-navy" />
                   Autor
                 </CardTitle>
               </CardHeader>
@@ -594,48 +582,6 @@ export default function CriarNoticiaPage() {
                 ) : (
                   <p className="text-sm text-gray-600">Carregando...</p>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Preview Rápido */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg">Preview Rápido</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm space-y-1">
-                  <p>
-                    <strong>Título:</strong> {formData.titulo || "Não definido"}
-                  </p>
-                  <p>
-                    <strong>Slug:</strong> {formData.slug || "Não definido"}
-                  </p>
-                  <p>
-                    <strong>Categoria:</strong> {formData.categoria}
-                  </p>
-                  <p>
-                    <strong>Status:</strong>
-                    <Badge
-                      className={`ml-2 ${
-                        formData.status === "rascunho"
-                          ? "bg-yellow-500"
-                          : formData.status === "publicado"
-                          ? "bg-green-500"
-                          : "bg-gray-500"
-                      } text-white text-xs`}
-                    >
-                      {formData.status.toUpperCase()}
-                    </Badge>
-                  </p>
-                  {formData.destaque && (
-                    <p>
-                      <strong>Destaque:</strong>
-                      <Badge className="ml-2 bg-yellow-500 text-white text-xs">
-                        ⭐ DESTAQUE
-                      </Badge>
-                    </p>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </div>
