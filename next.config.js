@@ -1,18 +1,17 @@
-// next.config.js
+// next.config.js - VERSÃO OTIMIZADA
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ["images.unsplash.com", "lcnudonuslqefbxzghjt.supabase.co"],
     remotePatterns: [
       {
         protocol: "https",
         hostname: "images.unsplash.com",
-        pathname: "/**",
+        pathname: "/photo-**",
       },
       {
         protocol: "https",
         hostname: "lcnudonuslqefbxzghjt.supabase.co",
-        pathname: "/**",
+        pathname: "/storage/v1/object/public/**",
       },
     ],
     formats: ["image/webp", "image/avif"],
@@ -28,6 +27,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Otimizações adicionais
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production",
+  },
+  poweredByHeader: false,
 };
 
 module.exports = nextConfig;

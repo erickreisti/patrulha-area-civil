@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO ESTILO PASSAPORTE COM BOTÕES PADRONIZADOS
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -346,68 +346,6 @@ export default function AgentPerfil() {
       <BaseLayout>
         <div className="min-h-screen flex items-center justify-center p-4 relative z-20">
           <div className="w-full max-w-6xl">
-            {/* Header Responsivo */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="flex flex-col items-center mb-6 sm:mb-8 lg:mb-12"
-            >
-              {/* Layout responsivo para logo, título e bandeira */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 lg:gap-8 mb-6 w-full max-w-4xl mx-auto">
-                {/* Logo - Esquerda */}
-                <div className="order-2 sm:order-1 flex-shrink-0">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-white rounded-full shadow-2xl overflow-hidden border-4 border-white"
-                  >
-                    <Image
-                      src="/images/logos/logo.webp"
-                      alt="Patrulha Aérea Civil"
-                      width={96}
-                      height={96}
-                      className="w-full h-full object-cover"
-                      priority
-                    />
-                  </motion.div>
-                </div>
-
-                {/* Títulos - Centro */}
-                <div className="order-1 sm:order-2 flex-1 text-center min-w-0 px-2 sm:px-4">
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-bold text-white font-bebas tracking-wide uppercase leading-tight">
-                    Patrulha Aérea Civil
-                  </h1>
-                  <p className="text-white/90 text-sm sm:text-base lg:text-lg xl:text-xl font-roboto mt-1 sm:mt-2 leading-snug">
-                    Comando Integrado do Estado do Rio de Janeiro
-                  </p>
-                </div>
-
-                {/* Bandeira - Direita */}
-                <div className="order-3 flex-shrink-0">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    className="w-12 h-9 sm:w-16 sm:h-12 lg:w-20 lg:h-15 border-2 border-white rounded shadow-lg"
-                  >
-                    <Image
-                      src="/images/logos/flag-br.webp"
-                      alt="Bandeira do Brasil"
-                      width={80}
-                      height={60}
-                      className="w-full h-full object-cover rounded"
-                      priority
-                    />
-                  </motion.div>
-                </div>
-              </div>
-
-              {/* Título "Informações do Patrulheiro" */}
-              <div className="text-center w-full max-w-2xl">
-                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white font-bebas tracking-wide uppercase border-b-2 border-white/30 pb-2 sm:pb-3">
-                  Identificação de Agente
-                </h2>
-              </div>
-            </motion.div>
-
             {/* Card do Perfil - ESTILO PASSAPORTE */}
             <motion.div
               initial={{ opacity: 0, y: 40 }}
@@ -425,6 +363,7 @@ export default function AgentPerfil() {
                       fill
                       className="object-contain"
                       priority
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 400px"
                     />
                   </div>
                 </div>
@@ -434,6 +373,64 @@ export default function AgentPerfil() {
                 <div className="absolute inset-4 border border-slate-200/30 rounded-lg pointer-events-none z-0" />
 
                 <CardContent className="p-4 sm:p-6 lg:p-8 relative z-10">
+                  {/* HEADER INTERNO DO CARD - SEM BACKGROUND, LOGO 2X MAIOR */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    className="flex items-center justify-between pb-6 lg:pb-8 border-b-2 border-slate-200/50 mb-6 lg:mb-8"
+                  >
+                    {/* Logo - Esquerda - 2X MAIOR */}
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      className="flex-shrink-0"
+                    >
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 overflow-hidden">
+                        <Image
+                          src="/images/logos/logo.webp"
+                          alt="Patrulha Aérea Civil"
+                          width={112}
+                          height={112}
+                          className="w-full h-full object-cover"
+                          priority
+                        />
+                      </div>
+                    </motion.div>
+
+                    {/* Título - Centro - SEM BACKGROUND */}
+                    <div className="flex-1 text-center px-4 sm:px-6 min-w-0">
+                      <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-800 tracking-wide uppercase leading-tight font-bebas">
+                        Patrulha Aérea Civil
+                      </h1>
+                      <p className="text-slate-600 text-xs sm:text-sm mt-1 leading-snug font-roboto">
+                        Comando Integrado do Estado do Rio de Janeiro
+                      </p>
+                      {/* Subtítulo "Identificação de Agente" */}
+                      <div className="mt-2">
+                        <h2 className="text-sm sm:text-base font-bold text-slate-700 tracking-wide uppercase font-bebas">
+                          Identificação de Agente
+                        </h2>
+                      </div>
+                    </div>
+
+                    {/* Bandeira - Direita - 2X MAIOR */}
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      className="flex-shrink-0"
+                    >
+                      <div className="w-16 h-12 sm:w-20 sm:h-15 lg:w-24 lg:h-18 border-2 border-slate-300 rounded">
+                        <Image
+                          src="/images/logos/flag-br.webp"
+                          alt="Bandeira do Brasil"
+                          width={96}
+                          height={72}
+                          className="w-full h-full object-cover rounded"
+                          priority
+                        />
+                      </div>
+                    </motion.div>
+                  </motion.div>
+
                   {/* Layout Principal Responsivo */}
                   <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12 items-center lg:items-start">
                     {/* Lado Esquerdo - Informações Textuais */}
@@ -588,8 +585,8 @@ export default function AgentPerfil() {
                     <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-navy/20 rounded-full"></div>
                   </div>
 
-                  {/* Status e Botões */}
-                  <div className="flex flex-col items-center space-y-6">
+                  {/* Status do Agente - ÚLTIMO ELEMENTO DENTRO DO CARD */}
+                  <div className="flex flex-col items-center">
                     {/* Status do Agente */}
                     <div className="text-center w-full">
                       <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block mb-3 font-roboto">
@@ -632,77 +629,95 @@ export default function AgentPerfil() {
                         </p>
                       )}
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-                    {/* 🎯 BOTÕES DE AÇÃO PADRONIZADOS */}
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
-                      {/* 🔵 AZUL - Ações Administrativas (Editar Perfil) */}
-                      {isAdmin && (
-                        <Link
-                          href={`/admin/agentes/${profile!.id}`}
-                          className="w-full sm:w-auto"
-                        >
-                          <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-3 text-sm sm:text-base font-semibold shadow-md w-full transition-all duration-300 font-roboto border-2 border-blue-500/50 group relative overflow-hidden">
-                              {/* Efeito de brilho */}
-                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                              <FaEdit className="w-4 h-4 mr-2 relative z-10" />
-                              <span className="relative z-10">
-                                Editar Perfil
-                              </span>
-                            </Button>
-                          </motion.div>
-                        </Link>
-                      )}
-
-                      {/* Botões de Navegação */}
-                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        {/* ⚫ CINZA - Navegação Neutra (Voltar ao Site) */}
-                        <Link
-                          href="/"
-                          className="flex items-center justify-center gap-2 text-slate-700 hover:bg-slate-100 transition-all duration-300 font-medium px-4 py-3 border-2 border-slate-300 rounded-lg text-xs sm:text-sm w-full sm:w-auto text-center font-roboto hover:scale-105 group relative overflow-hidden"
-                        >
-                          {/* Efeito de fundo sutil */}
-                          <div className="absolute inset-0 bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                          <FaHome className="w-3 h-3 sm:w-4 sm:h-4 relative z-10" />
-                          <span className="relative z-10">Voltar ao Site</span>
-                        </Link>
-
-                        {/* 🟣 ROXO - Funcionalidades Administrativas (Dashboard) */}
-                        {isAdmin && (
-                          <Link
-                            href="/admin/dashboard"
-                            className="flex items-center justify-center gap-2 bg-purple-600 text-white hover:bg-purple-700 transition-all duration-300 font-medium px-4 py-3 border-2 border-purple-500/50 rounded-lg hover:shadow-md text-xs sm:text-sm w-full sm:w-auto text-center font-roboto hover:scale-105 group relative overflow-hidden"
-                          >
-                            {/* Efeito de brilho */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                            <FaChartBar className="w-3 h-3 sm:w-4 sm:h-4 relative z-10" />
-                            <span className="relative z-10">Dashboard</span>
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 🔴 VERMELHO - Ações Destrutivas (Sair do Sistema) */}
+            {/* BOTÕES FORA DO CARD - MELHORADOS */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="flex flex-col items-center gap-4 mt-8"
+            >
+              {/* BOTÕES PRINCIPAIS */}
+              <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-2xl">
+                {/* 🔵 BOTÃO EDITAR PERFIL (Admin) */}
+                {isAdmin && (
+                  <Link
+                    href={`/admin/agentes/${profile!.id}`}
+                    className="w-full sm:w-auto flex-1"
+                  >
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <Button
-                        onClick={handleSignOut}
-                        variant="outline"
-                        className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 mt-2 px-6 py-2 text-sm font-roboto transition-all duration-300 border-2 group relative overflow-hidden"
-                      >
-                        {/* Efeito de fundo sutil */}
-                        <div className="absolute inset-0 bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <span className="relative z-10">Sair do Sistema</span>
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 text-sm sm:text-base font-semibold shadow-lg w-full transition-all duration-300 font-roboto border-2 border-blue-500/50 group relative overflow-hidden">
+                        {/* Efeito de brilho */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                        <FaEdit className="w-4 h-4 mr-3 relative z-10" />
+                        <span className="relative z-10">Editar Perfil</span>
                       </Button>
                     </motion.div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </Link>
+                )}
+
+                {/* 🟣 BOTÃO DASHBOARD (Admin) */}
+                {isAdmin && (
+                  <Link
+                    href="/admin/dashboard"
+                    className="w-full sm:w-auto flex-1"
+                  >
+                    <motion.div
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <Button className="bg-purple-600 hover:bg-purple-700 text-white px-6 sm:px-8 py-3 text-sm sm:text-base font-semibold shadow-lg w-full transition-all duration-300 font-roboto border-2 border-purple-500/50 group relative overflow-hidden">
+                        {/* Efeito de brilho */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                        <FaChartBar className="w-4 h-4 mr-3 relative z-10" />
+                        <span className="relative z-10">Dashboard</span>
+                      </Button>
+                    </motion.div>
+                  </Link>
+                )}
+
+                {/* ⚪ BOTÃO VOLTAR AO SITE */}
+                <Link href="/" className="w-full sm:w-auto flex-1">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      variant="outline"
+                      className="bg-white hover:bg-slate-50 text-slate-700 border-2 border-slate-300 hover:border-slate-400 px-6 sm:px-8 py-3 text-sm sm:text-base font-semibold shadow-md w-full transition-all duration-300 font-roboto group relative overflow-hidden"
+                    >
+                      {/* Efeito de fundo sutil */}
+                      <div className="absolute inset-0 bg-slate-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <FaHome className="w-4 h-4 mr-3 relative z-10" />
+                      <span className="relative z-10">Voltar ao Site</span>
+                    </Button>
+                  </motion.div>
+                </Link>
+              </div>
+
+              {/* 🔴 BOTÃO SAIR DO SISTEMA */}
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="w-full max-w-2xl"
+              >
+                <Button
+                  onClick={handleSignOut}
+                  variant="outline"
+                  className="bg-white hover:bg-red-50 text-red-600 border-2 border-red-300 hover:border-red-400 hover:text-red-700 px-8 py-3 text-sm font-semibold w-full transition-all duration-300 font-roboto group relative overflow-hidden"
+                >
+                  {/* Efeito de fundo sutil */}
+                  <div className="absolute inset-0 bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="relative z-10">Sair do Sistema</span>
+                </Button>
+              </motion.div>
             </motion.div>
 
             {/* Footer com informações do sistema */}
@@ -710,9 +725,9 @@ export default function AgentPerfil() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5, delay: 0.8 }}
-              className="text-center mt-6 sm:mt-8"
+              className="text-center mt-8"
             >
-              <p className="text-white/70 text-xs sm:text-sm font-roboto">
+              <p className="text-white/70 text-sm font-roboto">
                 Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
               </p>
             </motion.div>
