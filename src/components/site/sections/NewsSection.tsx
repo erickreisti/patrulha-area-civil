@@ -1,3 +1,4 @@
+// src/components/site/sections/NewsSection.tsx - CORRIGIDO
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,45 @@ import { Badge } from "@/components/ui/badge";
 import { FaCalendar, FaArrowRight, FaClock } from "react-icons/fa";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useNoticias } from "@/hooks/useNoticias";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+// Hook simples para notícias - SEM RECURSÃO
+function useNoticias() {
+  const [noticias, setNoticias] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchNoticias() {
+      try {
+        setLoading(true);
+        const supabase = createClient();
+
+        // Query SIMPLES sem join com profiles que causa recursão
+        const { data, error } = await supabase
+          .from("noticias")
+          .select("*")
+          .eq("status", "publicado")
+          .order("data_publicacao", { ascending: false })
+          .limit(6);
+
+        if (error) throw error;
+
+        setNoticias(data || []);
+      } catch (err: any) {
+        console.error("Erro ao carregar notícias:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchNoticias();
+  }, []);
+
+  return { noticias, loading, error };
+}
 
 const SectionHeader = () => (
   <motion.div
@@ -47,14 +86,14 @@ const NewsCard = ({ noticia, index }: { noticia: any; index: number }) => (
     transition={{ duration: 0.5, delay: index * 0.1 }}
     viewport={{ once: true }}
   >
-    <Card className="border-slate-200 bg-white hover:shadow-xl transition-all duration-300 group hover:scale-105">
-      <CardHeader className="pb-4">
+    <Card className="border-slate-200 bg-white hover:shadow-xl transition-all duration-300 group hover:scale-105 h-full flex flex-col">
+      <CardHeader className="pb-4 flex-1">
         <div className="flex items-center justify-between mb-3">
           <Badge
             variant="secondary"
             className="bg-navy/10 text-navy hover:bg-navy/20 border-0 font-roboto text-xs"
           >
-            {noticia.categoria}
+            {noticia.categoria || "Geral"}
           </Badge>
           <div className="flex items-center text-slate-500 text-xs font-roboto">
             <FaCalendar className="h-3 w-3 mr-1" />
@@ -68,18 +107,20 @@ const NewsCard = ({ noticia, index }: { noticia: any; index: number }) => (
 
       <CardContent className="space-y-4">
         <CardDescription className="text-slate-600 font-roboto text-sm leading-relaxed line-clamp-3">
-          {noticia.resumo}
+          {noticia.resumo || noticia.conteudo?.substring(0, 150) + "..."}
         </CardDescription>
-        <Button
-          variant="link"
-          className="p-0 h-auto text-navy hover:text-navy-700 font-roboto text-sm flex items-center gap-1 group"
-          asChild
-        >
-          <Link href={`/noticias/${noticia.slug}`}>
-            Ler Mais
-            <FaArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform duration-200" />
-          </Link>
-        </Button>
+        <div className="mt-auto pt-4">
+          <Button
+            variant="link"
+            className="p-0 h-auto text-navy hover:text-navy-700 font-roboto text-sm flex items-center gap-1 group"
+            asChild
+          >
+            <Link href={`/noticias/${noticia.slug}`}>
+              Ler Mais
+              <FaArrowRight className="h-3 w-3 group-hover:translate-x-1 transition-transform duration-200" />
+            </Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   </motion.div>
@@ -125,7 +166,10 @@ export function NewsSection() {
           <SectionHeader />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="border-slate-200 bg-white animate-pulse">
+              <Card
+                key={i}
+                className="border-slate-200 bg-white animate-pulse h-64"
+              >
                 <CardHeader className="pb-4">
                   <div className="h-4 bg-slate-200 rounded w-1/4 mb-3"></div>
                   <div className="h-6 bg-slate-200 rounded mb-2"></div>

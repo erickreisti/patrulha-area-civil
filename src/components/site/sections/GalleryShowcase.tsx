@@ -1,3 +1,4 @@
+// src/components/site/sections/GalleryShowcase.tsx - CORRIGIDO
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,62 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FaImages, FaArrowRight, FaEye } from "react-icons/fa";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useGaleria } from "@/hooks/useGaleria";
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+// Hook simples para galeria - SEM RECURSÃO
+function useGaleria() {
+  const [categorias, setCategorias] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchCategorias() {
+      try {
+        setLoading(true);
+        const supabase = createClient();
+
+        // Query SIMPLES sem joins complexos que causam recursão
+        const { data: categoriasData, error: categoriasError } = await supabase
+          .from("galeria_categorias")
+          .select("*")
+          .eq("status", true)
+          .order("ordem", { ascending: true });
+
+        if (categoriasError) throw categoriasError;
+
+        // Buscar contagem de itens separadamente
+        const categoriasComContagem = await Promise.all(
+          (categoriasData || []).map(async (categoria) => {
+            const { count, error: countError } = await supabase
+              .from("galeria_itens")
+              .select("*", { count: "exact", head: true })
+              .eq("categoria_id", categoria.id)
+              .eq("status", true);
+
+            if (countError) {
+              console.error("Erro ao contar itens:", countError);
+              return { ...categoria, itemCount: 0 };
+            }
+
+            return { ...categoria, itemCount: count || 0 };
+          })
+        );
+
+        setCategorias(categoriasComContagem);
+      } catch (err: any) {
+        console.error("Erro ao carregar categorias:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCategorias();
+  }, []);
+
+  return { categorias, loading, error };
+}
 
 const SectionHeader = () => (
   <motion.div
@@ -66,11 +122,9 @@ const GalleryCard = ({
           <span className="text-sm font-medium text-navy uppercase tracking-wide">
             {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
           </span>
-          {categoria.galeria_itens && (
-            <span className="text-xs text-slate-500">
-              {categoria.galeria_itens[0]?.count || 0} itens
-            </span>
-          )}
+          <span className="text-xs text-slate-500">
+            {categoria.itemCount || 0} itens
+          </span>
         </div>
 
         <h3 className="font-bold text-slate-800 text-lg mb-4 leading-tight">

@@ -3,45 +3,40 @@
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { NoticiaWithAutor } from "@/types/noticias";
 
 export function useNoticias() {
-  const [noticias, setNoticias] = useState<NoticiaWithAutor[]>([]);
+  const [noticias, setNoticias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
-
   useEffect(() => {
-    const fetchNoticias = async () => {
+    async function fetchNoticias() {
       try {
         setLoading(true);
-        setError(null);
+        const supabase = createClient();
 
         const { data, error } = await supabase
           .from("noticias")
           .select(
-            `
-            *,
-            autor:profiles(full_name, graduacao)
-          `
+            "id, titulo, slug, resumo, categoria, data_publicacao, destaque"
           )
-          .eq("status", "publicado") // Apenas notícias publicadas
-          .order("data_publicacao", { ascending: false });
+          .eq("status", "publicado")
+          .order("data_publicacao", { ascending: false })
+          .limit(6);
 
         if (error) throw error;
 
         setNoticias(data || []);
       } catch (err: any) {
-        console.error("Erro ao buscar notícias:", err);
+        console.error("Erro ao carregar notícias:", err);
         setError(err.message);
       } finally {
         setLoading(false);
       }
-    };
+    }
 
     fetchNoticias();
-  }, [supabase]);
+  }, []);
 
   return { noticias, loading, error };
 }

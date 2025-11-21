@@ -1,4 +1,4 @@
-// src/app/(app)/admin/agentes/criar/page.tsx
+// 📁 /src/app/(app)/admin/agentes/criar/page.tsx - ATUALIZADO
 "use client";
 
 import { useState } from "react";
@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AvatarUpload } from "@/components/ui/avatar-upload";
+import { useToast } from "@/hooks/useToast";
 import Link from "next/link";
 import {
   FaUser,
@@ -37,8 +40,10 @@ const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function CriarAgentePage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState(""); // ✅ NOVO: Estado para avatar
   const [formData, setFormData] = useState({
     matricula: "",
     email: "",
@@ -59,6 +64,11 @@ export default function CriarAgentePage() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // ✅ NOVO: Handler para mudança de avatar
+  const handleAvatarChange = (url: string) => {
+    setAvatarUrl(url);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,12 +128,13 @@ export default function CriarAgentePage() {
 
       console.log("✅ Usuário criado no Auth:", authData.user.id);
 
-      // 2. Criar perfil na tabela profiles
+      // 2. Criar perfil na tabela profiles COM AVATAR
       const { error: profileError } = await supabase.from("profiles").insert({
         id: authData.user.id,
         matricula: formData.matricula,
         email: formData.email,
         full_name: formData.full_name,
+        avatar_url: avatarUrl || null, // ✅ NOVO: Incluir avatar URL
         graduacao: formData.graduacao || null,
         tipo_sanguineo: formData.tipo_sanguineo || null,
         validade_certificacao: formData.validade_certificacao || null,
@@ -170,13 +181,15 @@ export default function CriarAgentePage() {
       }
 
       // Sucesso - redirecionar para lista de agentes
-      alert(
-        "Agente criado com sucesso! Um email foi enviado para definir a senha."
+      toast.success(
+        "Agente criado com sucesso! Um email foi enviado para definir a senha.",
+        "Sucesso"
       );
       router.push("/admin/agentes");
     } catch (err: any) {
       console.error("💥 Erro completo:", err);
       setError(err.message);
+      toast.error(err.message, "Erro");
     } finally {
       setLoading(false);
     }
@@ -223,6 +236,17 @@ export default function CriarAgentePage() {
                       <strong>Erro:</strong> {error}
                     </div>
                   )}
+
+                  {/* ✅ NOVO: Upload de Avatar */}
+                  <div className="border-b border-gray-200 pb-6">
+                    <Label className="text-sm font-semibold mb-4 block">
+                      Foto do Perfil
+                    </Label>
+                    <AvatarUpload
+                      onAvatarChange={handleAvatarChange}
+                      className="justify-start"
+                    />
+                  </div>
 
                   {/* Informações Básicas */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -443,6 +467,13 @@ export default function CriarAgentePage() {
                   <FaUser className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                   <p>Agentes têm acesso apenas ao seu perfil</p>
                 </div>
+                {/* ✅ NOVO: Informação sobre avatar */}
+                <div className="flex items-start space-x-2">
+                  <FaImage className="w-4 h-4 text-pink-500 mt-0.5 flex-shrink-0" />
+                  <p>
+                    A foto de perfil é opcional e pode ser adicionada depois
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -475,5 +506,13 @@ export default function CriarAgentePage() {
 const FaInfo = ({ className }: { className?: string }) => (
   <svg className={className} fill="currentColor" viewBox="0 0 16 16">
     <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
+  </svg>
+);
+
+// Componente FaImage para completar
+const FaImage = ({ className }: { className?: string }) => (
+  <svg className={className} fill="currentColor" viewBox="0 0 16 16">
+    <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
+    <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z" />
   </svg>
 );

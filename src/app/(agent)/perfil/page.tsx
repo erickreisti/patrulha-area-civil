@@ -1,4 +1,4 @@
-// src/app/(app)/agent/perfil/page.tsx - VERSÃO CORRIGIDA
+// src/app/(app)/agent/perfil/page.tsx - VERSÃO COM UPLOAD DE FOTO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -48,6 +48,7 @@ export default function AgentPerfil() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -154,6 +155,171 @@ export default function AgentPerfil() {
 
     fetchProfile();
   }, [retryCount]);
+
+  // 🔄 FUNÇÃO PARA ATUALIZAR FOTO DE PERFIL - VERSÃO FINAL FUNCIONAL
+  const handleAvatarUpdate = async (file: File) => {
+    if (!profile) return;
+
+    setUploadingAvatar(true);
+    try {
+      const supabase = createClient();
+
+      console.log("📤 Iniciando upload simplificado...");
+
+      // ✅ NOME DO ARQUIVO SIMPLES
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+      const fileName = `avatar_${profile.id}_${Date.now()}.${fileExt}`;
+
+      console.log("📁 Nome do arquivo:", fileName);
+
+      // ✅ TENTAR UPLOAD DIRETO PARA O STORAGE
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("avatares-agentes")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("❌ Erro no upload:", uploadError);
+
+        // Se der erro de política, usar método Base64
+        if (
+          uploadError.message.includes("policy") ||
+          uploadError.message.includes("RLS")
+        ) {
+          console.log("🔄 Política RLS bloqueou, usando método Base64...");
+          await handleAvatarBase64(file);
+          return;
+        }
+
+        throw new Error(`❌ Erro no upload: ${uploadError.message}`);
+      }
+
+      console.log("✅ Upload para storage concluído!");
+
+      // ✅ OBTER URL PÚBLICA
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatares-agentes").getPublicUrl(fileName);
+
+      console.log("🔗 URL pública:", publicUrl);
+
+      // ✅ ATUALIZAR PERFIL NO BANCO
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", profile.id);
+
+      if (updateError) {
+        console.error("❌ Erro ao atualizar perfil:", updateError);
+        throw new Error(`❌ Erro ao atualizar perfil: ${updateError.message}`);
+      }
+
+      // ✅ ATUALIZAR ESTADO LOCAL
+      const updatedProfile = { ...profile, avatar_url: publicUrl };
+      setProfile(updatedProfile);
+
+      // ✅ ATUALIZAR LOCALSTORAGE
+      localStorage.setItem("pac_user_data", JSON.stringify(updatedProfile));
+
+      console.log("🎉 Foto de perfil atualizada com sucesso!");
+
+      // ✅ FEEDBACK POSITIVO
+      alert("✅ Foto de perfil atualizada com sucesso!");
+    } catch (err: any) {
+      console.error("❌ Erro ao atualizar avatar:", err);
+      alert("❌ Erro ao atualizar foto. Tente novamente.");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  // 🔧 MÉTODO BASE64 CORRIGIDO E FUNCIONAL
+  const handleAvatarBase64 = async (file: File): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        try {
+          const base64Image = e.target?.result as string;
+          console.log("🖼️ Convertendo para Base64...");
+
+          const supabase = createClient();
+
+          // ✅ ATUALIZAR PERFIL COM IMAGEM BASE64
+          const { error } = await supabase
+            .from("profiles")
+            .update({
+              avatar_url: base64Image,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", profile!.id);
+
+          if (error) {
+            console.error("❌ Erro ao atualizar perfil com Base64:", error);
+            reject(new Error(`Erro ao salvar imagem: ${error.message}`));
+            return;
+          }
+
+          // ✅ ATUALIZAR ESTADO LOCAL
+          const updatedProfile = { ...profile!, avatar_url: base64Image };
+          setProfile(updatedProfile);
+          localStorage.setItem("pac_user_data", JSON.stringify(updatedProfile));
+
+          console.log("✅ Foto atualizada via Base64!");
+          alert("✅ Foto de perfil atualizada com sucesso!");
+          resolve();
+        } catch (err: any) {
+          console.error("❌ Erro no processamento Base64:", err);
+          reject(new Error("Erro ao processar imagem."));
+        }
+      };
+
+      reader.onerror = () => {
+        reject(new Error("Erro ao ler o arquivo."));
+      };
+
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // 📸 FUNÇÃO PARA CLICAR NO ÍCONE DA CÂMERA
+  const handleCameraClick = () => {
+    if (!isAdmin) return;
+
+    // Criar input file programaticamente
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.style.display = "none";
+
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        // Validar tipo de arquivo
+        if (!file.type.startsWith("image/")) {
+          alert("Por favor, selecione apenas arquivos de imagem.");
+          return;
+        }
+
+        // Validar tamanho (máximo 2MB)
+        if (file.size > 2 * 1024 * 1024) {
+          alert("A imagem deve ter no máximo 2MB.");
+          return;
+        }
+
+        handleAvatarUpdate(file);
+      }
+    };
+
+    document.body.appendChild(input);
+    input.click();
+    document.body.removeChild(input);
+  };
 
   const handleRetry = () => {
     setRetryCount((prev) => prev + 1);
@@ -540,15 +706,33 @@ export default function AgentPerfil() {
                                   </span>
                                 </div>
                               )}
+
+                              {/* Overlay de loading durante upload */}
+                              {uploadingAvatar && (
+                                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+                                  <div className="text-center text-white">
+                                    <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                    <p className="text-xs">Enviando...</p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
+
                             {/* Botão de câmera apenas para admin */}
                             {isAdmin && (
                               <motion.button
                                 whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
-                                className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 sm:p-3 rounded-full hover:bg-blue-700 transition-all duration-300 shadow-xl border-2 border-white z-20"
+                                onClick={handleCameraClick}
+                                disabled={uploadingAvatar}
+                                className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 sm:p-3 rounded-full hover:bg-blue-700 transition-all duration-300 shadow-xl border-2 border-white z-20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Alterar foto de perfil"
                               >
-                                <FaCamera className="w-3 h-3 sm:w-4 sm:h-4" />
+                                {uploadingAvatar ? (
+                                  <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                ) : (
+                                  <FaCamera className="w-3 h-3 sm:w-4 sm:h-4" />
+                                )}
                               </motion.button>
                             )}
                           </motion.div>

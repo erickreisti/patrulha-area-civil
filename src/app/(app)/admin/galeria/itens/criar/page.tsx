@@ -1,3 +1,4 @@
+// src/app/(app)/admin/galeria/itens/criar/page.tsx - COM UPLOAD
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,27 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { MediaUpload } from "@/components/ui/media-upload";
 import { useToast } from "@/hooks/useToast";
 import Link from "next/link";
 import {
   FaArrowLeft,
   FaSave,
-  FaSpinner,
   FaImage,
   FaVideo,
-  FaExclamationTriangle,
-  FaTimes,
-  FaEye,
-  FaEyeSlash,
+  FaFolder,
   FaChartBar,
   FaHome,
   FaUser,
@@ -40,23 +31,23 @@ interface Categoria {
   tipo: "fotos" | "videos";
 }
 
-export default function CriarItemPage() {
+export default function CriarItemGaleriaPage() {
   const router = useRouter();
-  const { toast } = useToast();
   const supabase = createClient();
+  const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [mediaUrl, setMediaUrl] = useState<string>("");
   const [formData, setFormData] = useState({
     titulo: "",
     descricao: "",
     tipo: "foto" as "foto" | "video",
     categoria_id: "",
-    arquivo_url: "",
-    status: true,
     ordem: 0,
+    status: true,
+    destaque: false,
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCategorias();
@@ -75,66 +66,88 @@ export default function CriarItemPage() {
       setCategorias(data || []);
     } catch (error: any) {
       console.error("Erro ao carregar categorias:", error);
-      toast.error("Erro ao carregar categorias");
+      toast.error("Erro ao carregar categorias", "Erro");
     }
   };
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSwitchChange = (name: string, checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: checked,
+    }));
+  };
+
+  const handleTipoChange = (tipo: "foto" | "video") => {
+    setFormData((prev) => ({
+      ...prev,
+      tipo,
+      categoria_id: "", // Limpar categoria quando mudar o tipo
+    }));
+  };
+
+  const validateForm = (): string[] => {
+    const errors: string[] = [];
 
     if (!formData.titulo.trim()) {
-      newErrors.titulo = "Título é obrigatório";
-    } else if (formData.titulo.length < 3) {
-      newErrors.titulo = "Título deve ter pelo menos 3 caracteres";
+      errors.push("Título é obrigatório");
     }
 
     if (!formData.categoria_id) {
-      newErrors.categoria_id = "Categoria é obrigatória";
+      errors.push("Categoria é obrigatória");
     }
 
-    if (!formData.arquivo_url.trim()) {
-      newErrors.arquivo_url = "URL do arquivo é obrigatória";
-    } else if (!isValidUrl(formData.arquivo_url)) {
-      newErrors.arquivo_url = "URL inválida";
+    if (!mediaUrl) {
+      errors.push("Arquivo de mídia é obrigatório");
     }
 
     if (formData.ordem < 0) {
-      newErrors.ordem = "Ordem não pode ser negativa";
+      errors.push("Ordem não pode ser negativa");
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const isValidUrl = (url: string) => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
+    return errors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
-    if (!validateForm()) {
-      toast.error("Por favor, corrija os erros no formulário.");
+    // Validar formulário
+    const errors = validateForm();
+    if (errors.length > 0) {
+      toast.error("Erros no formulário:\n" + errors.join("\n"), "Validação");
+      setLoading(false);
       return;
     }
 
     try {
-      setLoading(true);
-
       // Buscar usuário atual para o autor_id
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        throw new Error("Usuário não autenticado");
+        toast.error("Usuário não autenticado", "Erro de autenticação");
+        setLoading(false);
+        return;
       }
 
+      // Determinar o bucket correto baseado no tipo
+      const bucket =
+        formData.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
+
+      // Criar item da galeria
       const { data, error } = await supabase
         .from("galeria_itens")
         .insert([
@@ -143,8 +156,9 @@ export default function CriarItemPage() {
             descricao: formData.descricao.trim() || null,
             tipo: formData.tipo,
             categoria_id: formData.categoria_id,
-            arquivo_url: formData.arquivo_url.trim(),
+            arquivo_url: mediaUrl,
             status: formData.status,
+            destaque: formData.destaque,
             ordem: formData.ordem,
             autor_id: user.id,
             created_at: new Date().toISOString(),
@@ -153,31 +167,20 @@ export default function CriarItemPage() {
         .select()
         .single();
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      toast.success("Item criado com sucesso!");
+      toast.success("Item da galeria criado com sucesso!", "Sucesso");
 
-      // Redirecionar para a lista
+      // Redirecionar para a listagem
       setTimeout(() => {
         router.push("/admin/galeria/itens");
-      }, 1000);
+      }, 1500);
     } catch (error: any) {
       console.error("Erro ao criar item:", error);
-
-      if (error.code === "23505") {
-        toast.error("Já existe um item com este título.");
-      } else {
-        toast.error("Não foi possível criar o item.");
-      }
+      toast.error(`Erro ao criar item: ${error.message}`, "Erro");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTipoChange = (tipo: "foto" | "video") => {
-    setFormData((prev) => ({ ...prev, tipo, categoria_id: "" }));
   };
 
   const categoriasFiltradas = categorias.filter(
@@ -191,16 +194,15 @@ export default function CriarItemPage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide">
-              ADICIONAR ITEM À GALERIA
+              NOVO ITEM DA GALERIA
             </h1>
             <p className="text-gray-600">
-              Adicione novas fotos ou vídeos à galeria da Patrulha Aérea Civil
+              Adicione novas fotos ou vídeos à galeria
             </p>
           </div>
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/admin/galeria/itens">
               <Button
                 variant="outline"
@@ -211,7 +213,6 @@ export default function CriarItemPage() {
               </Button>
             </Link>
 
-            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
@@ -222,18 +223,6 @@ export default function CriarItemPage() {
               </Button>
             </Link>
 
-            {/* 🔵 AZUL - Ações Administrativas */}
-            <Link href="/perfil">
-              <Button
-                variant="outline"
-                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-              >
-                <FaUser className="w-4 h-4 mr-2" />
-                Meu Perfil
-              </Button>
-            </Link>
-
-            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"
@@ -249,11 +238,11 @@ export default function CriarItemPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Formulário Principal */}
           <div className="lg:col-span-2">
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-lg">
               <CardHeader className="border-b border-gray-200">
                 <CardTitle className="flex items-center text-xl">
                   <FaImage className="w-5 h-5 mr-2 text-navy" />
-                  Informações do Item
+                  Novo Item da Galeria
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
@@ -265,26 +254,13 @@ export default function CriarItemPage() {
                     </Label>
                     <Input
                       id="titulo"
+                      name="titulo"
                       value={formData.titulo}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          titulo: e.target.value,
-                        }))
-                      }
-                      placeholder="Ex: Treinamento de Resgate Aéreo, Evento Comunitário, etc."
-                      className={
-                        errors.titulo
-                          ? "border-red-500 focus:border-red-500"
-                          : ""
-                      }
+                      onChange={handleInputChange}
+                      placeholder="Ex: Treinamento de Resgate Aéreo"
+                      className="w-full"
+                      required
                     />
-                    {errors.titulo && (
-                      <p className="text-red-600 text-sm flex items-center gap-1">
-                        <FaExclamationTriangle className="w-3 h-3" />
-                        {errors.titulo}
-                      </p>
-                    )}
                   </div>
 
                   {/* Descrição */}
@@ -297,17 +273,14 @@ export default function CriarItemPage() {
                     </Label>
                     <Textarea
                       id="descricao"
+                      name="descricao"
                       value={formData.descricao}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          descricao: e.target.value,
-                        }))
-                      }
+                      onChange={handleInputChange}
                       placeholder="Descreva o conteúdo deste item..."
                       rows={4}
+                      className="w-full resize-none"
                     />
-                    <p className="text-gray-500 text-sm">
+                    <p className="text-xs text-gray-500">
                       {formData.descricao.length}/500 caracteres
                     </p>
                   </div>
@@ -319,81 +292,65 @@ export default function CriarItemPage() {
                       <Label className="text-sm font-semibold">
                         Tipo de Mídia *
                       </Label>
-                      <Select
-                        value={formData.tipo}
-                        onValueChange={(value: "foto" | "video") =>
-                          handleTipoChange(value)
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="foto">
-                            <div className="flex items-center gap-2">
-                              <FaImage className="w-4 h-4 text-blue-600" />
-                              <span>Foto</span>
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="video">
-                            <div className="flex items-center gap-2">
-                              <FaVideo className="w-4 h-4 text-purple-600" />
-                              <span>Vídeo</span>
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex space-x-2">
+                        <Button
+                          type="button"
+                          variant={
+                            formData.tipo === "foto" ? "default" : "outline"
+                          }
+                          className={`flex-1 ${
+                            formData.tipo === "foto"
+                              ? "bg-blue-600 text-white"
+                              : "border-blue-600 text-blue-600"
+                          }`}
+                          onClick={() => handleTipoChange("foto")}
+                        >
+                          <FaImage className="w-4 h-4 mr-2" />
+                          Foto
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={
+                            formData.tipo === "video" ? "default" : "outline"
+                          }
+                          className={`flex-1 ${
+                            formData.tipo === "video"
+                              ? "bg-purple-600 text-white"
+                              : "border-purple-600 text-purple-600"
+                          }`}
+                          onClick={() => handleTipoChange("video")}
+                        >
+                          <FaVideo className="w-4 h-4 mr-2" />
+                          Vídeo
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Categoria */}
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold">
+                      <Label
+                        htmlFor="categoria_id"
+                        className="text-sm font-semibold"
+                      >
                         Categoria *
                       </Label>
-                      <Select
+                      <select
+                        id="categoria_id"
+                        name="categoria_id"
                         value={formData.categoria_id}
-                        onValueChange={(value) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            categoria_id: value,
-                          }))
-                        }
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                        required
                       >
-                        <SelectTrigger
-                          className={
-                            errors.categoria_id
-                              ? "border-red-500 focus:border-red-500"
-                              : ""
-                          }
-                        >
-                          <SelectValue placeholder="Selecione uma categoria" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categoriasFiltradas.length === 0 ? (
-                            <SelectItem value="no-category" disabled>
-                              Nenhuma categoria disponível para{" "}
-                              {formData.tipo === "foto" ? "fotos" : "vídeos"}
-                            </SelectItem>
-                          ) : (
-                            categoriasFiltradas.map((categoria) => (
-                              <SelectItem
-                                key={categoria.id}
-                                value={categoria.id}
-                              >
-                                {categoria.nome}
-                              </SelectItem>
-                            ))
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {errors.categoria_id && (
-                        <p className="text-red-600 text-sm flex items-center gap-1">
-                          <FaExclamationTriangle className="w-3 h-3" />
-                          {errors.categoria_id}
-                        </p>
-                      )}
+                        <option value="">Selecione uma categoria</option>
+                        {categoriasFiltradas.map((categoria) => (
+                          <option key={categoria.id} value={categoria.id}>
+                            {categoria.nome}
+                          </option>
+                        ))}
+                      </select>
                       {categoriasFiltradas.length === 0 && (
-                        <p className="text-yellow-600 text-sm">
+                        <p className="text-xs text-yellow-600">
                           ⚠️ Crie uma categoria para{" "}
                           {formData.tipo === "foto" ? "fotos" : "vídeos"}{" "}
                           primeiro
@@ -402,49 +359,29 @@ export default function CriarItemPage() {
                     </div>
                   </div>
 
-                  {/* URL do Arquivo */}
+                  {/* Upload de Mídia */}
                   <div className="space-y-2">
-                    <Label
-                      htmlFor="arquivo_url"
-                      className="text-sm font-semibold"
-                    >
-                      URL do Arquivo *
+                    <Label className="text-sm font-semibold">
+                      Arquivo de Mídia *
                     </Label>
-                    <Input
-                      id="arquivo_url"
-                      value={formData.arquivo_url}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          arquivo_url: e.target.value,
-                        }))
-                      }
-                      placeholder={
-                        formData.tipo === "foto"
-                          ? "https://exemplo.com/imagem.jpg"
-                          : "https://youtube.com/watch?v=..."
-                      }
-                      className={
-                        errors.arquivo_url
-                          ? "border-red-500 focus:border-red-500"
-                          : ""
-                      }
+                    <MediaUpload
+                      tipo={formData.tipo}
+                      onMediaChange={setMediaUrl}
+                      currentMedia={mediaUrl}
+                      className="w-full"
                     />
-                    {errors.arquivo_url && (
-                      <p className="text-red-600 text-sm flex items-center gap-1">
-                        <FaExclamationTriangle className="w-3 h-3" />
-                        {errors.arquivo_url}
-                      </p>
+                    {mediaUrl && (
+                      <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-xs text-green-700">
+                          ✅ {formData.tipo === "foto" ? "Imagem" : "Vídeo"}{" "}
+                          carregado com sucesso
+                        </p>
+                      </div>
                     )}
-                    <p className="text-gray-500 text-sm">
-                      {formData.tipo === "foto"
-                        ? "URL da imagem (JPG, PNG, WebP)"
-                        : "URL do vídeo (YouTube, Vimeo, etc.)"}
-                    </p>
                   </div>
 
                   {/* Configurações Avançadas */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Ordem */}
                     <div className="space-y-2">
                       <Label htmlFor="ordem" className="text-sm font-semibold">
@@ -452,28 +389,14 @@ export default function CriarItemPage() {
                       </Label>
                       <Input
                         id="ordem"
+                        name="ordem"
                         type="number"
                         min="0"
                         value={formData.ordem}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            ordem: parseInt(e.target.value) || 0,
-                          }))
-                        }
-                        className={
-                          errors.ordem
-                            ? "border-red-500 focus:border-red-500"
-                            : ""
-                        }
+                        onChange={handleInputChange}
+                        className="w-full"
                       />
-                      {errors.ordem && (
-                        <p className="text-red-600 text-sm flex items-center gap-1">
-                          <FaExclamationTriangle className="w-3 h-3" />
-                          {errors.ordem}
-                        </p>
-                      )}
-                      <p className="text-gray-500 text-sm">
+                      <p className="text-xs text-gray-500">
                         Número menor aparece primeiro
                       </p>
                     </div>
@@ -487,10 +410,7 @@ export default function CriarItemPage() {
                         <Switch
                           checked={formData.status}
                           onCheckedChange={(checked) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              status: checked,
-                            }))
+                            handleSwitchChange("status", checked)
                           }
                         />
                         <div>
@@ -505,33 +425,32 @@ export default function CriarItemPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Preview da URL (se for imagem) */}
-                  {formData.tipo === "foto" &&
-                    formData.arquivo_url &&
-                    isValidUrl(formData.arquivo_url) && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-semibold">
-                          Preview da Imagem
-                        </Label>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
-                          <div className="flex flex-col items-center justify-center text-center">
-                            <img
-                              src={formData.arquivo_url}
-                              alt="Preview"
-                              className="max-w-full max-h-48 object-contain rounded mb-3"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                              }}
-                            />
-                            <p className="text-sm text-gray-600 break-all">
-                              {formData.arquivo_url}
-                            </p>
-                          </div>
+                    {/* Destaque */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">
+                        Item em Destaque
+                      </Label>
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                        <Switch
+                          checked={formData.destaque}
+                          onCheckedChange={(checked) =>
+                            handleSwitchChange("destaque", checked)
+                          }
+                        />
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            {formData.destaque ? "Em destaque" : "Normal"}
+                          </p>
+                          <p className="text-gray-500 text-sm">
+                            {formData.destaque
+                              ? "Destacado"
+                              : "Listagem normal"}
+                          </p>
                         </div>
                       </div>
-                    )}
+                    </div>
+                  </div>
 
                   {/* Botões de Ação */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
@@ -542,7 +461,7 @@ export default function CriarItemPage() {
                     >
                       {loading ? (
                         <>
-                          <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                           Criando...
                         </>
                       ) : (
@@ -555,12 +474,11 @@ export default function CriarItemPage() {
 
                     <Button
                       type="button"
-                      variant="outline"
-                      disabled={loading}
                       onClick={() => router.push("/admin/galeria/itens")}
+                      variant="outline"
                       className="border-slate-700 text-slate-700 hover:bg-slate-100 py-3"
                     >
-                      <FaTimes className="w-4 h-4 mr-2" />
+                      <FaArrowLeft className="w-4 h-4 mr-2" />
                       Cancelar
                     </Button>
                   </div>
@@ -569,10 +487,10 @@ export default function CriarItemPage() {
             </Card>
           </div>
 
-          {/* Informações e Ajuda */}
+          {/* Sidebar - Informações */}
           <div className="space-y-6">
             {/* Status */}
-            <Card className="border-0 shadow-md">
+            <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Configurações</CardTitle>
               </CardHeader>
@@ -603,6 +521,19 @@ export default function CriarItemPage() {
                   </Badge>
                 </div>
 
+                <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Destaque:</span>
+                  <Badge
+                    className={
+                      formData.destaque
+                        ? "bg-yellow-500 text-white"
+                        : "bg-gray-400 text-white"
+                    }
+                  >
+                    {formData.destaque ? "Sim" : "Não"}
+                  </Badge>
+                </div>
+
                 <div className="flex justify-between items-center py-2">
                   <span className="text-gray-600">Ordem:</span>
                   <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
@@ -612,30 +543,75 @@ export default function CriarItemPage() {
               </CardContent>
             </Card>
 
-            {/* Ajuda */}
-            <Card className="border-0 shadow-md">
+            {/* Informações */}
+            <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <FaExclamationTriangle className="w-4 h-4 text-yellow-500" />
-                  Informações Importantes
-                </CardTitle>
+                <CardTitle className="text-lg">Informações</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-gray-600">
                 <p>
                   • Campos com <strong>*</strong> são obrigatórios
                 </p>
                 <p>
+                  • <strong>Fotos:</strong> JPG, PNG, WEBP até 5MB
+                </p>
+                <p>
+                  • <strong>Vídeos:</strong> MP4, MOV até 50MB
+                </p>
+                <p>
                   • <strong>Itens inativos</strong> não aparecem no site
+                </p>
+                <p>
+                  • <strong>Destaques</strong> aparecem em posição especial
                 </p>
                 <p>
                   • A <strong>ordem</strong> define a posição na listagem
                 </p>
-                <p>
-                  • Escolha a <strong>categoria correta</strong> para o tipo
-                </p>
-                <p>
-                  • URLs devem ser <strong>públicas e acessíveis</strong>
-                </p>
+              </CardContent>
+            </Card>
+
+            {/* Categorias Disponíveis */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  <FaFolder className="w-4 h-4 mr-2 text-navy" />
+                  Categorias Disponíveis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {categoriasFiltradas.length === 0 ? (
+                    <p className="text-sm text-yellow-600 text-center py-4">
+                      Nenhuma categoria disponível para{" "}
+                      {formData.tipo === "foto" ? "fotos" : "vídeos"}
+                    </p>
+                  ) : (
+                    categoriasFiltradas.map((categoria) => (
+                      <div
+                        key={categoria.id}
+                        className={`flex items-center justify-between p-2 rounded ${
+                          formData.categoria_id === categoria.id
+                            ? "bg-blue-50 border border-blue-200"
+                            : "bg-gray-50"
+                        }`}
+                      >
+                        <span className="text-sm font-medium">
+                          {categoria.nome}
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className={
+                            categoria.tipo === "fotos"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-purple-100 text-purple-800"
+                          }
+                        >
+                          {categoria.tipo}
+                        </Badge>
+                      </div>
+                    ))
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

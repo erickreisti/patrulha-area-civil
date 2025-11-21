@@ -1,3 +1,4 @@
+// middleware.ts - VERSÃO CORRIGIDA
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -78,7 +79,7 @@ export async function middleware(request: NextRequest) {
 
       if (profile?.role !== "admin") {
         console.log("🚫 Middleware: Acesso negado - usuário não é admin");
-        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ ATUALIZADO
+        return NextResponse.redirect(new URL("/agent/perfil", request.url)); // ✅ CORRIGIDO
       }
 
       if (!profile?.status) {
@@ -89,7 +90,7 @@ export async function middleware(request: NextRequest) {
       console.log("✅ Middleware: Acesso admin permitido");
     }
 
-    // 🛡️ PROTEÇÃO DAS ROTAS DE AGENTE (nova área)
+    // 🛡️ PROTEÇÃO DAS ROTAS DE AGENTE
     if (request.nextUrl.pathname.startsWith("/agent")) {
       console.log("🛡️ Middleware: Protegendo rota agent...");
 
@@ -135,16 +136,32 @@ export async function middleware(request: NextRequest) {
         .eq("id", user.id)
         .single();
 
-      // ✅ SEMPRE redirecionar para /perfil (nova rota)
-      return NextResponse.redirect(new URL("/perfil", request.url));
+      // ✅ REDIRECIONAR PARA A ROTA CORRETA
+      if (profile?.role === "admin") {
+        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+      } else {
+        return NextResponse.redirect(new URL("/agent/perfil", request.url)); // ✅ CORRIGIDO
+      }
     }
 
     // 🔄 REDIRECIONAMENTO DE ROTA RAIZ
     if (request.nextUrl.pathname === "/" && user) {
       console.log(
-        "🔄 Middleware: Usuário logado acessando raiz, redirecionando para perfil..."
+        "🔄 Middleware: Usuário logado acessando raiz, redirecionando..."
       );
-      return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ ATUALIZADO
+
+      // Buscar perfil para redirecionamento correto
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      if (profile?.role === "admin") {
+        return NextResponse.redirect(new URL("/admin/dashboard", request.url));
+      } else {
+        return NextResponse.redirect(new URL("/agent/perfil", request.url)); // ✅ CORRIGIDO
+      }
     }
   } catch (error) {
     console.error("💥 Middleware: Erro inesperado:", error);
@@ -155,11 +172,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/agent/:path*", // ✅ ADICIONADO
-    "/perfil/:path*", // ✅ ADICIONADO
-    "/login",
-    "/",
-  ],
+  matcher: ["/admin/:path*", "/agent/:path*", "/login", "/"],
 };
