@@ -1,4 +1,3 @@
-// src/app/(app)/admin/noticias/page.tsx - PADRONIZADO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -24,7 +23,6 @@ import {
   FaTrash,
   FaArchive,
   FaRocket,
-  FaArrowLeft,
 } from "react-icons/fa";
 import { NoticiaWithAutor, NoticiaStatus } from "@/types/noticias";
 
@@ -236,7 +234,6 @@ export default function NoticiasPage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
@@ -247,7 +244,6 @@ export default function NoticiasPage() {
               </Button>
             </Link>
 
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/perfil">
               <Button
                 variant="outline"
@@ -258,18 +254,16 @@ export default function NoticiasPage() {
               </Button>
             </Link>
 
-            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"
-                className="border-slate-700 text-slate-700 hover:bg-slate-100"
+                className="border-gray-700 text-gray-700 hover:bg-gray-100"
               >
                 <FaHome className="w-4 h-4 mr-2" />
                 Voltar ao Site
               </Button>
             </Link>
 
-            {/* 🟢 Verde para ações de criação */}
             <Link href="/admin/noticias/criar">
               <Button className="bg-green-600 hover:bg-green-700 text-white">
                 <FaPlus className="w-4 h-4 mr-2" />
@@ -290,7 +284,7 @@ export default function NoticiasPage() {
                     {stats.total}
                   </p>
                 </div>
-                <FaNewspaper className="w-8 h-8 text-navy" />
+                <FaNewspaper className="w-8 h-8 text-blue-800" />
               </div>
             </CardContent>
           </Card>
@@ -373,7 +367,7 @@ export default function NoticiasPage() {
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                 >
                   <option value="all">Todos os status</option>
                   <option value="rascunho">Rascunho</option>
@@ -384,7 +378,7 @@ export default function NoticiasPage() {
                 <select
                   value={filterCategoria}
                   onChange={(e) => setFilterCategoria(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                 >
                   <option value="all">Todas categorias</option>
                   {CATEGORIAS.map((cat) => (
@@ -397,7 +391,7 @@ export default function NoticiasPage() {
                 <select
                   value={filterDestaque}
                   onChange={(e) => setFilterDestaque(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy text-sm"
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                 >
                   <option value="all">Todos</option>
                   <option value="destaque">Em destaque</option>
@@ -412,14 +406,14 @@ export default function NoticiasPage() {
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <FaNewspaper className="w-5 h-5 mr-2 text-navy" />
+              <FaNewspaper className="w-5 h-5 mr-2 text-blue-800" />
               Lista de Notícias ({filteredNoticias.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mx-auto"></div>
                 <p className="text-gray-600 mt-4">Carregando notícias...</p>
               </div>
             ) : filteredNoticias.length === 0 ? (
@@ -545,7 +539,6 @@ export default function NoticiasPage() {
 
                         <td className="py-3 px-4">
                           <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
-                            {/* 🔵 AZUL - Ações Administrativas */}
                             <Link href={`/admin/noticias/${noticia.id}`}>
                               <Button
                                 variant="outline"
@@ -557,7 +550,6 @@ export default function NoticiasPage() {
                               </Button>
                             </Link>
 
-                            {/* 🟢 Verde para ações de status */}
                             <Button
                               variant="outline"
                               size="sm"
@@ -580,7 +572,6 @@ export default function NoticiasPage() {
                                 : "Republicar"}
                             </Button>
 
-                            {/* 🟡 Amarelo para ações de destaque */}
                             <Button
                               variant="outline"
                               size="sm"
@@ -597,7 +588,6 @@ export default function NoticiasPage() {
                               {noticia.destaque ? "Remover" : "Destacar"}
                             </Button>
 
-                            {/* 🔴 VERMELHO - Ações Destrutivas */}
                             <Button
                               variant="outline"
                               size="sm"

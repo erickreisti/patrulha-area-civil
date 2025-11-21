@@ -7,14 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -29,7 +21,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/useToast";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -131,7 +122,7 @@ function ImageWithFallback({
     >
       {imageLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-navy"></div>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-800"></div>
         </div>
       )}
       <Image
@@ -174,7 +165,6 @@ export default function ItensGaleriaPage() {
     loading: false,
   });
 
-  const { toast } = useToast();
   const supabase = createClient();
 
   useEffect(() => {
@@ -191,7 +181,10 @@ export default function ItensGaleriaPage() {
         .select(
           `
           *,
-          galeria_categorias!inner(nome, tipo)
+          galeria_categorias (
+            nome,
+            tipo
+          )
         `
         )
         .order("ordem", { ascending: true })
@@ -221,7 +214,7 @@ export default function ItensGaleriaPage() {
       setItens(data || []);
     } catch (error: any) {
       console.error("Erro ao carregar itens:", error);
-      toast.error("Erro ao carregar itens da galeria");
+      alert("Erro ao carregar itens da galeria");
     } finally {
       setLoading(false);
     }
@@ -264,12 +257,12 @@ export default function ItensGaleriaPage() {
 
       if (error) throw error;
 
-      toast.success("Item excluído com sucesso!");
+      alert("Item excluído com sucesso!");
       setDeleteDialog({ open: false, item: null, loading: false });
       fetchItens();
     } catch (error: any) {
       console.error("Erro ao excluir item:", error);
-      toast.error("Erro ao excluir item");
+      alert("Erro ao excluir item");
       setDeleteDialog((prev) => ({ ...prev, loading: false }));
     }
   };
@@ -366,7 +359,7 @@ export default function ItensGaleriaPage() {
             <Link href="/">
               <Button
                 variant="outline"
-                className="border-slate-700 text-slate-700 hover:bg-slate-100"
+                className="border-gray-700 text-gray-700 hover:bg-gray-100"
               >
                 <FaHome className="w-4 h-4 mr-2" />
                 Voltar ao Site
@@ -453,7 +446,7 @@ export default function ItensGaleriaPage() {
         <Card className="border-0 shadow-md mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FaFilter className="w-5 h-5 text-navy" />
+              <FaFilter className="w-5 h-5 text-blue-800" />
               Filtros e Busca
             </CardTitle>
           </CardHeader>
@@ -544,7 +537,7 @@ export default function ItensGaleriaPage() {
               <Button
                 variant="outline"
                 onClick={limparFiltros}
-                className="border-slate-700 text-slate-700 hover:bg-slate-100"
+                className="border-gray-700 text-gray-700 hover:bg-gray-100"
               >
                 Limpar Filtros
               </Button>
@@ -562,14 +555,14 @@ export default function ItensGaleriaPage() {
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <FaImage className="w-5 h-5 mr-2 text-navy" />
+              <FaImage className="w-5 h-5 mr-2 text-blue-800" />
               Lista de Itens ({itens.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mx-auto"></div>
                 <p className="text-gray-600 mt-4">Carregando itens...</p>
               </div>
             ) : itens.length === 0 ? (
@@ -595,25 +588,42 @@ export default function ItensGaleriaPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Ordem</TableHead>
-                      <TableHead>Criado em</TableHead>
-                      <TableHead>Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Item
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Categoria
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Tipo
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Status
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Ordem
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Criado em
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {itens.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
+                      <tr
+                        key={item.id}
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="py-3 px-4">
                           <div className="flex items-start space-x-3">
                             <ImageWithFallback
-                              src={item.thumbnail_url}
+                              src={item.thumbnail_url || item.arquivo_url}
                               alt={item.titulo}
                               tipo={item.tipo}
                             />
@@ -628,28 +638,30 @@ export default function ItensGaleriaPage() {
                               )}
                             </div>
                           </div>
-                        </TableCell>
+                        </td>
 
-                        <TableCell>
+                        <td className="py-3 px-4">
                           <Badge
                             variant="secondary"
                             className="bg-blue-100 text-blue-700"
                           >
                             {item.galeria_categorias?.nome || "N/A"}
                           </Badge>
-                        </TableCell>
+                        </td>
 
-                        <TableCell>{getTipoBadge(item.tipo)}</TableCell>
+                        <td className="py-3 px-4">{getTipoBadge(item.tipo)}</td>
 
-                        <TableCell>{getStatusBadge(item.status)}</TableCell>
+                        <td className="py-3 px-4">
+                          {getStatusBadge(item.status)}
+                        </td>
 
-                        <TableCell>
+                        <td className="py-3 px-4">
                           <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
                             {item.ordem}
                           </span>
-                        </TableCell>
+                        </td>
 
-                        <TableCell>
+                        <td className="py-3 px-4">
                           <div className="flex items-center space-x-2">
                             <FaCalendarAlt className="w-4 h-4 text-gray-400" />
                             <span className="text-sm text-gray-600">
@@ -658,9 +670,9 @@ export default function ItensGaleriaPage() {
                               )}
                             </span>
                           </div>
-                        </TableCell>
+                        </td>
 
-                        <TableCell>
+                        <td className="py-3 px-4">
                           <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
                             <Link href={`/admin/galeria/itens/${item.id}`}>
                               <Button
@@ -683,11 +695,11 @@ export default function ItensGaleriaPage() {
                               Excluir
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     ))}
-                  </TableBody>
-                </Table>
+                  </tbody>
+                </table>
               </div>
             )}
           </CardContent>
@@ -721,7 +733,7 @@ export default function ItensGaleriaPage() {
                 onClick={() =>
                   setDeleteDialog({ open: false, item: null, loading: false })
                 }
-                className="flex-1 border-slate-700 text-slate-700 hover:bg-slate-100"
+                className="flex-1 border-gray-700 text-gray-700 hover:bg-gray-100"
                 disabled={deleteDialog.loading}
               >
                 Cancelar

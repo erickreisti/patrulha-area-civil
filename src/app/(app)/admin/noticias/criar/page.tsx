@@ -1,4 +1,4 @@
-// src/app/(app)/admin/noticias/criar/page.tsx - COM UPLOAD
+// src/app/(app)/admin/noticias/criar/page.tsx - CORRIGIDA E PADRONIZADA
 "use client";
 
 import { useState } from "react";
@@ -11,8 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { ImageUpload } from "@/components/ui/image-upload";
-import { useToast } from "@/hooks/useToast";
 import Link from "next/link";
 import {
   FaNewspaper,
@@ -25,6 +23,7 @@ import {
   FaChartBar,
   FaHome,
   FaUser,
+  FaTimes,
 } from "react-icons/fa";
 
 // Categorias pré-definidas
@@ -41,7 +40,6 @@ const CATEGORIAS = [
 export default function CriarNoticiaPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [imagemUrl, setImagemUrl] = useState<string>("");
@@ -135,7 +133,7 @@ export default function CriarNoticiaPage() {
     // Validar formulário
     const errors = validateForm();
     if (errors.length > 0) {
-      toast.error("Erros no formulário:\n" + errors.join("\n"), "Validação");
+      alert("Erros no formulário:\n" + errors.join("\n"));
       setLoading(false);
       return;
     }
@@ -149,10 +147,7 @@ export default function CriarNoticiaPage() {
         .single();
 
       if (existingSlug) {
-        toast.error(
-          "Já existe outra notícia com este slug. Altere o título.",
-          "Slug duplicado"
-        );
+        alert("Já existe outra notícia com este slug. Altere o título.");
         setLoading(false);
         return;
       }
@@ -163,7 +158,7 @@ export default function CriarNoticiaPage() {
       } = await supabase.auth.getUser();
 
       if (!user) {
-        toast.error("Usuário não autenticado", "Erro de autenticação");
+        alert("Usuário não autenticado");
         setLoading(false);
         return;
       }
@@ -192,15 +187,15 @@ export default function CriarNoticiaPage() {
 
       if (error) throw error;
 
-      toast.success("Notícia criada com sucesso!", "Sucesso");
+      alert("Notícia criada com sucesso!");
 
       // Redirecionar para a listagem
       setTimeout(() => {
         router.push("/admin/noticias");
-      }, 1500);
+      }, 1000);
     } catch (error: any) {
-      console.error("Erro ao criar notícia:", error);
-      toast.error(`Erro ao criar notícia: ${error.message}`, "Erro");
+      console.error("❌ Erro ao criar notícia:", error);
+      alert(`Erro ao criar notícia: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -222,6 +217,7 @@ export default function CriarNoticiaPage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/admin/noticias">
               <Button
                 variant="outline"
@@ -232,6 +228,7 @@ export default function CriarNoticiaPage() {
               </Button>
             </Link>
 
+            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
@@ -242,10 +239,11 @@ export default function CriarNoticiaPage() {
               </Button>
             </Link>
 
+            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"
-                className="border-slate-700 text-slate-700 hover:bg-slate-100"
+                className="border-gray-700 text-gray-700 hover:bg-gray-100"
               >
                 <FaHome className="w-4 h-4 mr-2" />
                 Voltar ao Site
@@ -260,7 +258,7 @@ export default function CriarNoticiaPage() {
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b border-gray-200">
                 <CardTitle className="flex items-center text-xl">
-                  <FaNewspaper className="w-5 h-5 mr-2 text-navy" />
+                  <FaNewspaper className="w-5 h-5 mr-2 text-blue-800" />
                   Criar Nova Notícia
                 </CardTitle>
               </CardHeader>
@@ -354,6 +352,7 @@ export default function CriarNoticiaPage() {
 
                   {/* Botões de Ação */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+                    {/* 🟢 VERDE - Ações de Criação */}
                     <Button
                       type="submit"
                       disabled={loading}
@@ -372,13 +371,14 @@ export default function CriarNoticiaPage() {
                       )}
                     </Button>
 
+                    {/* ⚫ CINZA - Navegação Neutra */}
                     <Button
                       type="button"
                       onClick={() => router.push("/admin/noticias")}
                       variant="outline"
-                      className="border-slate-700 text-slate-700 hover:bg-slate-100 py-3"
+                      className="border-gray-700 text-gray-700 hover:bg-gray-100 py-3"
                     >
-                      <FaArrowLeft className="w-4 h-4 mr-2" />
+                      <FaTimes className="w-4 h-4 mr-2" />
                       Cancelar
                     </Button>
                   </div>
@@ -393,18 +393,25 @@ export default function CriarNoticiaPage() {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaImage className="w-4 h-4 mr-2 text-navy" />
+                  <FaImage className="w-4 h-4 mr-2 text-blue-800" />
                   Imagem de Capa
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ImageUpload
-                  bucket="imagens-noticias"
-                  onImageChange={setImagemUrl}
-                  currentImage={imagemUrl}
-                  maxSize={5 * 1024 * 1024}
-                  className="w-full"
-                />
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <FaImage className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-600 mb-2">
+                    Upload de imagem (em desenvolvimento)
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled
+                    className="text-xs border-gray-700 text-gray-700 hover:bg-gray-100"
+                  >
+                    Selecionar Imagem
+                  </Button>
+                </div>
                 {imagemUrl && (
                   <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-xs text-green-700">
@@ -412,6 +419,9 @@ export default function CriarNoticiaPage() {
                     </p>
                   </div>
                 )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Sistema de upload será implementado em breve
+                </p>
               </CardContent>
             </Card>
 
@@ -419,7 +429,7 @@ export default function CriarNoticiaPage() {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaCalendarAlt className="w-4 h-4 mr-2 text-navy" />
+                  <FaCalendarAlt className="w-4 h-4 mr-2 text-blue-800" />
                   Publicação
                 </CardTitle>
               </CardHeader>
@@ -463,7 +473,7 @@ export default function CriarNoticiaPage() {
                                 status: e.target.value as typeof status,
                               }))
                             }
-                            className="text-navy focus:ring-navy"
+                            className="text-blue-600 focus:ring-blue-600"
                           />
                           <span className="text-sm capitalize">{status}</span>
                           {status === "rascunho" && (
@@ -522,7 +532,7 @@ export default function CriarNoticiaPage() {
                   name="categoria"
                   value={formData.categoria}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                 >
                   {CATEGORIAS.map((cat) => (
                     <option key={cat} value={cat}>

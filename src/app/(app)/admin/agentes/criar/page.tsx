@@ -1,4 +1,3 @@
-// 📁 /src/app/(app)/admin/agentes/criar/page.tsx - ATUALIZADO
 "use client";
 
 import { useState } from "react";
@@ -8,8 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AvatarUpload } from "@/components/ui/avatar-upload";
-import { useToast } from "@/hooks/useToast";
 import Link from "next/link";
 import {
   FaUser,
@@ -22,6 +19,10 @@ import {
   FaSave,
   FaPlus,
   FaKey,
+  FaInfo,
+  FaImage,
+  FaChartBar,
+  FaHome,
 } from "react-icons/fa";
 
 // Opções baseadas no schema
@@ -40,10 +41,9 @@ const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 export default function CriarAgentePage() {
   const router = useRouter();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState(""); // ✅ NOVO: Estado para avatar
+  const [formError, setFormError] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [formData, setFormData] = useState({
     matricula: "",
     email: "",
@@ -66,15 +66,10 @@ export default function CriarAgentePage() {
     }));
   };
 
-  // ✅ NOVO: Handler para mudança de avatar
-  const handleAvatarChange = (url: string) => {
-    setAvatarUrl(url);
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    setFormError(null);
 
     try {
       // Validar dados básicos
@@ -100,7 +95,7 @@ export default function CriarAgentePage() {
       const { data: authData, error: authError } =
         await supabase.auth.admin.createUser({
           email: formData.email,
-          password: "pac12345", // Senha padrão
+          password: "pac12345",
           email_confirm: true,
           user_metadata: {
             matricula: formData.matricula,
@@ -128,13 +123,13 @@ export default function CriarAgentePage() {
 
       console.log("✅ Usuário criado no Auth:", authData.user.id);
 
-      // 2. Criar perfil na tabela profiles COM AVATAR
+      // 2. Criar perfil na tabela profiles
       const { error: profileError } = await supabase.from("profiles").insert({
         id: authData.user.id,
         matricula: formData.matricula,
         email: formData.email,
         full_name: formData.full_name,
-        avatar_url: avatarUrl || null, // ✅ NOVO: Incluir avatar URL
+        avatar_url: avatarUrl || null,
         graduacao: formData.graduacao || null,
         tipo_sanguineo: formData.tipo_sanguineo || null,
         validade_certificacao: formData.validade_certificacao || null,
@@ -151,7 +146,6 @@ export default function CriarAgentePage() {
         await supabase.auth.admin.deleteUser(authData.user.id);
 
         if (profileError.code === "23505") {
-          // Unique violation
           if (profileError.message.includes("matricula")) {
             throw new Error("Matrícula já cadastrada no sistema");
           }
@@ -165,7 +159,7 @@ export default function CriarAgentePage() {
 
       console.log("✅ Perfil criado com sucesso!");
 
-      // 3. Enviar email de boas-vindas com instruções para resetar senha
+      // 3. Enviar email de boas-vindas
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         formData.email,
         {
@@ -175,21 +169,19 @@ export default function CriarAgentePage() {
 
       if (resetError) {
         console.warn("⚠️ Não foi possível enviar email de reset:", resetError);
-        // Não falha a criação se o email não for enviado
       } else {
         console.log("✅ Email de reset enviado");
       }
 
       // Sucesso - redirecionar para lista de agentes
-      toast.success(
-        "Agente criado com sucesso! Um email foi enviado para definir a senha.",
-        "Sucesso"
+      alert(
+        "Agente criado com sucesso! Um email foi enviado para definir a senha."
       );
       router.push("/admin/agentes");
     } catch (err: any) {
       console.error("💥 Erro completo:", err);
-      setError(err.message);
-      toast.error(err.message, "Erro");
+      setFormError(err.message);
+      alert(err.message);
     } finally {
       setLoading(false);
     }
@@ -208,15 +200,38 @@ export default function CriarAgentePage() {
               Preencha os dados para cadastrar um novo agente no sistema
             </p>
           </div>
-          <Link href="/admin/agentes">
-            <Button
-              variant="outline"
-              className="border-navy-light text-navy-light hover:bg-navy-light hover:text-white"
-            >
-              <FaArrowLeft className="w-4 h-4 mr-2" />
-              Voltar para Lista
-            </Button>
-          </Link>
+
+          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+            <Link href="/admin/dashboard">
+              <Button
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+              >
+                <FaChartBar className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+
+            <Link href="/">
+              <Button
+                variant="outline"
+                className="border-gray-700 text-gray-700 hover:bg-gray-100"
+              >
+                <FaHome className="w-4 h-4 mr-2" />
+                Voltar ao Site
+              </Button>
+            </Link>
+
+            <Link href="/admin/agentes">
+              <Button
+                variant="outline"
+                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+              >
+                <FaArrowLeft className="w-4 h-4 mr-2" />
+                Voltar para Lista
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -225,28 +240,17 @@ export default function CriarAgentePage() {
             <Card className="border-0 shadow-md">
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <FaUser className="w-5 h-5 mr-2 text-navy-light" />
+                  <FaUser className="w-5 h-5 mr-2 text-blue-800" />
                   Dados do Agente
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {error && (
+                  {formError && (
                     <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                      <strong>Erro:</strong> {error}
+                      <strong>Erro:</strong> {formError}
                     </div>
                   )}
-
-                  {/* ✅ NOVO: Upload de Avatar */}
-                  <div className="border-b border-gray-200 pb-6">
-                    <Label className="text-sm font-semibold mb-4 block">
-                      Foto do Perfil
-                    </Label>
-                    <AvatarUpload
-                      onAvatarChange={handleAvatarChange}
-                      className="justify-start"
-                    />
-                  </div>
 
                   {/* Informações Básicas */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -326,7 +330,7 @@ export default function CriarAgentePage() {
                         name="graduacao"
                         value={formData.graduacao}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                         disabled={loading}
                       >
                         <option value="">Selecione uma graduação</option>
@@ -349,7 +353,7 @@ export default function CriarAgentePage() {
                           name="tipo_sanguineo"
                           value={formData.tipo_sanguineo}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light"
+                          className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           disabled={loading}
                         >
                           <option value="">Selecione o tipo sanguíneo</option>
@@ -394,7 +398,7 @@ export default function CriarAgentePage() {
                           name="role"
                           value={formData.role}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy-light"
+                          className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           disabled={loading}
                         >
                           <option value="agent">Agente</option>
@@ -409,7 +413,7 @@ export default function CriarAgentePage() {
                     <Button
                       type="submit"
                       disabled={loading}
-                      className="bg-navy-light hover:bg-navy text-white flex-1"
+                      className="bg-green-600 hover:bg-green-700 text-white flex-1"
                     >
                       {loading ? (
                         <>
@@ -446,7 +450,7 @@ export default function CriarAgentePage() {
             <Card className="border-0 shadow-md">
               <CardHeader>
                 <CardTitle className="flex items-center text-sm">
-                  <FaInfo className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaInfo className="w-4 h-4 mr-2 text-blue-800" />
                   Informações Importantes
                 </CardTitle>
               </CardHeader>
@@ -467,7 +471,6 @@ export default function CriarAgentePage() {
                   <FaUser className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
                   <p>Agentes têm acesso apenas ao seu perfil</p>
                 </div>
-                {/* ✅ NOVO: Informação sobre avatar */}
                 <div className="flex items-start space-x-2">
                   <FaImage className="w-4 h-4 text-pink-500 mt-0.5 flex-shrink-0" />
                   <p>
@@ -480,7 +483,7 @@ export default function CriarAgentePage() {
             <Card className="border-0 shadow-md">
               <CardHeader>
                 <CardTitle className="flex items-center text-sm">
-                  <FaKey className="w-4 h-4 mr-2 text-navy-light" />
+                  <FaKey className="w-4 h-4 mr-2 text-blue-800" />
                   Senha Inicial
                 </CardTitle>
               </CardHeader>
@@ -501,18 +504,3 @@ export default function CriarAgentePage() {
     </div>
   );
 }
-
-// Componente FaInfo para completar
-const FaInfo = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 16 16">
-    <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z" />
-  </svg>
-);
-
-// Componente FaImage para completar
-const FaImage = ({ className }: { className?: string }) => (
-  <svg className={className} fill="currentColor" viewBox="0 0 16 16">
-    <path d="M6.002 5.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z" />
-    <path d="M2.002 1a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2h-12zm12 1a1 1 0 0 1 1 1v6.5l-3.777-1.947a.5.5 0 0 0-.577.093l-3.71 3.71-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12V3a1 1 0 0 1 1-1h12z" />
-  </svg>
-);

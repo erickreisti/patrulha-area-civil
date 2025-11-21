@@ -1,9 +1,11 @@
-// src/app/(app)/admin/galeria/itens/criar/page.tsx - COM UPLOAD
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+
+// Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,9 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { MediaUpload } from "@/components/ui/media-upload";
-import { useToast } from "@/hooks/useToast";
-import Link from "next/link";
+
+// Icons
 import {
   FaArrowLeft,
   FaSave,
@@ -22,7 +23,7 @@ import {
   FaFolder,
   FaChartBar,
   FaHome,
-  FaUser,
+  FaSpinner,
 } from "react-icons/fa";
 
 interface Categoria {
@@ -31,23 +32,35 @@ interface Categoria {
   tipo: "fotos" | "videos";
 }
 
+interface FormData {
+  titulo: string;
+  descricao: string;
+  tipo: "foto" | "video";
+  categoria_id: string;
+  ordem: number;
+  status: boolean;
+  destaque: boolean;
+}
+
 export default function CriarItemGaleriaPage() {
   const router = useRouter();
   const supabase = createClient();
-  const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [mediaUrl, setMediaUrl] = useState<string>("");
-  const [formData, setFormData] = useState({
+  const [mediaUrl, setMediaUrl] = useState("");
+
+  const [formData, setFormData] = useState<FormData>({
     titulo: "",
     descricao: "",
-    tipo: "foto" as "foto" | "video",
+    tipo: "foto",
     categoria_id: "",
     ordem: 0,
     status: true,
     destaque: false,
   });
+
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetchCategorias();
@@ -55,18 +68,16 @@ export default function CriarItemGaleriaPage() {
 
   const fetchCategorias = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error: fetchError } = await supabase
         .from("galeria_categorias")
         .select("id, nome, tipo")
         .eq("status", true)
         .order("ordem", { ascending: true });
 
-      if (error) throw error;
-
+      if (fetchError) throw fetchError;
       setCategorias(data || []);
-    } catch (error: any) {
-      console.error("Erro ao carregar categorias:", error);
-      toast.error("Erro ao carregar categorias", "Erro");
+    } catch (err: any) {
+      console.error("Erro ao carregar categorias:", err);
     }
   };
 
@@ -78,11 +89,11 @@ export default function CriarItemGaleriaPage() {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: name === "ordem" ? Number(value) : value,
     }));
   };
 
-  const handleSwitchChange = (name: string, checked: boolean) => {
+  const handleSwitchChange = (name: keyof FormData, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
       [name]: checked,
@@ -97,58 +108,52 @@ export default function CriarItemGaleriaPage() {
     }));
   };
 
-  const validateForm = (): string[] => {
-    const errors: string[] = [];
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
 
     if (!formData.titulo.trim()) {
-      errors.push("Título é obrigatório");
+      newErrors.titulo = "Título é obrigatório";
+    } else if (formData.titulo.length < 3) {
+      newErrors.titulo = "Título deve ter pelo menos 3 caracteres";
     }
 
     if (!formData.categoria_id) {
-      errors.push("Categoria é obrigatória");
+      newErrors.categoria_id = "Categoria é obrigatória";
     }
 
-    if (!mediaUrl) {
-      errors.push("Arquivo de mídia é obrigatório");
+    if (!mediaUrl.trim()) {
+      newErrors.mediaUrl = "URL da mídia é obrigatória";
     }
 
     if (formData.ordem < 0) {
-      errors.push("Ordem não pode ser negativa");
+      newErrors.ordem = "Ordem não pode ser negativa";
     }
 
-    return errors;
+    setFormErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
-    // Validar formulário
-    const errors = validateForm();
-    if (errors.length > 0) {
-      toast.error("Erros no formulário:\n" + errors.join("\n"), "Validação");
-      setLoading(false);
+    if (!validateForm()) {
       return;
     }
 
+    setLoading(true);
+
     try {
-      // Buscar usuário atual para o autor_id
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
-        toast.error("Usuário não autenticado", "Erro de autenticação");
+        alert("Usuário não autenticado");
         setLoading(false);
         return;
       }
 
-      // Determinar o bucket correto baseado no tipo
-      const bucket =
-        formData.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
-
-      // Criar item da galeria
-      const { data, error } = await supabase
+      const { data, error: insertError } = await supabase
         .from("galeria_itens")
         .insert([
           {
@@ -167,17 +172,16 @@ export default function CriarItemGaleriaPage() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      toast.success("Item da galeria criado com sucesso!", "Sucesso");
+      alert("Item da galeria criado com sucesso!");
 
-      // Redirecionar para a listagem
       setTimeout(() => {
         router.push("/admin/galeria/itens");
       }, 1500);
-    } catch (error: any) {
-      console.error("Erro ao criar item:", error);
-      toast.error(`Erro ao criar item: ${error.message}`, "Erro");
+    } catch (err: any) {
+      console.error("Erro ao criar item:", err);
+      alert(`Erro ao criar item: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -201,7 +205,7 @@ export default function CriarItemGaleriaPage() {
             </p>
           </div>
 
-          {/* Botões de Navegação */}
+          {/* Navigation Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
             <Link href="/admin/galeria/itens">
               <Button
@@ -236,12 +240,12 @@ export default function CriarItemGaleriaPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Formulário Principal */}
+          {/* Main Form */}
           <div className="lg:col-span-2">
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b border-gray-200">
                 <CardTitle className="flex items-center text-xl">
-                  <FaImage className="w-5 h-5 mr-2 text-navy" />
+                  <FaImage className="w-5 h-5 mr-2 text-blue-600" />
                   Novo Item da Galeria
                 </CardTitle>
               </CardHeader>
@@ -258,9 +262,18 @@ export default function CriarItemGaleriaPage() {
                       value={formData.titulo}
                       onChange={handleInputChange}
                       placeholder="Ex: Treinamento de Resgate Aéreo"
-                      className="w-full"
+                      className={
+                        formErrors.titulo
+                          ? "border-red-500 focus:border-red-500"
+                          : ""
+                      }
                       required
                     />
+                    {formErrors.titulo && (
+                      <p className="text-red-500 text-sm">
+                        {formErrors.titulo}
+                      </p>
+                    )}
                   </div>
 
                   {/* Descrição */}
@@ -279,6 +292,7 @@ export default function CriarItemGaleriaPage() {
                       placeholder="Descreva o conteúdo deste item..."
                       rows={4}
                       className="w-full resize-none"
+                      maxLength={500}
                     />
                     <p className="text-xs text-gray-500">
                       {formData.descricao.length}/500 caracteres
@@ -339,7 +353,9 @@ export default function CriarItemGaleriaPage() {
                         name="categoria_id"
                         value={formData.categoria_id}
                         onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                        className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
+                          formErrors.categoria_id ? "border-red-500" : ""
+                        }`}
                         required
                       >
                         <option value="">Selecione uma categoria</option>
@@ -349,6 +365,11 @@ export default function CriarItemGaleriaPage() {
                           </option>
                         ))}
                       </select>
+                      {formErrors.categoria_id && (
+                        <p className="text-red-500 text-sm">
+                          {formErrors.categoria_id}
+                        </p>
+                      )}
                       {categoriasFiltradas.length === 0 && (
                         <p className="text-xs text-yellow-600">
                           ⚠️ Crie uma categoria para{" "}
@@ -359,17 +380,30 @@ export default function CriarItemGaleriaPage() {
                     </div>
                   </div>
 
-                  {/* Upload de Mídia */}
+                  {/* Media Upload */}
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold">
-                      Arquivo de Mídia *
+                      URL da Mídia *
                     </Label>
-                    <MediaUpload
-                      tipo={formData.tipo}
-                      onMediaChange={setMediaUrl}
-                      currentMedia={mediaUrl}
-                      className="w-full"
+                    <Input
+                      value={mediaUrl}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      placeholder={
+                        formData.tipo === "foto"
+                          ? "https://exemplo.com/imagem.jpg"
+                          : "https://youtube.com/watch?v=..."
+                      }
+                      className={
+                        formErrors.mediaUrl
+                          ? "border-red-500 focus:border-red-500"
+                          : ""
+                      }
                     />
+                    {formErrors.mediaUrl && (
+                      <p className="text-red-500 text-sm">
+                        {formErrors.mediaUrl}
+                      </p>
+                    )}
                     {mediaUrl && (
                       <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
                         <p className="text-xs text-green-700">
@@ -380,7 +414,7 @@ export default function CriarItemGaleriaPage() {
                     )}
                   </div>
 
-                  {/* Configurações Avançadas */}
+                  {/* Advanced Settings */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {/* Ordem */}
                     <div className="space-y-2">
@@ -394,8 +428,17 @@ export default function CriarItemGaleriaPage() {
                         min="0"
                         value={formData.ordem}
                         onChange={handleInputChange}
-                        className="w-full"
+                        className={
+                          formErrors.ordem
+                            ? "border-red-500 focus:border-red-500"
+                            : ""
+                        }
                       />
+                      {formErrors.ordem && (
+                        <p className="text-red-500 text-sm">
+                          {formErrors.ordem}
+                        </p>
+                      )}
                       <p className="text-xs text-gray-500">
                         Número menor aparece primeiro
                       </p>
@@ -452,7 +495,7 @@ export default function CriarItemGaleriaPage() {
                     </div>
                   </div>
 
-                  {/* Botões de Ação */}
+                  {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
                     <Button
                       type="submit"
@@ -461,7 +504,7 @@ export default function CriarItemGaleriaPage() {
                     >
                       {loading ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                          <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
                           Criando...
                         </>
                       ) : (
@@ -487,9 +530,9 @@ export default function CriarItemGaleriaPage() {
             </Card>
           </div>
 
-          {/* Sidebar - Informações */}
+          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Status */}
+            {/* Status Card */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Configurações</CardTitle>
@@ -543,7 +586,7 @@ export default function CriarItemGaleriaPage() {
               </CardContent>
             </Card>
 
-            {/* Informações */}
+            {/* Info Card */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Informações</CardTitle>
@@ -553,10 +596,10 @@ export default function CriarItemGaleriaPage() {
                   • Campos com <strong>*</strong> são obrigatórios
                 </p>
                 <p>
-                  • <strong>Fotos:</strong> JPG, PNG, WEBP até 5MB
+                  • <strong>Fotos:</strong> JPG, PNG, WEBP
                 </p>
                 <p>
-                  • <strong>Vídeos:</strong> MP4, MOV até 50MB
+                  • <strong>Vídeos:</strong> YouTube, Vimeo, MP4
                 </p>
                 <p>
                   • <strong>Itens inativos</strong> não aparecem no site
@@ -570,11 +613,11 @@ export default function CriarItemGaleriaPage() {
               </CardContent>
             </Card>
 
-            {/* Categorias Disponíveis */}
+            {/* Categories Card */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaFolder className="w-4 h-4 mr-2 text-navy" />
+                  <FaFolder className="w-4 h-4 mr-2 text-blue-600" />
                   Categorias Disponíveis
                 </CardTitle>
               </CardHeader>

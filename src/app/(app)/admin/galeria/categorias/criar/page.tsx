@@ -36,7 +36,7 @@ import {
 
 export default function CriarCategoriaPage() {
   const router = useRouter();
-  const { toast } = useToast();
+  const { success, error } = useToast();
   const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
@@ -48,7 +48,7 @@ export default function CriarCategoriaPage() {
     status: true,
     ordem: 0,
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -70,7 +70,7 @@ export default function CriarCategoriaPage() {
       newErrors.ordem = "Ordem não pode ser negativa";
     }
 
-    setErrors(newErrors);
+    setFormErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -78,14 +78,14 @@ export default function CriarCategoriaPage() {
     e.preventDefault();
 
     if (!validateForm()) {
-      toast.error("Por favor, corrija os erros no formulário.");
+      error("Por favor, corrija os erros no formulário.");
       return;
     }
 
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
+      const { data, error: insertError } = await supabase
         .from("galeria_categorias")
         .insert([
           {
@@ -102,23 +102,23 @@ export default function CriarCategoriaPage() {
         .select()
         .single();
 
-      if (error) {
-        throw error;
+      if (insertError) {
+        throw insertError;
       }
 
-      toast.success("Categoria criada com sucesso!");
+      success("Categoria criada com sucesso!");
 
       // Redirecionar para a lista
       setTimeout(() => {
         router.push("/admin/galeria/categorias");
       }, 1000);
-    } catch (error: any) {
-      console.error("Erro ao criar categoria:", error);
+    } catch (err: any) {
+      console.error("Erro ao criar categoria:", err);
 
-      if (error.code === "23505") {
-        toast.error("Já existe uma categoria com este nome ou slug.");
+      if (err.code === "23505") {
+        error("Já existe uma categoria com este nome ou slug.");
       } else {
-        toast.error("Não foi possível criar a categoria.");
+        error("Não foi possível criar a categoria.");
       }
     } finally {
       setLoading(false);
@@ -141,16 +141,16 @@ export default function CriarCategoriaPage() {
       nome,
       slug: generateSlug(nome),
     }));
-    if (errors.nome) {
-      setErrors((prev) => ({ ...prev, nome: "" }));
+    if (formErrors.nome) {
+      setFormErrors((prev) => ({ ...prev, nome: "" }));
     }
   };
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const slug = e.target.value.toLowerCase();
     setFormData((prev) => ({ ...prev, slug }));
-    if (errors.slug) {
-      setErrors((prev) => ({ ...prev, slug: "" }));
+    if (formErrors.slug) {
+      setFormErrors((prev) => ({ ...prev, slug: "" }));
     }
   };
 
@@ -239,13 +239,15 @@ export default function CriarCategoriaPage() {
                       onChange={handleNomeChange}
                       placeholder="Ex: Eventos Especiais, Treinamentos, etc."
                       className={
-                        errors.nome ? "border-red-500 focus:border-red-500" : ""
+                        formErrors.nome
+                          ? "border-red-500 focus:border-red-500"
+                          : ""
                       }
                     />
-                    {errors.nome && (
+                    {formErrors.nome && (
                       <p className="text-red-600 text-sm flex items-center gap-1">
                         <FaExclamationTriangle className="w-3 h-3" />
-                        {errors.nome}
+                        {formErrors.nome}
                       </p>
                     )}
                   </div>
@@ -265,16 +267,16 @@ export default function CriarCategoriaPage() {
                         onChange={handleSlugChange}
                         placeholder="ex: eventos-especiais"
                         className={`flex-1 rounded-l-none ${
-                          errors.slug
+                          formErrors.slug
                             ? "border-red-500 focus:border-red-500"
                             : ""
                         }`}
                       />
                     </div>
-                    {errors.slug && (
+                    {formErrors.slug && (
                       <p className="text-red-600 text-sm flex items-center gap-1">
                         <FaExclamationTriangle className="w-3 h-3" />
-                        {errors.slug}
+                        {formErrors.slug}
                       </p>
                     )}
                     <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -334,6 +336,7 @@ export default function CriarCategoriaPage() {
                       }
                       placeholder="Descreva o propósito desta categoria..."
                       rows={4}
+                      maxLength={500}
                     />
                     <p className="text-gray-500 text-sm">
                       {formData.descricao.length}/500 caracteres
@@ -359,15 +362,15 @@ export default function CriarCategoriaPage() {
                           }))
                         }
                         className={
-                          errors.ordem
+                          formErrors.ordem
                             ? "border-red-500 focus:border-red-500"
                             : ""
                         }
                       />
-                      {errors.ordem && (
+                      {formErrors.ordem && (
                         <p className="text-red-600 text-sm flex items-center gap-1">
                           <FaExclamationTriangle className="w-3 h-3" />
-                          {errors.ordem}
+                          {formErrors.ordem}
                         </p>
                       )}
                       <p className="text-gray-500 text-sm">

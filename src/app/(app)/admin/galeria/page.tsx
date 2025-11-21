@@ -8,10 +8,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Images, Folder, PlusCircle, Video, Camera } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/client";
 
 export default async function GaleriaAdminPage() {
-  const supabase = await createClient();
+  const supabase = createClient();
 
   // Buscar estatísticas
   const { count: categoriasCount } = await supabase

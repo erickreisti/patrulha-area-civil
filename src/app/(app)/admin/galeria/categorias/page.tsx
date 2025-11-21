@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/useToast";
 import Link from "next/link";
-import Image from "next/image";
 import {
   FaPlus,
   FaEdit,
@@ -40,81 +39,62 @@ import {
   FaChartBar,
   FaHome,
   FaUser,
+  FaFolder,
 } from "react-icons/fa";
-
-interface GaleriaItem {
-  id: string;
-  titulo: string;
-  descricao: string | null;
-  tipo: "foto" | "video";
-  arquivo_url: string;
-  thumbnail_url: string | null;
-  categoria_id: string;
-  status: boolean;
-  ordem: number;
-  created_at: string;
-  autor_id: string;
-  galeria_categorias: {
-    nome: string;
-    tipo: "fotos" | "videos";
-  };
-}
 
 interface Categoria {
   id: string;
   nome: string;
   tipo: "fotos" | "videos";
+  status: boolean;
+  ordem: number;
+  created_at: string;
+  updated_at: string;
+  itens_count?: number;
 }
 
-export default function ItensGaleriaPage() {
-  const [itens, setItens] = useState<GaleriaItem[]>([]);
+export default function CategoriasGaleriaPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
     busca: "",
-    categoria: "all",
     tipo: "all",
     status: "all",
   });
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
-    item: GaleriaItem | null;
+    categoria: Categoria | null;
     loading: boolean;
   }>({
     open: false,
-    item: null,
+    categoria: null,
     loading: false,
   });
 
-  const { toast } = useToast();
+  const { success, error } = useToast();
   const supabase = createClient();
 
   useEffect(() => {
-    fetchItens();
     fetchCategorias();
   }, []);
 
-  const fetchItens = async () => {
+  const fetchCategorias = async () => {
     try {
       setLoading(true);
 
       let query = supabase
-        .from("galeria_itens")
+        .from("galeria_categorias")
         .select(
           `
           *,
-          galeria_categorias!inner(nome, tipo)
+          galeria_itens(count)
         `
         )
         .order("ordem", { ascending: true })
         .order("created_at", { ascending: false });
 
       if (filtros.busca) {
-        query = query.ilike("titulo", `%${filtros.busca}%`);
-      }
-
-      if (filtros.categoria !== "all") {
-        query = query.eq("categoria_id", filtros.categoria);
+        query = query.ilike("nome", `%${filtros.busca}%`);
       }
 
       if (filtros.tipo !== "all") {
@@ -125,62 +105,64 @@ export default function ItensGaleriaPage() {
         query = query.eq("status", filtros.status === "ativo");
       }
 
-      const { data, error } = await query;
+      const { data, error: fetchError } = await query;
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
 
-      setItens(data || []);
-    } catch (error: any) {
-      console.error("Erro ao carregar itens:", error);
-      toast.error("Erro ao carregar itens da galeria");
+      // Processar dados para incluir contagem de itens
+      const categoriasComContagem = (data || []).map((categoria) => ({
+        ...categoria,
+        itens_count: categoria.galeria_itens?.[0]?.count || 0,
+      }));
+
+      setCategorias(categoriasComContagem);
+    } catch (err: any) {
+      console.error("Erro ao carregar categorias:", err);
+      error("Erro ao carregar categorias da galeria");
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchCategorias = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("galeria_categorias")
-        .select("id, nome, tipo")
-        .eq("status", true)
-        .order("ordem", { ascending: true });
-
-      if (error) throw error;
-
-      setCategorias(data || []);
-    } catch (error: any) {
-      console.error("Erro ao carregar categorias:", error);
-    }
-  };
-
-  const handleDeleteClick = (item: GaleriaItem) => {
+  const handleDeleteClick = (categoria: Categoria) => {
     setDeleteDialog({
       open: true,
-      item,
+      categoria,
       loading: false,
     });
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteDialog.item) return;
+    if (!deleteDialog.categoria) return;
 
     try {
       setDeleteDialog((prev) => ({ ...prev, loading: true }));
 
-      const { error } = await supabase
-        .from("galeria_itens")
+      // Verificar se a categoria tem itens associados
+      if (
+        deleteDialog.categoria.itens_count &&
+        deleteDialog.categoria.itens_count > 0
+      ) {
+        error(
+          `Não é possível excluir a categoria "${deleteDialog.categoria.nome}" porque existem ${deleteDialog.categoria.itens_count} itens associados a ela.`
+        );
+        setDeleteDialog({ open: false, categoria: null, loading: false });
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from("galeria_categorias")
         .delete()
-        .eq("id", deleteDialog.item.id);
+        .eq("id", deleteDialog.categoria.id);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
 
-      toast.success("Item excluído com sucesso!");
-      setDeleteDialog({ open: false, item: null, loading: false });
-      fetchItens();
-    } catch (error: any) {
-      console.error("Erro ao excluir item:", error);
-      toast.error("Erro ao excluir item");
+      success("Categoria excluída com sucesso!");
+      setDeleteDialog({ open: false, categoria: null, loading: false });
+      fetchCategorias();
+    } catch (err: any) {
+      console.error("Erro ao excluir categoria:", err);
+      error("Erro ao excluir categoria");
       setDeleteDialog((prev) => ({ ...prev, loading: false }));
     }
   };
@@ -190,29 +172,28 @@ export default function ItensGaleriaPage() {
   };
 
   const aplicarFiltros = () => {
-    fetchItens();
+    fetchCategorias();
   };
 
   const limparFiltros = () => {
     setFiltros({
       busca: "",
-      categoria: "all",
       tipo: "all",
       status: "all",
     });
-    setTimeout(() => fetchItens(), 100);
+    setTimeout(() => fetchCategorias(), 100);
   };
 
   const getTipoBadge = (tipo: string) => {
-    return tipo === "foto" ? (
+    return tipo === "fotos" ? (
       <Badge className="bg-blue-600 hover:bg-blue-700 text-white">
         <FaImage className="w-3 h-3 mr-1" />
-        Foto
+        Fotos
       </Badge>
     ) : (
       <Badge className="bg-purple-600 hover:bg-purple-700 text-white">
         <FaVideo className="w-3 h-3 mr-1" />
-        Vídeo
+        Vídeos
       </Badge>
     );
   };
@@ -231,48 +212,11 @@ export default function ItensGaleriaPage() {
     );
   };
 
-  // Função segura para renderizar thumbnails
-  const renderThumbnail = (item: GaleriaItem) => {
-    if (item.tipo === "foto" && item.thumbnail_url) {
-      try {
-        return (
-          <div className="relative w-12 h-12">
-            <Image
-              src={item.thumbnail_url}
-              alt={item.titulo}
-              fill
-              className="rounded object-cover"
-              sizes="48px"
-              onError={(e) => {
-                // Fallback para ícone se a imagem falhar
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-              }}
-            />
-          </div>
-        );
-      } catch (error) {
-        console.warn("Erro ao carregar thumbnail:", error);
-      }
-    }
-
-    // Fallback para ícone
-    return (
-      <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-        {item.tipo === "foto" ? (
-          <FaImage className="w-6 h-6 text-gray-400" />
-        ) : (
-          <FaVideo className="w-6 h-6 text-purple-500" />
-        )}
-      </div>
-    );
-  };
-
   const stats = {
-    total: itens.length,
-    fotos: itens.filter((i) => i.tipo === "foto").length,
-    videos: itens.filter((i) => i.tipo === "video").length,
-    ativos: itens.filter((i) => i.status).length,
+    total: categorias.length,
+    fotos: categorias.filter((c) => c.tipo === "fotos").length,
+    videos: categorias.filter((c) => c.tipo === "videos").length,
+    ativos: categorias.filter((c) => c.status).length,
   };
 
   return (
@@ -282,10 +226,10 @@ export default function ItensGaleriaPage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide">
-              GERENCIAR ITENS DA GALERIA
+              GERENCIAR CATEGORIAS DA GALERIA
             </h1>
             <p className="text-gray-600">
-              Gerencie fotos e vídeos da galeria da Patrulha Aérea Civil
+              Gerencie categorias para organizar fotos e vídeos da galeria
             </p>
           </div>
 
@@ -300,13 +244,13 @@ export default function ItensGaleriaPage() {
               </Button>
             </Link>
 
-            <Link href="/perfil">
+            <Link href="/admin/galeria/itens">
               <Button
                 variant="outline"
                 className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
               >
-                <FaUser className="w-4 h-4 mr-2" />
-                Meu Perfil
+                <FaImage className="w-4 h-4 mr-2" />
+                Ver Itens
               </Button>
             </Link>
 
@@ -320,10 +264,10 @@ export default function ItensGaleriaPage() {
               </Button>
             </Link>
 
-            <Link href="/admin/galeria/itens/criar">
+            <Link href="/admin/galeria/categorias/criar">
               <Button className="bg-green-600 hover:bg-green-700 text-white">
                 <FaPlus className="w-4 h-4 mr-2" />
-                Novo Item
+                Nova Categoria
               </Button>
             </Link>
           </div>
@@ -341,7 +285,7 @@ export default function ItensGaleriaPage() {
                   </p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-full">
-                  <FaImage className="w-6 h-6 text-blue-600" />
+                  <FaFolder className="w-6 h-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -405,12 +349,12 @@ export default function ItensGaleriaPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-2">
                 <div className="relative">
                   <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
-                    placeholder="Buscar por título..."
+                    placeholder="Buscar por nome..."
                     value={filtros.busca}
                     onChange={(e) =>
                       handleFiltroChange("busca", e.target.value)
@@ -418,27 +362,6 @@ export default function ItensGaleriaPage() {
                     className="pl-10"
                   />
                 </div>
-              </div>
-
-              <div>
-                <Select
-                  value={filtros.categoria}
-                  onValueChange={(value) =>
-                    handleFiltroChange("categoria", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todas categorias" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas categorias</SelectItem>
-                    {categorias.map((categoria) => (
-                      <SelectItem key={categoria.id} value={categoria.id}>
-                        {categoria.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
 
               <div>
@@ -451,8 +374,8 @@ export default function ItensGaleriaPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos tipos</SelectItem>
-                    <SelectItem value="foto">Fotos</SelectItem>
-                    <SelectItem value="video">Vídeos</SelectItem>
+                    <SelectItem value="fotos">Fotos</SelectItem>
+                    <SelectItem value="videos">Vídeos</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -493,44 +416,44 @@ export default function ItensGaleriaPage() {
 
               <div className="flex-1 text-right">
                 <span className="text-sm text-gray-600">
-                  {itens.length} itens encontrados
+                  {categorias.length} categorias encontradas
                 </span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Tabela de Itens */}
+        {/* Tabela de Categorias */}
         <Card className="border-0 shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <FaImage className="w-5 h-5 mr-2 text-navy" />
-              Lista de Itens ({itens.length})
+              <FaFolder className="w-5 h-5 mr-2 text-navy" />
+              Lista de Categorias ({categorias.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto"></div>
-                <p className="text-gray-600 mt-4">Carregando itens...</p>
+                <p className="text-gray-600 mt-4">Carregando categorias...</p>
               </div>
-            ) : itens.length === 0 ? (
+            ) : categorias.length === 0 ? (
               <div className="text-center py-8">
-                <FaImage className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <FaFolder className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-600">
                   {Object.values(filtros).some(
                     (val) => val !== "" && val !== "all"
                   )
-                    ? "Nenhum item encontrado com os filtros aplicados"
-                    : "Nenhum item cadastrado na galeria"}
+                    ? "Nenhuma categoria encontrada com os filtros aplicados"
+                    : "Nenhuma categoria cadastrada"}
                 </p>
                 {!Object.values(filtros).some(
                   (val) => val !== "" && val !== "all"
                 ) && (
-                  <Link href="/admin/galeria/itens/criar">
+                  <Link href="/admin/galeria/categorias/criar">
                     <Button className="bg-green-600 hover:bg-green-700 text-white mt-4">
                       <FaPlus className="w-4 h-4 mr-2" />
-                      Adicionar Primeiro Item
+                      Adicionar Primeira Categoria
                     </Button>
                   </Link>
                 )}
@@ -541,16 +464,16 @@ export default function ItensGaleriaPage() {
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">
-                        Item
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
-                        Categoria
+                        Nome
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">
                         Tipo
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">
                         Status
+                      </th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                        Itens
                       </th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">
                         Ordem
@@ -564,45 +487,44 @@ export default function ItensGaleriaPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {itens.map((item) => (
+                    {categorias.map((categoria) => (
                       <tr
-                        key={item.id}
+                        key={categoria.id}
                         className="border-b border-gray-100 hover:bg-gray-50"
                       >
                         <td className="py-3 px-4">
-                          <div className="flex items-start space-x-3">
-                            {renderThumbnail(item)}
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-gray-800 truncate">
-                                {item.titulo}
+                          <div className="flex items-center space-x-3">
+                            <div className="p-2 bg-blue-100 rounded-lg">
+                              <FaFolder className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-gray-800">
+                                {categoria.nome}
                               </p>
-                              {item.descricao && (
-                                <p className="text-sm text-gray-600 line-clamp-2">
-                                  {item.descricao}
-                                </p>
-                              )}
                             </div>
                           </div>
                         </td>
 
                         <td className="py-3 px-4">
-                          <Badge
-                            variant="secondary"
-                            className="bg-blue-100 text-blue-700"
-                          >
-                            {item.galeria_categorias?.nome || "N/A"}
-                          </Badge>
+                          {getTipoBadge(categoria.tipo)}
                         </td>
 
-                        <td className="py-3 px-4">{getTipoBadge(item.tipo)}</td>
+                        <td className="py-3 px-4">
+                          {getStatusBadge(categoria.status)}
+                        </td>
 
                         <td className="py-3 px-4">
-                          {getStatusBadge(item.status)}
+                          <Badge
+                            variant="secondary"
+                            className="bg-gray-100 text-gray-700"
+                          >
+                            {categoria.itens_count || 0} itens
+                          </Badge>
                         </td>
 
                         <td className="py-3 px-4">
                           <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                            {item.ordem}
+                            {categoria.ordem}
                           </span>
                         </td>
 
@@ -610,16 +532,18 @@ export default function ItensGaleriaPage() {
                           <div className="flex items-center space-x-2">
                             <FaCalendarAlt className="w-4 h-4 text-gray-400" />
                             <span className="text-sm text-gray-600">
-                              {new Date(item.created_at).toLocaleDateString(
-                                "pt-BR"
-                              )}
+                              {new Date(
+                                categoria.created_at
+                              ).toLocaleDateString("pt-BR")}
                             </span>
                           </div>
                         </td>
 
                         <td className="py-3 px-4">
                           <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0">
-                            <Link href={`/admin/galeria/itens/${item.id}`}>
+                            <Link
+                              href={`/admin/galeria/categorias/${categoria.id}`}
+                            >
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -633,8 +557,14 @@ export default function ItensGaleriaPage() {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleDeleteClick(item)}
-                              className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                              onClick={() => handleDeleteClick(categoria)}
+                              disabled={
+                                !!(
+                                  categoria.itens_count &&
+                                  categoria.itens_count > 0
+                                )
+                              }
+                              className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <FaTrash className="w-3 h-3 mr-1" />
                               Excluir
@@ -664,43 +594,67 @@ export default function ItensGaleriaPage() {
                 Confirmar Exclusão
               </DialogTitle>
               <DialogDescription>
-                Tem certeza que deseja excluir o item{" "}
-                <strong>"{deleteDialog.item?.titulo}"</strong>?
-                <br />
-                <span className="text-red-600 font-medium">
-                  Esta ação não pode ser desfeita.
-                </span>
+                {deleteDialog.categoria?.itens_count &&
+                deleteDialog.categoria.itens_count > 0 ? (
+                  <>
+                    Não é possível excluir a categoria{" "}
+                    <strong>"{deleteDialog.categoria?.nome}"</strong> porque
+                    existem{" "}
+                    <strong>{deleteDialog.categoria.itens_count} itens</strong>{" "}
+                    associados a ela.
+                    <br />
+                    <span className="text-red-600 font-medium">
+                      Transfira ou exclua os itens antes de remover a categoria.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    Tem certeza que deseja excluir a categoria{" "}
+                    <strong>"{deleteDialog.categoria?.nome}"</strong>?
+                    <br />
+                    <span className="text-red-600 font-medium">
+                      Esta ação não pode ser desfeita.
+                    </span>
+                  </>
+                )}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter className="flex flex-col sm:flex-row gap-3">
               <Button
                 variant="outline"
                 onClick={() =>
-                  setDeleteDialog({ open: false, item: null, loading: false })
+                  setDeleteDialog({
+                    open: false,
+                    categoria: null,
+                    loading: false,
+                  })
                 }
                 className="flex-1 border-slate-700 text-slate-700 hover:bg-slate-100"
                 disabled={deleteDialog.loading}
               >
                 Cancelar
               </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteConfirm}
-                disabled={deleteDialog.loading}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-              >
-                {deleteDialog.loading ? (
-                  <>
-                    <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
-                    Excluindo...
-                  </>
-                ) : (
-                  <>
-                    <FaTrash className="w-4 h-4 mr-2" />
-                    Excluir Item
-                  </>
-                )}
-              </Button>
+              {!deleteDialog.categoria?.itens_count ||
+              deleteDialog.categoria.itens_count === 0 ? (
+                <Button
+                  variant="destructive"
+                  onClick={handleDeleteConfirm}
+                  disabled={deleteDialog.loading}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {deleteDialog.loading ? (
+                    <>
+                      <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
+                      Excluindo...
+                    </>
+                  ) : (
+                    <>
+                      <FaTrash className="w-4 h-4 mr-2" />
+                      Excluir Categoria
+                    </>
+                  )}
+                </Button>
+              ) : null}
             </DialogFooter>
           </DialogContent>
         </Dialog>

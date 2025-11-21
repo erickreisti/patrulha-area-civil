@@ -1,4 +1,3 @@
-// src/app/(app)/admin/dashboard/page.tsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -254,7 +253,7 @@ export default function AdminDashboard() {
     value,
     icon: Icon,
     description,
-    color = "navy",
+    color = "blue",
   }: {
     title: string;
     value: number;
@@ -266,7 +265,7 @@ export default function AdminDashboard() {
       blue: "from-blue-500 to-blue-600",
       green: "from-green-500 to-green-600",
       purple: "from-purple-500 to-purple-600",
-      navy: "from-navy to-navy-700",
+      navy: "from-blue-800 to-blue-900",
     };
 
     return (
@@ -293,25 +292,24 @@ export default function AdminDashboard() {
     );
   };
 
-  // CORREÇÃO: Adicionar "purple" ao tipo de color
   const QuickAction = ({
     title,
     description,
     icon: Icon,
     href,
-    color = "navy",
+    color = "blue",
   }: {
     title: string;
     description: string;
     icon: any;
     href: string;
-    color?: "navy" | "green" | "blue" | "purple"; // CORRIGIDO: Adicionei "purple"
+    color?: "blue" | "green" | "purple" | "navy";
   }) => {
     const colorClasses = {
-      navy: "bg-navy hover:bg-navy-700 text-white",
+      navy: "bg-blue-800 hover:bg-blue-900 text-white",
       green: "bg-green-600 hover:bg-green-700 text-white",
       blue: "bg-blue-600 hover:bg-blue-700 text-white",
-      purple: "bg-purple-600 hover:bg-purple-700 text-white", // CORRIGIDO: Adicionei purple
+      purple: "bg-purple-600 hover:bg-purple-700 text-white",
     };
 
     return (
@@ -460,7 +458,6 @@ export default function AdminDashboard() {
               {/* Status do Sistema */}
               <div className="flex items-center gap-3 order-2 sm:order-1">
                 <StatusIndicator />
-                {/* 🔵 AZUL - Ações Administrativas */}
                 <Button
                   asChild
                   className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 sm:px-6 py-2.5"
@@ -474,7 +471,6 @@ export default function AdminDashboard() {
 
               {/* Links de Navegação */}
               <div className="flex gap-3 order-1 sm:order-2">
-                {/* 🔵 AZUL - Ações Administrativas */}
                 <Button
                   asChild
                   variant="outline"
@@ -485,11 +481,10 @@ export default function AdminDashboard() {
                     <span className="hidden sm:inline">Editar Perfil</span>
                   </Link>
                 </Button>
-                {/* ⚫ CINZA - Navegação Neutra */}
                 <Button
                   asChild
                   variant="outline"
-                  className="text-slate-700 border-slate-300 hover:bg-slate-100"
+                  className="text-gray-700 border-gray-300 hover:bg-gray-100"
                 >
                   <Link href="/">
                     <FaHome className="w-4 h-4 mr-2" />
@@ -571,7 +566,7 @@ export default function AdminDashboard() {
                     description="Acessar relatórios do sistema"
                     icon={FaChartBar}
                     href="/admin/relatorios"
-                    color="purple" // AGORA FUNCIONA: "purple" está incluído no tipo
+                    color="purple"
                   />
                 </div>
               </CardContent>
