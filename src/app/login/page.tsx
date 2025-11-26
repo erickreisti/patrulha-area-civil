@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { FaUser } from "react-icons/fa";
 
 export default function LoginPage() {
   const [matricula, setMatricula] = useState("");
@@ -376,27 +377,15 @@ export default function LoginPage() {
                       onChange={handleMatriculaChange}
                       placeholder="000.000.000-00"
                       maxLength={14}
-                      className="w-full text-base py-3 px-4 font-medium tracking-wider border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all duration-300"
+                      className="w-full text-base py-3 pl-4 pr-12 font-medium tracking-wider border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all duration-300"
                       required
                       disabled={loading}
                     />
                     <motion.div
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2"
                       whileHover={{ scale: 1.1 }}
                     >
-                      <svg
-                        className="w-5 h-5 text-gray-400"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                      </svg>
+                      <FaUser className="w-5 h-5 text-gray-400" />
                     </motion.div>
                   </div>
                   <p className="text-gray-500 text-xs">
