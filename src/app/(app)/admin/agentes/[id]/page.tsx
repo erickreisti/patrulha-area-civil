@@ -19,7 +19,6 @@ import {
   FaShieldAlt,
   FaArrowLeft,
   FaSave,
-  FaHistory,
   FaTimes,
   FaTrash,
   FaChartBar,
@@ -83,8 +82,6 @@ export default function EditarAgentePage() {
   const [saving, setSaving] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>("");
-  const [uploadStatus, setUploadStatus] = useState<string>("");
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [currentUserRole, setCurrentUserRole] = useState<"admin" | "agent">(
     "agent"
   );
@@ -117,7 +114,6 @@ export default function EditarAgentePage() {
       } = await supabase.auth.getSession();
 
       if (session) {
-        // Verificar se o usuário atual é admin
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
@@ -126,16 +122,10 @@ export default function EditarAgentePage() {
 
         if (profile) {
           setCurrentUserRole(profile.role);
-          setUploadStatus(
-            `✅ Logado como: ${session.user.email} (${profile.role})`
-          );
         }
-      } else {
-        setUploadStatus("❌ Sem sessão ativa - uploads não funcionarão");
       }
     } catch (error) {
       console.error("Erro ao verificar usuário:", error);
-      setUploadStatus("❌ Erro ao verificar sessão");
     }
   };
 
@@ -170,34 +160,20 @@ export default function EditarAgentePage() {
     }
   };
 
-  // Upload de Avatar - SOMENTE ADMIN (CORRIGIDO)
   const uploadAvatar = async (): Promise<string | null> => {
     if (!avatarFile || !agent) return null;
 
     try {
-      setUploadStatus("📤 Verificando permissões de administrador...");
-      setUploadProgress(10);
-
-      // ✅ VERIFICAR SE USUÁRIO É ADMIN
       if (currentUserRole !== "admin") {
         throw new Error(
           "Apenas administradores podem fazer upload de avatares"
         );
       }
 
-      setUploadStatus("✅ Admin verificado, fazendo upload...");
-      setUploadProgress(30);
-
       const fileExt = avatarFile.name.split(".").pop();
       const fileName = `avatar-${Date.now()}.${fileExt}`;
-
-      // ✅ ESTRUTURA CORRETA: pasta com ID do agente
       const filePath = `${agent.id}/${fileName}`;
 
-      setUploadStatus(`🎯 Enviando: ${fileName}...`);
-      setUploadProgress(50);
-
-      // ✅ UPLOAD DIRETO - sem fallbacks complexos
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("avatares-agentes")
         .upload(filePath, avatarFile, {
@@ -206,13 +182,7 @@ export default function EditarAgentePage() {
         });
 
       if (uploadError) {
-        console.error("❌ Erro no upload:", uploadError);
-
-        // Se for erro de RLS, tentar upload simples
         if (uploadError.message.includes("row-level security")) {
-          setUploadStatus("🔄 Tentando upload simples...");
-
-          // Tentar upload sem estrutura de pastas
           const simplePath = `avatar-${agent.id}-${Date.now()}.${fileExt}`;
           const { data: simpleData, error: simpleError } =
             await supabase.storage
@@ -229,16 +199,11 @@ export default function EditarAgentePage() {
             .from("avatares-agentes")
             .getPublicUrl(simpleData.path);
 
-          setUploadProgress(100);
-          setUploadStatus("✅ Avatar salvo (método alternativo)!");
           return publicUrl;
         }
 
         throw new Error(`Erro no upload: ${uploadError.message}`);
       }
-
-      setUploadStatus("✅ Upload concluído!");
-      setUploadProgress(80);
 
       const {
         data: { publicUrl },
@@ -246,14 +211,9 @@ export default function EditarAgentePage() {
         .from("avatares-agentes")
         .getPublicUrl(uploadData.path);
 
-      setUploadProgress(100);
-      setUploadStatus("✅ Avatar salvo com sucesso!");
-
       return publicUrl;
     } catch (error: any) {
       console.error("Erro no upload do avatar:", error);
-      setUploadStatus(`❌ ${error.message}`);
-      setUploadProgress(0);
       throw error;
     }
   };
@@ -262,13 +222,11 @@ export default function EditarAgentePage() {
     if (!avatarUrl || !agent || currentUserRole !== "admin") return;
 
     try {
-      // Extrair nome do arquivo da URL
       const urlParts = avatarUrl.split("/");
       const fileName = urlParts[urlParts.length - 1];
 
       if (!fileName) return;
 
-      // Tentar deletar em diferentes estruturas de pasta
       const pathsToDelete = [`${agent.id}/${fileName}`, fileName];
 
       for (const path of pathsToDelete) {
@@ -277,12 +235,11 @@ export default function EditarAgentePage() {
           .remove([path]);
 
         if (!error) {
-          console.log("✅ Avatar antigo removido:", path);
           break;
         }
       }
     } catch (error) {
-      console.warn("⚠️ Erro ao deletar avatar antigo:", error);
+      console.warn("Erro ao deletar avatar antigo:", error);
     }
   };
 
@@ -302,8 +259,6 @@ export default function EditarAgentePage() {
     }
 
     setAvatarFile(file);
-    setUploadStatus("");
-    setUploadProgress(0);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -319,8 +274,6 @@ export default function EditarAgentePage() {
 
     setAvatarFile(null);
     setAvatarPreview("");
-    setUploadStatus("");
-    setUploadProgress(0);
   };
 
   // Manipulação de Formulário
@@ -357,32 +310,22 @@ export default function EditarAgentePage() {
     }
 
     setSaving(true);
-    setUploadStatus("💾 Salvando alterações...");
 
     try {
       let finalAvatarUrl = agent?.avatar_url || "";
 
-      // Upload de avatar se necessário (apenas admin)
-      if (avatarFile) {
-        if (currentUserRole === "admin") {
-          setUploadStatus("📤 Fazendo upload do avatar...");
-          const newAvatarUrl = await uploadAvatar();
+      if (avatarFile && currentUserRole === "admin") {
+        const newAvatarUrl = await uploadAvatar();
 
-          if (newAvatarUrl) {
-            finalAvatarUrl = newAvatarUrl;
+        if (newAvatarUrl) {
+          finalAvatarUrl = newAvatarUrl;
 
-            if (agent?.avatar_url && agent.avatar_url !== newAvatarUrl) {
-              await deleteOldAvatar(agent.avatar_url);
-            }
+          if (agent?.avatar_url && agent.avatar_url !== newAvatarUrl) {
+            await deleteOldAvatar(agent.avatar_url);
           }
-        } else {
-          setUploadStatus("⚠️ Apenas admin pode alterar avatar");
         }
       }
 
-      setUploadStatus("💾 Atualizando perfil...");
-
-      // ✅ ATUALIZAR DADOS DO AGENTE
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -400,36 +343,16 @@ export default function EditarAgentePage() {
 
       if (error) throw error;
 
-      setUploadStatus("✅ Agente atualizado com sucesso!");
       alert("Agente atualizado com sucesso!");
 
       setTimeout(() => {
         router.push("/admin/agentes");
       }, 1500);
     } catch (err: any) {
-      console.error("❌ Erro ao atualizar agente:", err);
-      setUploadStatus("❌ Erro ao atualizar agente");
+      console.error("Erro ao atualizar agente:", err);
       alert(`Erro ao atualizar agente: ${err.message}`);
     } finally {
       setSaving(false);
-    }
-  };
-
-  // Funções Auxiliares
-  const resetPassword = async () => {
-    if (!agent) return;
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(agent.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) throw error;
-
-      alert(`Email de reset de senha enviado para: ${agent.email}`);
-    } catch (err: any) {
-      console.error("❌ Erro ao resetar senha:", err);
-      alert(`Erro ao enviar email de reset: ${err.message}`);
     }
   };
 
@@ -453,7 +376,7 @@ export default function EditarAgentePage() {
       alert("Agente desativado com sucesso!");
       router.push("/admin/agentes");
     } catch (err: any) {
-      console.error("❌ Erro ao desativar agente:", err);
+      console.error("Erro ao desativar agente:", err);
       alert(`Erro ao desativar agente: ${err.message}`);
     }
   };
@@ -481,160 +404,6 @@ export default function EditarAgentePage() {
 
     return { status: "valida", color: "bg-green-500", text: "Válida" };
   };
-
-  // Função de Teste Corrigida
-  const testBucketPolicies = async () => {
-    try {
-      setUploadStatus("🧪 Verificando permissões...");
-
-      // Verificar se é admin
-      if (currentUserRole !== "admin") {
-        setUploadStatus("❌ Apenas administradores podem testar upload");
-        alert("❌ Apenas administradores podem testar upload");
-        return;
-      }
-
-      setUploadStatus("✅ Admin verificado, criando arquivo de teste...");
-
-      // Criar arquivo de teste
-      const canvas = document.createElement("canvas");
-      canvas.width = 100;
-      canvas.height = 100;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Não foi possível criar contexto canvas");
-
-      ctx.fillStyle = "#3B82F6";
-      ctx.fillRect(0, 0, 100, 100);
-
-      const blob = await new Promise<Blob>((resolve) =>
-        canvas.toBlob((blob) => resolve(blob!), "image/png")
-      );
-
-      const testFile = new File([blob], `test-admin-${Date.now()}.png`, {
-        type: "image/png",
-      });
-
-      setUploadStatus("📤 Tentando upload...");
-
-      // ✅ TENTAR UPLOAD NA ESTRUTURA CORRETA
-      const testPath = `${agent?.id || "test-user"}/test-${Date.now()}.png`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("avatares-agentes")
-        .upload(testPath, testFile);
-
-      if (uploadError) {
-        setUploadStatus(`❌ Falha: ${uploadError.message}`);
-        alert(
-          `❌ Erro: ${uploadError.message}\n\nExecute o SQL de correção das políticas.`
-        );
-        return;
-      }
-
-      setUploadStatus("✅ Upload funcionou! Limpando...");
-
-      // Limpar arquivo de teste
-      await supabase.storage.from("avatares-agentes").remove([testPath]);
-
-      alert("🎉 Políticas configuradas corretamente! Upload funcionou.");
-      setUploadStatus("✅ Teste concluído com sucesso!");
-    } catch (error: any) {
-      console.error("💥 Erro no teste:", error);
-      setUploadStatus("💥 Erro inesperado no teste");
-      alert(`Erro: ${error.message}`);
-    }
-  };
-
-  // Função de Diagnóstico Simplificada
-  const diagnoseBucketIssues = async () => {
-    try {
-      setUploadStatus("🔍 Iniciando diagnóstico...");
-
-      // 1. Verificar sessão
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        setUploadStatus("❌ Nenhuma sessão ativa");
-        return;
-      }
-
-      // 2. Verificar role do usuário
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role, email")
-        .eq("id", session.user.id)
-        .single();
-
-      if (profileError) {
-        setUploadStatus(`❌ Erro ao buscar perfil: ${profileError.message}`);
-        return;
-      }
-
-      setUploadStatus(`✅ Logado como: ${profile.email} (${profile.role})`);
-
-      // 3. Teste simples de SELECT
-      const { data: listData, error: listError } = await supabase.storage
-        .from("avatares-agentes")
-        .list("", { limit: 1 });
-
-      if (listError) {
-        setUploadStatus(`❌ SELECT falhou: ${listError.message}`);
-      } else {
-        setUploadStatus(
-          `✅ SELECT funcionou - ${listData?.length || 0} arquivos`
-        );
-      }
-
-      alert(
-        `Diagnóstico:\n\nUsuário: ${profile.email}\nRole: ${
-          profile.role
-        }\n\nSELECT: ${listError ? "FALHOU" : "OK"}`
-      );
-    } catch (error: any) {
-      setUploadStatus(`💥 Erro no diagnóstico: ${error.message}`);
-    }
-  };
-
-  // Componentes de UI
-  const SessionCheckButton = () => (
-    <Button
-      onClick={async () => {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const roleText =
-          currentUserRole === "admin" ? " (Administrador)" : " (Agente)";
-        alert(
-          session
-            ? `✅ Logado como: ${session.user.email}${roleText}`
-            : "❌ Sem sessão ativa"
-        );
-      }}
-      variant="outline"
-      size="sm"
-    >
-      🔍 Ver Sessão
-    </Button>
-  );
-
-  const AdminCheckButton = () => (
-    <Button
-      onClick={() => {
-        if (currentUserRole === "admin") {
-          alert("✅ Você é administrador - Pode fazer upload de avatares");
-        } else {
-          alert(
-            "❌ Acesso negado - Apenas administradores podem fazer upload de avatares"
-          );
-        }
-      }}
-      variant="outline"
-      size="sm"
-    >
-      {currentUserRole === "admin" ? "👑 Verificar Admin" : "🔒 Sem Permissão"}
-    </Button>
-  );
 
   // Estados de Loading
   if (loading) {
@@ -710,15 +479,6 @@ export default function EditarAgentePage() {
                 Dashboard
               </Button>
             </Link>
-
-            <Button
-              onClick={resetPassword}
-              variant="outline"
-              className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-            >
-              <FaHistory className="w-4 h-4 mr-2" />
-              Resetar Senha
-            </Button>
           </div>
         </div>
 
@@ -733,58 +493,6 @@ export default function EditarAgentePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
-                {/* Diagnóstico */}
-                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800 mb-2">
-                    <strong>🔧 Status do Sistema (Acesso Restrito)</strong>
-                  </p>
-                  <div className="space-y-2 text-xs font-mono">
-                    <p>
-                      • 📦 Bucket: <code>avatares-agentes</code>
-                    </p>
-                    <p>
-                      • 🔐 Acesso:{" "}
-                      {currentUserRole === "admin"
-                        ? "✅ Administrador"
-                        : "❌ Apenas Leitura"}
-                    </p>
-                    <p>
-                      • 📤 Upload:{" "}
-                      {currentUserRole === "admin"
-                        ? "✅ Permitido"
-                        : "❌ Somente Admin"}
-                    </p>
-                    <p>• 🔍 Status: {uploadStatus || "Pronto"}</p>
-                    {uploadProgress > 0 && (
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    <Button
-                      onClick={testBucketPolicies}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                      size="sm"
-                      disabled={currentUserRole !== "admin"}
-                    >
-                      🧪 Testar Upload
-                    </Button>
-                    <Button
-                      onClick={diagnoseBucketIssues}
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      size="sm"
-                    >
-                      🔍 Diagnóstico
-                    </Button>
-                    <AdminCheckButton />
-                    <SessionCheckButton />
-                  </div>
-                </div>
-
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Upload de Avatar */}
                   <div className="space-y-4">
