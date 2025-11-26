@@ -23,6 +23,8 @@ import {
   FaImage,
   FaChartBar,
   FaHome,
+  FaTrash,
+  FaUpload,
 } from "react-icons/fa";
 
 // Opções baseadas no schema
@@ -43,7 +45,9 @@ export default function CriarAgentePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [formData, setFormData] = useState({
     matricula: "",
     email: "",
@@ -64,6 +68,71 @@ export default function CriarAgentePage() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  // Função para fazer upload do avatar
+  const uploadAvatar = async (userId: string): Promise<string | null> => {
+    if (!avatarFile) return null;
+
+    try {
+      const fileExt = avatarFile.name.split(".").pop();
+      const fileName = `${userId}/avatar-${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from("avatares-agentes")
+        .upload(fileName, avatarFile, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (error) {
+        console.error("❌ Erro ao fazer upload do avatar:", error);
+        return null;
+      }
+
+      // Obter URL pública do arquivo
+      const { data: urlData } = supabase.storage
+        .from("avatares-agentes")
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error("❌ Erro no upload do avatar:", error);
+      return null;
+    }
+  };
+
+  // Função para lidar com a seleção de arquivo
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor, selecione apenas arquivos de imagem");
+      return;
+    }
+
+    // Validar tamanho do arquivo (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem deve ter no máximo 5MB");
+      return;
+    }
+
+    setAvatarFile(file);
+
+    // Criar preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setAvatarPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Função para remover avatar selecionado
+  const removeAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -123,13 +192,23 @@ export default function CriarAgentePage() {
 
       console.log("✅ Usuário criado no Auth:", authData.user.id);
 
-      // 2. Criar perfil na tabela profiles
+      // 2. Fazer upload do avatar se existir
+      let avatarUrl = null;
+      if (avatarFile) {
+        console.log("📤 Fazendo upload do avatar...");
+        avatarUrl = await uploadAvatar(authData.user.id);
+        if (avatarUrl) {
+          console.log("✅ Avatar upload completo:", avatarUrl);
+        }
+      }
+
+      // 3. Criar perfil na tabela profiles
       const { error: profileError } = await supabase.from("profiles").insert({
         id: authData.user.id,
         matricula: formData.matricula,
         email: formData.email,
         full_name: formData.full_name,
-        avatar_url: avatarUrl || null,
+        avatar_url: avatarUrl,
         graduacao: formData.graduacao || null,
         tipo_sanguineo: formData.tipo_sanguineo || null,
         validade_certificacao: formData.validade_certificacao || null,
@@ -159,7 +238,7 @@ export default function CriarAgentePage() {
 
       console.log("✅ Perfil criado com sucesso!");
 
-      // 3. Enviar email de boas-vindas
+      // 4. Enviar email de boas-vindas
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(
         formData.email,
         {
@@ -252,6 +331,69 @@ export default function CriarAgentePage() {
                     </div>
                   )}
 
+                  {/* Upload de Avatar */}
+                  <div className="space-y-4">
+                    <Label className="text-sm font-medium text-gray-700">
+                      Foto do Agente
+                    </Label>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                      {/* Preview do Avatar */}
+                      <div className="flex-shrink-0">
+                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
+                          {avatarPreview ? (
+                            <img
+                              src={avatarPreview}
+                              alt="Preview do avatar"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <FaUser className="w-8 h-8 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Controles de Upload */}
+                      <div className="flex-1 space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <Label
+                            htmlFor="avatar-upload"
+                            className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors"
+                          >
+                            <FaUpload className="w-4 h-4 mr-2" />
+                            {avatarPreview ? "Alterar Foto" : "Selecionar Foto"}
+                          </Label>
+
+                          <Input
+                            id="avatar-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                            disabled={loading}
+                          />
+
+                          {avatarPreview && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={removeAvatar}
+                              className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                              disabled={loading}
+                            >
+                              <FaTrash className="w-4 h-4 mr-2" />
+                              Remover
+                            </Button>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                          Formatos: JPG, PNG, GIF. Tamanho máximo: 5MB
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Informações Básicas */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Matrícula */}
@@ -298,6 +440,9 @@ export default function CriarAgentePage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Resto do formulário permanece igual */}
+                  {/* ... (Nome Completo, Graduação, Tipo Sanguíneo, etc.) */}
 
                   {/* Nome Completo */}
                   <div className="space-y-2">

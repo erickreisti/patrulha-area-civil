@@ -1,35 +1,32 @@
-// next.config.js - VERSÃO OTIMIZADA
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "images.unsplash.com",
-        pathname: "/photo-**",
+        hostname: "lcnudonuslqefbxzghjt.supabase.co",
+        pathname: "/storage/v1/object/public/**",
       },
       {
         protocol: "https",
-        hostname: "lcnudonuslqefbxzghjt.supabase.co",
-        pathname: "/storage/v1/object/public/**",
+        hostname: "images.unsplash.com",
+        pathname: "/**",
       },
     ],
     formats: ["image/webp", "image/avif"],
     dangerouslyAllowSVG: true,
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   experimental: {
     optimizeCss: true,
+  },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production",
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
-  },
-  // Otimizações adicionais
-  compiler: {
-    removeConsole: process.env.NODE_ENV === "production",
   },
   poweredByHeader: false,
 };

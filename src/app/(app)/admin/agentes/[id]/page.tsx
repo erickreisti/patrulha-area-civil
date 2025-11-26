@@ -23,10 +23,10 @@ import {
   FaTimes,
   FaTrash,
   FaChartBar,
-  FaHome,
+  FaUpload,
 } from "react-icons/fa";
 
-// Opções
+// Constantes
 const GRADUACOES = [
   "Soldado",
   "Cabo",
@@ -40,6 +40,7 @@ const GRADUACOES = [
 
 const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
+// Interfaces
 interface AgentProfile {
   id: string;
   matricula: string;
@@ -55,31 +56,88 @@ interface AgentProfile {
   updated_at: string;
 }
 
+interface FormData {
+  full_name: string;
+  email: string;
+  graduacao: string;
+  tipo_sanguineo: string;
+  validade_certificacao: string;
+  role: "admin" | "agent";
+  status: boolean;
+}
+
+interface CertificationStatus {
+  status: "expirada" | "proximo" | "valida";
+  color: string;
+  text: string;
+}
+
 export default function EditarAgentePage() {
   const params = useParams();
   const router = useRouter();
   const agentId = params.id as string;
 
+  // Estados
   const [agent, setAgent] = useState<AgentProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState<string>("");
-  const [formData, setFormData] = useState({
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [uploadStatus, setUploadStatus] = useState<string>("");
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "agent">(
+    "agent"
+  );
+
+  const [formData, setFormData] = useState<FormData>({
     full_name: "",
+    email: "",
     graduacao: "",
     tipo_sanguineo: "",
     validade_certificacao: "",
-    role: "agent" as "agent" | "admin",
+    role: "agent",
     status: true,
   });
 
   const supabase = createClient();
 
+  // Efeitos
   useEffect(() => {
+    checkCurrentUser();
     if (agentId) {
       fetchAgent();
     }
   }, [agentId]);
+
+  // Funções Principais
+  const checkCurrentUser = async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session) {
+        // Verificar se o usuário atual é admin
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single();
+
+        if (profile) {
+          setCurrentUserRole(profile.role);
+          setUploadStatus(
+            `✅ Logado como: ${session.user.email} (${profile.role})`
+          );
+        }
+      } else {
+        setUploadStatus("❌ Sem sessão ativa - uploads não funcionarão");
+      }
+    } catch (error) {
+      console.error("Erro ao verificar usuário:", error);
+      setUploadStatus("❌ Erro ao verificar sessão");
+    }
+  };
 
   const fetchAgent = async () => {
     try {
@@ -94,9 +152,10 @@ export default function EditarAgentePage() {
       if (error) throw error;
 
       setAgent(data);
-      setAvatarUrl(data.avatar_url || "");
+      setAvatarPreview(data.avatar_url || "");
       setFormData({
         full_name: data.full_name || "",
+        email: data.email || "",
         graduacao: data.graduacao || "",
         tipo_sanguineo: data.tipo_sanguineo || "",
         validade_certificacao: data.validade_certificacao || "",
@@ -104,13 +163,167 @@ export default function EditarAgentePage() {
         status: data.status,
       });
     } catch (error: any) {
-      console.error("❌ Erro ao buscar agente:", error);
+      console.error("Erro ao buscar agente:", error);
       alert(`Erro ao carregar agente: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
+  // Upload de Avatar - SOMENTE ADMIN (CORRIGIDO)
+  const uploadAvatar = async (): Promise<string | null> => {
+    if (!avatarFile || !agent) return null;
+
+    try {
+      setUploadStatus("📤 Verificando permissões de administrador...");
+      setUploadProgress(10);
+
+      // ✅ VERIFICAR SE USUÁRIO É ADMIN
+      if (currentUserRole !== "admin") {
+        throw new Error(
+          "Apenas administradores podem fazer upload de avatares"
+        );
+      }
+
+      setUploadStatus("✅ Admin verificado, fazendo upload...");
+      setUploadProgress(30);
+
+      const fileExt = avatarFile.name.split(".").pop();
+      const fileName = `avatar-${Date.now()}.${fileExt}`;
+
+      // ✅ ESTRUTURA CORRETA: pasta com ID do agente
+      const filePath = `${agent.id}/${fileName}`;
+
+      setUploadStatus(`🎯 Enviando: ${fileName}...`);
+      setUploadProgress(50);
+
+      // ✅ UPLOAD DIRETO - sem fallbacks complexos
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("avatares-agentes")
+        .upload(filePath, avatarFile, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("❌ Erro no upload:", uploadError);
+
+        // Se for erro de RLS, tentar upload simples
+        if (uploadError.message.includes("row-level security")) {
+          setUploadStatus("🔄 Tentando upload simples...");
+
+          // Tentar upload sem estrutura de pastas
+          const simplePath = `avatar-${agent.id}-${Date.now()}.${fileExt}`;
+          const { data: simpleData, error: simpleError } =
+            await supabase.storage
+              .from("avatares-agentes")
+              .upload(simplePath, avatarFile);
+
+          if (simpleError) {
+            throw new Error(`Upload falhou: ${simpleError.message}`);
+          }
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage
+            .from("avatares-agentes")
+            .getPublicUrl(simpleData.path);
+
+          setUploadProgress(100);
+          setUploadStatus("✅ Avatar salvo (método alternativo)!");
+          return publicUrl;
+        }
+
+        throw new Error(`Erro no upload: ${uploadError.message}`);
+      }
+
+      setUploadStatus("✅ Upload concluído!");
+      setUploadProgress(80);
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage
+        .from("avatares-agentes")
+        .getPublicUrl(uploadData.path);
+
+      setUploadProgress(100);
+      setUploadStatus("✅ Avatar salvo com sucesso!");
+
+      return publicUrl;
+    } catch (error: any) {
+      console.error("Erro no upload do avatar:", error);
+      setUploadStatus(`❌ ${error.message}`);
+      setUploadProgress(0);
+      throw error;
+    }
+  };
+
+  const deleteOldAvatar = async (avatarUrl: string) => {
+    if (!avatarUrl || !agent || currentUserRole !== "admin") return;
+
+    try {
+      // Extrair nome do arquivo da URL
+      const urlParts = avatarUrl.split("/");
+      const fileName = urlParts[urlParts.length - 1];
+
+      if (!fileName) return;
+
+      // Tentar deletar em diferentes estruturas de pasta
+      const pathsToDelete = [`${agent.id}/${fileName}`, fileName];
+
+      for (const path of pathsToDelete) {
+        const { error } = await supabase.storage
+          .from("avatares-agentes")
+          .remove([path]);
+
+        if (!error) {
+          console.log("✅ Avatar antigo removido:", path);
+          break;
+        }
+      }
+    } catch (error) {
+      console.warn("⚠️ Erro ao deletar avatar antigo:", error);
+    }
+  };
+
+  // Manipulação de Arquivos
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor, selecione apenas arquivos de imagem");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem deve ter no máximo 5MB");
+      return;
+    }
+
+    setAvatarFile(file);
+    setUploadStatus("");
+    setUploadProgress(0);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setAvatarPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeAvatar = async () => {
+    if (agent?.avatar_url) {
+      await deleteOldAvatar(agent.avatar_url);
+    }
+
+    setAvatarFile(null);
+    setAvatarPreview("");
+    setUploadStatus("");
+    setUploadProgress(0);
+  };
+
+  // Manipulação de Formulário
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -129,26 +342,56 @@ export default function EditarAgentePage() {
     }));
   };
 
+  // Submit Principal
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.full_name.trim()) {
+      alert("Nome completo é obrigatório");
+      return;
+    }
+
+    if (!formData.email.trim() || !formData.email.includes("@")) {
+      alert("Email válido é obrigatório");
+      return;
+    }
+
     setSaving(true);
+    setUploadStatus("💾 Salvando alterações...");
 
     try {
-      // Validações básicas
-      if (!formData.full_name.trim()) {
-        alert("Nome completo é obrigatório");
-        setSaving(false);
-        return;
+      let finalAvatarUrl = agent?.avatar_url || "";
+
+      // Upload de avatar se necessário (apenas admin)
+      if (avatarFile) {
+        if (currentUserRole === "admin") {
+          setUploadStatus("📤 Fazendo upload do avatar...");
+          const newAvatarUrl = await uploadAvatar();
+
+          if (newAvatarUrl) {
+            finalAvatarUrl = newAvatarUrl;
+
+            if (agent?.avatar_url && agent.avatar_url !== newAvatarUrl) {
+              await deleteOldAvatar(agent.avatar_url);
+            }
+          }
+        } else {
+          setUploadStatus("⚠️ Apenas admin pode alterar avatar");
+        }
       }
 
+      setUploadStatus("💾 Atualizando perfil...");
+
+      // ✅ ATUALIZAR DADOS DO AGENTE
       const { error } = await supabase
         .from("profiles")
         .update({
           full_name: formData.full_name.trim(),
+          email: formData.email.trim(),
           graduacao: formData.graduacao || null,
           tipo_sanguineo: formData.tipo_sanguineo || null,
           validade_certificacao: formData.validade_certificacao || null,
-          avatar_url: avatarUrl || null,
+          avatar_url: finalAvatarUrl || null,
           role: formData.role,
           status: formData.status,
           updated_at: new Date().toISOString(),
@@ -157,21 +400,22 @@ export default function EditarAgentePage() {
 
       if (error) throw error;
 
-      console.log("✅ Agente atualizado com sucesso");
+      setUploadStatus("✅ Agente atualizado com sucesso!");
       alert("Agente atualizado com sucesso!");
 
-      // Redirecionar após sucesso
       setTimeout(() => {
         router.push("/admin/agentes");
-      }, 1000);
+      }, 1500);
     } catch (err: any) {
       console.error("❌ Erro ao atualizar agente:", err);
+      setUploadStatus("❌ Erro ao atualizar agente");
       alert(`Erro ao atualizar agente: ${err.message}`);
     } finally {
       setSaving(false);
     }
   };
 
+  // Funções Auxiliares
   const resetPassword = async () => {
     if (!agent) return;
 
@@ -206,7 +450,6 @@ export default function EditarAgentePage() {
 
       if (error) throw error;
 
-      console.log("🗑️ Agente desativado");
       alert("Agente desativado com sucesso!");
       router.push("/admin/agentes");
     } catch (err: any) {
@@ -215,7 +458,7 @@ export default function EditarAgentePage() {
     }
   };
 
-  const getCertificationStatus = () => {
+  const getCertificationStatus = (): CertificationStatus | string => {
     if (!formData.validade_certificacao) return "Não informada";
 
     const today = new Date();
@@ -239,6 +482,161 @@ export default function EditarAgentePage() {
     return { status: "valida", color: "bg-green-500", text: "Válida" };
   };
 
+  // Função de Teste Corrigida
+  const testBucketPolicies = async () => {
+    try {
+      setUploadStatus("🧪 Verificando permissões...");
+
+      // Verificar se é admin
+      if (currentUserRole !== "admin") {
+        setUploadStatus("❌ Apenas administradores podem testar upload");
+        alert("❌ Apenas administradores podem testar upload");
+        return;
+      }
+
+      setUploadStatus("✅ Admin verificado, criando arquivo de teste...");
+
+      // Criar arquivo de teste
+      const canvas = document.createElement("canvas");
+      canvas.width = 100;
+      canvas.height = 100;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Não foi possível criar contexto canvas");
+
+      ctx.fillStyle = "#3B82F6";
+      ctx.fillRect(0, 0, 100, 100);
+
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((blob) => resolve(blob!), "image/png")
+      );
+
+      const testFile = new File([blob], `test-admin-${Date.now()}.png`, {
+        type: "image/png",
+      });
+
+      setUploadStatus("📤 Tentando upload...");
+
+      // ✅ TENTAR UPLOAD NA ESTRUTURA CORRETA
+      const testPath = `${agent?.id || "test-user"}/test-${Date.now()}.png`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("avatares-agentes")
+        .upload(testPath, testFile);
+
+      if (uploadError) {
+        setUploadStatus(`❌ Falha: ${uploadError.message}`);
+        alert(
+          `❌ Erro: ${uploadError.message}\n\nExecute o SQL de correção das políticas.`
+        );
+        return;
+      }
+
+      setUploadStatus("✅ Upload funcionou! Limpando...");
+
+      // Limpar arquivo de teste
+      await supabase.storage.from("avatares-agentes").remove([testPath]);
+
+      alert("🎉 Políticas configuradas corretamente! Upload funcionou.");
+      setUploadStatus("✅ Teste concluído com sucesso!");
+    } catch (error: any) {
+      console.error("💥 Erro no teste:", error);
+      setUploadStatus("💥 Erro inesperado no teste");
+      alert(`Erro: ${error.message}`);
+    }
+  };
+
+  // Função de Diagnóstico Simplificada
+  const diagnoseBucketIssues = async () => {
+    try {
+      setUploadStatus("🔍 Iniciando diagnóstico...");
+
+      // 1. Verificar sessão
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setUploadStatus("❌ Nenhuma sessão ativa");
+        return;
+      }
+
+      // 2. Verificar role do usuário
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role, email")
+        .eq("id", session.user.id)
+        .single();
+
+      if (profileError) {
+        setUploadStatus(`❌ Erro ao buscar perfil: ${profileError.message}`);
+        return;
+      }
+
+      setUploadStatus(`✅ Logado como: ${profile.email} (${profile.role})`);
+
+      // 3. Teste simples de SELECT
+      const { data: listData, error: listError } = await supabase.storage
+        .from("avatares-agentes")
+        .list("", { limit: 1 });
+
+      if (listError) {
+        setUploadStatus(`❌ SELECT falhou: ${listError.message}`);
+      } else {
+        setUploadStatus(
+          `✅ SELECT funcionou - ${listData?.length || 0} arquivos`
+        );
+      }
+
+      alert(
+        `Diagnóstico:\n\nUsuário: ${profile.email}\nRole: ${
+          profile.role
+        }\n\nSELECT: ${listError ? "FALHOU" : "OK"}`
+      );
+    } catch (error: any) {
+      setUploadStatus(`💥 Erro no diagnóstico: ${error.message}`);
+    }
+  };
+
+  // Componentes de UI
+  const SessionCheckButton = () => (
+    <Button
+      onClick={async () => {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const roleText =
+          currentUserRole === "admin" ? " (Administrador)" : " (Agente)";
+        alert(
+          session
+            ? `✅ Logado como: ${session.user.email}${roleText}`
+            : "❌ Sem sessão ativa"
+        );
+      }}
+      variant="outline"
+      size="sm"
+    >
+      🔍 Ver Sessão
+    </Button>
+  );
+
+  const AdminCheckButton = () => (
+    <Button
+      onClick={() => {
+        if (currentUserRole === "admin") {
+          alert("✅ Você é administrador - Pode fazer upload de avatares");
+        } else {
+          alert(
+            "❌ Acesso negado - Apenas administradores podem fazer upload de avatares"
+          );
+        }
+      }}
+      variant="outline"
+      size="sm"
+    >
+      {currentUserRole === "admin" ? "👑 Verificar Admin" : "🔒 Sem Permissão"}
+    </Button>
+  );
+
+  // Estados de Loading
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
@@ -292,7 +690,6 @@ export default function EditarAgentePage() {
             </p>
           </div>
 
-          {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
             <Link href="/admin/agentes">
               <Button
@@ -311,16 +708,6 @@ export default function EditarAgentePage() {
               >
                 <FaChartBar className="w-4 h-4 mr-2" />
                 Dashboard
-              </Button>
-            </Link>
-
-            <Link href="/">
-              <Button
-                variant="outline"
-                className="border-gray-700 text-gray-700 hover:bg-gray-100"
-              >
-                <FaHome className="w-4 h-4 mr-2" />
-                Voltar ao Site
               </Button>
             </Link>
 
@@ -346,9 +733,143 @@ export default function EditarAgentePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6">
+                {/* Diagnóstico */}
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 mb-2">
+                    <strong>🔧 Status do Sistema (Acesso Restrito)</strong>
+                  </p>
+                  <div className="space-y-2 text-xs font-mono">
+                    <p>
+                      • 📦 Bucket: <code>avatares-agentes</code>
+                    </p>
+                    <p>
+                      • 🔐 Acesso:{" "}
+                      {currentUserRole === "admin"
+                        ? "✅ Administrador"
+                        : "❌ Apenas Leitura"}
+                    </p>
+                    <p>
+                      • 📤 Upload:{" "}
+                      {currentUserRole === "admin"
+                        ? "✅ Permitido"
+                        : "❌ Somente Admin"}
+                    </p>
+                    <p>• 🔍 Status: {uploadStatus || "Pronto"}</p>
+                    {uploadProgress > 0 && (
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <Button
+                      onClick={testBucketPolicies}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      size="sm"
+                      disabled={currentUserRole !== "admin"}
+                    >
+                      🧪 Testar Upload
+                    </Button>
+                    <Button
+                      onClick={diagnoseBucketIssues}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      size="sm"
+                    >
+                      🔍 Diagnóstico
+                    </Button>
+                    <AdminCheckButton />
+                    <SessionCheckButton />
+                  </div>
+                </div>
+
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Informações Fixas (somente leitura) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  {/* Upload de Avatar */}
+                  <div className="space-y-4">
+                    <Label className="text-sm font-semibold">
+                      Foto do Agente
+                      {currentUserRole !== "admin" && (
+                        <Badge className="ml-2 bg-yellow-500 text-white text-xs">
+                          Somente Admin
+                        </Badge>
+                      )}
+                    </Label>
+
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+                      <div className="flex-shrink-0">
+                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
+                          {avatarPreview ? (
+                            <img
+                              src={avatarPreview}
+                              alt="Avatar do agente"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : agent.avatar_url ? (
+                            <img
+                              src={agent.avatar_url}
+                              alt="Avatar do agente"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <FaUser className="w-8 h-8 text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 space-y-3">
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <Label
+                            htmlFor="avatar-upload-edit"
+                            className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors ${
+                              currentUserRole === "admin"
+                                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                                : "bg-gray-400 text-gray-200 cursor-not-allowed"
+                            }`}
+                          >
+                            <FaUpload className="w-4 h-4 mr-2" />
+                            {avatarPreview ? "Alterar Foto" : "Selecionar Foto"}
+                          </Label>
+
+                          <Input
+                            id="avatar-upload-edit"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                            disabled={saving || currentUserRole !== "admin"}
+                          />
+
+                          {(avatarPreview || agent.avatar_url) &&
+                            currentUserRole === "admin" && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={removeAvatar}
+                                className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                                disabled={saving}
+                              >
+                                <FaTrash className="w-4 h-4 mr-2" />
+                                Remover
+                              </Button>
+                            )}
+                        </div>
+
+                        <p className="text-xs text-gray-500">
+                          Formatos: JPG, PNG, GIF. Tamanho máximo: 5MB
+                          {currentUserRole !== "admin" && (
+                            <span className="text-yellow-600 font-medium ml-1">
+                              • Apenas administradores podem alterar
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informações Fixas - APENAS MATRÍCULA */}
+                  <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div>
                       <Label className="block text-sm font-medium text-gray-500">
                         Matrícula
@@ -357,17 +878,6 @@ export default function EditarAgentePage() {
                         <FaIdCard className="w-4 h-4 text-gray-400" />
                         <p className="text-lg font-mono font-bold text-gray-800">
                           {agent.matricula}
-                        </p>
-                      </div>
-                    </div>
-                    <div>
-                      <Label className="block text-sm font-medium text-gray-500">
-                        Email
-                      </Label>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <FaEnvelope className="w-4 h-4 text-gray-400" />
-                        <p className="text-lg text-gray-800 truncate">
-                          {agent.email}
                         </p>
                       </div>
                     </div>
@@ -396,9 +906,28 @@ export default function EditarAgentePage() {
                     </div>
                   </div>
 
+                  {/* Email */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-sm font-semibold">
+                      Email *
+                    </Label>
+                    <div className="relative">
+                      <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        placeholder="email@exemplo.com"
+                        className="pl-10 text-lg py-3"
+                        required
+                        disabled={saving}
+                      />
+                    </div>
+                  </div>
+
                   {/* Graduação e Tipo Sanguíneo */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Graduação */}
                     <div className="space-y-2">
                       <Label
                         htmlFor="graduacao"
@@ -422,7 +951,6 @@ export default function EditarAgentePage() {
                       </select>
                     </div>
 
-                    {/* Tipo Sanguíneo */}
                     <div className="space-y-2">
                       <Label
                         htmlFor="tipo_sanguineo"
@@ -452,7 +980,6 @@ export default function EditarAgentePage() {
 
                   {/* Validade da Certificação e Tipo de Usuário */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Validade da Certificação */}
                     <div className="space-y-2">
                       <Label
                         htmlFor="validade_certificacao"
@@ -473,7 +1000,6 @@ export default function EditarAgentePage() {
                       </div>
                     </div>
 
-                    {/* Tipo de Usuário */}
                     <div className="space-y-2">
                       <Label htmlFor="role" className="text-sm font-semibold">
                         Tipo de Usuário
@@ -539,9 +1065,8 @@ export default function EditarAgentePage() {
             </Card>
           </div>
 
-          {/* Sidebar - Configurações e Informações */}
+          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Status e Permissões */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
@@ -550,7 +1075,6 @@ export default function EditarAgentePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Status do Agente */}
                 <div className="flex items-center justify-between">
                   <Label
                     htmlFor="status"
@@ -568,11 +1092,10 @@ export default function EditarAgentePage() {
                 </div>
                 {!formData.status && (
                   <p className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                    ⚠️ Agente não poderá fazer login no sistema
+                    ⚠️ Agente não poderá fazer login
                   </p>
                 )}
 
-                {/* Tipo de Usuário */}
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">
                     Tipo de Acesso
@@ -611,7 +1134,6 @@ export default function EditarAgentePage() {
               </CardContent>
             </Card>
 
-            {/* Certificação */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
@@ -639,80 +1161,24 @@ export default function EditarAgentePage() {
                     <p className="text-sm text-gray-600">{certStatus}</p>
                   )}
                 </div>
-                {formData.validade_certificacao && (
-                  <div className="text-xs text-gray-500 space-y-1">
-                    <p>
-                      • Certificação{" "}
-                      {typeof certStatus === "object" &&
-                        certStatus.status === "expirada" &&
-                        " expirada"}
-                      {typeof certStatus === "object" &&
-                        certStatus.status === "proximo" &&
-                        " próxima do vencimento"}
-                      {typeof certStatus === "object" &&
-                        certStatus.status === "valida" &&
-                        " dentro da validade"}
-                    </p>
-                    <p>• Mantenha sempre atualizada</p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
-            {/* Informações do Agente */}
-            <Card className="border-0 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                  <FaHistory className="w-4 h-4 mr-2 text-blue-800" />
-                  Informações
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm space-y-2">
-                  <div>
-                    <strong>ID:</strong>
-                    <code className="ml-2 bg-gray-100 px-2 py-1 rounded text-xs font-mono">
-                      {agent.id.substring(0, 8)}...
-                    </code>
-                  </div>
-                  <div>
-                    <strong>Cadastrado em:</strong>
-                    <span className="ml-2 text-gray-600">
-                      {new Date(agent.created_at).toLocaleString("pt-BR")}
-                    </span>
-                  </div>
-                  <div>
-                    <strong>Última atualização:</strong>
-                    <span className="ml-2 text-gray-600">
-                      {new Date(agent.updated_at).toLocaleString("pt-BR")}
-                    </span>
-                  </div>
-                  <div>
-                    <strong>Status atual:</strong>
-                    <Badge
-                      className={`ml-2 ${
-                        agent.status
-                          ? "bg-green-500 text-white"
-                          : "bg-red-500 text-white"
-                      } text-xs`}
-                    >
-                      {agent.status ? "ATIVO" : "INATIVO"}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Preview Rápido */}
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Preview Rápido</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm space-y-1">
+              <CardContent>
+                <div className="text-sm space-y-2">
                   <p>
                     <strong>Nome:</strong>{" "}
                     {formData.full_name || "Não definido"}
+                  </p>
+                  <p>
+                    <strong>Email:</strong> {formData.email || "Não definido"}
+                  </p>
+                  <p>
+                    <strong>Matrícula:</strong> {agent.matricula}
                   </p>
                   <p>
                     <strong>Graduação:</strong>{" "}

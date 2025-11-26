@@ -79,7 +79,7 @@ export async function middleware(request: NextRequest) {
 
       if (profile?.role !== "admin") {
         console.log("🚫 Middleware: Acesso negado - usuário não é admin");
-        return NextResponse.redirect(new URL("/agent/perfil", request.url)); // ✅ CORRIGIDO
+        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ CORRIGIDO: /agent/perfil → /perfil
       }
 
       if (!profile?.status) {
@@ -140,7 +140,7 @@ export async function middleware(request: NextRequest) {
       if (profile?.role === "admin") {
         return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       } else {
-        return NextResponse.redirect(new URL("/agent/perfil", request.url)); // ✅ CORRIGIDO
+        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ CORRIGIDO: /agent/perfil → /perfil
       }
     }
 
@@ -160,7 +160,7 @@ export async function middleware(request: NextRequest) {
       if (profile?.role === "admin") {
         return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       } else {
-        return NextResponse.redirect(new URL("/agent/perfil", request.url)); // ✅ CORRIGIDO
+        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ CORRIGIDO: /agent/perfil → /perfil
       }
     }
   } catch (error) {
