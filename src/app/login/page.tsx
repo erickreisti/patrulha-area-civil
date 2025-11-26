@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -11,44 +11,194 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { FaUser } from "react-icons/fa";
+import { z } from "zod";
+
+// =============================================
+// SCHEMAS DE VALIDAÇÃO
+// =============================================
+
+const profileSchema = z.object({
+  id: z.string().uuid(),
+  matricula: z.string().min(1, "Matrícula é obrigatória"),
+  email: z.string().email("Email inválido"),
+  full_name: z.string().min(1, "Nome completo é obrigatório"),
+  avatar_url: z.string().nullable().optional(),
+  graduacao: z.string().nullable().optional(),
+  validade_certificacao: z.string().nullable().optional(),
+  tipo_sanguineo: z.string().nullable().optional(),
+  status: z.boolean().default(true),
+  role: z.enum(["admin", "agent"]).default("agent"),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+type ProfileData = z.infer<typeof profileSchema>;
+
+// =============================================
+// INTERFACES E TIPOS
+// =============================================
+
+interface CacheData {
+  data: ProfileData;
+  timestamp: number;
+  version: string;
+}
+
+interface AlertState {
+  type: "error" | "success" | "warning";
+  message: string;
+}
+
+// =============================================
+// HOOKS PERSONALIZADOS
+// =============================================
+
+const useRetryWithBackoff = () => {
+  const executeWithRetry = useCallback(
+    async <T,>(
+      operation: () => Promise<T>,
+      maxRetries: number = 3,
+      baseDelay: number = 1000
+    ): Promise<T> => {
+      let lastError: Error;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          return await operation();
+        } catch (error) {
+          lastError = error as Error;
+          console.warn(`Tentativa ${attempt + 1} falhou:`, error);
+
+          if (attempt === maxRetries - 1) break;
+
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.log(`Aguardando ${delay}ms antes da próxima tentativa...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+
+      throw lastError!;
+    },
+    []
+  );
+
+  return { executeWithRetry };
+};
+
+const useLoginCache = () => {
+  const CACHE_KEY = "pac_user_data";
+  const CACHE_VERSION = "1.0.0";
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+  const getFromCache = useCallback((): ProfileData | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached) return null;
+
+      const cacheData: CacheData = JSON.parse(cached);
+
+      // Verificar versão e validade do cache
+      if (cacheData.version !== CACHE_VERSION) return null;
+      if (Date.now() - cacheData.timestamp > CACHE_DURATION) return null;
+
+      // Validar schema
+      const validatedData = profileSchema.parse(cacheData.data);
+      console.log("✅ Dados carregados do cache:", validatedData);
+      return validatedData;
+    } catch (error) {
+      console.error("❌ Erro ao carregar cache:", error);
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+  }, []);
+
+  const setToCache = useCallback((data: ProfileData) => {
+    try {
+      const validatedData = profileSchema.parse(data);
+      const cacheData: CacheData = {
+        data: validatedData,
+        timestamp: Date.now(),
+        version: CACHE_VERSION,
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      console.log("✅ Dados salvos no cache:", validatedData);
+    } catch (error) {
+      console.error("❌ Erro ao salvar cache:", error);
+    }
+  }, []);
+
+  const clearCache = useCallback(() => {
+    localStorage.removeItem(CACHE_KEY);
+  }, []);
+
+  return { getFromCache, setToCache, clearCache };
+};
+
+// =============================================
+// COMPONENTE PRINCIPAL
+// =============================================
 
 export default function LoginPage() {
   const [matricula, setMatricula] = useState("");
   const [loading, setLoading] = useState(false);
-  const [alert, setAlert] = useState<{
-    type: "error" | "success" | "warning";
-    message: string;
-  } | null>(null);
+  const [alert, setAlert] = useState<AlertState | null>(null);
 
   const router = useRouter();
   const supabase = createClient();
+
+  // Hooks personalizados
+  const { executeWithRetry } = useRetryWithBackoff();
+  const { getFromCache, setToCache, clearCache } = useLoginCache();
 
   // Verificar se usuário já está logado
   useEffect(() => {
     const checkUser = async () => {
       try {
+        console.log("🔍 Verificando sessão existente...");
         const {
           data: { session },
         } = await supabase.auth.getSession();
+
         if (session?.user) {
+          console.log("✅ Sessão encontrada, redirecionando...");
+
+          // Verificar se temos dados no cache
+          const cachedData = getFromCache();
+          if (!cachedData) {
+            console.log("🔄 Buscando dados do perfil para cache...");
+            // Buscar dados do perfil para preencher cache
+            const { data: profile } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .single();
+
+            if (profile) {
+              setToCache(profile);
+            }
+          }
+
           window.location.href = "/perfil";
+        } else {
+          console.log("ℹ️ Nenhuma sessão ativa encontrada");
         }
       } catch (error) {
-        console.error("Erro ao verificar sessão:", error);
+        console.error("❌ Erro ao verificar sessão:", error);
       }
     };
     checkUser();
-  }, [supabase]);
+  }, [supabase, getFromCache, setToCache]);
 
-  const showAlert = (
-    type: "error" | "success" | "warning",
-    message: string
-  ) => {
-    setAlert({ type, message });
-    setTimeout(() => setAlert(null), 5000);
-  };
+  const showAlert = useCallback(
+    (type: "error" | "success" | "warning", message: string) => {
+      console.log(`📢 Alert [${type}]:`, message);
+      setAlert({ type, message });
+      setTimeout(() => setAlert(null), 5000);
+    },
+    []
+  );
 
-  const formatMatricula = (value: string) => {
+  const formatMatricula = useCallback((value: string) => {
     const numbers = value.replace(/\D/g, "");
     if (numbers.length <= 3) return numbers;
     if (numbers.length <= 6)
@@ -61,121 +211,217 @@ export default function LoginPage() {
       6,
       9
     )}-${numbers.slice(9, 11)}`;
-  };
+  }, []);
 
-  const handleMatriculaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatMatricula(e.target.value);
-    setMatricula(formatted);
-  };
+  const handleMatriculaChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const formatted = formatMatricula(e.target.value);
+      setMatricula(formatted);
+    },
+    [formatMatricula]
+  );
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setAlert(null);
-
-    try {
+  const validateMatricula = useCallback(
+    (matricula: string): { isValid: boolean; error?: string } => {
       const matriculaLimpa = matricula.replace(/\D/g, "");
 
-      if (matriculaLimpa.length !== 11) {
-        showAlert("error", "Matrícula deve ter 11 dígitos");
-        setLoading(false);
-        return;
+      if (matriculaLimpa.length === 0) {
+        return { isValid: false, error: "Matrícula é obrigatória" };
       }
 
-      console.log("🔍 Buscando perfil com matrícula:", matriculaLimpa);
+      if (matriculaLimpa.length !== 11) {
+        return {
+          isValid: false,
+          error: "Matrícula deve ter exatamente 11 dígitos",
+        };
+      }
 
-      // ✅ BUSCAR PERFIL COM HEADERS CORRETOS
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("matricula", matriculaLimpa)
-        .single();
+      // Validar se são apenas números
+      if (!/^\d+$/.test(matriculaLimpa)) {
+        return {
+          isValid: false,
+          error: "Matrícula deve conter apenas números",
+        };
+      }
 
-      if (profileError) {
-        console.error("❌ Erro ao buscar perfil:", profileError);
+      return { isValid: true };
+    },
+    []
+  );
 
-        if (profileError.code === "406") {
-          showAlert(
-            "error",
-            "Erro de configuração do servidor. Contate o administrador."
-          );
-        } else if (profileError.code === "PGRST116") {
-          showAlert("error", "Matrícula não encontrada no sistema");
-        } else {
-          showAlert("error", "Erro ao acessar o banco de dados");
+  const handleLogin = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setLoading(true);
+      setAlert(null);
+
+      try {
+        console.log("🚀 Iniciando processo de login...");
+
+        const matriculaLimpa = matricula.replace(/\D/g, "");
+
+        // Validação inicial
+        const validation = validateMatricula(matricula);
+        if (!validation.isValid) {
+          showAlert("error", validation.error!);
+          setLoading(false);
+          return;
         }
 
-        setLoading(false);
-        return;
-      }
+        console.log("🔍 Buscando perfil com matrícula:", matriculaLimpa);
 
-      if (!profile) {
-        showAlert("error", "Matrícula não cadastrada no sistema");
-        setLoading(false);
-        return;
-      }
+        // ✅ BUSCAR PERFIL COM RETRY E VALIDAÇÃO
+        const fetchProfileOperation = async (): Promise<ProfileData> => {
+          const { data: profile, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("matricula", matriculaLimpa)
+            .single();
 
-      console.log("✅ Perfil encontrado:", profile);
+          if (profileError) {
+            console.error("❌ Erro ao buscar perfil:", profileError);
 
-      if (!profile.status) {
-        showAlert("error", "Sua conta está inativa. Contate o administrador.");
-        setLoading(false);
-        return;
-      }
+            if (profileError.code === "406") {
+              throw new Error(
+                "Erro de configuração do servidor. Contate o administrador."
+              );
+            } else if (profileError.code === "PGRST116") {
+              throw new Error("Matrícula não encontrada no sistema");
+            } else {
+              throw new Error(
+                `Erro ao acessar o banco de dados: ${profileError.message}`
+              );
+            }
+          }
 
-      // ✅ LOGIN AUTOMÁTICO COM MATRÍCULA COMO SENHA
-      console.log("🔐 Tentando login com:", {
-        email: profile.email,
-        password: matriculaLimpa,
-      });
+          if (!profile) {
+            throw new Error("Matrícula não cadastrada no sistema");
+          }
 
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
+          console.log("✅ Perfil encontrado:", profile);
+
+          // Validar dados com Zod (com fallback)
+          try {
+            const validatedProfile = profileSchema.parse(profile);
+            return validatedProfile;
+          } catch (validationError) {
+            console.warn(
+              "⚠️ Erro de validação Zod, usando fallback:",
+              validationError
+            );
+            // Fallback: criar objeto básico sem validação estrita
+            return {
+              ...profile,
+              full_name: profile.full_name || "Nome não definido",
+              matricula: profile.matricula || matriculaLimpa,
+              email: profile.email || "email@indefinido.com",
+              status: Boolean(profile.status),
+              role: (profile.role as "admin" | "agent") || "agent",
+            } as ProfileData;
+          }
+        };
+
+        const profile = await executeWithRetry(fetchProfileOperation, 3, 1000);
+
+        if (!profile.status) {
+          showAlert(
+            "error",
+            "Sua conta está inativa. Contate o administrador."
+          );
+          setLoading(false);
+          return;
+        }
+
+        // ✅ LOGIN AUTOMÁTICO COM MATRÍCULA COMO SENHA
+        console.log("🔐 Tentando login com:", {
           email: profile.email,
           password: matriculaLimpa,
         });
 
-      if (authError) {
-        console.error("❌ Erro no login:", authError);
+        const loginOperation = async () => {
+          const { data: authData, error: authError } =
+            await supabase.auth.signInWithPassword({
+              email: profile.email,
+              password: matriculaLimpa,
+            });
 
-        if (authError.message.includes("Invalid login credentials")) {
-          showAlert(
-            "error",
-            "Credenciais inválidas. A senha pode estar incorreta."
-          );
-        } else {
-          showAlert("error", "Erro interno no login. Tente novamente.");
+          if (authError) {
+            console.error("❌ Erro no login:", authError);
+
+            if (authError.message.includes("Invalid login credentials")) {
+              throw new Error(
+                "Credenciais inválidas. A senha pode estar incorreta."
+              );
+            } else if (authError.message.includes("Email not confirmed")) {
+              throw new Error(
+                "Email não confirmado. Verifique sua caixa de entrada."
+              );
+            } else {
+              throw new Error(`Erro interno no login: ${authError.message}`);
+            }
+          }
+
+          if (!authData.user) {
+            throw new Error("Erro ao autenticar usuário");
+          }
+
+          return authData;
+        };
+
+        const authData = await executeWithRetry(loginOperation, 3, 1000);
+
+        console.log("✅ Login bem-sucedido:", authData.user);
+
+        // Salvar dados no cache
+        setToCache(profile);
+
+        const welcomeMessage =
+          profile.role === "admin"
+            ? `Bem-vindo, Administrador ${profile.full_name || ""}!`
+            : `Bem-vindo, ${profile.full_name || "Agente"}!`;
+
+        showAlert("success", welcomeMessage);
+
+        // Redirecionar após breve delay
+        setTimeout(() => {
+          console.log("🔄 Redirecionando para perfil...");
+          window.location.href = "/perfil";
+        }, 1500);
+      } catch (err: any) {
+        console.error("💥 Erro inesperado no login:", err);
+
+        // Limpar cache em caso de erro
+        clearCache();
+
+        let errorMessage = "Erro inesperado ao fazer login. Tente novamente.";
+
+        if (err.message.includes("Matrícula não encontrada")) {
+          errorMessage = err.message;
+        } else if (err.message.includes("Credenciais inválidas")) {
+          errorMessage = err.message;
+        } else if (err.message.includes("Erro de configuração")) {
+          errorMessage = err.message;
+        } else if (err.message.includes("Email não confirmado")) {
+          errorMessage = err.message;
         }
 
+        showAlert("error", errorMessage);
+      } finally {
         setLoading(false);
-        return;
       }
+    },
+    [
+      matricula,
+      supabase,
+      showAlert,
+      validateMatricula,
+      executeWithRetry,
+      setToCache,
+      clearCache,
+    ]
+  );
 
-      console.log("✅ Login bem-sucedido:", authData.user);
-
-      // Salvar dados no localStorage
-      localStorage.setItem("pac_user_data", JSON.stringify(profile));
-
-      const welcomeMessage =
-        profile.role === "admin"
-          ? `Bem-vindo, Administrador ${profile.full_name || ""}!`
-          : `Bem-vindo, ${profile.full_name || "Agente"}!`;
-
-      showAlert("success", welcomeMessage);
-
-      // Redirecionar após breve delay
-      setTimeout(() => {
-        window.location.href = "/perfil";
-      }, 1500);
-    } catch (err: any) {
-      console.error("💥 Erro inesperado no login:", err);
-      showAlert("error", "Erro inesperado ao fazer login. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getAlertVariant = () => {
+  const getAlertVariant = useCallback(() => {
     if (!alert) return "default";
     switch (alert.type) {
       case "error":
@@ -187,7 +433,7 @@ export default function LoginPage() {
       default:
         return "default";
     }
-  };
+  }, [alert]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center p-4 relative overflow-hidden">
@@ -265,24 +511,13 @@ export default function LoginPage() {
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.4 }}
             >
-              <h1 className="font-bebas text-3xl bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent tracking-widest uppercase leading-none mb-2">
+              {/* USANDO FONTES DO LAYOUT - Inter e Roboto */}
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent tracking-widest uppercase leading-none mb-2 font-sans">
                 PATRULHA AÉREA CIVIL
               </h1>
-              <p className="text-gray-600 text-base font-medium leading-tight">
-                Serviço Humanitário de Excelência
+              <p className="text-gray-600 text-base font-medium leading-tight font-sans">
+                COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
               </p>
-
-              <motion.div
-                className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm px-5 py-2 rounded-full border border-blue-200 shadow-sm mt-4"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.6, type: "spring" }}
-              >
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-blue-700 text-sm font-semibold tracking-wide">
-                  Sistema de Autenticação
-                </span>
-              </motion.div>
             </motion.div>
           </Link>
         </motion.div>
@@ -321,10 +556,11 @@ export default function LoginPage() {
                     />
                   </svg>
                 </motion.div>
-                <h2 className="text-2xl font-bebas text-gray-800 text-center mb-2 tracking-wide">
+                {/* USANDO FONTES DO LAYOUT */}
+                <h2 className="text-2xl font-bold text-gray-800 text-center mb-2 tracking-wide font-sans">
                   ACESSO DO AGENTE
                 </h2>
-                <p className="text-gray-500 text-sm">
+                <p className="text-gray-500 text-sm font-sans">
                   Digite sua matrícula para acessar o sistema
                 </p>
               </motion.div>
@@ -351,7 +587,7 @@ export default function LoginPage() {
                             : "#10b981",
                       }}
                     >
-                      <AlertDescription className="font-medium">
+                      <AlertDescription className="font-medium font-sans">
                         {alert.message}
                       </AlertDescription>
                     </Alert>
@@ -360,14 +596,14 @@ export default function LoginPage() {
               </AnimatePresence>
 
               <form onSubmit={handleLogin} className="space-y-6">
-                {/* Campo Matrícula */}
+                {/* Campo Matrícula - CORRIGIDO */}
                 <motion.div
                   className="space-y-3"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.6, delay: 0.6 }}
                 >
-                  <label className="block text-gray-800 text-sm font-semibold">
+                  <label className="block text-gray-800 text-sm font-semibold font-sans">
                     Matrícula do Agente
                   </label>
                   <div className="relative group">
@@ -377,18 +613,16 @@ export default function LoginPage() {
                       onChange={handleMatriculaChange}
                       placeholder="000.000.000-00"
                       maxLength={14}
-                      className="w-full text-base py-3 pl-4 pr-12 font-medium tracking-wider border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all duration-300"
+                      className="w-full text-base py-3 pl-4 pr-12 font-medium tracking-wider border-2 border-gray-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20 transition-all duration-300 font-sans"
                       required
                       disabled={loading}
+                      style={{ paddingRight: "3rem" }} // Garante espaço para o ícone
                     />
-                    <motion.div
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2"
-                      whileHover={{ scale: 1.1 }}
-                    >
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                       <FaUser className="w-5 h-5 text-gray-400" />
-                    </motion.div>
+                    </div>
                   </div>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-gray-500 text-xs font-sans">
                     Formato: XXX.XXX.XXX-XX (11 dígitos)
                   </p>
                 </motion.div>
@@ -402,7 +636,7 @@ export default function LoginPage() {
                   <Button
                     type="submit"
                     disabled={loading}
-                    className="w-full group relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3.5 text-lg rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl"
+                    className="w-full group relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3.5 text-lg rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-sans"
                   >
                     <motion.div
                       className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[100%]"
@@ -420,7 +654,7 @@ export default function LoginPage() {
                           }}
                           className="rounded-full h-5 w-5 border-b-2 border-white mr-3"
                         />
-                        <span>Entrando...</span>
+                        <span className="font-sans">Entrando...</span>
                       </div>
                     ) : (
                       <div className="flex items-center justify-center relative z-10">
@@ -440,7 +674,7 @@ export default function LoginPage() {
                             d="M13 7l5 5m0 0l-5 5m5-5H6"
                           />
                         </motion.svg>
-                        <span>Entrar no Sistema</span>
+                        <span className="font-sans">Entrar no Sistema</span>
                       </div>
                     )}
                   </Button>
@@ -458,7 +692,7 @@ export default function LoginPage() {
                   <div className="w-full border-t border-gray-200/60"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-3 text-gray-500 font-medium rounded-full border border-gray-200">
+                  <span className="bg-white px-3 text-gray-500 font-medium rounded-full border border-gray-200 font-sans">
                     ou
                   </span>
                 </div>
@@ -473,7 +707,7 @@ export default function LoginPage() {
                 <Link href="/">
                   <Button
                     variant="outline"
-                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-600 font-medium py-3 text-base rounded-xl transition-all duration-300 shadow-sm hover:shadow-md"
+                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-600 font-medium py-3 text-base rounded-xl transition-all duration-300 shadow-sm hover:shadow-md font-sans"
                   >
                     <motion.svg
                       className="w-4 h-4 mr-2"
@@ -512,7 +746,7 @@ export default function LoginPage() {
               animate={{ scale: [1, 1.5, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             />
-            <span className="text-green-600 text-xs font-semibold">
+            <span className="text-green-600 text-xs font-semibold font-sans">
               Sistema Seguro
             </span>
             <motion.div
@@ -521,7 +755,9 @@ export default function LoginPage() {
               transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
             />
           </div>
-          <p className="text-gray-400 text-xs">Autenticação Direta • v2.4.1</p>
+          <p className="text-gray-400 text-xs font-sans">
+            Autenticação Direta • v2.4.1
+          </p>
         </motion.div>
       </motion.div>
     </div>
