@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,10 +9,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   FaUser,
-  FaIdCard,
-  FaTint,
   FaCheckCircle,
-  FaTimesCircle,
   FaCalendarAlt,
   FaEdit,
   FaCamera,
@@ -22,24 +19,31 @@ import {
   FaChartBar,
   FaBan,
   FaHome,
+  FaSignOutAlt,
 } from "react-icons/fa";
 import { motion } from "framer-motion";
+import { z } from "zod";
 
-// Interfaces
-interface ProfileData {
-  id: string;
-  matricula: string;
-  email: string;
-  full_name: string;
-  avatar_url: string | null;
-  graduacao: string | null;
-  validade_certificacao: string | null;
-  tipo_sanguineo: string | null;
-  status: boolean;
-  role: string;
-  created_at: string;
-  updated_at: string;
-}
+// =============================================
+// SCHEMAS DE VALIDAÇÃO CORRIGIDOS
+// =============================================
+
+const profileSchema = z.object({
+  id: z.string().uuid(),
+  matricula: z.string().min(1, "Matrícula é obrigatória"),
+  email: z.string().email("Email inválido"),
+  full_name: z.string().min(1, "Nome completo é obrigatório"),
+  avatar_url: z.string().nullable().optional(),
+  graduacao: z.string().nullable().optional(),
+  validade_certificacao: z.string().nullable().optional(),
+  tipo_sanguineo: z.string().nullable().optional(),
+  status: z.boolean().default(true),
+  role: z.enum(["admin", "agent"]).default("agent"),
+  created_at: z.string(), // Removida validação datetime estrita
+  updated_at: z.string(), // Removida validação datetime estrita
+});
+
+type ProfileData = z.infer<typeof profileSchema>;
 
 interface CertificationInfo {
   text: string;
@@ -48,7 +52,130 @@ interface CertificationInfo {
   badgeVariant: "default" | "secondary" | "destructive";
 }
 
-// Componentes de UI
+// =============================================
+// INTERFACES E TIPOS
+// =============================================
+
+interface CacheData {
+  data: ProfileData;
+  timestamp: number;
+  version: string;
+}
+
+// =============================================
+// UTILITÁRIOS
+// =============================================
+
+// Debounce simples sem lodash
+const useDebounce = <T extends (...args: any[]) => void>(
+  callback: T,
+  delay: number
+): ((...args: Parameters<T>) => void) => {
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  return useCallback(
+    (...args: Parameters<T>) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        callback(...args);
+      }, delay);
+    },
+    [callback, delay]
+  );
+};
+
+// =============================================
+// HOOKS PERSONALIZADOS
+// =============================================
+
+const useProfileCache = () => {
+  const CACHE_KEY = "pac_user_data";
+  const CACHE_VERSION = "1.0.0";
+  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+  const getFromCache = useCallback((): ProfileData | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached) return null;
+
+      const cacheData: CacheData = JSON.parse(cached);
+
+      // Verificar versão e validade do cache
+      if (cacheData.version !== CACHE_VERSION) return null;
+      if (Date.now() - cacheData.timestamp > CACHE_DURATION) return null;
+
+      // Validar schema
+      const validatedData = profileSchema.parse(cacheData.data);
+      console.log("✅ Dados carregados do cache:", validatedData);
+      return validatedData;
+    } catch (error) {
+      console.error("❌ Erro ao carregar cache:", error);
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+  }, []);
+
+  const setToCache = useCallback((data: ProfileData) => {
+    try {
+      const validatedData = profileSchema.parse(data);
+      const cacheData: CacheData = {
+        data: validatedData,
+        timestamp: Date.now(),
+        version: CACHE_VERSION,
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+      console.log("✅ Dados salvos no cache:", validatedData);
+    } catch (error) {
+      console.error("❌ Erro ao salvar cache:", error);
+    }
+  }, []);
+
+  const clearCache = useCallback(() => {
+    localStorage.removeItem(CACHE_KEY);
+  }, []);
+
+  return { getFromCache, setToCache, clearCache };
+};
+
+const useRetryWithBackoff = () => {
+  const executeWithRetry = useCallback(
+    async <T,>(
+      operation: () => Promise<T>,
+      maxRetries: number = 3,
+      baseDelay: number = 1000
+    ): Promise<T> => {
+      let lastError: Error;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          return await operation();
+        } catch (error) {
+          lastError = error as Error;
+          console.warn(`Tentativa ${attempt + 1} falhou:`, error);
+
+          if (attempt === maxRetries - 1) break;
+
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.log(`Aguardando ${delay}ms antes da próxima tentativa...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+
+      throw lastError!;
+    },
+    []
+  );
+
+  return { executeWithRetry };
+};
+
+// =============================================
+// COMPONENTES DE UI
+// =============================================
+
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center space-x-3">
     <div className="relative w-6 h-6">
@@ -76,68 +203,10 @@ const BaseLayout = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-// Utilitários
-const formatDate = (dateString: string | null): string => {
-  if (!dateString) return "Não definida";
-  return new Date(dateString).toLocaleDateString("pt-BR");
-};
+// =============================================
+// COMPONENTES DE ESTADO
+// =============================================
 
-const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
-  if (!profile.status) {
-    return {
-      text: "CERTIFICAÇÃO CANCELADA",
-      className: "text-alert font-semibold",
-      iconColor: "text-alert",
-      badgeVariant: "destructive",
-    };
-  }
-
-  if (!profile.validade_certificacao) {
-    return {
-      text: "NÃO DEFINIDA",
-      className: "text-slate-600",
-      iconColor: "text-slate-500",
-      badgeVariant: "secondary",
-    };
-  }
-
-  const certificationDate = new Date(profile.validade_certificacao);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (certificationDate < today) {
-    return {
-      text: `EXPIRADA - ${certificationDate.toLocaleDateString("pt-BR")}`,
-      className: "text-alert font-semibold",
-      iconColor: "text-alert",
-      badgeVariant: "destructive",
-    };
-  }
-
-  const daysUntilExpiry = Math.ceil(
-    (certificationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (daysUntilExpiry <= 30) {
-    return {
-      text: `EXPIRA EM ${daysUntilExpiry} DIAS - ${certificationDate.toLocaleDateString(
-        "pt-BR"
-      )}`,
-      className: "text-warning font-semibold",
-      iconColor: "text-warning",
-      badgeVariant: "secondary",
-    };
-  }
-
-  return {
-    text: certificationDate.toLocaleDateString("pt-BR"),
-    className: "text-success font-semibold",
-    iconColor: "text-success",
-    badgeVariant: "default",
-  };
-};
-
-// Componentes de Estado
 const LoadingState = () => (
   <BaseLayout>
     <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
@@ -207,7 +276,406 @@ const ErrorState = ({
   </BaseLayout>
 );
 
-// Componente Principal
+// =============================================
+// UTILITÁRIOS
+// =============================================
+
+const formatDate = (dateString: string | null): string => {
+  if (!dateString) return "Não definida";
+
+  try {
+    // Tenta converter para Date - funciona com vários formatos
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return "Data inválida";
+    }
+    return date.toLocaleDateString("pt-BR");
+  } catch {
+    return "Data inválida";
+  }
+};
+
+const formatMatricula = (matricula: string | null): string => {
+  if (!matricula) return "NÃO DEFINIDA";
+
+  // Remove qualquer caractere não numérico
+  const onlyNumbers = matricula.replace(/\D/g, "");
+
+  // Aplica a máscara xxx.xxx.xxx-xx
+  if (onlyNumbers.length === 11) {
+    return onlyNumbers
+      .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+      .toUpperCase();
+  }
+
+  // Se não tiver 11 dígitos, retorna sem formatação
+  return matricula.toUpperCase();
+};
+
+const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
+  if (!profile.status) {
+    return {
+      text: "CERTIFICAÇÃO CANCELADA",
+      className: "text-alert font-semibold",
+      iconColor: "text-alert",
+      badgeVariant: "destructive",
+    };
+  }
+
+  if (!profile.validade_certificacao) {
+    return {
+      text: "NÃO DEFINIDA",
+      className: "text-slate-600",
+      iconColor: "text-slate-500",
+      badgeVariant: "secondary",
+    };
+  }
+
+  const certificationDate = new Date(profile.validade_certificacao);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (isNaN(certificationDate.getTime())) {
+    return {
+      text: "DATA INVÁLIDA",
+      className: "text-alert font-semibold",
+      iconColor: "text-alert",
+      badgeVariant: "destructive",
+    };
+  }
+
+  if (certificationDate < today) {
+    return {
+      text: `EXPIRADA - ${formatDate(profile.validade_certificacao)}`,
+      className: "text-alert font-semibold",
+      iconColor: "text-alert",
+      badgeVariant: "destructive",
+    };
+  }
+
+  const daysUntilExpiry = Math.ceil(
+    (certificationDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (daysUntilExpiry <= 30) {
+    return {
+      text: `EXPIRA EM ${daysUntilExpiry} DIAS - ${formatDate(
+        profile.validade_certificacao
+      )}`,
+      className: "text-warning font-semibold",
+      iconColor: "text-warning",
+      badgeVariant: "secondary",
+    };
+  }
+
+  return {
+    text: formatDate(profile.validade_certificacao),
+    className: "text-success font-semibold",
+    iconColor: "text-success",
+    badgeVariant: "default",
+  };
+};
+
+// =============================================
+// COMPONENTES DE SEÇÃO
+// =============================================
+
+const InfoSection = ({
+  label,
+  value,
+  icon: Icon,
+  isTitle = false,
+  isAlert = false,
+  isMono = false,
+  center = false,
+}: {
+  label: string;
+  value: string;
+  icon?: any;
+  isTitle?: boolean;
+  isAlert?: boolean;
+  isMono?: boolean;
+  center?: boolean;
+}) => (
+  <div className="space-y-2">
+    <label
+      className={`text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block ${
+        center ? "text-center" : "text-left"
+      } font-roboto`}
+    >
+      {label}
+    </label>
+    <div
+      className={`flex items-center ${
+        center ? "justify-center" : "justify-start"
+      } space-x-2 sm:space-x-3`}
+    >
+      {Icon && (
+        <Icon
+          className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${
+            isAlert ? "text-alert" : "text-navy"
+          } flex-shrink-0`}
+        />
+      )}
+      <p
+        className={`
+          ${
+            isTitle
+              ? "text-2xl sm:text-xl lg:text-3xl xl:text-4xl"
+              : "text-base sm:text-lg lg:text-2xl xl:text-3xl"
+          }
+          font-bold leading-tight break-words min-h-[1.2em] font-bebas
+          ${isAlert ? "text-alert uppercase" : "text-slate-800"}
+          ${isMono ? "font-mono" : ""}
+        `}
+      >
+        {value}
+      </p>
+    </div>
+  </div>
+);
+
+const CertificationSection = ({
+  certificationInfo,
+  profile,
+}: {
+  certificationInfo: CertificationInfo;
+  profile: ProfileData;
+}) => (
+  <div className="space-y-2">
+    <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
+      Validade da Certificação
+    </label>
+    <div className="flex items-center justify-center lg:justify-start space-x-2 sm:space-x-3">
+      <FaCalendarAlt className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-navy flex-shrink-0" />
+      <p className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold leading-tight break-words min-h-[1.2em] font-bebas text-slate-800">
+        {certificationInfo.text}
+      </p>
+    </div>
+    {!profile.status && (
+      <p className="text-xs text-alert mt-1 text-center lg:text-left font-roboto">
+        ⚠️ Agente inativo - certificação cancelada automaticamente
+      </p>
+    )}
+  </div>
+);
+
+const AdminBadge = () => (
+  <div className="flex justify-center lg:justify-start pt-2">
+    <Badge className="bg-navy hover:bg-navy-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 font-semibold text-xs sm:text-sm transition-all duration-300 hover:scale-105 font-roboto">
+      <FaShieldAlt className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+      ADMINISTRADOR
+    </Badge>
+  </div>
+);
+
+const AvatarSection = ({
+  profile,
+  isAdmin,
+  uploadingAvatar,
+  onCameraClick,
+}: {
+  profile: ProfileData;
+  isAdmin: boolean;
+  uploadingAvatar: boolean;
+  onCameraClick: () => void;
+}) => (
+  <div className="space-y-3 w-full max-w-xs">
+    <div className="flex justify-center">
+      <motion.div
+        className="relative"
+        whileHover={{ scale: 1.02 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="w-36 h-48 sm:w-40 sm:h-52 lg:w-44 lg:h-56 xl:w-48 xl:h-64 bg-slate-100 rounded-lg border-4 border-navy shadow-xl flex items-center justify-center overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-200/30 to-slate-100/50" />
+
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt="Foto de perfil"
+              className="w-full h-full object-cover relative z-10"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center text-slate-400 relative z-10">
+              <FaUser className="w-14 h-14 sm:w-16 sm:h-16 lg:w-18 lg:h-18 mb-1" />
+              <span className="text-xs text-center px-2 font-roboto">
+                Sem foto
+              </span>
+            </div>
+          )}
+
+          {uploadingAvatar && (
+            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+              <div className="text-center text-white">
+                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-1" />
+                <p className="text-xs">Enviando...</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {isAdmin && (
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={onCameraClick}
+            disabled={uploadingAvatar}
+            className="absolute -bottom-1 -right-1 bg-blue-600 text-white p-1.5 sm:p-2 rounded-full hover:bg-blue-700 transition-all duration-300 shadow-xl border-2 border-white z-20 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Alterar foto de perfil"
+            aria-label="Alterar foto de perfil"
+            onKeyDown={(e) => e.key === "Enter" && onCameraClick()}
+          >
+            {uploadingAvatar ? (
+              <div className="w-2 h-2 sm:w-3 sm:h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <FaCamera className="w-2 h-2 sm:w-3 sm:h-3" />
+            )}
+          </motion.button>
+        )}
+      </motion.div>
+    </div>
+  </div>
+);
+
+const StatusSection = ({ profile }: { profile: ProfileData }) => (
+  <div className="flex flex-col items-center">
+    <div className="text-center w-full">
+      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block mb-2 font-roboto">
+        Situação do Patrulheiro
+      </label>
+      <div className="flex justify-center">
+        <motion.div whileHover={{ scale: 1.05 }} transition={{ duration: 0.3 }}>
+          <Badge
+            className={`
+              text-lg sm:text-xl px-8 sm:px-12 lg:px-16 py-3 sm:py-4 font-bold rounded-lg
+              min-w-[280px] sm:min-w-[320px] max-w-[360px] w-full
+              transition-all duration-300 cursor-default
+              shadow-lg text-center font-roboto border
+              ${
+                profile.status
+                  ? "bg-success text-white hover:bg-success/90 border-success/50"
+                  : "bg-alert text-white hover:bg-alert/90 border-alert/50"
+              }
+            `}
+          >
+            <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+              {profile.status ? (
+                <FaCheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+              ) : (
+                <FaBan className="w-5 h-5 sm:w-6 sm:h-6" />
+              )}
+              <span className="text-sm sm:text-base font-bold">
+                {profile.status ? "ATIVO" : "INATIVO"}
+              </span>
+            </div>
+          </Badge>
+        </motion.div>
+      </div>
+      {!profile.status && (
+        <p className="text-xs text-alert mt-1 max-w-md mx-auto font-roboto">
+          ❗ Agente inativo - acesso limitado ao sistema
+        </p>
+      )}
+    </div>
+  </div>
+);
+
+const ActionButton = ({
+  href,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  href?: string;
+  icon: any;
+  label: string;
+  onClick?: () => void;
+}) => {
+  const buttonContent = (
+    <motion.div
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+      className="flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-300 cursor-pointer"
+    >
+      {Icon && <Icon className="w-3 h-3 sm:w-4 sm:h-4 text-white" />}
+      <span className="text-xs sm:text-sm font-medium text-white">{label}</span>
+    </motion.div>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="flex-1 min-w-[120px] text-center">
+        {buttonContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div onClick={onClick} className="flex-1 min-w-[120px] text-center">
+      {buttonContent}
+    </div>
+  );
+};
+
+const ActionButtons = ({
+  profile,
+  isAdmin,
+  onSignOut,
+}: {
+  profile: ProfileData;
+  isAdmin: boolean;
+  onSignOut: () => void;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay: 0.6 }}
+    className="flex flex-col items-center gap-3 mt-6"
+  >
+    <div className="flex flex-wrap justify-center gap-2 sm:gap-3 w-full max-w-2xl">
+      {isAdmin && (
+        <>
+          <ActionButton
+            href={`/admin/agentes/${profile.id}`}
+            icon={FaEdit}
+            label="Editar Perfil"
+          />
+          <ActionButton
+            href="/admin/dashboard"
+            icon={FaChartBar}
+            label="Dashboard"
+          />
+        </>
+      )}
+      <ActionButton href="/" icon={FaHome} label="Voltar ao Site" />
+      <ActionButton
+        onClick={onSignOut}
+        icon={FaSignOutAlt}
+        label="Sair do Sistema"
+      />
+    </div>
+
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5, delay: 0.8 }}
+      className="text-center mt-4"
+    >
+      <p className="text-white/70 text-xs sm:text-sm font-roboto">
+        Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
+      </p>
+    </motion.div>
+  </motion.div>
+);
+
+// =============================================
+// COMPONENTE PRINCIPAL
+// =============================================
+
 export default function AgentPerfil() {
   // Estados
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -217,157 +685,182 @@ export default function AgentPerfil() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // Efeitos
-  useEffect(() => {
-    fetchProfile();
-  }, [retryCount]);
+  // Hooks personalizados
+  const { getFromCache, setToCache, clearCache } = useProfileCache();
+  const { executeWithRetry } = useRetryWithBackoff();
 
-  // Funções Principais
-  const fetchProfile = async () => {
+  // Função principal para buscar perfil
+  const fetchProfile = useCallback(async () => {
     try {
       setError(null);
       setLoading(true);
 
-      const supabase = createClient();
-      let userData: ProfileData | null = null;
+      const operation = async (): Promise<ProfileData> => {
+        const supabase = createClient();
 
-      // Verificar autenticação
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+        // Verificar autenticação
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-      if (userError) {
-        throw new Error("Erro de autenticação: " + userError.message);
-      }
-
-      if (!user) {
-        throw new Error("Nenhum usuário autenticado encontrado");
-      }
-
-      // Buscar do localStorage
-      const localData = localStorage.getItem("pac_user_data");
-      if (localData) {
-        try {
-          userData = JSON.parse(localData);
-        } catch {
-          localStorage.removeItem("pac_user_data");
-        }
-      }
-
-      // Buscar do banco se não encontrou
-      if (!userData) {
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (profileError) {
-          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+        if (userError) {
+          throw new Error("Erro de autenticação: " + userError.message);
         }
 
-        if (!profileData) {
-          throw new Error("Perfil não encontrado no banco de dados");
+        if (!user) {
+          throw new Error("Nenhum usuário autenticado encontrado");
         }
 
-        userData = profileData;
-        localStorage.setItem("pac_user_data", JSON.stringify(userData));
-      }
+        console.log("👤 Usuário autenticado:", user.id);
 
-      if (userData) {
-        setProfile(userData);
-        setIsAdmin(userData.role?.toLowerCase().trim() === "admin");
-      } else {
-        throw new Error("Não foi possível carregar os dados do perfil");
-      }
+        // Tentar carregar do cache primeiro
+        let userData = getFromCache();
+
+        // Se não encontrou no cache, buscar do banco
+        if (!userData) {
+          console.log("🔄 Buscando dados do banco...");
+          const { data: profileData, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+
+          if (profileError) {
+            console.error("❌ Erro ao buscar perfil:", profileError);
+            throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+          }
+
+          if (!profileData) {
+            throw new Error("Perfil não encontrado no banco de dados");
+          }
+
+          console.log("📦 Dados brutos do banco:", profileData);
+
+          // Validar dados com Zod (schema corrigido)
+          try {
+            userData = profileSchema.parse(profileData);
+          } catch (validationError) {
+            console.error("❌ Erro de validação Zod:", validationError);
+            // Fallback: criar objeto básico sem validação estrita
+            userData = {
+              ...profileData,
+              full_name: profileData.full_name || "Nome não definido",
+              matricula: profileData.matricula || "NÃO DEFINIDA",
+              email: profileData.email || "email@indefinido.com",
+              status: Boolean(profileData.status),
+              role: (profileData.role as "admin" | "agent") || "agent",
+            } as ProfileData;
+          }
+
+          // Salvar no cache
+          setToCache(userData);
+        }
+
+        console.log("✅ Dados do perfil carregados:", {
+          full_name: userData.full_name,
+          matricula: userData.matricula,
+          graduacao: userData.graduacao,
+          tipo_sanguineo: userData.tipo_sanguineo,
+          validade_certificacao: userData.validade_certificacao,
+          status: userData.status,
+          role: userData.role,
+        });
+
+        return userData;
+      };
+
+      const userData = await executeWithRetry(operation, 3, 1000);
+
+      setProfile(userData);
+      setIsAdmin(userData.role?.toLowerCase().trim() === "admin");
     } catch (err: any) {
+      console.error("❌ Erro no fetchProfile:", err);
       setError(err.message);
+      clearCache(); // Limpar cache em caso de erro
     } finally {
       setLoading(false);
     }
-  };
+  }, [executeWithRetry, getFromCache, setToCache, clearCache]);
 
-  const handleAvatarUpdate = async (file: File) => {
-    if (!profile) return;
+  // Efeito para buscar perfil
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile, retryCount]);
 
-    setUploadingAvatar(true);
-    try {
-      const supabase = createClient();
-      const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
-      const fileName = `avatar_${profile.id}_${Date.now()}.${fileExt}`;
+  // Upload de avatar com debounce
+  const handleAvatarUpdate = useCallback(
+    async (file: File) => {
+      if (!profile) return;
 
-      // Upload para storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("avatares-agentes")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
+      setUploadingAvatar(true);
+      try {
+        const supabase = createClient();
+        const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const fileName = `avatar_${profile.id}_${Date.now()}.${fileExt}`;
 
-      if (uploadError) {
-        // Fallback para Base64
-        await handleAvatarBase64(file);
-        return;
+        // Upload para storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("avatares-agentes")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: true,
+          });
+
+        let avatarUrl: string;
+
+        if (uploadError) {
+          // Fallback para Base64
+          avatarUrl = await handleAvatarBase64(file);
+        } else {
+          // Obter URL pública
+          const { data: urlData } = supabase.storage
+            .from("avatares-agentes")
+            .getPublicUrl(fileName);
+          avatarUrl = urlData.publicUrl;
+        }
+
+        // Atualizar perfil
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", profile.id);
+
+        if (updateError) {
+          throw new Error(`Erro ao atualizar perfil: ${updateError.message}`);
+        }
+
+        // Atualizar estado local e cache
+        const updatedProfile = { ...profile, avatar_url: avatarUrl };
+        setProfile(updatedProfile);
+        setToCache(updatedProfile);
+
+        alert("✅ Foto de perfil atualizada com sucesso!");
+      } catch (err: any) {
+        console.error("❌ Erro ao atualizar avatar:", err);
+        alert("❌ Erro ao atualizar foto. Tente novamente.");
+      } finally {
+        setUploadingAvatar(false);
       }
+    },
+    [profile, setToCache]
+  );
 
-      // Obter URL pública
-      const { data: urlData } = supabase.storage
-        .from("avatares-agentes")
-        .getPublicUrl(fileName);
+  // Debounce para upload de avatar
+  const debouncedAvatarUpdate = useDebounce(handleAvatarUpdate, 500);
 
-      // Atualizar perfil
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          avatar_url: urlData.publicUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", profile.id);
-
-      if (updateError) {
-        throw new Error(`Erro ao atualizar perfil: ${updateError.message}`);
-      }
-
-      // Atualizar estado local
-      const updatedProfile = { ...profile, avatar_url: urlData.publicUrl };
-      setProfile(updatedProfile);
-      localStorage.setItem("pac_user_data", JSON.stringify(updatedProfile));
-
-      alert("✅ Foto de perfil atualizada com sucesso!");
-    } catch (err: any) {
-      alert("❌ Erro ao atualizar foto. Tente novamente.");
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
-
-  const handleAvatarBase64 = async (file: File): Promise<void> => {
+  const handleAvatarBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
 
-      reader.onload = async (e) => {
+      reader.onload = (e) => {
         try {
           const base64Image = e.target?.result as string;
-          const supabase = createClient();
-
-          const { error } = await supabase
-            .from("profiles")
-            .update({
-              avatar_url: base64Image,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", profile!.id);
-
-          if (error) throw new Error(`Erro ao salvar imagem: ${error.message}`);
-
-          const updatedProfile = { ...profile!, avatar_url: base64Image };
-          setProfile(updatedProfile);
-          localStorage.setItem("pac_user_data", JSON.stringify(updatedProfile));
-
-          alert("✅ Foto de perfil atualizada com sucesso!");
-          resolve();
-        } catch (err: any) {
+          resolve(base64Image);
+        } catch (err) {
           reject(new Error("Erro ao processar imagem."));
         }
       };
@@ -388,6 +881,7 @@ export default function AgentPerfil() {
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
+        // Validações
         if (!file.type.startsWith("image/")) {
           alert("Por favor, selecione apenas arquivos de imagem.");
           return;
@@ -398,7 +892,7 @@ export default function AgentPerfil() {
           return;
         }
 
-        handleAvatarUpdate(file);
+        debouncedAvatarUpdate(file);
       }
     };
 
@@ -415,7 +909,7 @@ export default function AgentPerfil() {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      localStorage.removeItem("pac_user_data");
+      clearCache();
       localStorage.removeItem("supabase.auth.token");
       window.location.href = "/login";
     } catch (error) {
@@ -452,7 +946,7 @@ export default function AgentPerfil() {
 
     return (
       <BaseLayout>
-        <div className="min-h-screen flex items-center justify-center p-4 relative z-20">
+        <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 relative z-20">
           <div className="w-full max-w-6xl">
             {/* Card do Perfil */}
             <motion.div
@@ -461,15 +955,15 @@ export default function AgentPerfil() {
               transition={{ duration: 0.7, delay: 0.2 }}
               className="flex justify-center"
             >
-              <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-2xl shadow-2xl overflow-hidden w-full max-w-4xl border-2 border-slate-200/80">
+              <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-xl overflow-hidden w-full max-w-3xl border border-slate-200/60">
                 {/* Marca d'água */}
-                <div className="absolute inset-0 opacity-[0.03] flex items-center justify-center pointer-events-none z-0">
-                  <div className="w-full h-full max-w-[400px] max-h-[400px] relative">
+                <div className="absolute inset-0 opacity-[0.02] flex items-center justify-center pointer-events-none z-0">
+                  <div className="w-full h-full max-w-[300px] max-h-[300px] relative">
                     <Image
                       src="/images/logos/logo-pattern.svg"
                       alt="Marca d'água Patrulha Aérea Civil"
                       fill
-                      sizes="400px"
+                      sizes="300px"
                       className="object-contain"
                       priority
                     />
@@ -477,45 +971,46 @@ export default function AgentPerfil() {
                 </div>
 
                 {/* Bordas decorativas */}
-                <div className="absolute inset-2 border border-slate-300/50 rounded-xl pointer-events-none z-0" />
-                <div className="absolute inset-4 border border-slate-200/30 rounded-lg pointer-events-none z-0" />
+                <div className="absolute inset-1 border border-slate-300/30 rounded-lg pointer-events-none z-0" />
 
-                <CardContent className="p-4 sm:p-6 lg:p-8 relative z-10">
+                <CardContent className="p-2 sm:p-3 lg:p-4 relative z-10">
                   {/* Header */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
-                    className="flex items-center justify-between pb-6 lg:pb-8 border-b-2 border-slate-200/50 mb-6 lg:mb-8"
+                    className="flex items-center justify-between pb-3 lg:pb-4 border-b border-slate-200/30 mb-3 lg:mb-4"
                   >
                     {/* Logo */}
                     <motion.div
                       whileHover={{ scale: 1.05 }}
                       className="flex-shrink-0"
                     >
-                      <div className="w-20 h-20 sm:w-24 sm:h-24 lg:w-28 lg:h-28 overflow-hidden">
-                        <Image
-                          src="/images/logos/logo.webp"
-                          alt="Patrulha Aérea Civil"
-                          width={112}
-                          height={112}
-                          className="w-full h-full object-cover"
-                          priority
-                        />
+                      <div className="w-28 h-28 sm:w-32 sm:h-32 lg:w-36 lg:h-36 flex items-center justify-center overflow-visible">
+                        <div className="relative w-full h-full max-w-full max-h-full">
+                          <Image
+                            src="/images/logos/logo.webp"
+                            alt="Patrulha Aérea Civil"
+                            width={144}
+                            height={144}
+                            className="w-full h-full object-contain"
+                            priority
+                          />
+                        </div>
                       </div>
                     </motion.div>
 
                     {/* Título */}
-                    <div className="flex-1 text-center px-4 sm:px-6 min-w-0">
-                      <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-800 tracking-wide uppercase leading-tight font-bebas">
+                    <div className="flex-1 text-center px-1 min-w-0 mx-1">
+                      <h1 className="text-navy text-lg sm:text-xl lg:text-3xl font-bold tracking-wide uppercase leading-tight font-bebas">
                         Patrulha Aérea Civil
                       </h1>
-                      <p className="text-slate-600 text-xs sm:text-sm mt-1 leading-snug font-roboto">
-                        Comando Integrado do Estado do Rio de Janeiro
+                      <p className="text-slate-600 text-xs mt-0.5 leading-snug font-roboto">
+                        COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
                       </p>
-                      <div className="mt-2">
-                        <h2 className="text-sm sm:text-base font-bold text-slate-700 tracking-wide uppercase font-bebas">
-                          Identificação de Agente
+                      <div className="mt-0.5">
+                        <h2 className="text-xs sm:text-sm font-bold text-slate-700 tracking-wide uppercase font-bebas">
+                          Identificação
                         </h2>
                       </div>
                     </div>
@@ -525,12 +1020,12 @@ export default function AgentPerfil() {
                       whileHover={{ scale: 1.05 }}
                       className="flex-shrink-0"
                     >
-                      <div className="w-16 h-12 sm:w-20 sm:h-15 lg:w-24 lg:h-18 border-2 border-slate-300 rounded">
+                      <div className="w-28 h-21 sm:w-32 sm:h-24 lg:w-36 lg:h-27 border border-slate-300 rounded flex items-center justify-center overflow-hidden">
                         <Image
                           src="/images/logos/flag-br.webp"
                           alt="Bandeira do Brasil"
-                          width={96}
-                          height={72}
+                          width={144}
+                          height={108}
                           className="w-full h-full object-cover rounded"
                           priority
                         />
@@ -539,9 +1034,9 @@ export default function AgentPerfil() {
                   </motion.div>
 
                   {/* Layout Principal */}
-                  <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12 items-center lg:items-start">
+                  <div className="flex flex-col lg:flex-row gap-0 items-center lg:items-start">
                     {/* Lado Esquerdo - Informações */}
-                    <div className="flex-1 w-full space-y-4 sm:space-y-6 text-center lg:text-left">
+                    <div className="flex-1 w-full space-y-3 text-center lg:text-left pr-0 lg:pr-1">
                       <InfoSection
                         label="Nome Completo"
                         value={profile.full_name || "Nome não definido"}
@@ -558,8 +1053,7 @@ export default function AgentPerfil() {
                       />
                       <InfoSection
                         label="Matrícula"
-                        value={`${profile.matricula} RJ`}
-                        icon={FaIdCard}
+                        value={`${formatMatricula(profile.matricula)} RJ`}
                         isMono
                       />
                       <CertificationSection
@@ -570,34 +1064,31 @@ export default function AgentPerfil() {
                     </div>
 
                     {/* Divisor */}
-                    <div className="hidden lg:block w-px h-80 bg-gradient-to-b from-transparent via-slate-300/50 to-transparent" />
+                    <div className="hidden lg:block w-px h-16 bg-slate-300/5" />
 
                     {/* Lado Direito - Foto e Info Adicional */}
-                    <div className="flex-1 w-full space-y-6 flex flex-col items-center">
+                    <div className="flex-1 w-full space-y-3 flex flex-col items-center pl-0 lg:pl-1">
                       <AvatarSection
                         profile={profile}
                         isAdmin={isAdmin}
                         uploadingAvatar={uploadingAvatar}
                         onCameraClick={onCameraClick}
                       />
-                      <InfoSection
-                        label="Tipo Sanguíneo"
-                        value={profile.tipo_sanguineo || "NÃO DEFINIDO"}
-                        icon={FaTint}
-                        isAlert
-                        center
-                      />
-                      <InfoSection
-                        label="Data de Cadastro"
-                        value={formatDate(profile.created_at)}
-                        center
-                      />
+                      {/* Tipo Sanguíneo */}
+                      <div className="w-full text-center">
+                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto">
+                          Tipo Sanguíneo
+                        </label>
+                        <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-alert uppercase font-bebas leading-tight">
+                          {profile.tipo_sanguineo || "NÃO DEFINIDO"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
                   {/* Divisor */}
-                  <div className="my-6 lg:my-8 border-t border-slate-300/50 relative">
-                    <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-8 h-2 bg-navy/20 rounded-full" />
+                  <div className="my-3 lg:my-4 border-t border-slate-300/30 relative">
+                    <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-navy/20 rounded-full" />
                   </div>
 
                   {/* Status */}
@@ -617,316 +1108,6 @@ export default function AgentPerfil() {
       </BaseLayout>
     );
   };
-
-  // Componentes de Seção
-  const InfoSection = ({
-    label,
-    value,
-    icon: Icon,
-    isTitle = false,
-    isAlert = false,
-    isMono = false,
-    center = false,
-  }: {
-    label: string;
-    value: string;
-    icon?: any;
-    isTitle?: boolean;
-    isAlert?: boolean;
-    isMono?: boolean;
-    center?: boolean;
-  }) => (
-    <div className="space-y-2">
-      <label
-        className={`text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block ${
-          center ? "text-center" : "text-left"
-        } font-roboto`}
-      >
-        {label}
-      </label>
-      <div
-        className={`flex items-center ${
-          center ? "justify-center" : "justify-start"
-        } space-x-2 sm:space-x-3`}
-      >
-        {Icon && (
-          <Icon
-            className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${
-              isAlert ? "text-alert" : "text-navy"
-            } flex-shrink-0`}
-          />
-        )}
-        <p
-          className={`
-        ${
-          isTitle
-            ? "text-lg sm:text-xl lg:text-2xl xl:text-3xl"
-            : "text-base sm:text-lg lg:text-xl xl:text-2xl"
-        }
-        font-bold leading-tight break-words min-h-[1.2em] font-bebas
-        ${isAlert ? "text-alert uppercase" : "text-slate-800"}
-        ${isMono ? "font-mono" : ""}
-      `}
-        >
-          {value}
-        </p>
-      </div>
-    </div>
-  );
-
-  const CertificationSection = ({
-    certificationInfo,
-    profile,
-  }: {
-    certificationInfo: CertificationInfo;
-    profile: ProfileData;
-  }) => (
-    <div className="space-y-2">
-      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
-        Validade da Certificação
-      </label>
-      <div className="flex items-center justify-center lg:justify-start space-x-2 sm:space-x-3">
-        <FaCalendarAlt
-          className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${certificationInfo.iconColor} flex-shrink-0`}
-        />
-        <Badge
-          variant={certificationInfo.badgeVariant}
-          className={`text-base sm:text-lg lg:text-xl xl:text-2xl font-mono font-bold px-4 py-2 ${certificationInfo.className} transition-all duration-300`}
-        >
-          {certificationInfo.text}
-        </Badge>
-      </div>
-      {!profile.status && (
-        <p className="text-xs text-alert mt-1 text-center lg:text-left font-roboto">
-          ⚠️ Agente inativo - certificação cancelada automaticamente
-        </p>
-      )}
-    </div>
-  );
-
-  const AdminBadge = () => (
-    <div className="flex justify-center lg:justify-start pt-2">
-      <Badge className="bg-navy hover:bg-navy-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 font-semibold text-xs sm:text-sm transition-all duration-300 hover:scale-105 font-roboto">
-        <FaShieldAlt className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-        ADMINISTRADOR
-      </Badge>
-    </div>
-  );
-
-  const AvatarSection = ({
-    profile,
-    isAdmin,
-    uploadingAvatar,
-    onCameraClick,
-  }: {
-    profile: ProfileData;
-    isAdmin: boolean;
-    uploadingAvatar: boolean;
-    onCameraClick: () => void;
-  }) => (
-    <div className="space-y-3 w-full max-w-xs">
-      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block text-center font-roboto">
-        Foto de Identificação
-      </label>
-      <div className="flex justify-center">
-        <motion.div
-          className="relative"
-          whileHover={{ scale: 1.02 }}
-          transition={{ duration: 0.3 }}
-        >
-          <div className="w-40 h-52 sm:w-48 sm:h-60 lg:w-52 lg:h-64 xl:w-56 xl:h-72 bg-slate-100 rounded-lg border-4 border-navy shadow-xl flex items-center justify-center overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-200/30 to-slate-100/50" />
-
-            {profile.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt="Foto de perfil"
-                className="w-full h-full object-cover relative z-10"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-slate-400 relative z-10">
-                <FaUser className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 mb-2" />
-                <span className="text-xs sm:text-sm text-center px-2 font-roboto">
-                  Sem foto
-                </span>
-              </div>
-            )}
-
-            {uploadingAvatar && (
-              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
-                <div className="text-center text-white">
-                  <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                  <p className="text-xs">Enviando...</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {isAdmin && (
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={onCameraClick}
-              disabled={uploadingAvatar}
-              className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 sm:p-3 rounded-full hover:bg-blue-700 transition-all duration-300 shadow-xl border-2 border-white z-20 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Alterar foto de perfil"
-            >
-              {uploadingAvatar ? (
-                <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <FaCamera className="w-3 h-3 sm:w-4 sm:h-4" />
-              )}
-            </motion.button>
-          )}
-        </motion.div>
-      </div>
-    </div>
-  );
-
-  const StatusSection = ({ profile }: { profile: ProfileData }) => (
-    <div className="flex flex-col items-center">
-      <div className="text-center w-full">
-        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block mb-3 font-roboto">
-          Situação do Agente
-        </label>
-        <div className="flex justify-center">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Badge
-              className={`
-            text-sm sm:text-base px-6 sm:px-8 lg:px-10 py-3 sm:py-4 font-bold rounded-lg
-            min-w-[180px] sm:min-w-[200px] max-w-[280px] w-full
-            transition-all duration-300 cursor-default
-            shadow-lg text-center font-roboto border-2
-            ${
-              profile.status
-                ? "bg-success text-white hover:bg-success/90 border-success/50"
-                : "bg-alert text-white hover:bg-alert/90 border-alert/50"
-            }
-          `}
-            >
-              <div className="flex items-center justify-center space-x-2 sm:space-x-3">
-                {profile.status ? (
-                  <FaCheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
-                ) : (
-                  <FaBan className="w-4 h-4 sm:w-5 sm:h-5" />
-                )}
-                <span className="text-xs sm:text-sm">
-                  {profile.status ? "ATIVO" : "INATIVO"}
-                </span>
-              </div>
-            </Badge>
-          </motion.div>
-        </div>
-        {!profile.status && (
-          <p className="text-xs sm:text-sm text-alert mt-2 max-w-md mx-auto font-roboto">
-            ❗ Agente inativo - acesso limitado ao sistema
-          </p>
-        )}
-      </div>
-    </div>
-  );
-
-  const ActionButtons = ({
-    profile,
-    isAdmin,
-    onSignOut,
-  }: {
-    profile: ProfileData;
-    isAdmin: boolean;
-    onSignOut: () => void;
-  }) => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.6 }}
-      className="flex flex-col items-center gap-4 mt-8"
-    >
-      <div className="flex flex-col sm:flex-row items-center gap-4 w-full max-w-2xl">
-        {isAdmin && (
-          <>
-            <ActionButton
-              href={`/admin/agentes/${profile.id}`}
-              icon={FaEdit}
-              label="Editar Perfil"
-              className="bg-blue-600 hover:bg-blue-700 border-blue-500/50"
-            />
-            <ActionButton
-              href="/admin/dashboard"
-              icon={FaChartBar}
-              label="Dashboard"
-              className="bg-purple-600 hover:bg-purple-700 border-purple-500/50"
-            />
-          </>
-        )}
-        <ActionButton
-          href="/"
-          icon={FaHome}
-          label="Voltar ao Site"
-          variant="outline"
-          className="bg-white hover:bg-slate-50 border-slate-300 hover:border-slate-400 text-slate-700"
-        />
-      </div>
-
-      <motion.div
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        className="w-full max-w-2xl"
-      >
-        <Button
-          onClick={onSignOut}
-          variant="outline"
-          className="bg-white hover:bg-red-50 text-red-600 border-2 border-red-300 hover:border-red-400 hover:text-red-700 px-8 py-3 text-sm font-semibold w-full transition-all duration-300 font-roboto group relative overflow-hidden"
-        >
-          <div className="absolute inset-0 bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <span className="relative z-10">Sair do Sistema</span>
-        </Button>
-      </motion.div>
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.8 }}
-        className="text-center mt-8"
-      >
-        <p className="text-white/70 text-sm font-roboto">
-          Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
-        </p>
-      </motion.div>
-    </motion.div>
-  );
-
-  const ActionButton = ({
-    href,
-    icon: Icon,
-    label,
-    variant = "default",
-    className = "",
-  }: {
-    href: string;
-    icon: any;
-    label: string;
-    variant?: "default" | "outline";
-    className?: string;
-  }) => (
-    <Link href={href} className="w-full sm:w-auto flex-1">
-      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-        <Button
-          variant={variant}
-          className={`px-6 sm:px-8 py-3 text-sm sm:text-base font-semibold shadow-lg w-full transition-all duration-300 font-roboto border-2 group relative overflow-hidden ${className}`}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-          <Icon className="w-4 h-4 mr-3 relative z-10" />
-          <span className="relative z-10">{label}</span>
-        </Button>
-      </motion.div>
-    </Link>
-  );
 
   return (
     <ProfileContent
