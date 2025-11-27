@@ -27,12 +27,37 @@ import {
   FaVideo,
   FaExclamationTriangle,
   FaTimes,
-  FaEye,
-  FaEyeSlash,
   FaChartBar,
   FaHome,
   FaUser,
 } from "react-icons/fa";
+
+interface FormData {
+  nome: string;
+  slug: string;
+  descricao: string;
+  tipo: "fotos" | "videos";
+  status: boolean;
+  ordem: number;
+}
+
+interface FormErrors {
+  nome?: string;
+  slug?: string;
+  ordem?: string;
+}
+
+// Interface para erro do Supabase
+interface SupabaseError {
+  code?: string;
+  message: string;
+  details?: string;
+  hint?: string;
+}
+
+function isSupabaseError(error: unknown): error is SupabaseError {
+  return typeof error === "object" && error !== null && "message" in error;
+}
 
 export default function CriarCategoriaPage() {
   const router = useRouter();
@@ -40,18 +65,18 @@ export default function CriarCategoriaPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     nome: "",
     slug: "",
     descricao: "",
-    tipo: "fotos" as "fotos" | "videos",
+    tipo: "fotos",
     status: true,
     ordem: 0,
   });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
 
     if (!formData.nome.trim()) {
       newErrors.nome = "Nome é obrigatório";
@@ -85,7 +110,7 @@ export default function CriarCategoriaPage() {
     try {
       setLoading(true);
 
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("galeria_categorias")
         .insert([
           {
@@ -112,10 +137,10 @@ export default function CriarCategoriaPage() {
       setTimeout(() => {
         router.push("/admin/galeria/categorias");
       }, 1000);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao criar categoria:", err);
 
-      if (err.code === "23505") {
+      if (isSupabaseError(err) && err.code === "23505") {
         error("Já existe uma categoria com este nome ou slug.");
       } else {
         error("Não foi possível criar a categoria.");
@@ -125,7 +150,7 @@ export default function CriarCategoriaPage() {
     }
   };
 
-  const generateSlug = (nome: string) => {
+  const generateSlug = (nome: string): string => {
     return nome
       .toLowerCase()
       .normalize("NFD")
@@ -170,7 +195,6 @@ export default function CriarCategoriaPage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/admin/galeria/categorias">
               <Button
                 variant="outline"
@@ -181,7 +205,6 @@ export default function CriarCategoriaPage() {
               </Button>
             </Link>
 
-            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
@@ -192,7 +215,6 @@ export default function CriarCategoriaPage() {
               </Button>
             </Link>
 
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/perfil">
               <Button
                 variant="outline"
@@ -203,7 +225,6 @@ export default function CriarCategoriaPage() {
               </Button>
             </Link>
 
-            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"

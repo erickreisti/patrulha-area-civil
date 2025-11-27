@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -62,11 +62,7 @@ export default function CriarItemGaleriaPage() {
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    fetchCategorias();
-  }, []);
-
-  const fetchCategorias = async () => {
+  const fetchCategorias = useCallback(async () => {
     try {
       const { data, error: fetchError } = await supabase
         .from("galeria_categorias")
@@ -76,10 +72,14 @@ export default function CriarItemGaleriaPage() {
 
       if (fetchError) throw fetchError;
       setCategorias(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao carregar categorias:", err);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchCategorias();
+  }, [fetchCategorias]);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -153,7 +153,7 @@ export default function CriarItemGaleriaPage() {
         return;
       }
 
-      const { data, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from("galeria_itens")
         .insert([
           {
@@ -179,9 +179,13 @@ export default function CriarItemGaleriaPage() {
       setTimeout(() => {
         router.push("/admin/galeria/itens");
       }, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao criar item:", err);
-      alert(`Erro ao criar item: ${err.message}`);
+      alert(
+        `Erro ao criar item: ${
+          err instanceof Error ? err.message : "Erro desconhecido"
+        }`
+      );
     } finally {
       setLoading(false);
     }

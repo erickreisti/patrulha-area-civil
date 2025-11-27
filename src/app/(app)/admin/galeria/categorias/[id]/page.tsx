@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +45,33 @@ interface CategoriaData {
   updated_at: string;
 }
 
+interface FormData {
+  nome: string;
+  slug: string;
+  descricao: string;
+  tipo: "fotos" | "videos";
+  status: boolean;
+  ordem: number;
+}
+
+interface FormErrors {
+  nome?: string;
+  slug?: string;
+  ordem?: string;
+}
+
+// Interface para erro do Supabase
+interface SupabaseError {
+  code?: string;
+  message: string;
+  details?: string;
+  hint?: string;
+}
+
+function isSupabaseError(error: unknown): error is SupabaseError {
+  return typeof error === "object" && error !== null && "message" in error;
+}
+
 export default function EditarCategoriaPage() {
   const params = useParams();
   const router = useRouter();
@@ -54,25 +81,19 @@ export default function EditarCategoriaPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [categoria, setCategoria] = useState<CategoriaData | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     nome: "",
     slug: "",
     descricao: "",
-    tipo: "fotos" as "fotos" | "videos",
+    tipo: "fotos",
     status: true,
     ordem: 0,
   });
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const categoriaId = params.id as string;
 
-  useEffect(() => {
-    if (categoriaId) {
-      fetchCategoria();
-    }
-  }, [categoriaId]);
-
-  const fetchCategoria = async () => {
+  const fetchCategoria = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -97,16 +118,22 @@ export default function EditarCategoriaPage() {
           ordem: data.ordem || 0,
         });
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao carregar categoria:", err);
       error("Não foi possível carregar a categoria.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [categoriaId, supabase, error]);
 
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
+  useEffect(() => {
+    if (categoriaId) {
+      fetchCategoria();
+    }
+  }, [categoriaId, fetchCategoria]);
+
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
 
     if (!formData.nome.trim()) {
       newErrors.nome = "Nome é obrigatório";
@@ -140,7 +167,7 @@ export default function EditarCategoriaPage() {
     try {
       setSaving(true);
 
-      const { data, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from("galeria_categorias")
         .update({
           nome: formData.nome.trim(),
@@ -165,10 +192,10 @@ export default function EditarCategoriaPage() {
       setTimeout(() => {
         router.push("/admin/galeria/categorias");
       }, 1000);
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao atualizar categoria:", err);
 
-      if (err.code === "23505") {
+      if (isSupabaseError(err) && err.code === "23505") {
         error("Já existe uma categoria com este nome ou slug.");
       } else {
         error("Não foi possível atualizar a categoria.");
@@ -178,7 +205,7 @@ export default function EditarCategoriaPage() {
     }
   };
 
-  const generateSlug = (nome: string) => {
+  const generateSlug = (nome: string): string => {
     return nome
       .toLowerCase()
       .normalize("NFD")
@@ -258,7 +285,6 @@ export default function EditarCategoriaPage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/admin/galeria/categorias">
               <Button
                 variant="outline"
@@ -269,7 +295,6 @@ export default function EditarCategoriaPage() {
               </Button>
             </Link>
 
-            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
@@ -280,7 +305,6 @@ export default function EditarCategoriaPage() {
               </Button>
             </Link>
 
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/perfil">
               <Button
                 variant="outline"
@@ -291,7 +315,6 @@ export default function EditarCategoriaPage() {
               </Button>
             </Link>
 
-            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"

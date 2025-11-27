@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,13 +38,14 @@ import {
   FaCalendarAlt,
   FaChartBar,
   FaHome,
-  FaUser,
   FaFolder,
 } from "react-icons/fa";
 
 interface Categoria {
   id: string;
   nome: string;
+  slug: string;
+  descricao: string | null;
   tipo: "fotos" | "videos";
   status: boolean;
   ordem: number;
@@ -53,19 +54,27 @@ interface Categoria {
   itens_count?: number;
 }
 
+interface Filtros {
+  busca: string;
+  tipo: string;
+  status: string;
+}
+
+interface DeleteDialogState {
+  open: boolean;
+  categoria: Categoria | null;
+  loading: boolean;
+}
+
 export default function CategoriasGaleriaPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState({
+  const [filtros, setFiltros] = useState<Filtros>({
     busca: "",
     tipo: "all",
     status: "all",
   });
-  const [deleteDialog, setDeleteDialog] = useState<{
-    open: boolean;
-    categoria: Categoria | null;
-    loading: boolean;
-  }>({
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>({
     open: false,
     categoria: null,
     loading: false,
@@ -74,22 +83,14 @@ export default function CategoriasGaleriaPage() {
   const { success, error } = useToast();
   const supabase = createClient();
 
-  useEffect(() => {
-    fetchCategorias();
-  }, []);
-
-  const fetchCategorias = async () => {
+  const fetchCategorias = useCallback(async () => {
     try {
       setLoading(true);
 
+      // Primeiro, busque as categorias
       let query = supabase
         .from("galeria_categorias")
-        .select(
-          `
-          *,
-          galeria_itens(count)
-        `
-        )
+        .select("*")
         .order("ordem", { ascending: true })
         .order("created_at", { ascending: false });
 
@@ -105,24 +106,49 @@ export default function CategoriasGaleriaPage() {
         query = query.eq("status", filtros.status === "ativo");
       }
 
-      const { data, error: fetchError } = await query;
+      const { data: categoriasData, error: categoriasError } = await query;
 
-      if (fetchError) throw fetchError;
+      if (categoriasError) throw categoriasError;
 
-      // Processar dados para incluir contagem de itens
-      const categoriasComContagem = (data || []).map((categoria) => ({
-        ...categoria,
-        itens_count: categoria.galeria_itens?.[0]?.count || 0,
-      }));
+      // Agora busque a contagem de itens para cada categoria
+      if (categoriasData && categoriasData.length > 0) {
+        const categoriasComContagem = await Promise.all(
+          categoriasData.map(async (categoria) => {
+            const { count, error: countError } = await supabase
+              .from("galeria_itens")
+              .select("*", { count: "exact", head: true })
+              .eq("categoria_id", categoria.id);
 
-      setCategorias(categoriasComContagem);
-    } catch (err: any) {
+            if (countError) {
+              console.error(
+                `Erro ao contar itens da categoria ${categoria.nome}:`,
+                countError
+              );
+              return { ...categoria, itens_count: 0 };
+            }
+
+            return {
+              ...categoria,
+              itens_count: count || 0,
+            };
+          })
+        );
+
+        setCategorias(categoriasComContagem);
+      } else {
+        setCategorias([]);
+      }
+    } catch (err) {
       console.error("Erro ao carregar categorias:", err);
       error("Erro ao carregar categorias da galeria");
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtros, supabase, error]);
+
+  useEffect(() => {
+    fetchCategorias();
+  }, [fetchCategorias]);
 
   const handleDeleteClick = (categoria: Categoria) => {
     setDeleteDialog({
@@ -144,7 +170,7 @@ export default function CategoriasGaleriaPage() {
         deleteDialog.categoria.itens_count > 0
       ) {
         error(
-          `Não é possível excluir a categoria "${deleteDialog.categoria.nome}" porque existem ${deleteDialog.categoria.itens_count} itens associados a ela.`
+          `Não é possível excluir a categoria &quot;${deleteDialog.categoria.nome}&quot; porque existem ${deleteDialog.categoria.itens_count} itens associados a ela.`
         );
         setDeleteDialog({ open: false, categoria: null, loading: false });
         return;
@@ -160,14 +186,14 @@ export default function CategoriasGaleriaPage() {
       success("Categoria excluída com sucesso!");
       setDeleteDialog({ open: false, categoria: null, loading: false });
       fetchCategorias();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Erro ao excluir categoria:", err);
       error("Erro ao excluir categoria");
       setDeleteDialog((prev) => ({ ...prev, loading: false }));
     }
   };
 
-  const handleFiltroChange = (key: string, value: string) => {
+  const handleFiltroChange = (key: keyof Filtros, value: string) => {
     setFiltros((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -181,8 +207,18 @@ export default function CategoriasGaleriaPage() {
       tipo: "all",
       status: "all",
     });
-    setTimeout(() => fetchCategorias(), 100);
   };
+
+  // Efeito para buscar categorias quando limpar filtros
+  useEffect(() => {
+    if (
+      filtros.busca === "" &&
+      filtros.tipo === "all" &&
+      filtros.status === "all"
+    ) {
+      fetchCategorias();
+    }
+  }, [filtros, fetchCategorias]);
 
   const getTipoBadge = (tipo: string) => {
     return tipo === "fotos" ? (
@@ -501,6 +537,9 @@ export default function CategoriasGaleriaPage() {
                               <p className="font-semibold text-gray-800">
                                 {categoria.nome}
                               </p>
+                              <p className="text-sm text-gray-500">
+                                {categoria.slug}
+                              </p>
                             </div>
                           </div>
                         </td>
@@ -598,8 +637,8 @@ export default function CategoriasGaleriaPage() {
                 deleteDialog.categoria.itens_count > 0 ? (
                   <>
                     Não é possível excluir a categoria{" "}
-                    <strong>"{deleteDialog.categoria?.nome}"</strong> porque
-                    existem{" "}
+                    <strong>&quot;{deleteDialog.categoria?.nome}&quot;</strong>{" "}
+                    porque existem{" "}
                     <strong>{deleteDialog.categoria.itens_count} itens</strong>{" "}
                     associados a ela.
                     <br />
@@ -610,7 +649,7 @@ export default function CategoriasGaleriaPage() {
                 ) : (
                   <>
                     Tem certeza que deseja excluir a categoria{" "}
-                    <strong>"{deleteDialog.categoria?.nome}"</strong>?
+                    <strong>&quot;{deleteDialog.categoria?.nome}&quot;</strong>?
                     <br />
                     <span className="text-red-600 font-medium">
                       Esta ação não pode ser desfeita.

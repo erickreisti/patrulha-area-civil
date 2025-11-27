@@ -1,4 +1,3 @@
-// src/app/(app)/admin/noticias/criar/page.tsx - CORRIGIDA E PADRONIZADA
 "use client";
 
 import { useState } from "react";
@@ -18,11 +17,8 @@ import {
   FaArrowLeft,
   FaCalendarAlt,
   FaImage,
-  FaEye,
-  FaStar,
   FaChartBar,
   FaHome,
-  FaUser,
   FaTimes,
 } from "react-icons/fa";
 
@@ -42,7 +38,6 @@ export default function CriarNoticiaPage() {
   const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
-  const [imagemUrl, setImagemUrl] = useState<string>("");
   const [formData, setFormData] = useState({
     titulo: "",
     slug: "",
@@ -163,39 +158,43 @@ export default function CriarNoticiaPage() {
         return;
       }
 
+      console.log("🔄 Criando nova notícia...", formData);
+
       // Criar notícia
-      const { data, error } = await supabase
-        .from("noticias")
-        .insert([
-          {
-            titulo: formData.titulo.trim(),
-            slug: formData.slug.trim(),
-            conteudo: formData.conteudo.trim(),
-            resumo: formData.resumo.trim(),
-            imagem: imagemUrl || null,
-            categoria: formData.categoria,
-            autor_id: user.id,
-            destaque: formData.destaque,
-            data_publicacao: formData.data_publicacao,
-            status: formData.status,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
+      const { error } = await supabase.from("noticias").insert([
+        {
+          titulo: formData.titulo.trim(),
+          slug: formData.slug.trim(),
+          conteudo: formData.conteudo.trim(),
+          resumo: formData.resumo.trim(),
+          imagem: null,
+          categoria: formData.categoria,
+          autor_id: user.id,
+          destaque: formData.destaque,
+          data_publicacao: formData.data_publicacao,
+          status: formData.status,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao criar notícia:", error);
+        throw error;
+      }
 
+      console.log("✅ Notícia criada com sucesso!");
       alert("Notícia criada com sucesso!");
 
       // Redirecionar para a listagem
       setTimeout(() => {
         router.push("/admin/noticias");
       }, 1000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Erro ao criar notícia:", error);
-      alert(`Erro ao criar notícia: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      alert(`Erro ao criar notícia: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -217,7 +216,6 @@ export default function CriarNoticiaPage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/admin/noticias">
               <Button
                 variant="outline"
@@ -228,7 +226,6 @@ export default function CriarNoticiaPage() {
               </Button>
             </Link>
 
-            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
@@ -239,7 +236,6 @@ export default function CriarNoticiaPage() {
               </Button>
             </Link>
 
-            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"
@@ -352,7 +348,6 @@ export default function CriarNoticiaPage() {
 
                   {/* Botões de Ação */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
-                    {/* 🟢 VERDE - Ações de Criação */}
                     <Button
                       type="submit"
                       disabled={loading}
@@ -371,7 +366,6 @@ export default function CriarNoticiaPage() {
                       )}
                     </Button>
 
-                    {/* ⚫ CINZA - Navegação Neutra */}
                     <Button
                       type="button"
                       onClick={() => router.push("/admin/noticias")}
@@ -412,13 +406,6 @@ export default function CriarNoticiaPage() {
                     Selecionar Imagem
                   </Button>
                 </div>
-                {imagemUrl && (
-                  <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="text-xs text-green-700">
-                      ✅ Imagem carregada com sucesso
-                    </p>
-                  </div>
-                )}
                 <p className="text-xs text-gray-500 mt-2">
                   Sistema de upload será implementado em breve
                 </p>

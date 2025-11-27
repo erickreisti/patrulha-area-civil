@@ -1,9 +1,8 @@
-// src/components/admin/AdminHeader.tsx - COM REACT ICONS
+// src/components/admin/AdminHeader.tsx - CORRIGIDO
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +16,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
@@ -109,7 +109,6 @@ interface UserProfile {
 // FUNÇÕES AUXILIARES
 // =============================================
 
-// Função para obter as iniciais do nome (primeira letra do primeiro nome + primeira letra do último nome)
 const getInitials = (fullName: string): string => {
   if (!fullName || fullName.trim().length === 0) return "U";
 
@@ -147,7 +146,6 @@ export function AdminHeader() {
   // EFFECTS E CARREGAMENTO DE DADOS
   // =============================================
 
-  // Carregar perfil do usuário
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
@@ -175,7 +173,6 @@ export function AdminHeader() {
     loadUserProfile();
   }, [supabase]);
 
-  // Fechar busca quando clicar fora - CORRIGIDO
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -190,7 +187,6 @@ export function AdminHeader() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Focar no input quando abrir o modal de busca
   useEffect(() => {
     if (isSearchOpen && searchInputRef.current) {
       setTimeout(() => {
@@ -200,7 +196,7 @@ export function AdminHeader() {
   }, [isSearchOpen]);
 
   // =============================================
-  // SISTEMA DE BUSCA INTELIGENTE - CORRIGIDO
+  // SISTEMA DE BUSCA INTELIGENTE
   // =============================================
 
   const performSearch = useCallback(
@@ -208,14 +204,12 @@ export function AdminHeader() {
       const searchTerm = `%${query}%`;
 
       try {
-        // 🔍 BUSCA SIMULTÂNEA EM TODAS AS TABELAS
         const [
           { data: agents, error: agentsError },
           { data: news, error: newsError },
           { data: galleryItems, error: galleryItemsError },
           { data: galleryCategories, error: galleryCategoriesError },
         ] = await Promise.all([
-          // 👥 BUSCA EM AGENTES
           supabase
             .from("profiles")
             .select("*")
@@ -223,8 +217,6 @@ export function AdminHeader() {
               `full_name.ilike.${searchTerm},matricula.ilike.${searchTerm},email.ilike.${searchTerm}`
             )
             .limit(5),
-
-          // 📰 BUSCA EM NOTÍCIAS
           supabase
             .from("noticias")
             .select("*")
@@ -232,15 +224,11 @@ export function AdminHeader() {
               `titulo.ilike.${searchTerm},resumo.ilike.${searchTerm},categoria.ilike.${searchTerm}`
             )
             .limit(5),
-
-          // 🖼️ BUSCA EM ITENS DA GALERIA
           supabase
             .from("galeria_itens")
             .select("*")
             .or(`titulo.ilike.${searchTerm},descricao.ilike.${searchTerm}`)
             .limit(5),
-
-          // 📁 BUSCA EM CATEGORIAS DA GALERIA
           supabase
             .from("galeria_categorias")
             .select("*")
@@ -248,7 +236,6 @@ export function AdminHeader() {
             .limit(5),
         ]);
 
-        // Log de erros para debug
         if (agentsError) console.error("Erro ao buscar agentes:", agentsError);
         if (newsError) console.error("Erro ao buscar notícias:", newsError);
         if (galleryItemsError)
@@ -256,7 +243,6 @@ export function AdminHeader() {
         if (galleryCategoriesError)
           console.error("Erro ao buscar categorias:", galleryCategoriesError);
 
-        // Validar dados com Zod (com fallback para arrays vazios em caso de erro)
         const validatedResults: SearchResults = {
           agents: agents ? agents.map((item) => profileSchema.parse(item)) : [],
           news: news ? news.map((item) => newsSchema.parse(item)) : [],
@@ -282,7 +268,6 @@ export function AdminHeader() {
     [supabase]
   );
 
-  // Debounce para busca - CORRIGIDO
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length >= 2) {
@@ -371,7 +356,7 @@ export function AdminHeader() {
         <div className="text-center py-8 text-gray-500">
           <FaSearch className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p>Nenhum resultado encontrado para</p>
-          <p className="font-semibold">&quot{searchQuery}&quot</p>
+          <p className="font-semibold">&quot;{searchQuery}&quot;</p>
         </div>
       );
     }
@@ -539,11 +524,11 @@ export function AdminHeader() {
               <FaBars className="h-5 w-5" />
             </Button>
 
-            {/* 🔍 SISTEMA DE BUSCA PRINCIPAL - CORRIGIDO */}
+            {/* 🔍 SISTEMA DE BUSCA PRINCIPAL */}
             <form onSubmit={handleSearch} className="relative">
               <div className="relative">
                 <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
+                <input
                   ref={searchInputRef}
                   type="search"
                   placeholder="Buscar agentes, notícias, galeria..."
@@ -559,7 +544,7 @@ export function AdminHeader() {
                       setIsSearchOpen(true);
                     }
                   }}
-                  className="pl-10 pr-10 w-64 lg:w-80 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg"
+                  className="pl-10 pr-10 w-64 lg:w-80 border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg h-10 px-3 py-2 text-sm"
                 />
                 {searchQuery && (
                   <button
@@ -614,7 +599,7 @@ export function AdminHeader() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* 👤 PERFIL DO USUÁRIO - COM INICIAIS */}
+            {/* 👤 PERFIL DO USUÁRIO */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -686,7 +671,7 @@ export function AdminHeader() {
         </div>
       </header>
 
-      {/* 🔍 MODAL DE RESULTADOS DA BUSCA - CORRIGIDO */}
+      {/* 🔍 MODAL DE RESULTADOS DA BUSCA */}
       <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden p-0">
           <DialogHeader className="px-6 py-4 border-b">
@@ -697,18 +682,21 @@ export function AdminHeader() {
                 <FaSpinner className="w-4 h-4 animate-spin ml-2" />
               )}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Resultados da busca por {searchQuery}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="px-6 py-4">
             {/* Input de busca dentro do modal */}
             <div className="relative mb-4">
               <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
+              <input
                 type="search"
                 placeholder="Continue buscando..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full pl-10 border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg h-10 px-3 py-2 text-sm"
                 autoFocus
               />
             </div>

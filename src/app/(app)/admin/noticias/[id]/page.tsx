@@ -1,8 +1,7 @@
-// src/app/(app)/admin/noticias/[id]/page.tsx - PADRONIZADO
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,6 @@ import {
   FaArrowLeft,
   FaEye,
   FaCalendarAlt,
-  FaUser,
   FaLink,
   FaImage,
   FaHistory,
@@ -56,7 +54,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [noticia, setNoticia] = useState<NoticiaWithAutor | null>(null);
   const [formData, setFormData] = useState<NoticiaFormData>({
     titulo: "",
@@ -75,14 +72,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     const fetchData = async () => {
       try {
         setLoading(true);
-
-        // Buscar usuário logado
-        const {
-          data: { user: authUser },
-        } = await supabase.auth.getUser();
-        if (authUser) {
-          setUser(authUser);
-        }
+        console.log(`🔄 Buscando notícia ID: ${params.id}...`);
 
         // Buscar notícia com dados do autor
         const { data: noticiaData, error } = await supabase
@@ -96,12 +86,16 @@ export default function EditarNoticiaPage({ params }: PageProps) {
           .eq("id", params.id)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error("❌ Erro ao buscar notícia:", error);
+          throw error;
+        }
 
         if (!noticiaData) {
           throw new Error("Notícia não encontrada");
         }
 
+        console.log("✅ Notícia carregada:", noticiaData);
         setNoticia(noticiaData);
         setFormData({
           titulo: noticiaData.titulo,
@@ -114,9 +108,11 @@ export default function EditarNoticiaPage({ params }: PageProps) {
           data_publicacao: noticiaData.data_publicacao,
           status: noticiaData.status,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("❌ Erro ao carregar notícia:", error);
-        alert(`Erro ao carregar notícia: ${error.message}`);
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro desconhecido";
+        alert(`Erro ao carregar notícia: ${errorMessage}`);
         router.push("/admin/noticias");
       } finally {
         setLoading(false);
@@ -239,13 +235,18 @@ export default function EditarNoticiaPage({ params }: PageProps) {
         updated_at: new Date().toISOString(),
       };
 
+      console.log("🔄 Atualizando notícia...", updateData);
+
       // Atualizar no banco
       const { error } = await supabase
         .from("noticias")
         .update(updateData)
         .eq("id", params.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao atualizar notícia:", error);
+        throw error;
+      }
 
       console.log("✅ Notícia atualizada com sucesso");
 
@@ -254,9 +255,11 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
       // Redirecionar para a listagem
       router.push("/admin/noticias");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Erro ao atualizar notícia:", error);
-      alert(`Erro ao atualizar notícia: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      alert(`Erro ao atualizar notícia: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -283,15 +286,16 @@ export default function EditarNoticiaPage({ params }: PageProps) {
       console.log("🗑️ Notícia excluída");
       alert("Notícia excluída com sucesso!");
       router.push("/admin/noticias");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Erro ao excluir notícia:", error);
-      alert(`Erro ao excluir notícia: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      alert(`Erro ao excluir notícia: ${errorMessage}`);
     }
   };
 
   // Preview da notícia
   const handlePreview = () => {
-    // Em produção, isso abriria a notícia em uma nova aba
     alert(
       "Preview da notícia:\n\n" +
         `Título: ${formData.titulo}\n` +
@@ -319,7 +323,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
         <div className="container mx-auto px-4">
           <div className="text-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-800 mx-auto mb-4"></div>
             <p className="text-gray-600">Carregando notícia...</p>
           </div>
         </div>
@@ -365,7 +369,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
           {/* Botões de Navegação */}
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {/* 🔵 AZUL - Ações Administrativas */}
             <Link href="/admin/noticias">
               <Button
                 variant="outline"
@@ -376,7 +379,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
               </Button>
             </Link>
 
-            {/* 🟣 ROXO - Funcionalidades Administrativas */}
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
@@ -387,11 +389,10 @@ export default function EditarNoticiaPage({ params }: PageProps) {
               </Button>
             </Link>
 
-            {/* ⚫ CINZA - Navegação Neutra */}
             <Link href="/">
               <Button
                 variant="outline"
-                className="border-slate-700 text-slate-700 hover:bg-slate-100"
+                className="border-gray-700 text-gray-700 hover:bg-gray-100"
               >
                 <FaHome className="w-4 h-4 mr-2" />
                 Voltar ao Site
@@ -425,7 +426,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader className="border-b border-gray-200">
                 <CardTitle className="flex items-center text-xl">
-                  <FaNewspaper className="w-5 h-5 mr-2 text-navy" />
+                  <FaNewspaper className="w-5 h-5 mr-2 text-blue-800" />
                   Editar Notícia
                 </CardTitle>
               </CardHeader>
@@ -519,7 +520,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
                   {/* Botões de Ação */}
                   <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
-                    {/* 🔵 AZUL - Ações Administrativas */}
                     <Button
                       type="submit"
                       disabled={saving}
@@ -538,7 +538,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       )}
                     </Button>
 
-                    {/* 🔴 VERMELHO - Ações Destrutivas */}
                     <Button
                       type="button"
                       onClick={handleDelete}
@@ -549,12 +548,11 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       Excluir
                     </Button>
 
-                    {/* ⚫ CINZA - Navegação Neutra */}
                     <Button
                       type="button"
                       onClick={() => router.push("/admin/noticias")}
                       variant="outline"
-                      className="border-slate-700 text-slate-700 hover:bg-slate-100 py-3"
+                      className="border-gray-700 text-gray-700 hover:bg-gray-100 py-3"
                     >
                       <FaTimes className="w-4 h-4 mr-2" />
                       Cancelar
@@ -571,7 +569,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaCalendarAlt className="w-4 h-4 mr-2 text-navy" />
+                  <FaCalendarAlt className="w-4 h-4 mr-2 text-blue-800" />
                   Publicação
                 </CardTitle>
               </CardHeader>
@@ -616,7 +614,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                               status: e.target.value as NoticiaStatus,
                             }))
                           }
-                          className="text-navy focus:ring-navy"
+                          className="text-blue-600 focus:ring-blue-600"
                         />
                         <span className="text-sm capitalize">{status}</span>
                         {status === "rascunho" && (
@@ -668,7 +666,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaImage className="w-4 h-4 mr-2 text-navy" />
+                  <FaImage className="w-4 h-4 mr-2 text-blue-800" />
                   Categoria e Mídia
                 </CardTitle>
               </CardHeader>
@@ -683,7 +681,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                     name="categoria"
                     value={formData.categoria}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                   >
                     {CATEGORIAS.map((cat) => (
                       <option key={cat} value={cat}>
@@ -707,7 +705,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       variant="outline"
                       size="sm"
                       disabled
-                      className="text-xs border-slate-700 text-slate-700 hover:bg-slate-100"
+                      className="text-xs border-gray-700 text-gray-700 hover:bg-gray-100"
                     >
                       Selecionar Imagem
                     </Button>
@@ -723,7 +721,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
             <Card className="border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                  <FaHistory className="w-4 h-4 mr-2 text-navy" />
+                  <FaHistory className="w-4 h-4 mr-2 text-blue-800" />
                   Informações
                 </CardTitle>
               </CardHeader>

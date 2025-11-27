@@ -82,7 +82,7 @@ const BrandSection = () => {
             Patrulha Aérea Civil
           </h2>
           <p className="text-navy font-roboto font-medium text-base">
-            Servindo com Excelência e Dedicação
+            COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
           </p>
         </div>
       </Link>

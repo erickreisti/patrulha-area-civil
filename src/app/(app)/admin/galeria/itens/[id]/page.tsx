@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import Image from "next/image";
 import {
   FaArrowLeft,
   FaSave,
@@ -72,6 +73,13 @@ interface FormData {
   ordem: number;
 }
 
+interface SupabaseError {
+  code?: string;
+  message: string;
+  details?: string;
+  hint?: string;
+}
+
 export default function EditarItemPage() {
   const params = useParams();
   const router = useRouter();
@@ -97,14 +105,7 @@ export default function EditarItemPage() {
 
   const itemId = params.id as string;
 
-  useEffect(() => {
-    if (itemId) {
-      fetchItem();
-      fetchCategorias();
-    }
-  }, [itemId]);
-
-  const fetchItem = async () => {
+  const fetchItem = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -139,15 +140,15 @@ export default function EditarItemPage() {
           ordem: data.ordem || 0,
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao carregar item:", err);
       alert("Não foi possível carregar o item.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [itemId, supabase]);
 
-  const fetchCategorias = async () => {
+  const fetchCategorias = useCallback(async () => {
     try {
       const { data, error: fetchError } = await supabase
         .from("galeria_categorias")
@@ -157,10 +158,17 @@ export default function EditarItemPage() {
 
       if (fetchError) throw fetchError;
       setCategorias(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao carregar categorias:", err);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (itemId) {
+      fetchItem();
+      fetchCategorias();
+    }
+  }, [itemId, fetchItem, fetchCategorias]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -209,7 +217,7 @@ export default function EditarItemPage() {
     try {
       setSaving(true);
 
-      const { data, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from("galeria_itens")
         .update({
           titulo: formData.titulo.trim(),
@@ -235,10 +243,13 @@ export default function EditarItemPage() {
       setTimeout(() => {
         router.push("/admin/galeria/itens");
       }, 1000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao atualizar item:", err);
 
-      if (err.code === "23505") {
+      // Corrigido: usando type guard para verificar se é um SupabaseError
+      const error = err as SupabaseError;
+
+      if (error.code === "23505") {
         alert("Já existe um item com este título.");
       } else {
         alert("Não foi possível atualizar o item.");
@@ -588,14 +599,19 @@ export default function EditarItemPage() {
                       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50">
                         {formData.tipo === "foto" ? (
                           <div className="flex flex-col items-center justify-center text-center">
-                            <img
-                              src={formData.url}
-                              alt="Preview"
-                              className="max-w-full max-h-64 object-contain rounded mb-3"
-                              onError={(e) => {
-                                e.currentTarget.style.display = "none";
-                              }}
-                            />
+                            <div className="relative w-full max-h-64 mb-3">
+                              <Image
+                                src={formData.url}
+                                alt="Preview"
+                                width={400}
+                                height={256}
+                                className="max-w-full max-h-64 object-contain rounded"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = "none";
+                                }}
+                              />
+                            </div>
                             <p className="text-sm text-gray-600 break-all">
                               {formData.url}
                             </p>

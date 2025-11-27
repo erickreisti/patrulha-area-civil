@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import Image from "next/image";
 import {
   FaNewspaper,
   FaPlus,
@@ -50,37 +51,46 @@ export default function NoticiasPage() {
 
   const supabase = createClient();
 
+  // ✅ CORREÇÃO: Mover fetchNoticias para dentro do useEffect
   useEffect(() => {
-    fetchNoticias();
-  }, []);
+    const fetchNoticias = async () => {
+      try {
+        setLoading(true);
+        console.log("🔄 Buscando notícias do banco...");
 
-  const fetchNoticias = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("noticias")
-        .select(
-          `
+        const { data, error } = await supabase
+          .from("noticias")
+          .select(
+            `
           *,
           autor:profiles(full_name, graduacao)
         `
-        )
-        .order("created_at", { ascending: false });
+          )
+          .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setNoticias(data || []);
-    } catch (error) {
-      console.error("Erro ao buscar notícias:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        if (error) {
+          console.error("❌ Erro ao buscar notícias:", error);
+          throw error;
+        }
 
+        console.log(`✅ ${data?.length || 0} notícias carregadas:`, data);
+        setNoticias(data || []);
+      } catch (error) {
+        console.error("❌ Erro ao buscar notícias:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNoticias();
+  }, [supabase]); // ✅ Agora só supabase está nas dependências
+
+  // Resto do código permanece igual...
   const filteredNoticias = noticias.filter((noticia) => {
     const matchesSearch =
       noticia.titulo.toLowerCase().includes(search.toLowerCase()) ||
-      noticia.resumo.toLowerCase().includes(search.toLowerCase()) ||
-      noticia.conteudo.toLowerCase().includes(search.toLowerCase());
+      noticia.resumo?.toLowerCase().includes(search.toLowerCase()) ||
+      noticia.conteudo?.toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus =
       filterStatus === "all" || noticia.status === filterStatus;
@@ -131,8 +141,13 @@ export default function NoticiasPage() {
             : noticia
         )
       );
+
+      console.log(
+        `✅ Status da notícia ${noticiaId} alterado para ${newStatus}`
+      );
     } catch (error) {
-      console.error("Erro ao alterar status:", error);
+      console.error("❌ Erro ao alterar status:", error);
+      alert("Erro ao alterar status da notícia");
     }
   };
 
@@ -162,8 +177,13 @@ export default function NoticiasPage() {
             : noticia
         )
       );
+
+      console.log(
+        `✅ Destaque da notícia ${noticiaId} alterado para ${!currentDestaque}`
+      );
     } catch (error) {
-      console.error("Erro ao alterar destaque:", error);
+      console.error("❌ Erro ao alterar destaque:", error);
+      alert("Erro ao alterar destaque da notícia");
     }
   };
 
@@ -181,10 +201,14 @@ export default function NoticiasPage() {
         .from("noticias")
         .delete()
         .eq("id", noticiaId);
+
       if (error) throw error;
+
       setNoticias((prev) => prev.filter((noticia) => noticia.id !== noticiaId));
+      console.log(`🗑️ Notícia ${noticiaId} excluída com sucesso`);
     } catch (error) {
-      console.error("Erro ao excluir notícia:", error);
+      console.error("❌ Erro ao excluir notícia:", error);
+      alert("Erro ao excluir notícia");
     }
   };
 
@@ -366,7 +390,9 @@ export default function NoticiasPage() {
               <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                 <select
                   value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  onChange={(e) =>
+                    setFilterStatus(e.target.value as NoticiaStatus | "all")
+                  }
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                 >
                   <option value="all">Todos os status</option>
@@ -390,7 +416,11 @@ export default function NoticiasPage() {
 
                 <select
                   value={filterDestaque}
-                  onChange={(e) => setFilterDestaque(e.target.value as any)}
+                  onChange={(e) =>
+                    setFilterDestaque(
+                      e.target.value as "all" | "destaque" | "normal"
+                    )
+                  }
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm"
                 >
                   <option value="all">Todos</option>
@@ -468,9 +498,11 @@ export default function NoticiasPage() {
                           <div className="flex items-start space-x-3">
                             <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
                               {noticia.imagem ? (
-                                <img
+                                <Image
                                   src={noticia.imagem}
                                   alt={noticia.titulo}
+                                  width={48}
+                                  height={48}
                                   className="w-12 h-12 rounded object-cover"
                                 />
                               ) : (

@@ -251,7 +251,7 @@ const LoadingSpinner = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
 const LoadingButton = () => {
   return (
     <Button
-      className="bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed"
+      className="bg-navy text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed"
       disabled
     >
       <motion.div
@@ -264,9 +264,9 @@ const LoadingButton = () => {
           ease: "easeInOut",
         }}
       />
-      <div className="flex items-center justify-center gap-3 relative z-10">
+      <div className="flex items-center justify-center gap-2 relative z-10">
         <LoadingSpinner size="sm" />
-        <span className="text-white/90">Carregando...</span>
+        <span className="text-white/90 hidden sm:inline">Carregando...</span>
       </div>
     </Button>
   );
@@ -292,7 +292,8 @@ const TopBar = () => {
     <div className="bg-navy py-2">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center text-white text-sm">
-          <div className="flex items-center gap-3">
+          {/* Bandeira - visível apenas em desktop */}
+          <div className="hidden sm:flex items-center gap-3">
             <div className="relative w-6 h-4">
               <Image
                 src="/images/logos/flag-br.webp"
@@ -308,7 +309,12 @@ const TopBar = () => {
             </span>
           </div>
 
-          <div className="flex gap-2">
+          {/* Texto alternativo para mobile */}
+          <div className="sm:hidden text-slate-200 text-xs font-medium">
+            Brasil
+          </div>
+
+          <div className="flex gap-1 sm:gap-2">
             {SOCIAL_ICONS.map((social) => {
               const IconComponent = social.icon;
               return (
@@ -318,13 +324,13 @@ const TopBar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    "w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-white no-underline transition-all duration-300 border border-white/20",
+                    "w-7 h-7 sm:w-8 sm:h-8 bg-white/10 rounded-full flex items-center justify-center text-white no-underline transition-all duration-300 border border-white/20",
                     social.hoverColor,
                     "hover:border-transparent hover:scale-110 hover:shadow-lg"
                   )}
                   aria-label={social.label}
                 >
-                  <IconComponent className="w-3 h-3" />
+                  <IconComponent className="w-3 h-3 sm:w-3 sm:h-3" />
                 </a>
               );
             })}
@@ -337,22 +343,22 @@ const TopBar = () => {
 
 const Logo = () => {
   return (
-    <Link href="/" className="flex items-center gap-3 sm:gap-4 group">
-      <div className="relative w-14 h-14 sm:w-16 sm:h-16">
+    <Link href="/" className="flex items-center gap-2 sm:gap-3 group">
+      <div className="relative w-10 h-10 sm:w-14 sm:h-14">
         <Image
           src="/images/logos/logo.webp"
           alt="Patrulha Aérea Civil"
-          width={64}
-          height={64}
+          width={56}
+          height={56}
           className="object-contain drop-shadow-md w-full h-full"
           priority
         />
       </div>
       <div className="text-left">
-        <h1 className="font-bebas text-xl sm:text-2xl bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight">
+        <h1 className="font-bebas text-lg sm:text-xl bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight">
           PATRULHA AÉREA CIVIL
         </h1>
-        <p className="text-slate-600 text-xs sm:text-sm leading-tight mt-1 font-roboto">
+        <p className="text-slate-600 text-xs leading-tight mt-0.5 font-roboto">
           Serviço Humanitário
         </p>
       </div>
@@ -362,8 +368,8 @@ const Logo = () => {
 
 const DesktopLogo = () => {
   return (
-    <Link href="/" className="flex items-center gap-4 group">
-      <div className="relative w-16 h-16 transition-all duration-300 group-hover:scale-105">
+    <Link href="/" className="flex items-center gap-3 sm:gap-4 group">
+      <div className="relative w-12 h-12 sm:w-16 sm:h-16 transition-all duration-300 group-hover:scale-105">
         <Image
           src="/images/logos/logo.webp"
           alt="Patrulha Aérea Civil"
@@ -374,11 +380,11 @@ const DesktopLogo = () => {
         />
       </div>
       <div className="text-left">
-        <h1 className="font-bebas text-2xl bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 group-hover:scale-105">
+        <h1 className="font-bebas text-xl sm:text-2xl bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 group-hover:scale-105">
           PATRULHA AÉREA CIVIL
         </h1>
-        <p className="text-slate-600 text-sm leading-tight mt-1 font-roboto">
-          Serviço Humanitário de Excelência
+        <p className="text-slate-600 text-xs sm:text-sm leading-tight mt-1 font-roboto">
+          COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
         </p>
       </div>
     </Link>
@@ -417,7 +423,7 @@ const NavigationItem = ({
 
 const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   <nav className="flex items-center">
-    <ul className="flex list-none gap-8 m-0 p-0">
+    <ul className="flex list-none gap-4 lg:gap-6 xl:gap-8 m-0 p-0">
       {NAVIGATION.map((item) => (
         <NavigationItem
           key={item.name}
@@ -429,8 +435,7 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// 🎯 BOTÃO DO USUÁRIO CORRIGIDO - MOSTRA "MEU PERFIL"
-// 🎯 BOTÃO DO USUÁRIO COM AVATAR REAL
+// 🎯 BOTÃO DO USUÁRIO CORRIGIDO - SEM AVATAR NO BOTÃO, SÓ NO DROPDOWN
 const UserMenuButton = () => {
   const { user, profile, loading, signOut, isAdmin } = useHeaderAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -445,7 +450,7 @@ const UserMenuButton = () => {
   if (!user) {
     return (
       <Button
-        className="bg-navy hover:bg-navy-700 text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
+        className="bg-navy hover:bg-navy-700 text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
         asChild
       >
         <Link href="/login">
@@ -460,31 +465,9 @@ const UserMenuButton = () => {
     <div className="relative">
       <Button
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="bg-navy hover:bg-navy-700 text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] flex items-center gap-2"
+        className="bg-navy hover:bg-navy-700 text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
       >
-        {/* 🎯 AVATAR REAL DO AGENTE */}
-        {profile?.avatar_url ? (
-          <div className="w-6 h-6 rounded-full overflow-hidden border-2 border-white/50 flex-shrink-0">
-            <Image
-              src={profile.avatar_url}
-              alt={`Avatar de ${profile.full_name || "Agente"}`}
-              width={24}
-              height={24}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                // Fallback para ícone se a imagem não carregar
-                const parent = e.currentTarget.parentElement;
-                if (parent) {
-                  parent.innerHTML =
-                    '<FaUser className="w-4 h-4 text-white" />';
-                }
-              }}
-            />
-          </div>
-        ) : (
-          <FaUser className="w-4 h-4 flex-shrink-0" />
-        )}
-
+        {/* 🎯 SEM AVATAR NO BOTÃO - APENAS TEXTO */}
         <span className="relative z-10">Meu Perfil</span>
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
       </Button>
@@ -493,7 +476,7 @@ const UserMenuButton = () => {
         <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 animate-scale-in">
           <div className="p-4 border-b border-slate-200">
             <div className="flex items-center gap-3">
-              {/* 🎯 AVATAR NO DROPDOWN TAMBÉM */}
+              {/* 🎯 AVATAR APENAS NO DROPDOWN */}
               {profile?.avatar_url ? (
                 <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-navy/20 flex-shrink-0">
                   <Image
@@ -771,19 +754,24 @@ export function Header() {
 
       <div className="bg-white transition-all duration-300">
         <div className="container mx-auto px-4 sm:px-6">
+          {/* Mobile Header */}
           <div className="xl:hidden flex items-center justify-between w-full py-3">
             <Logo />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleMenu}
-              className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110"
-              aria-label="Alternar menu"
-            >
-              <FaBars className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <UserMenuButton />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMenu}
+                className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110"
+                aria-label="Alternar menu"
+              >
+                <FaBars className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
 
+          {/* Desktop Header */}
           <div className="hidden xl:flex items-center justify-between w-full py-4">
             <DesktopLogo />
             <DesktopNavigation pathname={pathname} />

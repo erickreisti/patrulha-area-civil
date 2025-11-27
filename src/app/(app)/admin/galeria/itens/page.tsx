@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,7 +65,6 @@ interface Categoria {
   tipo: "fotos" | "videos";
 }
 
-// Componente de Imagem com Placeholder Robusto
 interface ImageWithFallbackProps {
   src: string | null;
   alt: string;
@@ -82,13 +81,16 @@ function ImageWithFallback({
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  // Reset states quando a src mudar
-  useEffect(() => {
-    setImageError(false);
-    setImageLoading(true);
-  }, [src]);
+  // Reset states quando a props mudam - usando key no componente para forçar re-mount
+  const handleImageLoad = () => {
+    setImageLoading(false);
+  };
 
-  // Se for vídeo ou não tiver src, mostra apenas ícone
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoading(false);
+  };
+
   if (tipo === "video" || !src) {
     return (
       <div
@@ -101,7 +103,6 @@ function ImageWithFallback({
     );
   }
 
-  // Se houve erro ou imagem está quebrada
   if (imageError) {
     return (
       <div
@@ -115,7 +116,6 @@ function ImageWithFallback({
     );
   }
 
-  // Tenta carregar a imagem
   return (
     <div
       className={`w-12 h-12 rounded overflow-hidden relative bg-gray-200 ${className}`}
@@ -126,6 +126,7 @@ function ImageWithFallback({
         </div>
       )}
       <Image
+        key={src} // Key para forçar re-mount quando src mudar
         src={src}
         alt={alt}
         width={48}
@@ -133,11 +134,8 @@ function ImageWithFallback({
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           imageLoading ? "opacity-0" : "opacity-100"
         }`}
-        onLoad={() => setImageLoading(false)}
-        onError={() => {
-          setImageError(true);
-          setImageLoading(false);
-        }}
+        onLoad={handleImageLoad}
+        onError={handleImageError}
         priority={false}
         loading="lazy"
       />
@@ -167,12 +165,7 @@ export default function ItensGaleriaPage() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    fetchItens();
-    fetchCategorias();
-  }, []);
-
-  const fetchItens = async () => {
+  const fetchItens = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -190,7 +183,6 @@ export default function ItensGaleriaPage() {
         .order("ordem", { ascending: true })
         .order("created_at", { ascending: false });
 
-      // Aplicar filtros
       if (filtros.busca) {
         query = query.ilike("titulo", `%${filtros.busca}%`);
       }
@@ -212,15 +204,15 @@ export default function ItensGaleriaPage() {
       if (error) throw error;
 
       setItens(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar itens:", error);
       alert("Erro ao carregar itens da galeria");
     } finally {
       setLoading(false);
     }
-  };
+  }, [filtros, supabase]);
 
-  const fetchCategorias = async () => {
+  const fetchCategorias = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from("galeria_categorias")
@@ -231,10 +223,15 @@ export default function ItensGaleriaPage() {
       if (error) throw error;
 
       setCategorias(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao carregar categorias:", error);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchItens();
+    fetchCategorias();
+  }, [fetchItens, fetchCategorias]);
 
   const handleDeleteClick = (item: GaleriaItem) => {
     setDeleteDialog({
@@ -260,7 +257,7 @@ export default function ItensGaleriaPage() {
       alert("Item excluído com sucesso!");
       setDeleteDialog({ open: false, item: null, loading: false });
       fetchItens();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao excluir item:", error);
       alert("Erro ao excluir item");
       setDeleteDialog((prev) => ({ ...prev, loading: false }));
@@ -720,7 +717,7 @@ export default function ItensGaleriaPage() {
               </DialogTitle>
               <DialogDescription>
                 Tem certeza que deseja excluir o item{" "}
-                <strong>"{deleteDialog.item?.titulo}"</strong>?
+                <strong>&quot;{deleteDialog.item?.titulo}&quot;</strong>?
                 <br />
                 <span className="text-red-600 font-medium">
                   Esta ação não pode ser desfeita.
