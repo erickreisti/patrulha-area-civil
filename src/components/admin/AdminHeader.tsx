@@ -1,4 +1,4 @@
-// src/components/admin/AdminHeader.tsx - CORRIGIDO
+// src/components/admin/AdminHeader.tsx - COMPLETO COM NOTIFICAÇÕES FUNCIONAIS
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -40,6 +40,11 @@ import {
   FaFolder,
   FaTimes,
   FaSpinner,
+  FaCheck,
+  FaTrash,
+  FaExclamationTriangle,
+  FaInfoCircle,
+  FaEye,
 } from "react-icons/fa";
 
 // =============================================
@@ -87,6 +92,36 @@ const galleryCategorySchema = z.object({
   created_at: z.string(),
 });
 
+// Interface para metadata baseada no schema
+interface NotificationMetadata {
+  resource_type?: string;
+  resource_id?: string;
+  action_type?: string;
+  user_id?: string;
+  [key: string]: unknown;
+}
+
+// Interface para notificações
+interface Notification {
+  id: string;
+  user_id: string;
+  type:
+    | "system"
+    | "user_created"
+    | "news_published"
+    | "gallery_upload"
+    | "warning"
+    | "info";
+  title: string;
+  message: string;
+  action_url?: string;
+  is_read: boolean;
+  metadata?: NotificationMetadata;
+  expires_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 type ProfileData = z.infer<typeof profileSchema>;
 type NewsData = z.infer<typeof newsSchema>;
 type GalleryItemData = z.infer<typeof galleryItemSchema>;
@@ -124,6 +159,276 @@ const getInitials = (fullName: string): string => {
 };
 
 // =============================================
+// HOOK DE NOTIFICAÇÕES
+// =============================================
+
+const useNotifications = () => {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+
+      setNotifications(data || []);
+    } catch (err) {
+      console.error("Erro ao buscar notificações:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
+
+  const markAsRead = useCallback(
+    async (notificationId: string) => {
+      try {
+        const { error } = await supabase
+          .from("notifications")
+          .update({ is_read: true })
+          .eq("id", notificationId);
+
+        if (error) throw error;
+
+        setNotifications((prev) =>
+          prev.map((notif) =>
+            notif.id === notificationId ? { ...notif, is_read: true } : notif
+          )
+        );
+      } catch (err) {
+        console.error("Erro ao marcar notificação como lida:", err);
+      }
+    },
+    [supabase]
+  );
+
+  const markAllAsRead = useCallback(async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false);
+
+      if (error) throw error;
+
+      setNotifications((prev) =>
+        prev.map((notif) => ({ ...notif, is_read: true }))
+      );
+    } catch (err) {
+      console.error("Erro ao marcar todas como lidas:", err);
+    }
+  }, [supabase]);
+
+  const deleteNotification = useCallback(
+    async (notificationId: string) => {
+      try {
+        const { error } = await supabase
+          .from("notifications")
+          .delete()
+          .eq("id", notificationId);
+
+        if (error) throw error;
+
+        setNotifications((prev) =>
+          prev.filter((notif) => notif.id !== notificationId)
+        );
+      } catch (err) {
+        console.error("Erro ao excluir notificação:", err);
+      }
+    },
+    [supabase]
+  );
+
+  // Escutar por novas notificações em tempo real
+  useEffect(() => {
+    fetchNotifications();
+
+    const channel = supabase
+      .channel("notifications-changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+        },
+        () => {
+          fetchNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, fetchNotifications]);
+
+  const unreadCount = notifications.filter((notif) => !notif.is_read).length;
+
+  return {
+    notifications,
+    unreadCount,
+    loading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    refreshNotifications: fetchNotifications,
+  };
+};
+
+// =============================================
+// COMPONENTE DE ITEM DE NOTIFICAÇÃO
+// =============================================
+
+const NotificationItem = ({
+  notification,
+  onMarkAsRead,
+  onDelete,
+}: {
+  notification: Notification;
+  onMarkAsRead: (id: string) => void;
+  onDelete: (id: string) => void;
+}) => {
+  const router = useRouter();
+
+  const getNotificationIcon = () => {
+    switch (notification.type) {
+      case "system":
+        return <FaCog className="w-4 h-4 text-blue-600 flex-shrink-0" />;
+      case "user_created":
+        return <FaUsers className="w-4 h-4 text-green-600 flex-shrink-0" />;
+      case "news_published":
+        return <FaFileAlt className="w-4 h-4 text-purple-600 flex-shrink-0" />;
+      case "gallery_upload":
+        return <FaImage className="w-4 h-4 text-orange-600 flex-shrink-0" />;
+      case "warning":
+        return (
+          <FaExclamationTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+        );
+      case "info":
+        return <FaInfoCircle className="w-4 h-4 text-blue-600 flex-shrink-0" />;
+      default:
+        return <FaBell className="w-4 h-4 text-gray-600 flex-shrink-0" />;
+    }
+  };
+
+  const getNotificationColor = () => {
+    if (notification.is_read) return "border-gray-200 bg-white";
+
+    switch (notification.type) {
+      case "system":
+        return "border-blue-200 bg-blue-50";
+      case "user_created":
+        return "border-green-200 bg-green-50";
+      case "news_published":
+        return "border-purple-200 bg-purple-50";
+      case "gallery_upload":
+        return "border-orange-200 bg-orange-50";
+      case "warning":
+        return "border-yellow-200 bg-yellow-50";
+      case "info":
+        return "border-blue-200 bg-blue-50";
+      default:
+        return "border-gray-200 bg-gray-50";
+    }
+  };
+
+  const handleClick = () => {
+    if (!notification.is_read) {
+      onMarkAsRead(notification.id);
+    }
+
+    if (notification.action_url) {
+      router.push(notification.action_url);
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+
+    if (diffInMinutes < 1) return "Agora";
+    if (diffInMinutes < 60) return `Há ${diffInMinutes} min`;
+    if (diffInMinutes < 1440) return `Há ${Math.floor(diffInMinutes / 60)} h`;
+    return date.toLocaleDateString("pt-BR");
+  };
+
+  return (
+    <div
+      className={`p-3 border rounded-lg ${getNotificationColor()} transition-colors`}
+    >
+      <div className="flex items-start gap-3">
+        {getNotificationIcon()}
+
+        <div className="flex-1 min-w-0">
+          <button
+            onClick={handleClick}
+            className="w-full text-left hover:opacity-80 transition-opacity"
+          >
+            <p
+              className={`font-medium text-sm mb-1 ${
+                !notification.is_read ? "text-gray-900" : "text-gray-700"
+              }`}
+            >
+              {notification.title}
+            </p>
+            <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+              {notification.message}
+            </p>
+          </button>
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">
+              {formatTime(notification.created_at)}
+            </span>
+
+            <div className="flex items-center gap-1">
+              {!notification.is_read && (
+                <button
+                  onClick={() => onMarkAsRead(notification.id)}
+                  className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                  title="Marcar como lida"
+                >
+                  <FaCheck className="w-3 h-3" />
+                </button>
+              )}
+
+              <button
+                onClick={() => onDelete(notification.id)}
+                className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                title="Excluir notificação"
+              >
+                <FaTrash className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================
 // COMPONENTE PRINCIPAL
 // =============================================
 
@@ -141,6 +446,17 @@ export function AdminHeader() {
   const supabase = createClient();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchAreaRef = useRef<HTMLDivElement>(null);
+
+  // Hook de notificações
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    refreshNotifications,
+  } = useNotifications();
 
   // =============================================
   // EFFECTS E CARREGAMENTO DE DADOS
@@ -574,7 +890,7 @@ export function AdminHeader() {
               </Link>
             </Button>
 
-            {/* Notificações */}
+            {/* 🔔 NOTIFICAÇÕES FUNCIONAIS */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -583,19 +899,77 @@ export function AdminHeader() {
                   className="relative text-gray-500 hover:text-gray-700"
                 >
                   <FaBell className="h-5 w-5" />
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center border-2 border-white">
-                    3
-                  </span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center border-2 border-white font-medium">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80">
-                <DropdownMenuLabel>Notificações</DropdownMenuLabel>
+              <DropdownMenuContent
+                align="end"
+                className="w-96 max-h-96 overflow-y-auto"
+              >
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>Notificações</span>
+                  {unreadCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={markAllAsRead}
+                      className="h-6 text-xs text-blue-600 hover:text-blue-700"
+                    >
+                      <FaEye className="w-3 h-3 mr-1" />
+                      Marcar todas como lidas
+                    </Button>
+                  )}
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div className="p-2">
-                  <div className="text-center text-sm text-gray-500 py-4">
-                    Nenhuma notificação nova
-                  </div>
+
+                <div className="p-2 space-y-2">
+                  {notificationsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <FaSpinner className="w-4 h-4 animate-spin text-gray-400 mr-2" />
+                      <span className="text-sm text-gray-500">
+                        Carregando...
+                      </span>
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <FaBell className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-sm">Nenhuma notificação</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Novas notificações aparecerão aqui
+                      </p>
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onMarkAsRead={markAsRead}
+                        onDelete={deleteNotification}
+                      />
+                    ))
+                  )}
                 </div>
+
+                {notifications.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="p-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={refreshNotifications}
+                        className="w-full text-xs"
+                      >
+                        <FaSpinner className="w-3 h-3 mr-1" />
+                        Atualizar notificações
+                      </Button>
+                    </div>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
 
