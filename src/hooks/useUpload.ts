@@ -22,20 +22,20 @@ interface UploadResult {
 export function useUpload() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
-  const { toast } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
   const supabase = createClient();
 
   const uploadFile = async (
     file: File,
     options: UploadOptions
   ): Promise<UploadResult> => {
-    const { bucket, folder = "", onProgress, onComplete } = options;
+    const { bucket, folder = "", onComplete } = options;
 
     const bucketName = STORAGE_BUCKETS[bucket];
     const maxSize = STORAGE_CONFIG.MAX_FILE_SIZES[bucket];
 
-    // Tipos permitidos baseados no bucket
-    let allowedTypes: string[] = [];
+    // Tipos permitidos baseados no bucket - usando ReadonlyArray
+    let allowedTypes: ReadonlyArray<string> = [];
     switch (bucket) {
       case "AVATARES":
         allowedTypes = STORAGE_CONFIG.ALLOWED_TYPES.IMAGES;
@@ -57,7 +57,7 @@ export function useUpload() {
     // Validações
     if (file.size > maxSize) {
       const error = `Arquivo muito grande. Máximo: ${maxSize / 1024 / 1024}MB`;
-      toast.error(error, "Erro de validação");
+      toastError(error, "Erro de validação");
       return { url: null, error, path: null };
     }
 
@@ -65,7 +65,7 @@ export function useUpload() {
       const error = `Tipo de arquivo não permitido. Permitidos: ${allowedTypes
         .map((t) => t.split("/")[1])
         .join(", ")}`;
-      toast.error(error, "Erro de validação");
+      toastError(error, "Erro de validação");
       return { url: null, error, path: null };
     }
 
@@ -113,7 +113,7 @@ export function useUpload() {
         data: { publicUrl },
       } = supabase.storage.from(bucketName).getPublicUrl(data!.path);
 
-      toast.success("Arquivo enviado com sucesso!", "Upload concluído");
+      toastSuccess("Arquivo enviado com sucesso!", "Upload concluído");
 
       if (onComplete) {
         onComplete(publicUrl);
@@ -123,11 +123,15 @@ export function useUpload() {
       setTimeout(() => setProgress(0), 1000);
 
       return { url: publicUrl, error: null, path: data!.path };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Erro ao fazer upload:", error);
-      toast.error("Erro ao enviar arquivo", "Erro de upload");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao enviar arquivo";
+      toastError("Erro ao enviar arquivo", "Erro de upload");
       setProgress(0);
-      return { url: null, error: error.message, path: null };
+      return { url: null, error: errorMessage, path: null };
     } finally {
       setUploading(false);
     }
@@ -143,12 +147,16 @@ export function useUpload() {
 
       if (error) throw error;
 
-      toast.success("Arquivo removido com sucesso!", "Remoção concluída");
+      toastSuccess("Arquivo removido com sucesso!", "Remoção concluída");
       return { success: true, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ Erro ao remover arquivo:", error);
-      toast.error("Erro ao remover arquivo", "Erro");
-      return { success: false, error: error.message };
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Erro desconhecido ao remover arquivo";
+      toastError("Erro ao remover arquivo", "Erro");
+      return { success: false, error: errorMessage };
     }
   };
 

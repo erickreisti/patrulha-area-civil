@@ -1,4 +1,4 @@
-// src/components/ui/media-upload.tsx
+// src/components/ui/media-upload.tsx - VERSÃO FINAL CORRIGIDA
 "use client";
 
 import React, { useState, useRef } from "react";
@@ -28,7 +28,7 @@ export function MediaUpload({
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
-  const { toast } = useToast();
+  const { error: toastError, success: toastSuccess } = useToast();
 
   const getAcceptTypes = () => {
     return tipo === "foto" ? "image/*" : "video/*";
@@ -52,17 +52,17 @@ export function MediaUpload({
 
     // Validações
     if (tipo === "foto" && !file.type.startsWith("image/")) {
-      toast.error("Selecione apenas arquivos de imagem", "Tipo inválido");
+      toastError("Selecione apenas arquivos de imagem", "Tipo inválido");
       return;
     }
 
     if (tipo === "video" && !file.type.startsWith("video/")) {
-      toast.error("Selecione apenas arquivos de vídeo", "Tipo inválido");
+      toastError("Selecione apenas arquivos de vídeo", "Tipo inválido");
       return;
     }
 
     if (file.size > maxSize) {
-      toast.error(
+      toastError(
         `O arquivo deve ter no máximo ${maxSize / 1024 / 1024}MB`,
         "Arquivo muito grande"
       );
@@ -113,16 +113,16 @@ export function MediaUpload({
       setMediaUrl(publicUrl);
       onMediaChange(publicUrl);
 
-      toast.success(
+      toastSuccess(
         `${tipo === "foto" ? "Imagem" : "Vídeo"} carregado com sucesso!`,
         "Sucesso"
       );
 
       // Resetar progresso
       setTimeout(() => setProgress(0), 1000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao fazer upload:", error);
-      toast.error(
+      toastError(
         `Erro ao enviar ${tipo === "foto" ? "imagem" : "vídeo"}`,
         "Erro de upload"
       );
@@ -159,15 +159,22 @@ export function MediaUpload({
               <div className="flex items-center space-x-3">
                 <div className="flex-shrink-0">
                   {tipo === "foto" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={mediaUrl}
-                      alt="Preview"
+                      alt="Preview da mídia"
                       className="w-16 h-16 object-cover rounded-lg"
                     />
                   ) : (
                     <div className="relative w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
-                      <Video className="w-6 h-6 text-gray-400" />
-                      <Play className="w-4 h-4 text-white absolute" />
+                      <Video
+                        className="w-6 h-6 text-gray-400"
+                        aria-hidden="true"
+                      />
+                      <Play
+                        className="w-4 h-4 text-white absolute"
+                        aria-hidden="true"
+                      />
                     </div>
                   )}
                 </div>
@@ -187,7 +194,7 @@ export function MediaUpload({
                   disabled={uploading}
                   className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
             </CardContent>
@@ -219,7 +226,10 @@ export function MediaUpload({
             <div className="space-y-3">
               {uploading ? (
                 <>
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+                  <Loader2
+                    className="w-8 h-8 text-blue-600 animate-spin mx-auto"
+                    aria-hidden="true"
+                  />
                   <div className="space-y-2">
                     <Progress value={progress} className="w-full" />
                     <p className="text-sm text-blue-600">
@@ -232,9 +242,15 @@ export function MediaUpload({
                   <div className="flex justify-center">
                     <div className="p-3 bg-gray-100 rounded-full">
                       {tipo === "foto" ? (
-                        <Image className="w-6 h-6 text-gray-400" />
+                        <Image
+                          className="w-6 h-6 text-gray-400"
+                          aria-hidden="true"
+                        />
                       ) : (
-                        <Video className="w-6 h-6 text-gray-400" />
+                        <Video
+                          className="w-6 h-6 text-gray-400"
+                          aria-hidden="true"
+                        />
                       )}
                     </div>
                   </div>
@@ -248,7 +264,7 @@ export function MediaUpload({
                         fileInputRef.current?.click();
                       }}
                     >
-                      <Upload className="w-4 h-4 mr-2" />
+                      <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
                       Selecionar {getFileTypeName()}
                     </Button>
                     <p className="text-sm text-gray-600">
@@ -277,7 +293,7 @@ export function MediaUpload({
           onClick={() => fileInputRef.current?.click()}
           className="w-full border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
         >
-          <Upload className="w-4 h-4 mr-2" />
+          <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
           Trocar {getFileTypeName()}
         </Button>
       )}

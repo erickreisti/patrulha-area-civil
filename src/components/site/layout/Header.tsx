@@ -15,9 +15,6 @@ import {
   FaSignOutAlt,
   FaCog,
   FaChartBar,
-  FaArrowLeft,
-  FaEdit,
-  FaHome,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { createClient } from "@/lib/supabase/client";
@@ -59,92 +56,31 @@ const SOCIAL_ICONS = [
   },
 ];
 
-// 🎯 COMPONENTE DE LOADING PROFISSIONAL
-const LoadingSpinner = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
-  const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-5 h-5",
-    lg: "w-6 h-6",
-  };
+// 🎯 INTERFACES COMPLETAS
+interface UserProfile {
+  id: string;
+  matricula: string;
+  email: string;
+  full_name?: string;
+  avatar_url?: string;
+  graduacao?: string;
+  validade_certificacao?: string;
+  tipo_sanguineo?: string;
+  status: boolean;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
 
-  return (
-    <div className={`relative ${sizeClasses[size]}`}>
-      {/* Spinner principal */}
-      <motion.div
-        className="absolute inset-0 border-2 border-white/30 rounded-full"
-        animate={{ rotate: 360 }}
-        transition={{
-          duration: 1,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-      />
+interface AuthUser {
+  id: string;
+  email: string;
+}
 
-      {/* Ponteiro do spinner */}
-      <motion.div
-        className="absolute inset-0 border-2 border-transparent border-t-white rounded-full"
-        animate={{ rotate: 360 }}
-        transition={{
-          duration: 1,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-      />
-
-      {/* Ponto central */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-1 h-1 bg-white/50 rounded-full" />
-      </div>
-    </div>
-  );
-};
-
-// 🎯 BOTÃO DE LOADING COMPLETO
-const LoadingButton = () => {
-  return (
-    <Button
-      className="bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed"
-      disabled
-    >
-      {/* Efeito de shimmer sutil */}
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
-        initial={{ x: "-100%" }}
-        animate={{ x: "100%" }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
-
-      {/* Conteúdo do botão */}
-      <div className="flex items-center justify-center gap-3 relative z-10">
-        <LoadingSpinner size="sm" />
-        <span className="text-white/90">Carregando...</span>
-      </div>
-    </Button>
-  );
-};
-
-const useScrollDetection = (threshold = 30) => {
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > threshold);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [threshold]);
-
-  return isScrolled;
-};
-
+// 🎯 HOOK DE AUTENTICAÇÃO CORRIGIDO
 const useHeaderAuth = () => {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -152,56 +88,64 @@ const useHeaderAuth = () => {
     const checkAuth = async () => {
       try {
         setLoading(true);
-        const localData = localStorage.getItem("pac_user_data");
-        if (localData) {
-          try {
-            const profileData = JSON.parse(localData);
-            setProfile(profileData);
-            setUser({ id: profileData.id, email: profileData.email });
-            setLoading(false);
-            return;
-          } catch (parseError) {
-            localStorage.removeItem("pac_user_data");
-          }
+
+        // SEMPRE buscar do banco primeiro
+        const {
+          data: { user: authUser },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) {
+          console.error("❌ Erro ao buscar usuário:", authError);
+          setLoading(false);
+          return;
         }
 
-        try {
-          const {
-            data: { user: authUser },
-            error,
-          } = await supabase.auth.getUser();
+        if (authUser && authUser.email) {
+          const userData: AuthUser = {
+            id: authUser.id,
+            email: authUser.email,
+          };
+          setUser(userData);
 
-          if (error) {
+          // Buscar profile ATUALIZADO do banco
+          const { data: profileData, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", authUser.id)
+            .single();
+
+          if (profileError) {
+            console.error("❌ Erro ao buscar perfil:", profileError);
             setLoading(false);
             return;
           }
 
-          if (authUser) {
-            setUser(authUser);
-            const { data: profileData, error: profileError } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", authUser.id)
-              .single();
-
-            if (profileError) {
-              setLoading(false);
-              return;
-            }
-
-            if (profileData) {
-              setProfile(profileData);
-              localStorage.setItem(
-                "pac_user_data",
-                JSON.stringify(profileData)
-              );
-            }
+          if (profileData) {
+            setProfile(profileData);
+            // Atualizar localStorage com dados mais recentes
+            localStorage.setItem("pac_user_data", JSON.stringify(profileData));
           }
-        } catch (authError) {
-          console.log("⚠️ Header: Auth falhou, continuando sem usuário");
+        } else {
+          // Limpar dados se não há usuário autenticado
+          setUser(null);
+          setProfile(null);
+          localStorage.removeItem("pac_user_data");
         }
       } catch (err) {
-        console.error("❌ Header: Erro ao verificar auth:", err);
+        console.error("❌ Erro inesperado:", err);
+        // Em caso de erro, tentar usar cache local como fallback
+        try {
+          const localData = localStorage.getItem("pac_user_data");
+          if (localData) {
+            const profileData = JSON.parse(localData) as UserProfile;
+            setProfile(profileData);
+            setUser({ id: profileData.id, email: profileData.email });
+          }
+        } catch (cacheError) {
+          console.error("❌ Erro no cache local:", cacheError);
+          localStorage.removeItem("pac_user_data");
+        }
       } finally {
         setLoading(false);
       }
@@ -209,10 +153,17 @@ const useHeaderAuth = () => {
 
     checkAuth();
 
+    // Escutar mudanças de autenticação
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
+      if (event === "SIGNED_IN" && session?.user && session.user.email) {
+        const userData: AuthUser = {
+          id: session.user.id,
+          email: session.user.email,
+        };
+
+        // Buscar perfil atualizado
         const { data: profileData } = await supabase
           .from("profiles")
           .select("*")
@@ -221,14 +172,17 @@ const useHeaderAuth = () => {
 
         if (profileData) {
           setProfile(profileData);
-          setUser(session.user);
+          setUser(userData);
           localStorage.setItem("pac_user_data", JSON.stringify(profileData));
         }
       } else if (event === "SIGNED_OUT") {
         setUser(null);
         setProfile(null);
         localStorage.removeItem("pac_user_data");
+        localStorage.removeItem("supabase.auth.token");
       }
+
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -256,6 +210,81 @@ const useHeaderAuth = () => {
     signOut,
     isAdmin,
   };
+};
+
+// 🎯 COMPONENTE DE LOADING
+const LoadingSpinner = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
+  const sizeClasses = {
+    sm: "w-4 h-4",
+    md: "w-5 h-5",
+    lg: "w-6 h-6",
+  };
+
+  return (
+    <div className={`relative ${sizeClasses[size]}`}>
+      <motion.div
+        className="absolute inset-0 border-2 border-white/30 rounded-full"
+        animate={{ rotate: 360 }}
+        transition={{
+          duration: 1,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+      <motion.div
+        className="absolute inset-0 border-2 border-transparent border-t-white rounded-full"
+        animate={{ rotate: 360 }}
+        transition={{
+          duration: 1,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="w-1 h-1 bg-white/50 rounded-full" />
+      </div>
+    </div>
+  );
+};
+
+// 🎯 BOTÃO DE LOADING
+const LoadingButton = () => {
+  return (
+    <Button
+      className="bg-navy text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed"
+      disabled
+    >
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        initial={{ x: "-100%" }}
+        animate={{ x: "100%" }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+      <div className="flex items-center justify-center gap-3 relative z-10">
+        <LoadingSpinner size="sm" />
+        <span className="text-white/90">Carregando...</span>
+      </div>
+    </Button>
+  );
+};
+
+const useScrollDetection = (threshold = 30) => {
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > threshold);
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [threshold]);
+
+  return isScrolled;
 };
 
 const TopBar = () => {
@@ -400,13 +429,14 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
+// 🎯 BOTÃO DO USUÁRIO CORRIGIDO - MOSTRA "MEU PERFIL"
+// 🎯 BOTÃO DO USUÁRIO COM AVATAR REAL
 const UserMenuButton = () => {
   const { user, profile, loading, signOut, isAdmin } = useHeaderAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const pathname = usePathname();
 
   const isOnProfilePage = pathname === "/perfil";
-  const isOnAdminDashboard = pathname === "/admin/dashboard";
 
   if (loading) {
     return <LoadingButton />;
@@ -432,8 +462,30 @@ const UserMenuButton = () => {
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="bg-navy hover:bg-navy-700 text-white font-medium px-6 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] flex items-center gap-2"
       >
-        <FaUser className="w-4 h-4" />
-        <span className="relative z-10">{profile?.graduacao || "Agente"}</span>
+        {/* 🎯 AVATAR REAL DO AGENTE */}
+        {profile?.avatar_url ? (
+          <div className="w-6 h-6 rounded-full overflow-hidden border-2 border-white/50 flex-shrink-0">
+            <Image
+              src={profile.avatar_url}
+              alt={`Avatar de ${profile.full_name || "Agente"}`}
+              width={24}
+              height={24}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // Fallback para ícone se a imagem não carregar
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  parent.innerHTML =
+                    '<FaUser className="w-4 h-4 text-white" />';
+                }
+              }}
+            />
+          </div>
+        ) : (
+          <FaUser className="w-4 h-4 flex-shrink-0" />
+        )}
+
+        <span className="relative z-10">Meu Perfil</span>
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
       </Button>
 
@@ -441,9 +493,30 @@ const UserMenuButton = () => {
         <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 animate-scale-in">
           <div className="p-4 border-b border-slate-200">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-navy rounded-full flex items-center justify-center">
-                <FaUser className="w-5 h-5 text-white" />
-              </div>
+              {/* 🎯 AVATAR NO DROPDOWN TAMBÉM */}
+              {profile?.avatar_url ? (
+                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-navy/20 flex-shrink-0">
+                  <Image
+                    src={profile.avatar_url}
+                    alt={`Avatar de ${profile.full_name || "Agente"}`}
+                    width={40}
+                    height={40}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      // Fallback para ícone se a imagem não carregar
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        parent.innerHTML =
+                          '<div class="w-10 h-10 bg-navy rounded-full flex items-center justify-center"><FaUser class="w-5 h-5 text-white" /></div>';
+                      }
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="w-10 h-10 bg-navy rounded-full flex items-center justify-center flex-shrink-0">
+                  <FaUser className="w-5 h-5 text-white" />
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-slate-800 truncate">
                   {profile?.full_name || "Agente PAC"}
@@ -454,26 +527,26 @@ const UserMenuButton = () => {
                     : user.email}
                 </p>
                 <p className="text-xs text-navy font-medium capitalize">
-                  {isAdmin ? "Administrador" : "Agente"}
+                  {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
                 </p>
               </div>
             </div>
           </div>
 
           <div className="p-2 space-y-1">
-            {/* 🔵 AZUL - Ações Administrativas */}
+            {/* 🔵 AZUL - Ações do Perfil */}
             {!isOnProfilePage && (
               <Link
                 href="/perfil"
                 className="flex items-center gap-3 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors border border-transparent hover:border-blue-200"
                 onClick={() => setIsDropdownOpen(false)}
               >
-                <FaArrowLeft className="w-4 h-4" />
-                Voltar ao Perfil
+                <FaUser className="w-4 h-4" />
+                Ver Meu Perfil
               </Link>
             )}
 
-            {/* 🟣 ROXO - Funcionalidades Administrativas */}
+            {/* 🟣 ROXO - Dashboard SOMENTE para Admin */}
             {isAdmin && (
               <Link
                 href="/admin/dashboard"
@@ -485,7 +558,7 @@ const UserMenuButton = () => {
               </Link>
             )}
 
-            {/* 🔵 AZUL - Ações Administrativas */}
+            {/* 🔵 AZUL - Configurações */}
             <Link
               href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
               className="flex items-center gap-3 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors border border-transparent hover:border-blue-200"
@@ -497,7 +570,7 @@ const UserMenuButton = () => {
           </div>
 
           <div className="p-2 border-t border-slate-200">
-            {/* 🔴 VERMELHO - Ações Destrutivas */}
+            {/* 🔴 VERMELHO - Logout */}
             <button
               onClick={signOut}
               className="flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors w-full border border-transparent hover:border-red-200"
@@ -557,33 +630,53 @@ const MobileMenu = ({
             <>
               <div className="pt-4 border-t border-slate-200">
                 <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
-                  <div className="w-8 h-8 bg-navy rounded-full flex items-center justify-center">
-                    <FaUser className="w-4 h-4 text-white" />
-                  </div>
+                  {profile?.avatar_url ? (
+                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-navy/20 flex-shrink-0">
+                      <Image
+                        src={profile.avatar_url}
+                        alt={`Avatar de ${profile.full_name || "Agente"}`}
+                        width={32}
+                        height={32}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            parent.innerHTML =
+                              '<div class="w-8 h-8 bg-navy rounded-full flex items-center justify-center"><FaUser class="w-4 h-4 text-white" /></div>';
+                          }
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 bg-navy rounded-full flex items-center justify-center flex-shrink-0">
+                      <FaUser className="w-4 h-4 text-white" />
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">
                       {profile?.full_name || "Agente PAC"}
                     </p>
                     <p className="text-xs text-slate-600">
-                      {isAdmin ? "Administrador" : "Agente"}
+                      {profile?.graduacao || "Agente"}{" "}
+                      {isAdmin ? "• Admin" : ""}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* 🔵 AZUL - Ações Administrativas */}
+              {/* 🔵 AZUL - Meu Perfil */}
               {!isOnProfilePage && (
                 <Link
                   href="/perfil"
                   className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-blue-50 text-blue-600 border-l-4 border-blue-600"
                   onClick={onClose}
                 >
-                  <FaArrowLeft className="w-4 h-4" />
-                  Voltar ao Perfil
+                  <FaUser className="w-4 h-4" />
+                  Ver Meu Perfil
                 </Link>
               )}
 
-              {/* 🟣 ROXO - Funcionalidades Administrativas */}
+              {/* 🟣 ROXO - Dashboard SOMENTE para Admin */}
               {isAdmin && (
                 <Link
                   href="/admin/dashboard"
@@ -594,7 +687,7 @@ const MobileMenu = ({
                 </Link>
               )}
 
-              {/* 🔵 AZUL - Ações Administrativas */}
+              {/* 🔵 AZUL - Configurações */}
               <Link
                 href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-blue-50 text-blue-600 border-l-4 border-blue-600"
@@ -604,7 +697,7 @@ const MobileMenu = ({
                 Configurações
               </Link>
 
-              {/* 🔴 VERMELHO - Ações Destrutivas */}
+              {/* 🔴 VERMELHO - Logout */}
               <button
                 onClick={() => {
                   signOut();

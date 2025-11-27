@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import Image from "next/image";
 import {
   FaUser,
   FaIdCard,
@@ -47,7 +48,6 @@ export default function CriarAgentePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>("");
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [formData, setFormData] = useState({
     matricula: "",
     email: "",
@@ -78,7 +78,7 @@ export default function CriarAgentePage() {
       const fileExt = avatarFile.name.split(".").pop();
       const fileName = `${userId}/avatar-${Date.now()}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from("avatares-agentes")
         .upload(fileName, avatarFile, {
           cacheControl: "3600",
@@ -257,10 +257,12 @@ export default function CriarAgentePage() {
         "Agente criado com sucesso! Um email foi enviado para definir a senha."
       );
       router.push("/admin/agentes");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
-      setFormError(err.message);
-      alert(err.message);
+      const errorMessage =
+        err instanceof Error ? err.message : "Erro desconhecido";
+      setFormError(errorMessage);
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -342,9 +344,11 @@ export default function CriarAgentePage() {
                       <div className="flex-shrink-0">
                         <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
                           {avatarPreview ? (
-                            <img
+                            <Image
                               src={avatarPreview}
                               alt="Preview do avatar"
+                              width={96}
+                              height={96}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -440,9 +444,6 @@ export default function CriarAgentePage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Resto do formulário permanece igual */}
-                  {/* ... (Nome Completo, Graduação, Tipo Sanguíneo, etc.) */}
 
                   {/* Nome Completo */}
                   <div className="space-y-2">

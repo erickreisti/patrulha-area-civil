@@ -4,8 +4,17 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+export interface CategoriaGaleria {
+  id: string;
+  nome: string;
+  slug: string;
+  descricao: string | null;
+  tipo: string;
+  ordem: number;
+}
+
 export function useGaleria() {
-  const [categorias, setCategorias] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaGaleria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,9 +33,13 @@ export function useGaleria() {
         if (categoriasError) throw categoriasError;
 
         setCategorias(categoriasData || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Erro ao carregar categorias:", err);
-        setError(err.message);
+        const errorMessage =
+          err instanceof Error
+            ? err.message
+            : "Erro desconhecido ao carregar categorias";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

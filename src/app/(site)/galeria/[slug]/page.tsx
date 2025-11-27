@@ -14,6 +14,7 @@ import {
   FaMapMarkerAlt,
 } from "react-icons/fa";
 import Link from "next/link";
+import Image from "next/image";
 
 interface PageProps {
   params: {
@@ -135,10 +136,12 @@ export default async function CategoriaGaleriaPage({ params }: PageProps) {
                   {/* Thumbnail do Item */}
                   <div className="h-48 bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center relative">
                     {item.thumbnail_url ? (
-                      // Se tiver thumbnail, mostrar imagem
-                      <img
+                      // ✅ Substituído img por Image
+                      <Image
                         src={item.thumbnail_url}
                         alt={item.titulo}
+                        width={400}
+                        height={192}
                         className="w-full h-full object-cover"
                       />
                     ) : (

@@ -1,19 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import Image from "next/image";
 import {
   FaUser,
   FaPlus,
   FaEdit,
   FaTrash,
   FaSearch,
-  FaFilter,
   FaEye,
   FaEyeSlash,
   FaShieldAlt,
@@ -48,11 +48,7 @@ export default function AgentesPage() {
 
   const supabase = createClient();
 
-  useEffect(() => {
-    fetchAgents();
-  }, []);
-
-  const fetchAgents = async () => {
+  const fetchAgents = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -62,13 +58,17 @@ export default function AgentesPage() {
 
       if (error) throw error;
       setAgents(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao buscar agentes:", error);
       alert("Erro ao carregar lista de agentes");
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
+
+  useEffect(() => {
+    fetchAgents();
+  }, [fetchAgents]);
 
   const toggleAgentStatus = async (agentId: string, currentStatus: boolean) => {
     try {
@@ -86,7 +86,7 @@ export default function AgentesPage() {
       );
 
       alert(`Agente ${!currentStatus ? "ativado" : "desativado"} com sucesso!`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao alterar status:", error);
       alert("Erro ao alterar status do agente");
     }
@@ -107,7 +107,7 @@ export default function AgentesPage() {
 
       setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
       alert("Agente excluído com sucesso!");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao excluir agente:", error);
       alert("Erro ao excluir agente");
     }
@@ -262,7 +262,9 @@ export default function AgentesPage() {
               {/* Filtro por Tipo */}
               <select
                 value={filterRole}
-                onChange={(e) => setFilterRole(e.target.value as any)}
+                onChange={(e) =>
+                  setFilterRole(e.target.value as "all" | "admin" | "agent")
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
               >
                 <option value="all">Todos os tipos</option>
@@ -273,7 +275,11 @@ export default function AgentesPage() {
               {/* Filtro por Status */}
               <select
                 value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
+                onChange={(e) =>
+                  setFilterStatus(
+                    e.target.value as "all" | "active" | "inactive"
+                  )
+                }
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
               >
                 <option value="all">Todos os status</option>
@@ -346,10 +352,12 @@ export default function AgentesPage() {
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10">
                               {agent.avatar_url ? (
-                                <img
+                                <Image
                                   className="h-10 w-10 rounded-full object-cover"
                                   src={agent.avatar_url}
                                   alt={agent.full_name || "Agente"}
+                                  width={40}
+                                  height={40}
                                 />
                               ) : (
                                 <div className="h-10 w-10 rounded-full bg-blue-800 flex items-center justify-center">

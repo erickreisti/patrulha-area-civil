@@ -19,8 +19,10 @@ import {
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
+type IconType = React.ComponentType<{ className?: string }>;
+
 interface Service {
-  icon: any;
+  icon: IconType;
   title: string;
   description: string;
   fullDescription: string;

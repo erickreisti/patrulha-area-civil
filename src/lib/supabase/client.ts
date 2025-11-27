@@ -1,4 +1,12 @@
 import { createBrowserClient } from "@supabase/ssr";
+import { SupabaseClient } from "@supabase/supabase-js";
+
+// Extender a interface Window para incluir a propriedade supabase
+declare global {
+  interface Window {
+    supabase?: SupabaseClient;
+  }
+}
 
 export const createClient = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -15,7 +23,7 @@ export const createClient = () => {
 
   // Adicionar ao window para debug (apenas desenvolvimento)
   if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
-    (window as any).supabase = client;
+    window.supabase = client;
   }
 
   return client;

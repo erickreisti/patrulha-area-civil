@@ -9,9 +9,21 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+// Interface para categorias da galeria
+interface CategoriaGaleria {
+  id: string;
+  nome: string;
+  slug: string;
+  descricao?: string;
+  tipo: "fotos" | "videos";
+  ordem: number;
+  status: boolean;
+  itemCount: number;
+}
+
 // Hook simples para galeria - SEM RECURSÃO
 function useGaleria() {
-  const [categorias, setCategorias] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaGaleria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,10 +60,12 @@ function useGaleria() {
           })
         );
 
-        setCategorias(categoriasComContagem);
-      } catch (err: any) {
+        setCategorias(categoriasComContagem as CategoriaGaleria[]);
+      } catch (err: unknown) {
         console.error("Erro ao carregar categorias:", err);
-        setError(err.message);
+        const errorMessage =
+          err instanceof Error ? err.message : "Erro desconhecido";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -90,13 +104,12 @@ const SectionHeader = () => (
   </motion.div>
 );
 
-const GalleryCard = ({
-  categoria,
-  index,
-}: {
-  categoria: any;
+interface GalleryCardProps {
+  categoria: CategoriaGaleria;
   index: number;
-}) => (
+}
+
+const GalleryCard = ({ categoria, index }: GalleryCardProps) => (
   <motion.div
     initial={{ opacity: 0, y: 30 }}
     whileInView={{ opacity: 1, y: 0 }}
@@ -156,7 +169,11 @@ const GalleryCard = ({
   </motion.div>
 );
 
-const GalleryGrid = ({ categorias }: { categorias: any[] }) => (
+interface GalleryGridProps {
+  categorias: CategoriaGaleria[];
+}
+
+const GalleryGrid = ({ categorias }: GalleryGridProps) => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
     {categorias.slice(0, 3).map((categoria, index) => (
       <GalleryCard key={categoria.id} categoria={categoria} index={index} />

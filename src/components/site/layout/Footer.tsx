@@ -14,6 +14,7 @@ import {
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { motion } from "framer-motion";
+import { IconType } from "react-icons";
 
 const SOCIAL_LINKS = [
   {
@@ -209,17 +210,19 @@ const ContactInfo = () => (
   </ul>
 );
 
+interface ContactItemProps {
+  icon: IconType;
+  text: string;
+  isEmergency?: boolean;
+  index: number;
+}
+
 const ContactItem = ({
   icon: Icon,
   text,
   isEmergency = false,
   index,
-}: {
-  icon: any;
-  text: string;
-  isEmergency?: boolean;
-  index: number;
-}) => (
+}: ContactItemProps) => (
   <motion.li
     className={`flex items-start space-x-3 transition-colors duration-300 ${
       isEmergency ? "hover:text-alert" : "hover:text-navy"

@@ -1,11 +1,11 @@
-// src/components/ui/image-upload.tsx
+// src/components/ui/image-upload.tsx - VERSÃO FINAL CORRIGIDA
 "use client";
 
 import React, { useState, useRef } from "react";
 import { Button } from "./button";
 import { Card, CardContent } from "./card";
 import { Progress } from "./progress";
-import { Upload, X, Image, Loader2, Check } from "lucide-react";
+import { Upload, X, Image, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ export function ImageUpload({
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
-  const { toast } = useToast();
+  const { error: toastError, success: toastSuccess } = useToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -39,12 +39,12 @@ export function ImageUpload({
 
     // Validações
     if (!file.type.startsWith("image/")) {
-      toast.error("Selecione apenas arquivos de imagem", "Tipo inválido");
+      toastError("Selecione apenas arquivos de imagem", "Tipo inválido");
       return;
     }
 
     if (file.size > maxSize) {
-      toast.error(
+      toastError(
         `A imagem deve ter no máximo ${maxSize / 1024 / 1024}MB`,
         "Arquivo muito grande"
       );
@@ -94,13 +94,13 @@ export function ImageUpload({
       setImageUrl(publicUrl);
       onImageChange(publicUrl);
 
-      toast.success("Imagem carregada com sucesso!", "Sucesso");
+      toastSuccess("Imagem carregada com sucesso!", "Sucesso");
 
       // Resetar progresso
       setTimeout(() => setProgress(0), 1000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao fazer upload:", error);
-      toast.error("Erro ao enviar imagem", "Erro de upload");
+      toastError("Erro ao enviar imagem", "Erro de upload");
       setProgress(0);
     } finally {
       setUploading(false);
@@ -124,9 +124,10 @@ export function ImageUpload({
             <CardContent className="p-4">
               <div className="flex items-center space-x-3">
                 <div className="flex-shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageUrl}
-                    alt="Preview"
+                    alt="Preview da imagem"
                     className="w-16 h-16 object-cover rounded-lg"
                   />
                 </div>
@@ -146,7 +147,7 @@ export function ImageUpload({
                   disabled={uploading}
                   className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
             </CardContent>
@@ -178,7 +179,10 @@ export function ImageUpload({
             <div className="space-y-3">
               {uploading ? (
                 <>
-                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+                  <Loader2
+                    className="w-8 h-8 text-blue-600 animate-spin mx-auto"
+                    aria-hidden="true"
+                  />
                   <div className="space-y-2">
                     <Progress value={progress} className="w-full" />
                     <p className="text-sm text-blue-600">
@@ -190,7 +194,10 @@ export function ImageUpload({
                 <>
                   <div className="flex justify-center">
                     <div className="p-3 bg-gray-100 rounded-full">
-                      <Image className="w-6 h-6 text-gray-400" />
+                      <Image
+                        className="w-6 h-6 text-gray-400"
+                        aria-hidden="true"
+                      />
                     </div>
                   </div>
                   <div>
@@ -203,7 +210,7 @@ export function ImageUpload({
                         fileInputRef.current?.click();
                       }}
                     >
-                      <Upload className="w-4 h-4 mr-2" />
+                      <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
                       Selecionar Imagem
                     </Button>
                     <p className="text-sm text-gray-600">
@@ -229,7 +236,7 @@ export function ImageUpload({
           onClick={() => fileInputRef.current?.click()}
           className="w-full border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
         >
-          <Upload className="w-4 h-4 mr-2" />
+          <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
           Trocar Imagem
         </Button>
       )}

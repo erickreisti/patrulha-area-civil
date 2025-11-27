@@ -7,14 +7,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  FaArrowLeft,
-  FaUsers,
-  FaShieldAlt,
-  FaBook,
-  FaHeart,
-  FaBullseye,
-} from "react-icons/fa";
+import { FaArrowLeft, FaUsers, FaBullseye } from "react-icons/fa";
 import Link from "next/link";
 
 export default function PatrulheiroMirimPage() {

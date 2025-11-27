@@ -11,7 +11,6 @@ import {
   FaArrowLeft,
   FaPlane,
   FaShieldAlt,
-  FaUsers,
   FaBullseye,
   FaHeart,
 } from "react-icons/fa";

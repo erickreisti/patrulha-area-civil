@@ -371,7 +371,7 @@ export function AdminHeader() {
         <div className="text-center py-8 text-gray-500">
           <FaSearch className="w-12 h-12 mx-auto mb-4 text-gray-300" />
           <p>Nenhum resultado encontrado para</p>
-          <p className="font-semibold">"{searchQuery}"</p>
+          <p className="font-semibold">&quot{searchQuery}&quot</p>
         </div>
       );
     }

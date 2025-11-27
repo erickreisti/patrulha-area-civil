@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FaSearch } from "react-icons/fa";
@@ -16,43 +16,39 @@ export function SearchAndFilter({
   initialTipo = "Todas",
 }: SearchAndFilterProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [selectedType, setSelectedType] = useState(initialTipo);
 
   const tipos = ["Todas", "Fotos", "Vídeos"];
 
-  const updateURL = (search: string, tipo: string) => {
-    const params = new URLSearchParams();
-
-    if (search) params.set("search", search);
-    if (tipo !== "Todas") params.set("tipo", tipo);
-
-    const queryString = params.toString();
-    const newUrl = queryString ? `/galeria?${queryString}` : "/galeria";
-
-    router.push(newUrl, { scroll: false });
-  };
-
-  const handleSearchChange = (value: string) => {
-    setSearchTerm(value);
-    updateURL(value, selectedType);
-  };
-
-  const handleTypeChange = (tipo: string) => {
-    setSelectedType(tipo);
-    updateURL(searchTerm, tipo);
-  };
-
-  // Debounce para busca
   useEffect(() => {
+    const updateURL = (search: string, tipo: string) => {
+      const params = new URLSearchParams();
+
+      if (search) params.set("search", search);
+      if (tipo !== "Todas") params.set("tipo", tipo);
+
+      const queryString = params.toString();
+      const newUrl = queryString ? `/galeria?${queryString}` : "/galeria";
+
+      router.push(newUrl, { scroll: false });
+    };
+
     const timer = setTimeout(() => {
       updateURL(searchTerm, selectedType);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedType]);
+  }, [searchTerm, selectedType, router]); // ✅ Adicionado router como dependência
+
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value);
+  };
+
+  const handleTypeChange = (tipo: string) => {
+    setSelectedType(tipo);
+  };
 
   return (
     <section className="py-8 bg-white border-b border-gray-200">

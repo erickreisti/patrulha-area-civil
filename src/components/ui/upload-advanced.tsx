@@ -1,4 +1,4 @@
-// src/components/ui/upload-advanced.tsx - VERSÃO CORRIGIDA
+// src/components/ui/upload-advanced.tsx - VERSÃO FINAL CORRIGIDA
 "use client";
 
 import React, { useRef, useCallback, useState } from "react";
@@ -52,50 +52,56 @@ export function UploadAdvanced({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const { toast } = useToast();
+  const { error: toastError, success: toastSuccess } = useToast();
   const supabase = createClient();
 
-  const validateFile = (file: File): string | null => {
-    if (file.size > maxSize) {
-      return `Arquivo muito grande. Máximo: ${maxSize / 1024 / 1024}MB`;
-    }
-
-    if (allowedTypes && !allowedTypes.includes(file.type)) {
-      return `Tipo de arquivo não permitido. Permitidos: ${allowedTypes.join(
-        ", "
-      )}`;
-    }
-
-    return null;
-  };
-
-  const addFiles = (newFiles: File[]) => {
-    const validatedFiles: UploadFile[] = [];
-
-    newFiles.forEach((file) => {
-      const error = validateFile(file);
-
-      if (error) {
-        toast.error(error, "Erro de validação");
-        return;
+  const validateFile = useCallback(
+    (file: File): string | null => {
+      if (file.size > maxSize) {
+        return `Arquivo muito grande. Máximo: ${maxSize / 1024 / 1024}MB`;
       }
 
-      validatedFiles.push({
-        file,
-        progress: 0,
-        status: "pending",
-      });
-    });
+      if (allowedTypes && !allowedTypes.includes(file.type)) {
+        return `Tipo de arquivo não permitido. Permitidos: ${allowedTypes.join(
+          ", "
+        )}`;
+      }
 
-    setFiles((prev) => [...prev, ...validatedFiles]);
-  };
+      return null;
+    },
+    [maxSize, allowedTypes]
+  );
+
+  const addFiles = useCallback(
+    (newFiles: File[]) => {
+      const validatedFiles: UploadFile[] = [];
+
+      newFiles.forEach((file) => {
+        const error = validateFile(file);
+
+        if (error) {
+          toastError(error, "Erro de validação");
+          return;
+        }
+
+        validatedFiles.push({
+          file,
+          progress: 0,
+          status: "pending",
+        });
+      });
+
+      setFiles((prev) => [...prev, ...validatedFiles]);
+    },
+    [toastError, validateFile]
+  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
 
       if (files.length + newFiles.length > maxFiles) {
-        toast.error(
+        toastError(
           `Limite de ${maxFiles} arquivos excedido.`,
           "Limite de upload"
         );
@@ -113,7 +119,7 @@ export function UploadAdvanced({
         const newFiles = Array.from(e.dataTransfer.files);
 
         if (files.length + newFiles.length > maxFiles) {
-          toast.error(
+          toastError(
             `Limite de ${maxFiles} arquivos excedido.`,
             "Limite de upload"
           );
@@ -123,7 +129,7 @@ export function UploadAdvanced({
         addFiles(newFiles);
       }
     },
-    [files.length, maxFiles, toast]
+    [files.length, maxFiles, toastError, addFiles]
   );
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -228,7 +234,7 @@ export function UploadAdvanced({
       }
 
       if (urls.length > 0) {
-        toast.success(
+        toastSuccess(
           `${urls.length} arquivo(s) enviado(s) com sucesso.`,
           "Upload concluído"
         );
@@ -245,20 +251,27 @@ export function UploadAdvanced({
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith("image/"))
-      return <Image className="w-4 h-4 text-blue-600" />;
+      return <Image className="w-4 h-4 text-blue-600" aria-hidden="true" />;
     if (file.type.startsWith("video/"))
-      return <Video className="w-4 h-4 text-purple-600" />;
-    return <File className="w-4 h-4 text-gray-600" />;
+      return <Video className="w-4 h-4 text-purple-600" aria-hidden="true" />;
+    return <File className="w-4 h-4 text-gray-600" aria-hidden="true" />;
   };
 
   const getStatusIcon = (file: UploadFile) => {
     switch (file.status) {
       case "completed":
-        return <Check className="w-4 h-4 text-green-600" />;
+        return <Check className="w-4 h-4 text-green-600" aria-hidden="true" />;
       case "error":
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
+        return (
+          <AlertCircle className="w-4 h-4 text-red-600" aria-hidden="true" />
+        );
       case "uploading":
-        return <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />;
+        return (
+          <Loader2
+            className="w-4 h-4 text-blue-600 animate-spin"
+            aria-hidden="true"
+          />
+        );
       default:
         return null;
     }
@@ -318,6 +331,7 @@ export function UploadAdvanced({
                     "w-8 h-8 transition-colors",
                     hasFiles ? "text-blue-600" : "text-gray-400"
                   )}
+                  aria-hidden="true"
                 />
               </div>
             </div>
@@ -439,7 +453,7 @@ export function UploadAdvanced({
                     disabled={isUploading}
                     className="flex-shrink-0 ml-2 text-gray-400 hover:text-red-600"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
               </Card>
@@ -450,7 +464,10 @@ export function UploadAdvanced({
             <div className="text-sm text-gray-600">
               {isUploading ? (
                 <div className="flex items-center space-x-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                  <Loader2
+                    className="w-4 h-4 animate-spin text-blue-600"
+                    aria-hidden="true"
+                  />
                   <span>Enviando arquivos...</span>
                 </div>
               ) : (
@@ -480,7 +497,10 @@ export function UploadAdvanced({
               >
                 {isUploading ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2
+                      className="w-4 h-4 mr-2 animate-spin"
+                      aria-hidden="true"
+                    />
                     Enviando...
                   </>
                 ) : (

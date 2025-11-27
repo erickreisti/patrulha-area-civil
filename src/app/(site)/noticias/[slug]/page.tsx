@@ -1,4 +1,3 @@
-// src/app/(site)/noticias/[slug]/page.tsx - ATUALIZADO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,6 +14,7 @@ import {
   FaNewspaper,
 } from "react-icons/fa";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { NoticiaWithAutor } from "@/types/noticias";
 
@@ -26,7 +26,6 @@ export default function NoticiaPage() {
     NoticiaWithAutor[]
   >([]);
   const [loading, setLoading] = useState(true);
-  const [isSharing, setIsSharing] = useState(false);
 
   const supabase = createClient();
 
@@ -96,8 +95,8 @@ export default function NoticiaPage() {
         console.log("Erro ao compartilhar:", error);
       }
     } else {
-      setIsSharing(true);
-      setTimeout(() => setIsSharing(false), 2000);
+      // Fallback para copiar link
+      navigator.clipboard.writeText(window.location.href);
     }
   };
 
@@ -184,10 +183,13 @@ export default function NoticiaPage() {
             {/* Imagem de destaque */}
             {noticia.imagem && (
               <div className="h-96 bg-gray-200 rounded-lg flex items-center justify-center mb-8 shadow-lg border border-gray-200 overflow-hidden">
-                <img
+                <Image
                   src={noticia.imagem}
                   alt={noticia.titulo}
+                  width={800}
+                  height={384}
                   className="w-full h-full object-cover"
+                  priority
                 />
               </div>
             )}

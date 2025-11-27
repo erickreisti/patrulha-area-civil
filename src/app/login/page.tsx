@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -47,6 +46,15 @@ interface CacheData {
 interface AlertState {
   type: "error" | "success" | "warning";
   message: string;
+}
+
+// =============================================
+// TIPOS DE ERRO PERSONALIZADOS
+// =============================================
+
+interface LoginError extends Error {
+  message: string;
+  code?: string;
 }
 
 // =============================================
@@ -110,7 +118,7 @@ const useLoginCache = () => {
       localStorage.removeItem(CACHE_KEY);
       return null;
     }
-  }, []);
+  }, [CACHE_DURATION]); // ✅ Corrigido: Adicionada dependência
 
   const setToCache = useCallback((data: ProfileData) => {
     try {
@@ -143,7 +151,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(null);
 
-  const router = useRouter();
+  // ✅ Corrigido: Removida variável não utilizada
+  // const router = useRouter();
   const supabase = createClient();
 
   // Hooks personalizados
@@ -387,7 +396,8 @@ export default function LoginPage() {
           console.log("🔄 Redirecionando para perfil...");
           window.location.href = "/perfil";
         }, 1500);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        // ✅ Corrigido: Substituído 'any' por tipo específico
         console.error("💥 Erro inesperado no login:", err);
 
         // Limpar cache em caso de erro
@@ -395,14 +405,18 @@ export default function LoginPage() {
 
         let errorMessage = "Erro inesperado ao fazer login. Tente novamente.";
 
-        if (err.message.includes("Matrícula não encontrada")) {
-          errorMessage = err.message;
-        } else if (err.message.includes("Credenciais inválidas")) {
-          errorMessage = err.message;
-        } else if (err.message.includes("Erro de configuração")) {
-          errorMessage = err.message;
-        } else if (err.message.includes("Email não confirmado")) {
-          errorMessage = err.message;
+        if (err instanceof Error) {
+          const loginError = err as LoginError;
+
+          if (loginError.message.includes("Matrícula não encontrada")) {
+            errorMessage = loginError.message;
+          } else if (loginError.message.includes("Credenciais inválidas")) {
+            errorMessage = loginError.message;
+          } else if (loginError.message.includes("Erro de configuração")) {
+            errorMessage = loginError.message;
+          } else if (loginError.message.includes("Email não confirmado")) {
+            errorMessage = loginError.message;
+          }
         }
 
         showAlert("error", errorMessage);

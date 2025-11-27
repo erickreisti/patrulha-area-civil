@@ -85,7 +85,7 @@ export default async function GaleriaPage({
       ?.filter((cat) => cat.tipo === "videos")
       .reduce((sum, cat) => sum + (cat.galeria_itens?.[0]?.count || 0), 0) || 0;
 
-  const totalItens = totalFotos + totalVideos;
+  // ✅ Removida a variável totalItens não utilizada
 
   const estatisticas = [
     {

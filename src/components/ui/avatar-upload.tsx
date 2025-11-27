@@ -1,4 +1,4 @@
-// src/components/ui/avatar-upload.tsx - VERSÃO CORRIGIDA
+// src/components/ui/avatar-upload.tsx - VERSÃO FINAL CORRIGIDA
 "use client";
 
 import React, { useState, useRef } from "react";
@@ -28,7 +28,7 @@ export function AvatarUpload({
   const [progress, setProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
-  const { toast } = useToast();
+  const { error: toastError, success: toastSuccess } = useToast();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -37,12 +37,12 @@ export function AvatarUpload({
 
     // Validações
     if (!file.type.startsWith("image/")) {
-      toast.error("Selecione apenas arquivos de imagem", "Tipo inválido");
+      toastError("Selecione apenas arquivos de imagem", "Tipo inválido");
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("A imagem deve ter no máximo 2MB", "Arquivo muito grande");
+      toastError("A imagem deve ter no máximo 2MB", "Arquivo muito grande");
       return;
     }
 
@@ -90,13 +90,13 @@ export function AvatarUpload({
       setAvatarUrl(publicUrl);
       onAvatarChange(publicUrl);
 
-      toast.success("Avatar atualizado com sucesso!", "Sucesso");
+      toastSuccess("Avatar atualizado com sucesso!", "Sucesso");
 
       // Resetar progresso
       setTimeout(() => setProgress(0), 1000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao fazer upload:", error);
-      toast.error("Erro ao enviar imagem", "Erro de upload");
+      toastError("Erro ao enviar imagem", "Erro de upload");
       setProgress(0);
     } finally {
       setUploading(false);
@@ -117,7 +117,7 @@ export function AvatarUpload({
         <Avatar className="w-20 h-20 border-2 border-gray-200">
           <AvatarImage src={avatarUrl} />
           <AvatarFallback className="bg-navy text-white text-lg font-semibold">
-            <User className="w-8 h-8" />
+            <User className="w-8 h-8" aria-hidden="true" />
           </AvatarFallback>
         </Avatar>
 
@@ -152,9 +152,12 @@ export function AvatarUpload({
             className="border-navy text-navy hover:bg-navy hover:text-white"
           >
             {uploading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <Loader2
+                className="w-4 h-4 mr-2 animate-spin"
+                aria-hidden="true"
+              />
             ) : (
-              <Upload className="w-4 h-4 mr-2" />
+              <Upload className="w-4 h-4 mr-2" aria-hidden="true" />
             )}
             {uploading
               ? "Enviando..."
@@ -172,7 +175,7 @@ export function AvatarUpload({
               disabled={uploading}
               className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
             >
-              <X className="w-4 h-4 mr-2" />
+              <X className="w-4 h-4 mr-2" aria-hidden="true" />
               Remover
             </Button>
           )}

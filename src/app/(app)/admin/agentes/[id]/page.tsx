@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import Link from "next/link";
+import Image from "next/image";
 import {
   FaUser,
   FaIdCard,
@@ -98,16 +99,8 @@ export default function EditarAgentePage() {
 
   const supabase = createClient();
 
-  // Efeitos
-  useEffect(() => {
-    checkCurrentUser();
-    if (agentId) {
-      fetchAgent();
-    }
-  }, [agentId]);
-
-  // Funções Principais
-  const checkCurrentUser = async () => {
+  // Funções usando useCallback para evitar dependências infinitas
+  const checkCurrentUser = useCallback(async () => {
     try {
       const {
         data: { session },
@@ -127,9 +120,9 @@ export default function EditarAgentePage() {
     } catch (error) {
       console.error("Erro ao verificar usuário:", error);
     }
-  };
+  }, [supabase]);
 
-  const fetchAgent = async () => {
+  const fetchAgent = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -152,14 +145,25 @@ export default function EditarAgentePage() {
         role: data.role,
         status: data.status,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro ao buscar agente:", error);
-      alert(`Erro ao carregar agente: ${error.message}`);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      alert(`Erro ao carregar agente: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, [agentId, supabase]);
 
+  // Efeitos
+  useEffect(() => {
+    checkCurrentUser();
+    if (agentId) {
+      fetchAgent();
+    }
+  }, [agentId, checkCurrentUser, fetchAgent]);
+
+  // Funções Principais
   const uploadAvatar = async (): Promise<string | null> => {
     if (!avatarFile || !agent) return null;
 
@@ -212,9 +216,11 @@ export default function EditarAgentePage() {
         .getPublicUrl(uploadData.path);
 
       return publicUrl;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro no upload do avatar:", error);
-      throw error;
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      throw new Error(errorMessage);
     }
   };
 
@@ -348,9 +354,11 @@ export default function EditarAgentePage() {
       setTimeout(() => {
         router.push("/admin/agentes");
       }, 1500);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao atualizar agente:", err);
-      alert(`Erro ao atualizar agente: ${err.message}`);
+      const errorMessage =
+        err instanceof Error ? err.message : "Erro desconhecido";
+      alert(`Erro ao atualizar agente: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -375,9 +383,11 @@ export default function EditarAgentePage() {
 
       alert("Agente desativado com sucesso!");
       router.push("/admin/agentes");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao desativar agente:", err);
-      alert(`Erro ao desativar agente: ${err.message}`);
+      const errorMessage =
+        err instanceof Error ? err.message : "Erro desconhecido";
+      alert(`Erro ao desativar agente: ${errorMessage}`);
     }
   };
 
@@ -509,15 +519,19 @@ export default function EditarAgentePage() {
                       <div className="flex-shrink-0">
                         <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
                           {avatarPreview ? (
-                            <img
+                            <Image
                               src={avatarPreview}
-                              alt="Avatar do agente"
+                              alt="Preview do avatar"
+                              width={96}
+                              height={96}
                               className="w-full h-full object-cover"
                             />
                           ) : agent.avatar_url ? (
-                            <img
+                            <Image
                               src={agent.avatar_url}
                               alt="Avatar do agente"
+                              width={96}
+                              height={96}
                               className="w-full h-full object-cover"
                             />
                           ) : (

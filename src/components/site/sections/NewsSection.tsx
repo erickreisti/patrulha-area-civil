@@ -16,9 +16,21 @@ import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+// Interface para notícias
+interface Noticia {
+  id: string;
+  titulo: string;
+  slug: string;
+  conteudo?: string;
+  resumo?: string;
+  categoria?: string;
+  data_publicacao: string;
+  status: string;
+}
+
 // Hook simples para notícias - SEM RECURSÃO
 function useNoticias() {
-  const [noticias, setNoticias] = useState<any[]>([]);
+  const [noticias, setNoticias] = useState<Noticia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,9 +51,11 @@ function useNoticias() {
         if (error) throw error;
 
         setNoticias(data || []);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Erro ao carregar notícias:", err);
-        setError(err.message);
+        const errorMessage =
+          err instanceof Error ? err.message : "Erro desconhecido";
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -79,7 +93,12 @@ const SectionHeader = () => (
   </motion.div>
 );
 
-const NewsCard = ({ noticia, index }: { noticia: any; index: number }) => (
+interface NewsCardProps {
+  noticia: Noticia;
+  index: number;
+}
+
+const NewsCard = ({ noticia, index }: NewsCardProps) => (
   <motion.div
     initial={{ opacity: 0, y: 30 }}
     whileInView={{ opacity: 1, y: 0 }}
@@ -126,7 +145,11 @@ const NewsCard = ({ noticia, index }: { noticia: any; index: number }) => (
   </motion.div>
 );
 
-const NewsGrid = ({ noticias }: { noticias: any[] }) => (
+interface NewsGridProps {
+  noticias: Noticia[];
+}
+
+const NewsGrid = ({ noticias }: NewsGridProps) => (
   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
     {noticias.slice(0, 3).map((noticia, index) => (
       <NewsCard key={noticia.id} noticia={noticia} index={index} />

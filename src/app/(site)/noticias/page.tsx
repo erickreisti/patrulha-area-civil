@@ -1,4 +1,3 @@
-// src/app/(site)/noticias/page.tsx - ATUALIZADO
 "use client";
 
 import { useState, useEffect } from "react";
@@ -21,6 +20,7 @@ import {
   FaSearch,
 } from "react-icons/fa";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { NoticiaWithAutor } from "@/types/noticias";
 
@@ -59,7 +59,7 @@ export default function NoticiasPage() {
     };
 
     fetchNoticias();
-  }, []);
+  }, [supabase]); // ✅ Corrigido: adicionado supabase como dependência
 
   // Extrair categorias únicas
   const categorias = [
@@ -192,10 +192,13 @@ export default function NoticiasPage() {
                   >
                     <div className="h-64 bg-gray-200 flex items-center justify-center relative">
                       {noticia.imagem ? (
-                        <img
+                        <Image
                           src={noticia.imagem}
                           alt={noticia.titulo}
+                          width={600}
+                          height={256}
                           className="w-full h-full object-cover"
+                          priority
                         />
                       ) : (
                         <span className="text-gray-600">

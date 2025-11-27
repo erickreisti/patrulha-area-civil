@@ -40,7 +40,8 @@ export interface CreateCategoriaData {
   status?: boolean;
 }
 
-export interface UpdateCategoriaData extends Partial<CreateCategoriaData> {}
+// Corrigido: Removida a interface vazia e usando type alias
+export type UpdateCategoriaData = Partial<CreateCategoriaData>;
 
 export interface CreateItemData {
   titulo: string;
@@ -53,4 +54,5 @@ export interface CreateItemData {
   status?: boolean;
 }
 
-export interface UpdateItemData extends Partial<CreateItemData> {}
+// Corrigido: Removida a interface vazia e usando type alias
+export type UpdateItemData = Partial<CreateItemData>;

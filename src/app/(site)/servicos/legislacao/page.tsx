@@ -13,7 +13,6 @@ import {
   FaBook,
   FaArrowRight,
   FaDownload,
-  FaBullseye,
 } from "react-icons/fa";
 import Link from "next/link";
 

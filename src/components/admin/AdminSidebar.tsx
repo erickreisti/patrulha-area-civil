@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Users,
-  FileText,
   Images,
   Folder,
   LogOut,
@@ -15,6 +14,7 @@ import {
   UserPlus,
   List,
   Newspaper,
+  LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,22 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-const navigation = [
+// Definindo tipos para a navegação
+interface NavigationChild {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  children?: NavigationChild[];
+}
+
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  children?: NavigationChild[];
+}
+
+const navigation: NavigationItem[] = [
   {
     name: "Dashboard",
     href: "/admin/dashboard",
@@ -109,7 +124,10 @@ export function AdminSidebar() {
   };
 
   // Função para renderizar os itens de navegação
-  const renderNavigationItem = (item: any, level = 0) => {
+  const renderNavigationItem = (
+    item: NavigationItem | NavigationChild,
+    level = 0
+  ) => {
     const isActive = isLinkActive(item.href);
 
     return (
@@ -146,7 +164,7 @@ export function AdminSidebar() {
               isActive ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
             )}
           >
-            {item.children.map((child: any) =>
+            {item.children.map((child: NavigationChild) =>
               renderNavigationItem(child, level + 1)
             )}
           </div>
