@@ -762,7 +762,7 @@ export default function AgentPerfil() {
                         label="Graduação"
                         value={
                           profile.graduacao
-                            ? `${profile.graduacao.toUpperCase()} - PAC`
+                            ? `${profile.graduacao.toUpperCase()}`
                             : "GRADUAÇÃO NÃO DEFINIDA - PAC"
                         }
                         isAlert
