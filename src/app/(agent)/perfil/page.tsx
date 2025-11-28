@@ -10,9 +10,7 @@ import Image from "next/image";
 import {
   FaUser,
   FaCheckCircle,
-  FaCalendarAlt,
   FaEdit,
-  FaCamera,
   FaExclamationTriangle,
   FaSync,
   FaShieldAlt,
@@ -23,10 +21,6 @@ import {
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { z } from "zod";
-
-// =============================================
-// SCHEMAS DE VALIDAÇÃO CORRIGIDOS
-// =============================================
 
 const profileSchema = z.object({
   id: z.string().uuid(),
@@ -52,40 +46,27 @@ interface CertificationInfo {
   badgeVariant: "default" | "secondary" | "destructive";
 }
 
-// =============================================
-// INTERFACES E TIPOS
-// =============================================
-
 interface CacheData {
   data: ProfileData;
   timestamp: number;
   version: string;
 }
 
-// =============================================
-// HOOKS PERSONALIZADOS
-// =============================================
-
 const useProfileCache = () => {
   const CACHE_KEY = "pac_user_data";
   const CACHE_VERSION = "1.0.0";
-  const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+  const CACHE_DURATION = 5 * 60 * 1000;
 
   const getFromCache = useCallback((): ProfileData | null => {
     try {
       const cached = localStorage.getItem(CACHE_KEY);
       if (!cached) return null;
-
       const cacheData: CacheData = JSON.parse(cached);
-
       if (cacheData.version !== CACHE_VERSION) return null;
       if (Date.now() - cacheData.timestamp > CACHE_DURATION) return null;
-
       const validatedData = profileSchema.parse(cacheData.data);
-      console.log("✅ Dados carregados do cache:", validatedData);
       return validatedData;
-    } catch (error) {
-      console.error("❌ Erro ao carregar cache:", error);
+    } catch {
       localStorage.removeItem(CACHE_KEY);
       return null;
     }
@@ -100,9 +81,8 @@ const useProfileCache = () => {
         version: CACHE_VERSION,
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-      console.log("✅ Dados salvos no cache:", validatedData);
     } catch (error) {
-      console.error("❌ Erro ao salvar cache:", error);
+      console.error("Erro ao salvar cache:", error);
     }
   }, []);
 
@@ -121,33 +101,22 @@ const useRetryWithBackoff = () => {
       baseDelay = 1000
     ): Promise<T> => {
       let lastError: Error;
-
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           return await operation();
         } catch (error) {
           lastError = error as Error;
-          console.warn(`Tentativa ${attempt + 1} falhou:`, error);
-
           if (attempt === maxRetries - 1) break;
-
           const delay = baseDelay * Math.pow(2, attempt);
-          console.log(`Aguardando ${delay}ms antes da próxima tentativa...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
-
       throw lastError!;
     },
     []
   );
-
   return { executeWithRetry };
 };
-
-// =============================================
-// COMPONENTES DE UI
-// =============================================
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center space-x-3">
@@ -245,18 +214,11 @@ const ErrorState = ({
   </BaseLayout>
 );
 
-// =============================================
-// UTILITÁRIOS
-// =============================================
-
 const formatDate = (dateString: string | null): string => {
   if (!dateString) return "Não definida";
-
   try {
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      return "Data inválida";
-    }
+    if (isNaN(date.getTime())) return "Data inválida";
     return date.toLocaleDateString("pt-BR");
   } catch {
     return "Data inválida";
@@ -265,15 +227,12 @@ const formatDate = (dateString: string | null): string => {
 
 const formatMatricula = (matricula: string | null): string => {
   if (!matricula) return "NÃO DEFINIDA";
-
   const onlyNumbers = matricula.replace(/\D/g, "");
-
   if (onlyNumbers.length === 11) {
     return onlyNumbers
       .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
       .toUpperCase();
   }
-
   return matricula.toUpperCase();
 };
 
@@ -341,10 +300,6 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
   };
 };
 
-// =============================================
-// COMPONENTES DE SEÇÃO
-// =============================================
-
 interface InfoSectionProps {
   label: string;
   value: string;
@@ -364,7 +319,7 @@ const InfoSection: React.FC<InfoSectionProps> = ({
   isMono = false,
   center = false,
 }) => (
-  <div className="space-y-2">
+  <div className="space-y-1 sm:space-y-2">
     <label
       className={`text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block ${
         center ? "text-center" : "text-left"
@@ -375,11 +330,11 @@ const InfoSection: React.FC<InfoSectionProps> = ({
     <div
       className={`flex items-center ${
         center ? "justify-center" : "justify-start"
-      } space-x-2 sm:space-x-3`}
+      } space-x-2`}
     >
       {Icon && (
         <Icon
-          className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 ${
+          className={`w-3 h-3 sm:w-4 sm:h-4 ${
             isAlert ? "text-alert" : "text-navy"
           } flex-shrink-0`}
         />
@@ -388,12 +343,13 @@ const InfoSection: React.FC<InfoSectionProps> = ({
         className={`
           ${
             isTitle
-              ? "text-2xl sm:text-xl lg:text-3xl xl:text-4xl"
-              : "text-base sm:text-lg lg:text-2xl xl:text-3xl"
+              ? "text-lg sm:text-xl lg:text-2xl"
+              : "text-base sm:text-lg lg:text-xl"
           }
           font-bold leading-tight break-words min-h-[1.2em] font-bebas
           ${isAlert ? "text-alert uppercase" : "text-slate-800"}
           ${isMono ? "font-mono" : ""}
+          max-w-full overflow-hidden
         `}
       >
         {value}
@@ -409,28 +365,27 @@ const CertificationSection = ({
   certificationInfo: CertificationInfo;
   profile: ProfileData;
 }) => (
-  <div className="space-y-2">
+  <div className="space-y-1 sm:space-y-2">
     <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
-      Validade da Certificação
+      Validade
     </label>
-    <div className="flex items-center justify-center lg:justify-start space-x-2 sm:space-x-3">
-      <FaCalendarAlt className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-navy flex-shrink-0" />
-      <p className="text-base sm:text-lg lg:text-xl xl:text-2xl font-bold leading-tight break-words min-h-[1.2em] font-bebas text-slate-800">
+    <div className="flex items-center justify-center lg:justify-start">
+      <p className="text-base sm:text-lg lg:text-xl font-bold leading-tight break-words min-h-[1.2em] font-bebas text-slate-800 max-w-full overflow-hidden">
         {certificationInfo.text}
       </p>
     </div>
     {!profile.status && (
       <p className="text-xs text-alert mt-1 text-center lg:text-left font-roboto">
-        ⚠️ Agente inativo - certificação cancelada automaticamente
+        ⚠️ Agente inativo - certificação cancelada
       </p>
     )}
   </div>
 );
 
 const AdminBadge = () => (
-  <div className="flex justify-center lg:justify-start pt-2">
-    <Badge className="bg-navy hover:bg-navy-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 font-semibold text-xs sm:text-sm transition-all duration-300 hover:scale-105 font-roboto">
-      <FaShieldAlt className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+  <div className="flex justify-center lg:justify-start pt-1 sm:pt-2">
+    <Badge className="bg-navy hover:bg-navy-700 text-white px-2 sm:px-3 py-1 font-semibold text-xs transition-all duration-300 hover:scale-105 font-roboto">
+      <FaShieldAlt className="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
       ADMINISTRADOR
     </Badge>
   </div>
@@ -438,25 +393,17 @@ const AdminBadge = () => (
 
 interface AvatarSectionProps {
   profile: ProfileData;
-  isAdmin: boolean;
-  uploadingAvatar: boolean;
-  onCameraClick: () => void;
 }
 
-const AvatarSection: React.FC<AvatarSectionProps> = ({
-  profile,
-  isAdmin,
-  uploadingAvatar,
-  onCameraClick,
-}) => (
-  <div className="space-y-3 w-full max-w-xs">
+const AvatarSection: React.FC<AvatarSectionProps> = ({ profile }) => (
+  <div className="space-y-2 sm:space-y-3 w-full max-w-[280px] mx-auto">
     <div className="flex justify-center">
       <motion.div
         className="relative"
         whileHover={{ scale: 1.02 }}
         transition={{ duration: 0.3 }}
       >
-        <div className="w-36 h-48 sm:w-40 sm:h-52 lg:w-44 lg:h-56 xl:w-48 xl:h-64 bg-slate-100 rounded-lg border-4 border-navy shadow-xl flex items-center justify-center overflow-hidden relative">
+        <div className="w-40 h-52 sm:w-48 sm:h-60 lg:w-56 lg:h-72 xl:w-64 xl:h-80 bg-slate-100 rounded-lg border-4 border-navy shadow-xl flex items-center justify-center overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-slate-200/30 to-slate-100/50" />
 
           {profile.avatar_url ? (
@@ -472,41 +419,13 @@ const AvatarSection: React.FC<AvatarSectionProps> = ({
             />
           ) : (
             <div className="flex flex-col items-center justify-center text-slate-400 relative z-10">
-              <FaUser className="w-14 h-14 sm:w-16 sm:h-16 lg:w-18 lg:h-18 mb-1" />
-              <span className="text-xs text-center px-2 font-roboto">
+              <FaUser className="w-16 h-16 sm:w-20 sm:h-20 mb-2" />
+              <span className="text-sm text-center px-2 font-roboto">
                 Sem foto
               </span>
             </div>
           )}
-
-          {uploadingAvatar && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
-              <div className="text-center text-white">
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-1" />
-                <p className="text-xs">Enviando...</p>
-              </div>
-            </div>
-          )}
         </div>
-
-        {isAdmin && (
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={onCameraClick}
-            disabled={uploadingAvatar}
-            className="absolute -bottom-1 -right-1 bg-blue-600 text-white p-1.5 sm:p-2 rounded-full hover:bg-blue-700 transition-all duration-300 shadow-xl border-2 border-white z-20 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Alterar foto de perfil"
-            aria-label="Alterar foto de perfil"
-            onKeyDown={(e) => e.key === "Enter" && onCameraClick()}
-          >
-            {uploadingAvatar ? (
-              <div className="w-2 h-2 sm:w-3 sm:h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <FaCamera className="w-2 h-2 sm:w-3 sm:h-3" />
-            )}
-          </motion.button>
-        )}
       </motion.div>
     </div>
   </div>
@@ -522,8 +441,8 @@ const StatusSection = ({ profile }: { profile: ProfileData }) => (
         <motion.div whileHover={{ scale: 1.05 }} transition={{ duration: 0.3 }}>
           <Badge
             className={`
-              text-lg sm:text-xl px-8 sm:px-12 lg:px-16 py-3 sm:py-4 font-bold rounded-lg
-              min-w-[280px] sm:min-w-[320px] max-w-[360px] w-full
+              text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3 font-bold rounded-lg
+              min-w-[200px] sm:min-w-[240px] max-w-[280px] w-full
               transition-all duration-300 cursor-default
               shadow-lg text-center font-roboto border
               ${
@@ -533,13 +452,13 @@ const StatusSection = ({ profile }: { profile: ProfileData }) => (
               }
             `}
           >
-            <div className="flex items-center justify-center space-x-2 sm:space-x-3">
+            <div className="flex items-center justify-center space-x-2">
               {profile.status ? (
-                <FaCheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                <FaCheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
               ) : (
-                <FaBan className="w-5 h-5 sm:w-6 sm:h-6" />
+                <FaBan className="w-3 h-3 sm:w-4 sm:h-4" />
               )}
-              <span className="text-sm sm:text-base font-bold">
+              <span className="text-xs sm:text-sm font-bold">
                 {profile.status ? "ATIVO" : "INATIVO"}
               </span>
             </div>
@@ -547,8 +466,8 @@ const StatusSection = ({ profile }: { profile: ProfileData }) => (
         </motion.div>
       </div>
       {!profile.status && (
-        <p className="text-xs text-alert mt-1 max-w-md mx-auto font-roboto">
-          ❗ Agente inativo - acesso limitado ao sistema
+        <p className="text-xs text-alert mt-1 max-w-md mx-auto font-roboto px-2">
+          ❗ Agente inativo - acesso limitado
         </p>
       )}
     </div>
@@ -572,23 +491,25 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     <motion.div
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      className="flex items-center space-x-2 px-3 py-2 rounded-lg transition-all duration-300 cursor-pointer"
+      className="flex items-center justify-center space-x-1 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy"
     >
-      {Icon && <Icon className="w-3 h-3 sm:w-4 sm:h-4 text-white" />}
-      <span className="text-xs sm:text-sm font-medium text-white">{label}</span>
+      {Icon && <Icon className="w-3 h-3 text-white" />}
+      <span className="text-xs font-medium text-white whitespace-nowrap">
+        {label}
+      </span>
     </motion.div>
   );
 
   if (href) {
     return (
-      <Link href={href} className="flex-1 min-w-[120px] text-center">
+      <Link href={href} className="flex-1 min-w-[100px] max-w-[140px]">
         {buttonContent}
       </Link>
     );
   }
 
   return (
-    <div onClick={onClick} className="flex-1 min-w-[120px] text-center">
+    <div onClick={onClick} className="flex-1 min-w-[100px] max-w-[140px]">
       {buttonContent}
     </div>
   );
@@ -607,15 +528,15 @@ const ActionButtons = ({
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5, delay: 0.6 }}
-    className="flex flex-col items-center gap-3 mt-6"
+    className="flex flex-col items-center gap-2 sm:gap-3 mt-4 sm:mt-6"
   >
-    <div className="flex flex-wrap justify-center gap-2 sm:gap-3 w-full max-w-2xl">
+    <div className="flex flex-wrap justify-center gap-1 sm:gap-2 w-full max-w-md px-2">
       {isAdmin && (
         <>
           <ActionButton
             href={`/admin/agentes/${profile.id}`}
             icon={FaEdit}
-            label="Editar Perfil"
+            label="Editar"
           />
           <ActionButton
             href="/admin/dashboard"
@@ -624,30 +545,22 @@ const ActionButtons = ({
           />
         </>
       )}
-      <ActionButton href="/" icon={FaHome} label="Voltar ao Site" />
-      <ActionButton
-        onClick={onSignOut}
-        icon={FaSignOutAlt}
-        label="Sair do Sistema"
-      />
+      <ActionButton href="/" icon={FaHome} label="Site" />
+      <ActionButton onClick={onSignOut} icon={FaSignOutAlt} label="Sair" />
     </div>
 
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5, delay: 0.8 }}
-      className="text-center mt-4"
+      className="text-center mt-2 sm:mt-4"
     >
-      <p className="text-white/70 text-xs sm:text-sm font-roboto">
+      <p className="text-white/70 text-xs font-roboto">
         Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
       </p>
     </motion.div>
   </motion.div>
 );
-
-// =============================================
-// COMPONENTE PRINCIPAL
-// =============================================
 
 export default function AgentPerfil() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -655,7 +568,6 @@ export default function AgentPerfil() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const { getFromCache, setToCache, clearCache } = useProfileCache();
   const { executeWithRetry } = useRetryWithBackoff();
@@ -670,44 +582,26 @@ export default function AgentPerfil() {
 
         const {
           data: { user },
-          error: userError,
         } = await supabase.auth.getUser();
 
-        if (userError) {
-          throw new Error("Erro de autenticação: " + userError.message);
-        }
-
-        if (!user) {
-          throw new Error("Nenhum usuário autenticado encontrado");
-        }
-
-        console.log("👤 Usuário autenticado:", user.id);
+        if (!user) throw new Error("Nenhum usuário autenticado encontrado");
 
         let userData = getFromCache();
 
         if (!userData) {
-          console.log("🔄 Buscando dados do banco...");
           const { data: profileData, error: profileError } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", user.id)
             .single();
 
-          if (profileError) {
-            console.error("❌ Erro ao buscar perfil:", profileError);
+          if (profileError)
             throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
-          }
-
-          if (!profileData) {
-            throw new Error("Perfil não encontrado no banco de dados");
-          }
-
-          console.log("📦 Dados brutos do banco:", profileData);
+          if (!profileData) throw new Error("Perfil não encontrado");
 
           try {
             userData = profileSchema.parse(profileData);
-          } catch (validationError) {
-            console.error("❌ Erro de validação Zod:", validationError);
+          } catch {
             userData = {
               ...profileData,
               full_name: profileData.full_name || "Nome não definido",
@@ -721,25 +615,13 @@ export default function AgentPerfil() {
           setToCache(userData);
         }
 
-        console.log("✅ Dados do perfil carregados:", {
-          full_name: userData.full_name,
-          matricula: userData.matricula,
-          graduacao: userData.graduacao,
-          tipo_sanguineo: userData.tipo_sanguineo,
-          validade_certificacao: userData.validade_certificacao,
-          status: userData.status,
-          role: userData.role,
-        });
-
         return userData;
       };
 
       const userData = await executeWithRetry(operation, 3, 1000);
-
       setProfile(userData);
       setIsAdmin(userData.role?.toLowerCase().trim() === "admin");
     } catch (err: unknown) {
-      console.error("❌ Erro no fetchProfile:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
       setError(errorMessage);
@@ -753,112 +635,6 @@ export default function AgentPerfil() {
     fetchProfile();
   }, [fetchProfile, retryCount]);
 
-  const handleAvatarUpdate = useCallback(
-    async (file: File) => {
-      if (!profile) return;
-
-      setUploadingAvatar(true);
-      try {
-        const supabase = createClient();
-        const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
-        const fileName = `avatar_${profile.id}_${Date.now()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("avatares-agentes")
-          .upload(fileName, file, {
-            cacheControl: "3600",
-            upsert: true,
-          });
-
-        let avatarUrl: string;
-
-        if (uploadError) {
-          avatarUrl = await handleAvatarBase64(file);
-        } else {
-          const { data: urlData } = supabase.storage
-            .from("avatares-agentes")
-            .getPublicUrl(fileName);
-          avatarUrl = urlData.publicUrl;
-        }
-
-        const { error: updateError } = await supabase
-          .from("profiles")
-          .update({
-            avatar_url: avatarUrl,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", profile.id);
-
-        if (updateError) {
-          throw new Error(`Erro ao atualizar perfil: ${updateError.message}`);
-        }
-
-        const updatedProfile = { ...profile, avatar_url: avatarUrl };
-        setProfile(updatedProfile);
-        setToCache(updatedProfile);
-
-        alert("✅ Foto de perfil atualizada com sucesso!");
-      } catch (err: unknown) {
-        console.error("❌ Erro ao atualizar avatar:", err);
-        alert("❌ Erro ao atualizar foto. Tente novamente.");
-      } finally {
-        setUploadingAvatar(false);
-      }
-    },
-    [profile, setToCache]
-  );
-
-  const handleAvatarBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-
-      reader.onload = (e) => {
-        try {
-          const base64Image = e.target?.result as string;
-          resolve(base64Image);
-        } catch {
-          reject(new Error("Erro ao processar imagem."));
-        }
-      };
-
-      reader.onerror = () => reject(new Error("Erro ao ler o arquivo."));
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleCameraClick = () => {
-    // 🔒 Impede múltiplos cliques ou uploads simultâneos
-    if (!isAdmin || uploadingAvatar) return;
-
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.style.display = "none";
-
-    input.onchange = (e) => {
-      const target = e.target as HTMLInputElement;
-      const file = target.files?.[0];
-      if (file) {
-        if (!file.type.startsWith("image/")) {
-          alert("Por favor, selecione apenas arquivos de imagem.");
-          return;
-        }
-
-        if (file.size > 2 * 1024 * 1024) {
-          alert("A imagem deve ter no máximo 2MB.");
-          return;
-        }
-
-        // ✅ Chamada direta, sem debounce
-        handleAvatarUpdate(file);
-      }
-    };
-
-    document.body.appendChild(input);
-    input.click();
-    document.body.removeChild(input);
-  };
-
   const handleRetry = () => {
     setRetryCount((prev) => prev + 1);
   };
@@ -870,8 +646,8 @@ export default function AgentPerfil() {
       clearCache();
       localStorage.removeItem("supabase.auth.token");
       window.location.href = "/login";
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
+    } catch {
+      console.error("Erro ao fazer logout");
     }
   };
 
@@ -888,21 +664,17 @@ export default function AgentPerfil() {
   const ProfileContent = ({
     profile,
     isAdmin,
-    uploadingAvatar,
-    onCameraClick,
     onSignOut,
   }: {
     profile: ProfileData;
     isAdmin: boolean;
-    uploadingAvatar: boolean;
-    onCameraClick: () => void;
     onSignOut: () => void;
   }) => {
     const certificationInfo = getCertificationInfo(profile);
 
     return (
       <BaseLayout>
-        <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 relative z-20">
+        <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 relative z-20">
           <div className="w-full max-w-6xl">
             <motion.div
               initial={{ opacity: 0, y: 40 }}
@@ -910,9 +682,9 @@ export default function AgentPerfil() {
               transition={{ duration: 0.7, delay: 0.2 }}
               className="flex justify-center"
             >
-              <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-xl overflow-hidden w-full max-w-3xl border border-slate-200/60">
+              <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-xl overflow-hidden w-full max-w-sm sm:max-w-md lg:max-w-3xl border border-slate-200/60 mx-2">
                 <div className="absolute inset-0 opacity-[0.02] flex items-center justify-center pointer-events-none z-0">
-                  <div className="w-full h-full max-w-[300px] max-h-[300px] relative">
+                  <div className="w-full h-full max-w-[800px] max-h-[800px] sm:max-w-[800px] sm:max-h-[800px] relative">
                     <Image
                       src="/images/logos/logo-pattern.svg"
                       alt="Marca d'água Patrulha Aérea Civil"
@@ -926,24 +698,23 @@ export default function AgentPerfil() {
 
                 <div className="absolute inset-1 border border-slate-300/30 rounded-lg pointer-events-none z-0" />
 
-                <CardContent className="p-2 sm:p-3 lg:p-4 relative z-10">
+                <CardContent className="p-3 sm:p-4 lg:p-6 relative z-10">
+                  {/* HEADER REORGANIZADO NA ORDEM CORRETA */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
-                    className="flex items-center justify-between pb-3 lg:pb-4 border-b border-slate-200/30 mb-3 lg:mb-4"
+                    className="flex flex-col items-center pb-4 border-b border-slate-200/30 mb-4 space-y-4"
                   >
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      className="flex-shrink-0"
-                    >
-                      <div className="w-28 h-28 sm:w-32 sm:h-32 lg:w-36 lg:h-36 flex items-center justify-center overflow-visible">
-                        <div className="relative w-full h-full max-w-full max-h-full">
+                    {/* 1. LOGO */}
+                    <motion.div whileHover={{ scale: 1.05 }}>
+                      <div className="w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 xl:w-40 xl:h-40 flex items-center justify-center">
+                        <div className="relative w-full h-full">
                           <Image
                             src="/images/logos/logo.webp"
                             alt="Patrulha Aérea Civil"
-                            width={144}
-                            height={144}
+                            width={160}
+                            height={160}
                             className="w-full h-full object-contain"
                             priority
                           />
@@ -951,41 +722,39 @@ export default function AgentPerfil() {
                       </div>
                     </motion.div>
 
-                    <div className="flex-1 text-center px-1 min-w-0 mx-1">
-                      <h1 className="text-navy text-lg sm:text-xl lg:text-3xl font-bold tracking-wide uppercase leading-tight font-bebas">
+                    {/* 2. PATRULHA AÉREA CIVIL */}
+                    <div className="text-center">
+                      <h1 className="text-navy text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide uppercase leading-tight font-bebas">
                         Patrulha Aérea Civil
                       </h1>
-                      <p className="text-slate-600 text-xs mt-0.5 leading-snug font-roboto">
+                      <p className="text-slate-600 text-xs sm:text-sm mt-1 leading-snug font-roboto">
                         COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
                       </p>
-                      <div className="mt-0.5">
-                        <h2 className="text-xs sm:text-sm font-bold text-slate-700 tracking-wide uppercase font-bebas">
-                          Identificação
-                        </h2>
-                      </div>
                     </div>
 
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      className="flex-shrink-0"
-                    >
-                      <div className="w-28 h-21 sm:w-32 sm:h-24 lg:w-36 lg:h-27 border border-slate-300 rounded flex items-center justify-center overflow-hidden">
+                    {/* 3. IDENTIFICAÇÃO E 4. BANDEIRA */}
+                    <div className="text-center space-y-2">
+                      <h2 className="text-xs sm:text-sm font-bold text-slate-700 tracking-wide uppercase font-bebas">
+                        Identificação
+                      </h2>
+                      <div className="w-12 h-8 sm:w-14 sm:h-10 border border-slate-300 rounded flex items-center justify-center justify-self-center overflow-hidden">
                         <Image
                           src="/images/logos/flag-br.webp"
                           alt="Bandeira do Brasil"
-                          width={144}
-                          height={108}
+                          width={56}
+                          height={40}
                           className="w-full h-full object-cover rounded"
                           priority
                         />
                       </div>
-                    </motion.div>
+                    </div>
                   </motion.div>
 
-                  <div className="flex flex-col lg:flex-row gap-0 items-center lg:items-start">
-                    <div className="flex-1 w-full space-y-3 text-center lg:text-left pr-0 lg:pr-1">
+                  <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-center lg:items-start">
+                    {/* LADO ESQUERDO - INFORMAÇÕES */}
+                    <div className="flex-1 w-full space-y-3 sm:space-y-4 text-center lg:text-left">
                       <InfoSection
-                        label="Nome Completo"
+                        label="Nome"
                         value={profile.full_name || "Nome não definido"}
                         isTitle
                       />
@@ -1010,28 +779,25 @@ export default function AgentPerfil() {
                       {isAdmin && <AdminBadge />}
                     </div>
 
-                    <div className="hidden lg:block w-px h-16 bg-slate-300/5" />
+                    <div className="w-full lg:w-px lg:h-40 bg-slate-300/10 my-3 lg:my-0" />
 
-                    <div className="flex-1 w-full space-y-3 flex flex-col items-center pl-0 lg:pl-1">
-                      <AvatarSection
-                        profile={profile}
-                        isAdmin={isAdmin}
-                        uploadingAvatar={uploadingAvatar}
-                        onCameraClick={onCameraClick}
-                      />
+                    {/* LADO DIREITO - AVATAR E TIPO SANGUÍNEO */}
+                    <div className="flex-1 w-full space-y-3 sm:space-y-4 flex flex-col items-center">
+                      <AvatarSection profile={profile} />
+
                       <div className="w-full text-center">
-                        <label className="text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto">
+                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                           Tipo Sanguíneo
                         </label>
-                        <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-alert uppercase font-bebas leading-tight">
+                        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-alert uppercase font-bebas leading-tight">
                           {profile.tipo_sanguineo || "NÃO DEFINIDO"}
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="my-3 lg:my-4 border-t border-slate-300/30 relative">
-                    <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-6 h-1 bg-navy/20 rounded-full" />
+                  <div className="my-4 border-t border-slate-300/30 relative">
+                    <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-navy/20 rounded-full" />
                   </div>
 
                   <StatusSection profile={profile} />
@@ -1054,8 +820,6 @@ export default function AgentPerfil() {
     <ProfileContent
       profile={profile}
       isAdmin={isAdmin}
-      uploadingAvatar={uploadingAvatar}
-      onCameraClick={handleCameraClick}
       onSignOut={handleSignOut}
     />
   );

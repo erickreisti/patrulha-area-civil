@@ -28,14 +28,22 @@ import {
 
 // Constantes
 const GRADUACOES = [
-  "Soldado",
-  "Cabo",
-  "Sargento",
-  "Subtenente",
-  "Tenente",
-  "Capitão",
-  "Major",
-  "Coronel",
+  "COMODORO DE BRIGADA - PAC",
+  "COMODORO - PAC",
+  "VICE COMODORO - PAC",
+  "CORONEL - PAC",
+  "TENENTE CORONEL - PAC",
+  "MAJOR - PAC",
+  "CAPITÃO - PAC",
+  "1° TENENTE - PAC",
+  "2° TENENTE - PAC",
+  "ASPIRANTE -a-OFICIAL - PAC",
+  "SUBOFICIAL - PAC",
+  "1° SARGENTO - PAC",
+  "2° SARGENTO - PAC",
+  "3° SARGENTO - PAC",
+  "CABO - PAC",
+  "PATRULHEIRO",
 ];
 
 const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
