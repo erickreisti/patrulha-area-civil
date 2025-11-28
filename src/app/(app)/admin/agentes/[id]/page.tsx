@@ -44,6 +44,7 @@ const GRADUACOES = [
   "3° SARGENTO - PAC",
   "CABO - PAC",
   "PATRULHEIRO",
+  "AGENTE - PAC",
 ];
 
 const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
