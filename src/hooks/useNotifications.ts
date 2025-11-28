@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useToast } from "@/hooks/useToast";
+import { toast } from "sonner";
 
 // Interface para metadata baseada no schema
 export interface NotificationMetadata {
@@ -48,7 +48,6 @@ export function useNotifications(): UseNotificationsReturn {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
-  const { success, error } = useToast();
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -57,7 +56,10 @@ export function useNotifications(): UseNotificationsReturn {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setNotifications([]);
+        return;
+      }
 
       const { data, error: fetchError } = await supabase
         .from("notifications")
@@ -71,18 +73,21 @@ export function useNotifications(): UseNotificationsReturn {
       setNotifications(data || []);
     } catch (err) {
       console.error("Erro ao buscar notificações:", err);
-      error("Erro ao carregar notificações");
+      toast.error("Erro ao carregar notificações");
     } finally {
       setLoading(false);
     }
-  }, [supabase, error]);
+  }, [supabase]);
 
   const markAsRead = useCallback(
     async (notificationId: string) => {
       try {
         const { error: updateError } = await supabase
           .from("notifications")
-          .update({ is_read: true })
+          .update({
+            is_read: true,
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", notificationId);
 
         if (updateError) throw updateError;
@@ -92,12 +97,14 @@ export function useNotifications(): UseNotificationsReturn {
             notif.id === notificationId ? { ...notif, is_read: true } : notif
           )
         );
+
+        toast.success("Notificação marcada como lida");
       } catch (err) {
         console.error("Erro ao marcar notificação como lida:", err);
-        error("Erro ao atualizar notificação");
+        toast.error("Erro ao atualizar notificação");
       }
     },
-    [supabase, error]
+    [supabase]
   );
 
   const markAllAsRead = useCallback(async () => {
@@ -109,7 +116,10 @@ export function useNotifications(): UseNotificationsReturn {
 
       const { error: updateError } = await supabase
         .from("notifications")
-        .update({ is_read: true })
+        .update({
+          is_read: true,
+          updated_at: new Date().toISOString(),
+        })
         .eq("user_id", user.id)
         .eq("is_read", false);
 
@@ -119,12 +129,12 @@ export function useNotifications(): UseNotificationsReturn {
         prev.map((notif) => ({ ...notif, is_read: true }))
       );
 
-      success("Todas notificações marcadas como lidas");
+      toast.success("Todas notificações marcadas como lidas");
     } catch (err) {
       console.error("Erro ao marcar todas como lidas:", err);
-      error("Erro ao atualizar notificações");
+      toast.error("Erro ao atualizar notificações");
     }
-  }, [supabase, error, success]);
+  }, [supabase]);
 
   const deleteNotification = useCallback(
     async (notificationId: string) => {
@@ -139,13 +149,13 @@ export function useNotifications(): UseNotificationsReturn {
         setNotifications((prev) =>
           prev.filter((notif) => notif.id !== notificationId)
         );
-        success("Notificação removida");
+        toast.success("Notificação removida");
       } catch (err) {
         console.error("Erro ao excluir notificação:", err);
-        error("Erro ao remover notificação");
+        toast.error("Erro ao remover notificação");
       }
     },
-    [supabase, error, success]
+    [supabase]
   );
 
   // Escutar por novas notificações em tempo real
@@ -161,20 +171,110 @@ export function useNotifications(): UseNotificationsReturn {
           schema: "public",
           table: "notifications",
         },
-        (payload) => {
+        async (payload) => {
           const newNotification = payload.new as Notification;
 
           // Verificar se a notificação é para o usuário atual
-          supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user && newNotification.user_id === user.id) {
-              setNotifications((prev) => [newNotification, ...prev]);
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user && newNotification.user_id === user.id) {
+            setNotifications((prev) => [newNotification, ...prev]);
 
-              // Mostrar toast para notificações não lidas
-              if (!newNotification.is_read) {
-                success(`Nova notificação: ${newNotification.title}`);
+            // Mostrar toast para notificações não lidas
+            if (!newNotification.is_read) {
+              // Toast customizado baseado no tipo
+              const getToastConfig = (type: Notification["type"]) => {
+                switch (type) {
+                  case "system":
+                  case "info":
+                    return { style: "info" as const };
+                  case "user_created":
+                    return { style: "success" as const };
+                  case "warning":
+                    return { style: "warning" as const };
+                  case "news_published":
+                  case "gallery_upload":
+                  default:
+                    return { style: "default" as const };
+                }
+              };
+
+              const toastConfig = getToastConfig(newNotification.type);
+
+              // Usar toast padrão para tipos que não têm método específico
+              if (toastConfig.style === "default") {
+                toast(newNotification.title, {
+                  description: newNotification.message,
+                  duration: newNotification.type === "warning" ? 8000 : 4000,
+                  action: newNotification.action_url
+                    ? {
+                        label: "Ver",
+                        onClick: () =>
+                          window.open(newNotification.action_url, "_blank"),
+                      }
+                    : undefined,
+                });
+              } else {
+                // Usar métodos específicos do toast (success, warning, info)
+                toast[toastConfig.style](newNotification.title, {
+                  description: newNotification.message,
+                  duration: newNotification.type === "warning" ? 8000 : 4000,
+                  action: newNotification.action_url
+                    ? {
+                        label: "Ver",
+                        onClick: () =>
+                          window.open(newNotification.action_url, "_blank"),
+                      }
+                    : undefined,
+                });
               }
             }
-          });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+        },
+        async (payload) => {
+          const updatedNotification = payload.new as Notification;
+
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user && updatedNotification.user_id === user.id) {
+            setNotifications((prev) =>
+              prev.map((notif) =>
+                notif.id === updatedNotification.id
+                  ? updatedNotification
+                  : notif
+              )
+            );
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "notifications",
+        },
+        async (payload) => {
+          const deletedNotification = payload.old as Notification;
+
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user && deletedNotification.user_id === user.id) {
+            setNotifications((prev) =>
+              prev.filter((notif) => notif.id !== deletedNotification.id)
+            );
+          }
         }
       )
       .subscribe();
@@ -182,7 +282,39 @@ export function useNotifications(): UseNotificationsReturn {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, fetchNotifications, success]);
+  }, [supabase, fetchNotifications]);
+
+  // Limpar notificações expiradas
+  useEffect(() => {
+    const cleanupExpiredNotifications = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { error: deleteError } = await supabase
+          .from("notifications")
+          .delete()
+          .eq("user_id", user.id)
+          .lt("expires_at", new Date().toISOString());
+
+        if (deleteError) {
+          console.error("Erro ao limpar notificações expiradas:", deleteError);
+        }
+      } catch (err) {
+        console.error("Erro na limpeza de notificações:", err);
+      }
+    };
+
+    // Executar limpeza a cada hora
+    const interval = setInterval(cleanupExpiredNotifications, 60 * 60 * 1000);
+
+    // Executar uma vez na inicialização
+    cleanupExpiredNotifications();
+
+    return () => clearInterval(interval);
+  }, [supabase]);
 
   const unreadCount = notifications.filter((notif) => !notif.is_read).length;
 
@@ -195,4 +327,49 @@ export function useNotifications(): UseNotificationsReturn {
     deleteNotification,
     refreshNotifications: fetchNotifications,
   };
+}
+
+// Hook auxiliar para criar notificações
+export function useNotificationCreator() {
+  const supabase = createClient();
+
+  const createNotification = useCallback(
+    async (
+      userId: string,
+      type: Notification["type"],
+      title: string,
+      message: string,
+      metadata?: NotificationMetadata,
+      action_url?: string
+    ) => {
+      try {
+        const { error: insertError } = await supabase
+          .from("notifications")
+          .insert({
+            user_id: userId,
+            type,
+            title,
+            message,
+            action_url,
+            metadata,
+            is_read: false,
+            expires_at:
+              type === "warning"
+                ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+                : undefined,
+          });
+
+        if (insertError) throw insertError;
+
+        return true;
+      } catch (err) {
+        console.error("Erro ao criar notificação:", err);
+        toast.error("Erro ao criar notificação");
+        return false;
+      }
+    },
+    [supabase]
+  );
+
+  return { createNotification };
 }

@@ -1,20 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { FileUpload } from "@/components/ui/file-upload";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner"; // ✅ Adicionado Sonner
 import Link from "next/link";
-import Image from "next/image";
 import {
   FaUser,
   FaIdCard,
   FaEnvelope,
-  FaTint,
-  FaCalendarAlt,
   FaShieldAlt,
   FaArrowLeft,
   FaSave,
@@ -24,12 +37,14 @@ import {
   FaImage,
   FaChartBar,
   FaHome,
-  FaTrash,
-  FaUpload,
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaExclamationCircle,
+  FaTimes,
+  FaChevronDown,
 } from "react-icons/fa";
 
 // Opções baseadas no schema
-
 const GRADUACOES = [
   "COMODORO DE BRIGADA - PAC",
   "COMODORO - PAC",
@@ -52,23 +67,72 @@ const GRADUACOES = [
 
 const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
+interface FormData {
+  matricula: string;
+  email: string;
+  full_name: string;
+  graduacao: string;
+  tipo_sanguineo: string;
+  validade_certificacao: string;
+  role: "agent" | "admin";
+  avatar_url?: string;
+}
+
 export default function CriarAgentePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string>("");
-  const [formData, setFormData] = useState({
+  const [dateOpen, setDateOpen] = useState(false);
+  const [alert, setAlert] = useState<{
+    type: "success" | "destructive" | "warning" | "default";
+    title: string;
+    message: string;
+    show: boolean;
+  }>({
+    type: "default",
+    title: "",
+    message: "",
+    show: false,
+  });
+
+  const [formData, setFormData] = useState<FormData>({
     matricula: "",
     email: "",
     full_name: "",
     graduacao: "",
     tipo_sanguineo: "",
     validade_certificacao: "",
-    role: "agent" as "agent" | "admin",
+    role: "agent",
+    avatar_url: "",
   });
 
-  const supabase = createClient();
+  // Função para mostrar alerta
+  const showAlert = (
+    type: "success" | "destructive" | "warning",
+    title: string,
+    message: string
+  ) => {
+    setAlert({
+      type,
+      title,
+      message,
+      show: true,
+    });
+  };
+
+  // Função para fechar alerta
+  const closeAlert = () => {
+    setAlert((prev) => ({ ...prev, show: false }));
+  };
+
+  // Auto-fechar alertas de sucesso após 5 segundos
+  useEffect(() => {
+    if (alert.show && alert.type === "success") {
+      const timer = setTimeout(() => {
+        closeAlert();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [alert.show, alert.type]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -80,207 +144,191 @@ export default function CriarAgentePage() {
     }));
   };
 
-  // Função para fazer upload do avatar
-  const uploadAvatar = async (userId: string): Promise<string | null> => {
-    if (!avatarFile) return null;
-
-    try {
-      const fileExt = avatarFile.name.split(".").pop();
-      const fileName = `${userId}/avatar-${Date.now()}.${fileExt}`;
-
-      const { error } = await supabase.storage
-        .from("avatares-agentes")
-        .upload(fileName, avatarFile, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (error) {
-        console.error("❌ Erro ao fazer upload do avatar:", error);
-        return null;
-      }
-
-      // Obter URL pública do arquivo
-      const { data: urlData } = supabase.storage
-        .from("avatares-agentes")
-        .getPublicUrl(fileName);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error("❌ Erro no upload do avatar:", error);
-      return null;
-    }
+  // Função para atualizar avatar usando FileUpload
+  const handleAvatarChange = (avatarUrl: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      avatar_url: avatarUrl,
+    }));
   };
 
-  // Função para lidar com a seleção de arquivo
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validar tipo de arquivo
-    if (!file.type.startsWith("image/")) {
-      alert("Por favor, selecione apenas arquivos de imagem");
-      return;
-    }
-
-    // Validar tamanho do arquivo (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("A imagem deve ter no máximo 5MB");
-      return;
-    }
-
-    setAvatarFile(file);
-
-    // Criar preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setAvatarPreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+  // Função para atualizar a data
+  const handleDateSelect = (date: Date | undefined) => {
+    setFormData((prev) => ({
+      ...prev,
+      validade_certificacao: date ? date.toISOString().split("T")[0] : "",
+    }));
+    setDateOpen(false);
   };
 
-  // Função para remover avatar selecionado
-  const removeAvatar = () => {
-    setAvatarFile(null);
-    setAvatarPreview("");
+  // Formatar data para exibição
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "Selecionar data";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("pt-BR");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setFormError(null);
+    closeAlert();
 
     try {
-      // Validar dados básicos
+      // Validações
       if (!formData.matricula || !formData.email || !formData.full_name) {
         throw new Error("Matrícula, email e nome são obrigatórios");
       }
 
-      // Validar formato da matrícula (11 dígitos)
       if (!/^\d{11}$/.test(formData.matricula)) {
         throw new Error(
           "Matrícula deve conter exatamente 11 dígitos numéricos"
         );
       }
 
-      // Validar email
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
         throw new Error("Email inválido");
       }
 
       console.log("🔄 Iniciando criação do agente...", formData);
 
-      // 1. Criar usuário no Auth do Supabase
-      const { data: authData, error: authError } =
-        await supabase.auth.admin.createUser({
-          email: formData.email,
-          password: "pac12345",
-          email_confirm: true,
-          user_metadata: {
-            matricula: formData.matricula,
-            full_name: formData.full_name,
-            role: formData.role,
-          },
-        });
+      // ✅ Toast de loading
+      const toastId = toast.loading("Cadastrando agente...");
 
-      if (authError) {
-        console.error("❌ Erro ao criar usuário no Auth:", authError);
-
-        if (authError.message.includes("already registered")) {
-          throw new Error("Email já cadastrado no sistema");
-        }
-        if (authError.message.includes("password")) {
-          throw new Error("Senha muito fraca. Use uma senha mais forte");
-        }
-
-        throw new Error(`Erro ao criar usuário: ${authError.message}`);
-      }
-
-      if (!authData.user) {
-        throw new Error("Nenhum usuário retornado do Auth");
-      }
-
-      console.log("✅ Usuário criado no Auth:", authData.user.id);
-
-      // 2. Fazer upload do avatar se existir
-      let avatarUrl = null;
-      if (avatarFile) {
-        console.log("📤 Fazendo upload do avatar...");
-        avatarUrl = await uploadAvatar(authData.user.id);
-        if (avatarUrl) {
-          console.log("✅ Avatar upload completo:", avatarUrl);
-        }
-      }
-
-      // 3. Criar perfil na tabela profiles
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: authData.user.id,
-        matricula: formData.matricula,
-        email: formData.email,
-        full_name: formData.full_name,
-        avatar_url: avatarUrl,
-        graduacao: formData.graduacao || null,
-        tipo_sanguineo: formData.tipo_sanguineo || null,
-        validade_certificacao: formData.validade_certificacao || null,
-        role: formData.role,
-        status: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+      // Chamar a API route para criar o agente
+      const response = await fetch("/api/admin/agents", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
       });
 
-      if (profileError) {
-        console.error("❌ Erro ao criar perfil:", profileError);
+      const result = await response.json();
 
-        // Tentar deletar o usuário do Auth se o perfil falhou
-        await supabase.auth.admin.deleteUser(authData.user.id);
-
-        if (profileError.code === "23505") {
-          if (profileError.message.includes("matricula")) {
-            throw new Error("Matrícula já cadastrada no sistema");
-          }
-          if (profileError.message.includes("email")) {
-            throw new Error("Email já cadastrado no sistema");
-          }
-        }
-
-        throw new Error(`Erro ao criar perfil: ${profileError.message}`);
+      if (!response.ok) {
+        throw new Error(result.error || "Erro ao criar agente");
       }
 
-      console.log("✅ Perfil criado com sucesso!");
+      console.log("✅ Agente criado com sucesso:", result);
 
-      // 4. Enviar email de boas-vindas
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-        formData.email,
-        {
-          redirectTo: `${window.location.origin}/reset-password`,
-        }
+      // ✅ Toast de sucesso
+      toast.success("Agente criado com sucesso!", {
+        id: toastId,
+        description: `O agente ${formData.full_name} foi cadastrado no sistema.`,
+        duration: 5000,
+      });
+
+      // Mostrar alerta de sucesso (mantido para compatibilidade)
+      showAlert(
+        "success",
+        "Agente criado com sucesso!",
+        `O agente ${formData.full_name} foi cadastrado no sistema e receberá um email para definir sua senha.`
       );
 
-      if (resetError) {
-        console.warn("⚠️ Não foi possível enviar email de reset:", resetError);
-      } else {
-        console.log("✅ Email de reset enviado");
-      }
+      // Limpar formulário
+      setFormData({
+        matricula: "",
+        email: "",
+        full_name: "",
+        graduacao: "",
+        tipo_sanguineo: "",
+        validade_certificacao: "",
+        role: "agent",
+        avatar_url: "",
+      });
 
-      // Sucesso - redirecionar para lista de agentes
-      alert(
-        "Agente criado com sucesso! Um email foi enviado para definir a senha."
-      );
-      router.push("/admin/agentes");
+      // Redirecionar após 3 segundos
+      setTimeout(() => {
+        router.push("/admin/agentes");
+        router.refresh();
+      }, 3000);
     } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
-      setFormError(errorMessage);
-      alert(errorMessage);
+
+      // ✅ Toast de erro
+      toast.error("Erro ao criar agente", {
+        description: errorMessage,
+        duration: 6000,
+      });
+
+      // Mostrar alerta de erro (mantido para compatibilidade)
+      showAlert("destructive", "Erro ao criar agente", errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
+  // Loading skeleton para quando estiver carregando
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
+            <Skeleton className="h-10 w-64 mb-2" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2">
+              <Card className="border-0 shadow-md">
+                <CardHeader>
+                  <Skeleton className="h-6 w-48" />
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              <Skeleton className="h-48 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
+        {/* Alertas (mantidos para compatibilidade) */}
+        {alert.show && (
+          <div className="mb-6 animate-fade-in">
+            <Alert variant={alert.type} className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={closeAlert}
+                className="absolute right-2 top-2 h-6 w-6 p-0"
+              >
+                <FaTimes className="h-3 w-3" />
+              </Button>
+
+              {alert.type === "success" && (
+                <FaCheckCircle className="h-4 w-4 text-green-600" />
+              )}
+              {alert.type === "destructive" && (
+                <FaExclamationCircle className="h-4 w-4 text-red-600" />
+              )}
+              {alert.type === "warning" && (
+                <FaExclamationTriangle className="h-4 w-4 text-yellow-600" />
+              )}
+
+              <AlertTitle className="flex items-center gap-2">
+                {alert.title}
+              </AlertTitle>
+              <AlertDescription>{alert.message}</AlertDescription>
+            </Alert>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
           <div>
@@ -296,7 +344,7 @@ export default function CriarAgentePage() {
             <Link href="/admin/dashboard">
               <Button
                 variant="outline"
-                className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
               >
                 <FaChartBar className="w-4 h-4 mr-2" />
                 Dashboard
@@ -337,87 +385,34 @@ export default function CriarAgentePage() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
-                  {formError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                      <strong>Erro:</strong> {formError}
-                    </div>
-                  )}
-
-                  {/* Upload de Avatar */}
+                  {/* Upload de Avatar usando FileUpload */}
                   <div className="space-y-4">
                     <Label className="text-sm font-medium text-gray-700">
                       Foto do Agente
                     </Label>
-
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-                      {/* Preview do Avatar */}
-                      <div className="flex-shrink-0">
-                        <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center overflow-hidden">
-                          {avatarPreview ? (
-                            <Image
-                              src={avatarPreview}
-                              alt="Preview do avatar"
-                              width={96}
-                              height={96}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <FaUser className="w-8 h-8 text-gray-400" />
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Controles de Upload */}
-                      <div className="flex-1 space-y-3">
-                        <div className="flex flex-col sm:flex-row gap-3">
-                          <Label
-                            htmlFor="avatar-upload"
-                            className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center transition-colors"
-                          >
-                            <FaUpload className="w-4 h-4 mr-2" />
-                            {avatarPreview ? "Alterar Foto" : "Selecionar Foto"}
-                          </Label>
-
-                          <Input
-                            id="avatar-upload"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleAvatarChange}
-                            className="hidden"
-                            disabled={loading}
-                          />
-
-                          {avatarPreview && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={removeAvatar}
-                              className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
-                              disabled={loading}
-                            >
-                              <FaTrash className="w-4 h-4 mr-2" />
-                              Remover
-                            </Button>
-                          )}
-                        </div>
-
-                        <p className="text-xs text-gray-500">
-                          Formatos: JPG, PNG, GIF. Tamanho máximo: 5MB
-                        </p>
-                      </div>
-                    </div>
+                    <FileUpload
+                      type="avatar"
+                      onFileChange={handleAvatarChange}
+                      currentFile={formData.avatar_url}
+                      className="p-4 border border-gray-200 rounded-lg bg-white"
+                      userId={formData.matricula}
+                    />
                   </div>
 
                   {/* Informações Básicas */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Matrícula */}
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <Label
+                        htmlFor="matricula"
+                        className="text-sm font-medium text-gray-700"
+                      >
                         Matrícula *
-                      </label>
+                      </Label>
                       <div className="relative">
                         <FaIdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <Input
+                          id="matricula"
                           type="text"
                           name="matricula"
                           value={formData.matricula}
@@ -436,12 +431,16 @@ export default function CriarAgentePage() {
 
                     {/* Email */}
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <Label
+                        htmlFor="email"
+                        className="text-sm font-medium text-gray-700"
+                      >
                         Email *
-                      </label>
+                      </Label>
                       <div className="relative">
                         <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <Input
+                          id="email"
                           type="email"
                           name="email"
                           value={formData.email}
@@ -457,12 +456,16 @@ export default function CriarAgentePage() {
 
                   {/* Nome Completo */}
                   <div className="space-y-2">
-                    <label className="block text-sm font-medium text-gray-700">
+                    <Label
+                      htmlFor="full_name"
+                      className="text-sm font-medium text-gray-700"
+                    >
                       Nome Completo *
-                    </label>
+                    </Label>
                     <div className="relative">
                       <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Input
+                        id="full_name"
                         type="text"
                         name="full_name"
                         value={formData.full_name}
@@ -477,90 +480,124 @@ export default function CriarAgentePage() {
 
                   {/* Graduação e Tipo Sanguíneo */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Graduação */}
+                    {/* Graduação - USANDO SELECT MODERNO */}
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <Label
+                        htmlFor="graduacao"
+                        className="text-sm font-medium text-gray-700"
+                      >
                         Graduação
-                      </label>
-                      <select
-                        name="graduacao"
+                      </Label>
+                      <Select
                         value={formData.graduacao}
-                        onChange={handleChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({ ...prev, graduacao: value }))
+                        }
                         disabled={loading}
                       >
-                        <option value="">Selecione uma graduação</option>
-                        {GRADUACOES.map((graduacao) => (
-                          <option key={graduacao} value={graduacao}>
-                            {graduacao}
-                          </option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecione uma graduação" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GRADUACOES.map((graduacao) => (
+                            <SelectItem key={graduacao} value={graduacao}>
+                              {graduacao}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    {/* Tipo Sanguíneo */}
+                    {/* Tipo Sanguíneo - USANDO SELECT MODERNO */}
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <Label
+                        htmlFor="tipo_sanguineo"
+                        className="text-sm font-medium text-gray-700"
+                      >
                         Tipo Sanguíneo
-                      </label>
-                      <div className="relative">
-                        <FaTint className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <select
-                          name="tipo_sanguineo"
-                          value={formData.tipo_sanguineo}
-                          onChange={handleChange}
-                          className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          disabled={loading}
-                        >
-                          <option value="">Selecione o tipo sanguíneo</option>
+                      </Label>
+                      <Select
+                        value={formData.tipo_sanguineo}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            tipo_sanguineo: value,
+                          }))
+                        }
+                        disabled={loading}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecione o tipo sanguíneo" />
+                        </SelectTrigger>
+                        <SelectContent>
                           {TIPOS_SANGUINEOS.map((tipo) => (
-                            <option key={tipo} value={tipo}>
+                            <SelectItem key={tipo} value={tipo}>
                               {tipo}
-                            </option>
+                            </SelectItem>
                           ))}
-                        </select>
-                      </div>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
                   {/* Validade da Certificação e Tipo de Usuário */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Validade da Certificação */}
+                    {/* Validade da Certificação - USANDO DATE PICKER */}
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <Label className="text-sm font-medium text-gray-700">
                         Validade da Certificação
-                      </label>
-                      <div className="relative">
-                        <FaCalendarAlt className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <Input
-                          type="date"
-                          name="validade_certificacao"
-                          value={formData.validade_certificacao}
-                          onChange={handleChange}
-                          className="pl-10"
-                          disabled={loading}
-                        />
-                      </div>
+                      </Label>
+                      <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-between font-normal"
+                            disabled={loading}
+                          >
+                            {formData.validade_certificacao
+                              ? formatDate(formData.validade_certificacao)
+                              : "Selecionar data"}
+                            <FaChevronDown className="w-4 h-4" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={
+                              formData.validade_certificacao
+                                ? new Date(formData.validade_certificacao)
+                                : undefined
+                            }
+                            onSelect={handleDateSelect}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
 
-                    {/* Tipo de Usuário */}
+                    {/* Tipo de Usuário - USANDO SELECT MODERNO */}
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-gray-700">
+                      <Label
+                        htmlFor="role"
+                        className="text-sm font-medium text-gray-700"
+                      >
                         Tipo de Usuário
-                      </label>
-                      <div className="relative">
-                        <FaShieldAlt className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <select
-                          name="role"
-                          value={formData.role}
-                          onChange={handleChange}
-                          className="w-full px-3 py-2 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
-                          disabled={loading}
-                        >
-                          <option value="agent">Agente</option>
-                          <option value="admin">Administrador</option>
-                        </select>
-                      </div>
+                      </Label>
+                      <Select
+                        value={formData.role}
+                        onValueChange={(value: "agent" | "admin") =>
+                          setFormData((prev) => ({ ...prev, role: value }))
+                        }
+                        disabled={loading}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="agent">Agente</SelectItem>
+                          <SelectItem value="admin">Administrador</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -620,15 +657,15 @@ export default function CriarAgentePage() {
                   <p>A matrícula deve conter exatamente 11 dígitos</p>
                 </div>
                 <div className="flex items-start space-x-2">
-                  <FaShieldAlt className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                  <FaShieldAlt className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                   <p>Administradores têm acesso total ao sistema</p>
                 </div>
                 <div className="flex items-start space-x-2">
-                  <FaUser className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                  <FaUser className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
                   <p>Agentes têm acesso apenas ao seu perfil</p>
                 </div>
                 <div className="flex items-start space-x-2">
-                  <FaImage className="w-4 h-4 text-pink-500 mt-0.5 flex-shrink-0" />
+                  <FaImage className="w-4 h-4 text-blue-300 mt-0.5 flex-shrink-0" />
                   <p>
                     A foto de perfil é opcional e pode ser adicionada depois
                   </p>

@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Roboto } from "next/font/google";
 import "./globals.css";
-import { ToastProvider } from "@/components/ui/toast-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -36,25 +35,13 @@ export const metadata: Metadata = {
     "proteção civil",
     "serviço humanitário",
     "busca e salvamento",
-    "emergências",
-    "aviação civil",
-    "resgate humanitário",
-    "operações aéreas",
-    "PAC Brasil",
   ],
   authors: [
-    {
-      name: "Patrulha Aérea Civil",
-      url: "https://patrulhaaereacivil.org.br",
-    },
+    { name: "Patrulha Aérea Civil", url: "https://patrulhaaereacivil.org.br" },
   ],
   creator: "Patrulha Aérea Civil",
   publisher: "Patrulha Aérea Civil",
-  formatDetection: {
-    email: false,
-    address: false,
-    telephone: false,
-  },
+  formatDetection: { email: false, address: false, telephone: false },
   metadataBase: new URL("https://patrulhaaereacivil.org.br"),
   icons: {
     icon: [{ url: "/icon.png", sizes: "32x32", type: "image/png" }],
@@ -109,7 +96,6 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         {children}
-        <ToastProvider />
       </body>
     </html>
   );

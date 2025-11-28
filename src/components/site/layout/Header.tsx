@@ -5,6 +5,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import {
   FaFacebook,
@@ -17,8 +27,9 @@ import {
   FaChartBar,
 } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
+import { useAuthStore } from "@/stores/auth-store";
+import { createClient } from "@/lib/supabase/client";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -55,162 +66,6 @@ const SOCIAL_ICONS = [
     hoverColor: "hover:bg-green-600",
   },
 ];
-
-// 🎯 INTERFACES COMPLETAS
-interface UserProfile {
-  id: string;
-  matricula: string;
-  email: string;
-  full_name?: string;
-  avatar_url?: string;
-  graduacao?: string;
-  validade_certificacao?: string;
-  tipo_sanguineo?: string;
-  status: boolean;
-  role: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface AuthUser {
-  id: string;
-  email: string;
-}
-
-// 🎯 HOOK DE AUTENTICAÇÃO CORRIGIDO
-const useHeaderAuth = () => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        setLoading(true);
-
-        // SEMPRE buscar do banco primeiro
-        const {
-          data: { user: authUser },
-          error: authError,
-        } = await supabase.auth.getUser();
-
-        if (authError) {
-          console.error("❌ Erro ao buscar usuário:", authError);
-          setLoading(false);
-          return;
-        }
-
-        if (authUser && authUser.email) {
-          const userData: AuthUser = {
-            id: authUser.id,
-            email: authUser.email,
-          };
-          setUser(userData);
-
-          // Buscar profile ATUALIZADO do banco
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", authUser.id)
-            .single();
-
-          if (profileError) {
-            console.error("❌ Erro ao buscar perfil:", profileError);
-            setLoading(false);
-            return;
-          }
-
-          if (profileData) {
-            setProfile(profileData);
-            // Atualizar localStorage com dados mais recentes
-            localStorage.setItem("pac_user_data", JSON.stringify(profileData));
-          }
-        } else {
-          // Limpar dados se não há usuário autenticado
-          setUser(null);
-          setProfile(null);
-          localStorage.removeItem("pac_user_data");
-        }
-      } catch (err) {
-        console.error("❌ Erro inesperado:", err);
-        // Em caso de erro, tentar usar cache local como fallback
-        try {
-          const localData = localStorage.getItem("pac_user_data");
-          if (localData) {
-            const profileData = JSON.parse(localData) as UserProfile;
-            setProfile(profileData);
-            setUser({ id: profileData.id, email: profileData.email });
-          }
-        } catch (cacheError) {
-          console.error("❌ Erro no cache local:", cacheError);
-          localStorage.removeItem("pac_user_data");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-
-    // Escutar mudanças de autenticação
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user && session.user.email) {
-        const userData: AuthUser = {
-          id: session.user.id,
-          email: session.user.email,
-        };
-
-        // Buscar perfil atualizado
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-
-        if (profileData) {
-          setProfile(profileData);
-          setUser(userData);
-          localStorage.setItem("pac_user_data", JSON.stringify(profileData));
-        }
-      } else if (event === "SIGNED_OUT") {
-        setUser(null);
-        setProfile(null);
-        localStorage.removeItem("pac_user_data");
-        localStorage.removeItem("supabase.auth.token");
-      }
-
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      localStorage.removeItem("pac_user_data");
-      localStorage.removeItem("supabase.auth.token");
-      setUser(null);
-      setProfile(null);
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
-    }
-  };
-
-  const isAdmin = profile?.role?.toLowerCase().trim() === "admin";
-
-  return {
-    user,
-    profile,
-    loading,
-    signOut,
-    isAdmin,
-  };
-};
 
 // 🎯 COMPONENTE DE LOADING
 const LoadingSpinner = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
@@ -435,13 +290,23 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// 🎯 BOTÃO DO USUÁRIO CORRIGIDO - SEM AVATAR NO BOTÃO, SÓ NO DROPDOWN
+// 🎯 USER MENU COM DROPDOWN DO SHADCN
 const UserMenuButton = () => {
-  const { user, profile, loading, signOut, isAdmin } = useHeaderAuth();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { user, profile, isAdmin, loading, clearAuth } = useAuthStore();
   const pathname = usePathname();
-
   const isOnProfilePage = pathname === "/perfil";
+
+  const handleSignOut = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      clearAuth();
+      localStorage.removeItem("supabase.auth.token");
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    }
+  };
 
   if (loading) {
     return <LoadingButton />;
@@ -462,119 +327,96 @@ const UserMenuButton = () => {
   }
 
   return (
-    <div className="relative">
-      <Button
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        className="bg-navy hover:bg-navy-700 text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
-      >
-        {/* 🎯 SEM AVATAR NO BOTÃO - APENAS TEXTO */}
-        <span className="relative z-10">Meu Perfil</span>
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
-      </Button>
-
-      {isDropdownOpen && (
-        <div className="absolute top-full right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-xl z-50 animate-scale-in">
-          <div className="p-4 border-b border-slate-200">
-            <div className="flex items-center gap-3">
-              {/* 🎯 AVATAR APENAS NO DROPDOWN */}
-              {profile?.avatar_url ? (
-                <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-navy/20 flex-shrink-0">
-                  <Image
-                    src={profile.avatar_url}
-                    alt={`Avatar de ${profile.full_name || "Agente"}`}
-                    width={40}
-                    height={40}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      // Fallback para ícone se a imagem não carregar
-                      const parent = e.currentTarget.parentElement;
-                      if (parent) {
-                        parent.innerHTML =
-                          '<div class="w-10 h-10 bg-navy rounded-full flex items-center justify-center"><FaUser class="w-5 h-5 text-white" /></div>';
-                      }
-                    }}
-                  />
-                </div>
-              ) : (
-                <div className="w-10 h-10 bg-navy rounded-full flex items-center justify-center flex-shrink-0">
-                  <FaUser className="w-5 h-5 text-white" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">
-                  {profile?.full_name || "Agente PAC"}
-                </p>
-                <p className="text-xs text-slate-600 truncate">
-                  {profile?.matricula
-                    ? `Matrícula: ${profile.matricula}`
-                    : user.email}
-                </p>
-                <p className="text-xs text-navy font-medium capitalize">
-                  {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
-                </p>
-              </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          className="bg-navy hover:bg-navy-700 text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
+        >
+          <span className="relative z-10">Meu Perfil</span>
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-64" align="end" sideOffset={8}>
+        {/* Header do Dropdown */}
+        <DropdownMenuLabel className="p-4 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <Avatar className="w-10 h-10 border-2 border-navy/20 flex-shrink-0">
+              <AvatarImage
+                src={profile?.avatar_url || ""}
+                alt={`Avatar de ${profile?.full_name || "Agente"}`}
+              />
+              <AvatarFallback className="bg-navy text-white">
+                <FaUser className="w-5 h-5" />
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-800 truncate">
+                {profile?.full_name || "Agente PAC"}
+              </p>
+              <p className="text-xs text-slate-600 truncate">
+                {profile?.matricula
+                  ? `Matrícula: ${profile.matricula}`
+                  : user.email}
+              </p>
+              <p className="text-xs text-navy font-medium capitalize">
+                {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
+              </p>
             </div>
           </div>
+        </DropdownMenuLabel>
 
-          <div className="p-2 space-y-1">
-            {/* 🔵 AZUL - Ações do Perfil */}
-            {!isOnProfilePage && (
-              <Link
-                href="/perfil"
-                className="flex items-center gap-3 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors border border-transparent hover:border-blue-200"
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <FaUser className="w-4 h-4" />
-                Ver Meu Perfil
+        <DropdownMenuGroup className="p-2">
+          {/* Perfil */}
+          {!isOnProfilePage && (
+            <DropdownMenuItem asChild>
+              <Link href="/perfil" className="cursor-pointer">
+                <FaUser className="w-4 h-4 mr-2 text-blue-600" />
+                <span>Ver Meu Perfil</span>
               </Link>
-            )}
+            </DropdownMenuItem>
+          )}
 
-            {/* 🟣 ROXO - Dashboard SOMENTE para Admin */}
-            {isAdmin && (
-              <Link
-                href="/admin/dashboard"
-                className="flex items-center gap-3 px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-md transition-colors border border-transparent hover:border-purple-200"
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <FaChartBar className="w-4 h-4" />
-                Ir ao Dashboard
+          {/* Dashboard (apenas admin) */}
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <Link href="/admin/dashboard" className="cursor-pointer">
+                <FaChartBar className="w-4 h-4 mr-2 text-purple-600" />
+                <span>Ir ao Dashboard</span>
               </Link>
-            )}
+            </DropdownMenuItem>
+          )}
 
-            {/* 🔵 AZUL - Configurações */}
+          {/* Configurações */}
+          <DropdownMenuItem asChild>
             <Link
               href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
-              className="flex items-center gap-3 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md transition-colors border border-transparent hover:border-blue-200"
-              onClick={() => setIsDropdownOpen(false)}
+              className="cursor-pointer"
             >
-              <FaCog className="w-4 h-4" />
-              Configurações
+              <FaCog className="w-4 h-4 mr-2 text-blue-600" />
+              <span>Configurações</span>
             </Link>
-          </div>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
 
-          <div className="p-2 border-t border-slate-200">
-            {/* 🔴 VERMELHO - Logout */}
-            <button
-              onClick={signOut}
-              className="flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors w-full border border-transparent hover:border-red-200"
-            >
-              <FaSignOutAlt className="w-4 h-4" />
-              Sair do Sistema
-            </button>
-          </div>
-        </div>
-      )}
+        <DropdownMenuSeparator />
 
-      {isDropdownOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setIsDropdownOpen(false)}
-        />
-      )}
-    </div>
+        {/* Logout */}
+        <DropdownMenuGroup className="p-2">
+          <DropdownMenuItem
+            onClick={handleSignOut}
+            className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+          >
+            <FaSignOutAlt className="w-4 h-4 mr-2" />
+            <span>Sair do Sistema</span>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
+// Resto do código do Header permanece igual...
 const MobileMenu = ({
   isOpen,
   onClose,
@@ -584,8 +426,21 @@ const MobileMenu = ({
   onClose: () => void;
   pathname: string;
 }) => {
-  const { user, profile, signOut, isAdmin } = useHeaderAuth();
+  const { user, profile, isAdmin, clearAuth } = useAuthStore();
   const isOnProfilePage = pathname === "/perfil";
+
+  const handleSignOut = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      clearAuth();
+      localStorage.removeItem("supabase.auth.token");
+      onClose();
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -613,28 +468,15 @@ const MobileMenu = ({
             <>
               <div className="pt-4 border-t border-slate-200">
                 <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
-                  {profile?.avatar_url ? (
-                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-navy/20 flex-shrink-0">
-                      <Image
-                        src={profile.avatar_url}
-                        alt={`Avatar de ${profile.full_name || "Agente"}`}
-                        width={32}
-                        height={32}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            parent.innerHTML =
-                              '<div class="w-8 h-8 bg-navy rounded-full flex items-center justify-center"><FaUser class="w-4 h-4 text-white" /></div>';
-                          }
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-8 h-8 bg-navy rounded-full flex items-center justify-center flex-shrink-0">
-                      <FaUser className="w-4 h-4 text-white" />
-                    </div>
-                  )}
+                  <Avatar className="w-8 h-8 border-2 border-navy/20 flex-shrink-0">
+                    <AvatarImage
+                      src={profile?.avatar_url || ""}
+                      alt={`Avatar de ${profile?.full_name || "Agente"}`}
+                    />
+                    <AvatarFallback className="bg-navy text-white text-xs">
+                      <FaUser className="w-4 h-4" />
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">
                       {profile?.full_name || "Agente PAC"}
@@ -683,7 +525,7 @@ const MobileMenu = ({
               {/* 🔴 VERMELHO - Logout */}
               <button
                 onClick={() => {
-                  signOut();
+                  handleSignOut();
                   onClose();
                 }}
                 className="px-4 py-3 rounded-lg text-base font-medium text-red-600 hover:bg-red-50 text-left border-l-4 border-red-600"
@@ -739,9 +581,15 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isScrolled = useScrollDetection();
   const pathname = usePathname();
+  const { initializeAuth } = useAuthStore();
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
+
+  // Inicializar auth quando o Header montar
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
 
   return (
     <header
