@@ -1,20 +1,11 @@
-// src/hooks/useGaleria.ts
 "use client";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-export interface CategoriaGaleria {
-  id: string;
-  nome: string;
-  slug: string;
-  descricao: string | null;
-  tipo: string;
-  ordem: number;
-}
+import { CategoriaListagem } from "@/types";
 
 export function useGaleria() {
-  const [categorias, setCategorias] = useState<CategoriaGaleria[]>([]);
+  const [categorias, setCategorias] = useState<CategoriaListagem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

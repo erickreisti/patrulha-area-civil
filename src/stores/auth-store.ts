@@ -1,27 +1,7 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
 import { persist } from "zustand/middleware";
-
-// Interfaces
-interface UserProfile {
-  id: string;
-  matricula: string;
-  email: string;
-  full_name?: string;
-  avatar_url?: string;
-  graduacao?: string;
-  validade_certificacao?: string;
-  tipo_sanguineo?: string;
-  status: boolean;
-  role: string;
-  created_at: string;
-  updated_at: string;
-}
-
-interface AuthUser {
-  id: string;
-  email: string;
-}
+import { AuthUser, UserProfile } from "@/types";
 
 interface AuthState {
   user: AuthUser | null;
@@ -60,7 +40,7 @@ export const useAuthStore = create<AuthState>()(
           } = await supabase.auth.getUser();
 
           if (error) {
-            console.log("ℹ️ Nenhuma sessão ativa (comportamento normal)");
+            console.log("ℹ️ Nenhuma sessão ativa");
             set({
               user: null,
               profile: null,
@@ -71,24 +51,12 @@ export const useAuthStore = create<AuthState>()(
             return;
           }
 
-          if (user && user.email) {
-            const { data: profile, error: profileError } = await supabase
+          if (user?.email) {
+            const { data: profile } = await supabase
               .from("profiles")
               .select("*")
               .eq("id", user.id)
               .single();
-
-            if (profileError) {
-              console.error("❌ Erro ao buscar perfil:", profileError);
-              set({
-                user: null,
-                profile: null,
-                isAdmin: false,
-                loading: false,
-                initialized: true,
-              });
-              return;
-            }
 
             if (profile) {
               set({
@@ -110,7 +78,7 @@ export const useAuthStore = create<AuthState>()(
             initialized: true,
           });
         } catch (error) {
-          console.error("❌ Erro inesperado no auth:", error);
+          console.error("❌ Erro no auth:", error);
           set({
             user: null,
             profile: null,
@@ -149,13 +117,12 @@ export const useAuthStore = create<AuthState>()(
 
         try {
           const supabase = createClient();
-          const { data: profile, error } = await supabase
+          const { data: profile } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", user.id)
             .single();
 
-          if (error) throw error;
           if (profile) {
             set({
               profile,

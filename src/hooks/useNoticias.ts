@@ -1,21 +1,11 @@
-// src/hooks/useNoticias.ts
 "use client";
 
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-export interface Noticia {
-  id: string;
-  titulo: string;
-  slug: string;
-  resumo: string | null;
-  categoria: string | null;
-  data_publicacao: string;
-  destaque: boolean;
-}
+import { NoticiaListagem } from "@/types";
 
 export function useNoticias() {
-  const [noticias, setNoticias] = useState<Noticia[]>([]);
+  const [noticias, setNoticias] = useState<NoticiaListagem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/ui/file-upload";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -22,27 +22,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner"; // ✅ Adicionado Sonner
+import { toast } from "sonner";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
-  FaUser,
-  FaIdCard,
-  FaEnvelope,
-  FaShieldAlt,
-  FaArrowLeft,
-  FaSave,
-  FaPlus,
-  FaKey,
-  FaInfo,
-  FaImage,
-  FaChartBar,
-  FaHome,
-  FaCheckCircle,
-  FaExclamationTriangle,
-  FaExclamationCircle,
-  FaTimes,
-  FaChevronDown,
-} from "react-icons/fa";
+  RiUserLine,
+  RiIdCardLine,
+  RiMailLine,
+  RiShieldKeyholeLine,
+  RiArrowLeftLine,
+  RiSaveLine,
+  RiAddLine,
+  RiKeyLine,
+  RiInformationLine,
+  RiImageLine,
+  RiBarChartLine,
+  RiHomeLine,
+  RiArrowDownSLine,
+} from "react-icons/ri";
 
 // Opções baseadas no schema
 const GRADUACOES = [
@@ -78,22 +75,32 @@ interface FormData {
   avatar_url?: string;
 }
 
+const slideIn = {
+  hidden: { opacity: 0, x: -20 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: {
+      duration: 0.6,
+    },
+  },
+};
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+    },
+  },
+};
+
 export default function CriarAgentePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
-  const [alert, setAlert] = useState<{
-    type: "success" | "destructive" | "warning" | "default";
-    title: string;
-    message: string;
-    show: boolean;
-  }>({
-    type: "default",
-    title: "",
-    message: "",
-    show: false,
-  });
-
   const [formData, setFormData] = useState<FormData>({
     matricula: "",
     email: "",
@@ -105,34 +112,10 @@ export default function CriarAgentePage() {
     avatar_url: "",
   });
 
-  // Função para mostrar alerta
-  const showAlert = (
-    type: "success" | "destructive" | "warning",
-    title: string,
-    message: string
-  ) => {
-    setAlert({
-      type,
-      title,
-      message,
-      show: true,
-    });
+  const generateMatricula = () => {
+    const randomNum = Math.floor(10000000000 + Math.random() * 90000000000);
+    setFormData((prev) => ({ ...prev, matricula: randomNum.toString() }));
   };
-
-  // Função para fechar alerta
-  const closeAlert = () => {
-    setAlert((prev) => ({ ...prev, show: false }));
-  };
-
-  // Auto-fechar alertas de sucesso após 5 segundos
-  useEffect(() => {
-    if (alert.show && alert.type === "success") {
-      const timer = setTimeout(() => {
-        closeAlert();
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [alert.show, alert.type]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -168,25 +151,43 @@ export default function CriarAgentePage() {
     return date.toLocaleDateString("pt-BR");
   };
 
+  const validateForm = (): string[] => {
+    const errors: string[] = [];
+
+    if (!formData.matricula.trim()) {
+      errors.push("Matrícula é obrigatória");
+    }
+
+    if (!formData.email.trim()) {
+      errors.push("Email é obrigatório");
+    }
+
+    if (!formData.full_name.trim()) {
+      errors.push("Nome completo é obrigatório");
+    }
+
+    if (!/^\d{11}$/.test(formData.matricula)) {
+      errors.push("Matrícula deve conter exatamente 11 dígitos numéricos");
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.push("Email inválido");
+    }
+
+    return errors;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    closeAlert();
 
     try {
       // Validações
-      if (!formData.matricula || !formData.email || !formData.full_name) {
-        throw new Error("Matrícula, email e nome são obrigatórios");
-      }
-
-      if (!/^\d{11}$/.test(formData.matricula)) {
-        throw new Error(
-          "Matrícula deve conter exatamente 11 dígitos numéricos"
-        );
-      }
-
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        throw new Error("Email inválido");
+      const validationErrors = validateForm();
+      if (validationErrors.length > 0) {
+        validationErrors.forEach((error) => toast.error(error));
+        setLoading(false);
+        return;
       }
 
       console.log("🔄 Iniciando criação do agente...", formData);
@@ -218,13 +219,6 @@ export default function CriarAgentePage() {
         duration: 5000,
       });
 
-      // Mostrar alerta de sucesso (mantido para compatibilidade)
-      showAlert(
-        "success",
-        "Agente criado com sucesso!",
-        `O agente ${formData.full_name} foi cadastrado no sistema e receberá um email para definir sua senha.`
-      );
-
       // Limpar formulário
       setFormData({
         matricula: "",
@@ -237,11 +231,11 @@ export default function CriarAgentePage() {
         avatar_url: "",
       });
 
-      // Redirecionar após 3 segundos
+      // Redirecionar após 2 segundos
       setTimeout(() => {
         router.push("/admin/agentes");
         router.refresh();
-      }, 3000);
+      }, 2000);
     } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
       const errorMessage =
@@ -252,18 +246,39 @@ export default function CriarAgentePage() {
         description: errorMessage,
         duration: 6000,
       });
-
-      // Mostrar alerta de erro (mantido para compatibilidade)
-      showAlert("destructive", "Erro ao criar agente", errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
+  const navigationButtons = [
+    {
+      href: "/admin/agentes",
+      icon: RiArrowLeftLine,
+      label: "Voltar",
+      className:
+        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
+    },
+    {
+      href: "/admin/dashboard",
+      icon: RiBarChartLine,
+      label: "Dashboard",
+      className:
+        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
+    },
+    {
+      href: "/",
+      icon: RiHomeLine,
+      label: "Voltar ao Site",
+      className:
+        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
+    },
+  ];
+
   // Loading skeleton para quando estiver carregando
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
             <Skeleton className="h-10 w-64 mb-2" />
@@ -272,7 +287,7 @@ export default function CriarAgentePage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
-              <Card className="border-0 shadow-md">
+              <Card className="border-0 shadow-lg">
                 <CardHeader>
                   <Skeleton className="h-6 w-48" />
                 </CardHeader>
@@ -296,43 +311,17 @@ export default function CriarAgentePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
       <div className="container mx-auto px-4">
-        {/* Alertas (mantidos para compatibilidade) */}
-        {alert.show && (
-          <div className="mb-6 animate-fade-in">
-            <Alert variant={alert.type} className="relative">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeAlert}
-                className="absolute right-2 top-2 h-6 w-6 p-0"
-              >
-                <FaTimes className="h-3 w-3" />
-              </Button>
-
-              {alert.type === "success" && (
-                <FaCheckCircle className="h-4 w-4 text-green-600" />
-              )}
-              {alert.type === "destructive" && (
-                <FaExclamationCircle className="h-4 w-4 text-red-600" />
-              )}
-              {alert.type === "warning" && (
-                <FaExclamationTriangle className="h-4 w-4 text-yellow-600" />
-              )}
-
-              <AlertTitle className="flex items-center gap-2">
-                {alert.title}
-              </AlertTitle>
-              <AlertDescription>{alert.message}</AlertDescription>
-            </Alert>
-          </div>
-        )}
-
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={slideIn}
+          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+        >
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
               CADASTRAR NOVO AGENTE
             </h1>
             <p className="text-gray-600">
@@ -341,104 +330,152 @@ export default function CriarAgentePage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            <Link href="/admin/dashboard">
-              <Button
-                variant="outline"
-                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+            {navigationButtons.map((button, index) => (
+              <motion.div
+                key={button.href}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
-                <FaChartBar className="w-4 h-4 mr-2" />
-                Dashboard
-              </Button>
-            </Link>
-
-            <Link href="/">
-              <Button
-                variant="outline"
-                className="border-gray-700 text-gray-700 hover:bg-gray-100"
-              >
-                <FaHome className="w-4 h-4 mr-2" />
-                Voltar ao Site
-              </Button>
-            </Link>
-
-            <Link href="/admin/agentes">
-              <Button
-                variant="outline"
-                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-              >
-                <FaArrowLeft className="w-4 h-4 mr-2" />
-                Voltar para Lista
-              </Button>
-            </Link>
+                <Link href={button.href}>
+                  <Button
+                    variant="outline"
+                    className={`transition-all duration-300 ${button.className}`}
+                  >
+                    <button.icon className="w-4 h-4 mr-2" />
+                    {button.label}
+                  </Button>
+                </Link>
+              </motion.div>
+            ))}
           </div>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Formulário */}
+          {/* Formulário Principal */}
           <div className="lg:col-span-2">
-            <Card className="border-0 shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FaUser className="w-5 h-5 mr-2 text-blue-800" />
-                  Dados do Agente
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  {/* Upload de Avatar usando FileUpload */}
-                  <div className="space-y-4">
-                    <Label className="text-sm font-medium text-gray-700">
-                      Foto do Agente
-                    </Label>
-                    <FileUpload
-                      type="avatar"
-                      onFileChange={handleAvatarChange}
-                      currentFile={formData.avatar_url}
-                      className="p-4 border border-gray-200 rounded-lg bg-white"
-                      userId={formData.matricula}
-                    />
-                  </div>
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.2 }}
+            >
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader className="border-b border-gray-200">
+                  <CardTitle className="flex items-center text-xl text-gray-800">
+                    <RiUserLine className="w-5 h-5 mr-2 text-navy-600" />
+                    Dados do Agente
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Upload de Avatar usando FileUpload */}
+                    <motion.div variants={fadeInUp} className="space-y-4">
+                      <Label className="text-sm font-semibold text-gray-700">
+                        Foto do Agente
+                      </Label>
+                      <FileUpload
+                        type="avatar"
+                        onFileChange={handleAvatarChange}
+                        currentFile={formData.avatar_url}
+                        className="p-4 border border-gray-200 rounded-lg bg-white hover:border-blue-500 transition-colors duration-300"
+                        userId={formData.matricula}
+                      />
+                    </motion.div>
 
-                  {/* Informações Básicas */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Matrícula */}
-                    <div className="space-y-2">
+                    {/* Matrícula com Gerador */}
+                    <motion.div
+                      variants={fadeInUp}
+                      transition={{ delay: 0.1 }}
+                      className="space-y-2"
+                    >
                       <Label
                         htmlFor="matricula"
-                        className="text-sm font-medium text-gray-700"
+                        className="text-sm font-semibold text-gray-700"
                       >
                         Matrícula *
                       </Label>
+                      <div className="flex gap-3">
+                        <div className="relative flex-1">
+                          <RiIdCardLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
+                          <Input
+                            id="matricula"
+                            type="text"
+                            name="matricula"
+                            value={formData.matricula}
+                            onChange={handleChange}
+                            placeholder="00000000000"
+                            maxLength={11}
+                            required
+                            className="pl-10 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
+                            disabled={loading}
+                          />
+                        </div>
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <Button
+                            type="button"
+                            onClick={generateMatricula}
+                            variant="outline"
+                            className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
+                            disabled={loading}
+                          >
+                            <RiAddLine className="w-4 h-4 mr-2" />
+                            Gerar
+                          </Button>
+                        </motion.div>
+                      </div>
+                      <p className="text-xs text-gray-500 transition-colors duration-300">
+                        11 dígitos numéricos
+                      </p>
+                    </motion.div>
+
+                    {/* Nome Completo */}
+                    <motion.div
+                      variants={fadeInUp}
+                      transition={{ delay: 0.2 }}
+                      className="space-y-2"
+                    >
+                      <Label
+                        htmlFor="full_name"
+                        className="text-sm font-semibold text-gray-700"
+                      >
+                        Nome Completo *
+                      </Label>
                       <div className="relative">
-                        <FaIdCard className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <RiUserLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
                         <Input
-                          id="matricula"
+                          id="full_name"
                           type="text"
-                          name="matricula"
-                          value={formData.matricula}
+                          name="full_name"
+                          value={formData.full_name}
                           onChange={handleChange}
-                          placeholder="00000000000"
-                          maxLength={11}
+                          placeholder="Nome completo do agente"
                           required
-                          className="pl-10"
+                          className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                           disabled={loading}
                         />
                       </div>
-                      <p className="text-xs text-gray-500">
-                        11 dígitos numéricos
-                      </p>
-                    </div>
+                    </motion.div>
 
                     {/* Email */}
-                    <div className="space-y-2">
+                    <motion.div
+                      variants={fadeInUp}
+                      transition={{ delay: 0.3 }}
+                      className="space-y-2"
+                    >
                       <Label
                         htmlFor="email"
-                        className="text-sm font-medium text-gray-700"
+                        className="text-sm font-semibold text-gray-700"
                       >
                         Email *
                       </Label>
                       <div className="relative">
-                        <FaEnvelope className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <RiMailLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
                         <Input
                           id="email"
                           type="email"
@@ -447,250 +484,341 @@ export default function CriarAgentePage() {
                           onChange={handleChange}
                           placeholder="agente@pac.org.br"
                           required
-                          className="pl-10"
+                          className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                           disabled={loading}
                         />
                       </div>
-                    </div>
-                  </div>
+                    </motion.div>
 
-                  {/* Nome Completo */}
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="full_name"
-                      className="text-sm font-medium text-gray-700"
+                    {/* Graduação e Tipo Sanguíneo */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Graduação */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.4 }}
+                        className="space-y-2"
+                      >
+                        <Label
+                          htmlFor="graduacao"
+                          className="text-sm font-semibold text-gray-700"
+                        >
+                          Graduação
+                        </Label>
+                        <Select
+                          value={formData.graduacao}
+                          onValueChange={(value) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              graduacao: value,
+                            }))
+                          }
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                            <SelectValue placeholder="Selecione uma graduação" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {GRADUACOES.map((graduacao) => (
+                              <SelectItem key={graduacao} value={graduacao}>
+                                {graduacao}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </motion.div>
+
+                      {/* Tipo Sanguíneo */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.5 }}
+                        className="space-y-2"
+                      >
+                        <Label
+                          htmlFor="tipo_sanguineo"
+                          className="text-sm font-semibold text-gray-700"
+                        >
+                          Tipo Sanguíneo
+                        </Label>
+                        <Select
+                          value={formData.tipo_sanguineo}
+                          onValueChange={(value) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              tipo_sanguineo: value,
+                            }))
+                          }
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                            <SelectValue placeholder="Selecione o tipo sanguíneo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TIPOS_SANGUINEOS.map((tipo) => (
+                              <SelectItem key={tipo} value={tipo}>
+                                {tipo}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </motion.div>
+                    </div>
+
+                    {/* Validade da Certificação e Tipo de Usuário */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Validade da Certificação */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.6 }}
+                        className="space-y-2"
+                      >
+                        <Label className="text-sm font-semibold text-gray-700">
+                          Validade da Certificação
+                        </Label>
+                        <Popover open={dateOpen} onOpenChange={setDateOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between font-normal transition-all duration-300 hover:border-blue-500"
+                              disabled={loading}
+                            >
+                              {formData.validade_certificacao
+                                ? formatDate(formData.validade_certificacao)
+                                : "Selecionar data"}
+                              <RiArrowDownSLine className="w-4 h-4" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                formData.validade_certificacao
+                                  ? new Date(formData.validade_certificacao)
+                                  : undefined
+                              }
+                              onSelect={handleDateSelect}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </motion.div>
+
+                      {/* Tipo de Usuário */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.7 }}
+                        className="space-y-2"
+                      >
+                        <Label
+                          htmlFor="role"
+                          className="text-sm font-semibold text-gray-700"
+                        >
+                          Tipo de Usuário
+                        </Label>
+                        <Select
+                          value={formData.role}
+                          onValueChange={(value: "agent" | "admin") =>
+                            setFormData((prev) => ({ ...prev, role: value }))
+                          }
+                          disabled={loading}
+                        >
+                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                            <SelectValue placeholder="Selecione o tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="agent">Agente</SelectItem>
+                            <SelectItem value="admin">Administrador</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </motion.div>
+                    </div>
+
+                    {/* Botões de Ação */}
+                    <motion.div
+                      variants={fadeInUp}
+                      transition={{ delay: 0.8 }}
+                      className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200"
                     >
-                      Nome Completo *
-                    </Label>
-                    <div className="relative">
-                      <FaUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <Input
-                        id="full_name"
-                        type="text"
-                        name="full_name"
-                        value={formData.full_name}
-                        onChange={handleChange}
-                        placeholder="Nome completo do agente"
-                        required
-                        className="pl-10"
-                        disabled={loading}
-                      />
-                    </div>
-                  </div>
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1"
+                      >
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loading ? (
+                            <>
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity }}
+                              >
+                                <RiSaveLine className="w-4 h-4 mr-2" />
+                              </motion.div>
+                              Cadastrando...
+                            </>
+                          ) : (
+                            <>
+                              <RiSaveLine className="w-4 h-4 mr-2" />
+                              Cadastrar Agente
+                            </>
+                          )}
+                        </Button>
+                      </motion.div>
 
-                  {/* Graduação e Tipo Sanguíneo */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Graduação - USANDO SELECT MODERNO */}
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="graduacao"
-                        className="text-sm font-medium text-gray-700"
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1"
                       >
-                        Graduação
-                      </Label>
-                      <Select
-                        value={formData.graduacao}
-                        onValueChange={(value) =>
-                          setFormData((prev) => ({ ...prev, graduacao: value }))
-                        }
-                        disabled={loading}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecione uma graduação" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GRADUACOES.map((graduacao) => (
-                            <SelectItem key={graduacao} value={graduacao}>
-                              {graduacao}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Tipo Sanguíneo - USANDO SELECT MODERNO */}
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="tipo_sanguineo"
-                        className="text-sm font-medium text-gray-700"
-                      >
-                        Tipo Sanguíneo
-                      </Label>
-                      <Select
-                        value={formData.tipo_sanguineo}
-                        onValueChange={(value) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            tipo_sanguineo: value,
-                          }))
-                        }
-                        disabled={loading}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecione o tipo sanguíneo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {TIPOS_SANGUINEOS.map((tipo) => (
-                            <SelectItem key={tipo} value={tipo}>
-                              {tipo}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Validade da Certificação e Tipo de Usuário */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Validade da Certificação - USANDO DATE PICKER */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium text-gray-700">
-                        Validade da Certificação
-                      </Label>
-                      <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                        <PopoverTrigger asChild>
+                        <Link href="/admin/agentes">
                           <Button
+                            type="button"
                             variant="outline"
-                            className="w-full justify-between font-normal"
+                            className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
                             disabled={loading}
                           >
-                            {formData.validade_certificacao
-                              ? formatDate(formData.validade_certificacao)
-                              : "Selecionar data"}
-                            <FaChevronDown className="w-4 h-4" />
+                            <RiArrowLeftLine className="w-4 h-4 mr-2" />
+                            Cancelar
                           </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={
-                              formData.validade_certificacao
-                                ? new Date(formData.validade_certificacao)
-                                : undefined
-                            }
-                            onSelect={handleDateSelect}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Tipo de Usuário - USANDO SELECT MODERNO */}
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor="role"
-                        className="text-sm font-medium text-gray-700"
-                      >
-                        Tipo de Usuário
-                      </Label>
-                      <Select
-                        value={formData.role}
-                        onValueChange={(value: "agent" | "admin") =>
-                          setFormData((prev) => ({ ...prev, role: value }))
-                        }
-                        disabled={loading}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="agent">Agente</SelectItem>
-                          <SelectItem value="admin">Administrador</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Botões */}
-                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                    <Button
-                      type="submit"
-                      disabled={loading}
-                      className="bg-green-600 hover:bg-green-700 text-white flex-1"
-                    >
-                      {loading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Cadastrando...
-                        </>
-                      ) : (
-                        <>
-                          <FaSave className="w-4 h-4 mr-2" />
-                          Cadastrar Agente
-                        </>
-                      )}
-                    </Button>
-
-                    <Link href="/admin/agentes" className="flex-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full border-gray-300 text-gray-700 hover:bg-gray-50"
-                        disabled={loading}
-                      >
-                        <FaArrowLeft className="w-4 h-4 mr-2" />
-                        Cancelar
-                      </Button>
-                    </Link>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
+                        </Link>
+                      </motion.div>
+                    </motion.div>
+                  </form>
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
 
-          {/* Informações */}
+          {/* Sidebar - Informações */}
           <div className="space-y-6">
-            <Card className="border-0 shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center text-sm">
-                  <FaInfo className="w-4 h-4 mr-2 text-blue-800" />
-                  Informações Importantes
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-gray-600">
-                <div className="flex items-start space-x-2">
-                  <FaPlus className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <p>O agente receberá um email para definir sua senha</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <FaIdCard className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <p>A matrícula deve conter exatamente 11 dígitos</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <FaShieldAlt className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <p>Administradores têm acesso total ao sistema</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <FaUser className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                  <p>Agentes têm acesso apenas ao seu perfil</p>
-                </div>
-                <div className="flex items-start space-x-2">
-                  <FaImage className="w-4 h-4 text-blue-300 mt-0.5 flex-shrink-0" />
-                  <p>
-                    A foto de perfil é opcional e pode ser adicionada depois
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Informações Importantes */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.3 }}
+            >
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg text-gray-800">
+                    <RiInformationLine className="w-5 h-5 mr-2 text-navy-600" />
+                    Informações Importantes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm text-gray-600">
+                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
+                    <RiAddLine className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <p>O agente receberá um email para definir sua senha</p>
+                  </div>
+                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
+                    <RiIdCardLine className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <p>A matrícula deve conter exatamente 11 dígitos</p>
+                  </div>
+                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
+                    <RiShieldKeyholeLine className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                    <p>Administradores têm acesso total ao sistema</p>
+                  </div>
+                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
+                    <RiUserLine className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <p>Agentes têm acesso apenas ao seu perfil</p>
+                  </div>
+                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
+                    <RiImageLine className="w-4 h-4 text-blue-300 mt-0.5 flex-shrink-0" />
+                    <p>
+                      A foto de perfil é opcional e pode ser adicionada depois
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-            <Card className="border-0 shadow-md">
-              <CardHeader>
-                <CardTitle className="flex items-center text-sm">
-                  <FaKey className="w-4 h-4 mr-2 text-blue-800" />
-                  Senha Inicial
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Senha padrão:</strong> pac12345
-                  </p>
-                  <p className="text-xs text-yellow-600 mt-1">
-                    O agente deverá alterar esta senha no primeiro acesso
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Senha Inicial */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.4 }}
+            >
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="flex items-center text-lg text-gray-800">
+                    <RiKeyLine className="w-5 h-5 mr-2 text-navy-600" />
+                    Senha Inicial
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 transition-colors duration-300 hover:bg-yellow-100">
+                    <p className="text-sm font-medium text-yellow-800 mb-2">
+                      <strong>Senha padrão:</strong> pac12345
+                    </p>
+                    <p className="text-xs text-yellow-600">
+                      O agente deverá alterar esta senha no primeiro acesso
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Preview Rápido */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.5 }}
+            >
+              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle className="text-lg text-gray-800">
+                    Preview Rápido
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="text-sm space-y-2 text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Matrícula:</span>
+                      <span className="font-medium font-mono">
+                        {formData.matricula || "Não definida"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Nome:</span>
+                      <span className="font-medium text-right max-w-[120px] truncate">
+                        {formData.full_name || "Não definido"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Email:</span>
+                      <span className="font-medium text-right max-w-[120px] truncate">
+                        {formData.email || "Não definido"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Graduação:</span>
+                      <Badge
+                        variant="secondary"
+                        className="bg-blue-100 text-blue-700"
+                      >
+                        {formData.graduacao || "Não definida"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tipo:</span>
+                      <Badge
+                        className={
+                          formData.role === "admin"
+                            ? "bg-purple-500 text-white"
+                            : "bg-blue-500 text-white"
+                        }
+                      >
+                        {formData.role === "admin" ? "ADMIN" : "AGENTE"}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
         </div>
       </div>

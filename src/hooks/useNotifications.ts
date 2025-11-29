@@ -1,38 +1,9 @@
-// src/hooks/useNotifications.ts
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-
-// Interface para metadata baseada no schema
-export interface NotificationMetadata {
-  resource_type?: string;
-  resource_id?: string;
-  action_type?: string;
-  user_id?: string;
-  [key: string]: unknown;
-}
-
-export interface Notification {
-  id: string;
-  user_id: string;
-  type:
-    | "system"
-    | "user_created"
-    | "news_published"
-    | "gallery_upload"
-    | "warning"
-    | "info";
-  title: string;
-  message: string;
-  action_url?: string;
-  is_read: boolean;
-  metadata?: NotificationMetadata;
-  expires_at?: string;
-  created_at: string;
-  updated_at: string;
-}
+import { Notification, NotificationMetadata } from "@/types";
 
 interface UseNotificationsReturn {
   notifications: Notification[];
@@ -174,16 +145,13 @@ export function useNotifications(): UseNotificationsReturn {
         async (payload) => {
           const newNotification = payload.new as Notification;
 
-          // Verificar se a notificação é para o usuário atual
           const {
             data: { user },
           } = await supabase.auth.getUser();
           if (user && newNotification.user_id === user.id) {
             setNotifications((prev) => [newNotification, ...prev]);
 
-            // Mostrar toast para notificações não lidas
             if (!newNotification.is_read) {
-              // Toast customizado baseado no tipo
               const getToastConfig = (type: Notification["type"]) => {
                 switch (type) {
                   case "system":
@@ -202,7 +170,6 @@ export function useNotifications(): UseNotificationsReturn {
 
               const toastConfig = getToastConfig(newNotification.type);
 
-              // Usar toast padrão para tipos que não têm método específico
               if (toastConfig.style === "default") {
                 toast(newNotification.title, {
                   description: newNotification.message,
@@ -216,7 +183,6 @@ export function useNotifications(): UseNotificationsReturn {
                     : undefined,
                 });
               } else {
-                // Usar métodos específicos do toast (success, warning, info)
                 toast[toastConfig.style](newNotification.title, {
                   description: newNotification.message,
                   duration: newNotification.type === "warning" ? 8000 : 4000,
@@ -307,10 +273,7 @@ export function useNotifications(): UseNotificationsReturn {
       }
     };
 
-    // Executar limpeza a cada hora
     const interval = setInterval(cleanupExpiredNotifications, 60 * 60 * 1000);
-
-    // Executar uma vez na inicialização
     cleanupExpiredNotifications();
 
     return () => clearInterval(interval);

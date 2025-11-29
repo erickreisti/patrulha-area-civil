@@ -8,8 +8,6 @@ export function createAdminClient() {
     throw new Error("Missing Supabase environment variables");
   }
 
-  console.log("🔐 Criando cliente admin Supabase...");
-
   return createSupabaseClient(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,

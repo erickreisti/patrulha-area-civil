@@ -1,27 +1,28 @@
 "use client";
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import { Button } from "./button";
-import { Card, CardContent } from "./card";
-import { Progress } from "./progress";
-import { Badge } from "./badge";
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { createAdminClient } from "@/lib/supabase/admin-client";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  FaUpload,
-  FaTimes,
-  FaFile,
-  FaImage,
-  FaVideo,
-  FaUser,
-  FaCheck,
-  FaExclamationCircle,
-  FaSpinner,
-} from "react-icons/fa";
+  RiUploadLine,
+  RiCloseLine,
+  RiFileLine,
+  RiImageLine,
+  RiVideoLine,
+  RiUserLine,
+  RiCheckLine,
+  RiErrorWarningLine,
+  RiLoaderLine,
+  RiDeleteBinLine,
+} from "react-icons/ri";
 
-// Tipos de upload suportados
 type UploadType = "avatar" | "image" | "video" | "file" | "media";
 type UploadStatus = "pending" | "uploading" | "completed" | "error";
 
@@ -34,62 +35,54 @@ interface UploadFile {
 }
 
 interface FileUploadProps {
-  // Configurações básicas
   type?: UploadType;
   bucket?: string;
   multiple?: boolean;
   maxFiles?: number;
   maxSize?: number;
-
-  // Callbacks
   onUploadComplete?: (urls: string[]) => void;
   onFileChange?: (url: string) => void;
-
-  // Estado atual
   currentFile?: string;
-
-  // Configurações específicas por tipo
   accept?: string;
   className?: string;
   userId?: string;
 }
 
-// Configurações padrão por tipo
 const UPLOAD_CONFIGS = {
   avatar: {
     bucket: "avatares-agentes",
     multiple: false,
     maxFiles: 1,
-    maxSize: 2 * 1024 * 1024, // 2MB
-    accept: "image/*",
+    maxSize: 2 * 1024 * 1024,
+    accept: "image/*" as const,
   },
   image: {
     bucket: "imagens-noticias",
     multiple: false,
     maxFiles: 1,
-    maxSize: 5 * 1024 * 1024, // 5MB
-    accept: "image/*",
+    maxSize: 5 * 1024 * 1024,
+    accept: "image/*" as const,
   },
   video: {
     bucket: "galeria-videos",
     multiple: false,
     maxFiles: 1,
-    maxSize: 50 * 1024 * 1024, // 50MB
-    accept: "video/*",
+    maxSize: 50 * 1024 * 1024,
+    accept: "video/*" as const,
   },
   file: {
     bucket: "documentos-oficiais",
     multiple: true,
     maxFiles: 10,
-    maxSize: 10 * 1024 * 1024, // 10MB
-    accept: "*/*",
+    maxSize: 10 * 1024 * 1024,
+    accept: "*/*" as const,
   },
   media: {
     bucket: "galeria-fotos",
     multiple: true,
     maxFiles: 20,
-    maxSize: 5 * 1024 * 1024, // 5MB
-    accept: "image/*,video/*",
+    maxSize: 5 * 1024 * 1024,
+    accept: "image/*,video/*" as const,
   },
 } as const;
 
@@ -111,17 +104,8 @@ export function FileUpload({
   const [isUploading, setIsUploading] = useState(false);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState(currentFile || "");
 
-  // 🔐 USAR ADMIN CLIENT PARA UPLOADS (ignora RLS)
   const supabase = createAdminClient();
 
-  // Sincronizar currentFile com estado interno
-  useEffect(() => {
-    if (currentFile !== currentAvatarUrl) {
-      setCurrentAvatarUrl(currentFile || "");
-    }
-  }, [currentFile, currentAvatarUrl]);
-
-  // Obter configurações baseadas no tipo
   const config = {
     ...UPLOAD_CONFIGS[type],
     bucket: bucket || UPLOAD_CONFIGS[type].bucket,
@@ -131,8 +115,13 @@ export function FileUpload({
     accept: accept ?? UPLOAD_CONFIGS[type].accept,
   };
 
-  // Para uploads únicos (avatar, image, video), usar currentFile
   const shouldUseSingleMode = !config.multiple;
+
+  useEffect(() => {
+    if (currentFile !== currentAvatarUrl) {
+      setCurrentAvatarUrl(currentFile || "");
+    }
+  }, [currentFile, currentAvatarUrl]);
 
   const validateFile = useCallback(
     (file: File): string | null => {
@@ -154,7 +143,6 @@ export function FileUpload({
     [config.maxSize, config.accept]
   );
 
-  // Upload automático para avatar (sem botão de enviar)
   const uploadFileAutomatically = useCallback(
     async (file: File) => {
       setIsUploading(true);
@@ -163,19 +151,12 @@ export function FileUpload({
       const fileName = `avatar_${userId || "user"}_${Date.now()}.${fileExt}`;
 
       try {
-        console.log(
-          "🔄 Iniciando upload automático com admin client...",
-          fileName
-        );
-
-        // Atualizar estado para uploading
         setFiles((prev) =>
           prev.map((f) =>
             f.file === file ? { ...f, status: "uploading", progress: 0 } : f
           )
         );
 
-        // Simular progresso
         const progressInterval = setInterval(() => {
           setFiles((prev) =>
             prev.map((f) =>
@@ -186,7 +167,6 @@ export function FileUpload({
           );
         }, 200);
 
-        // 🔐 Fazer upload com admin client (ignora RLS)
         const { data, error } = await supabase.storage
           .from(config.bucket)
           .upload(fileName, file, {
@@ -201,32 +181,26 @@ export function FileUpload({
           throw error;
         }
 
-        // Completar progresso
         setFiles((prev) =>
           prev.map((f) => (f.file === file ? { ...f, progress: 100 } : f))
         );
 
-        // Obter URL pública
         const {
           data: { publicUrl },
         } = supabase.storage.from(config.bucket).getPublicUrl(data!.path);
 
-        console.log("✅ Upload concluído:", publicUrl);
-
-        // Atualizar estado final
         setFiles((prev) =>
           prev.map((f) =>
             f.file === file ? { ...f, status: "completed", url: publicUrl } : f
           )
         );
 
-        // Atualizar URL atual e chamar callback
         setCurrentAvatarUrl(publicUrl);
         if (onFileChange) {
           onFileChange(publicUrl);
         }
 
-        toast.success("Avatar atualizado com sucesso!");
+        toast.success("Upload realizado com sucesso!");
       } catch (error: unknown) {
         console.error("❌ Erro no upload:", error);
         const errorMessage =
@@ -246,7 +220,7 @@ export function FileUpload({
               : f
           )
         );
-        toast.error("Erro ao fazer upload do avatar", {
+        toast.error("Erro ao fazer upload", {
           description: errorMessage,
         });
       } finally {
@@ -259,7 +233,6 @@ export function FileUpload({
   const addFiles = useCallback(
     (newFiles: File[]) => {
       if (shouldUseSingleMode) {
-        // Modo único: substituir arquivo atual
         const file = newFiles[0];
         const error = validateFile(file);
 
@@ -278,12 +251,10 @@ export function FileUpload({
           },
         ]);
 
-        // Upload automático para avatar
         if (type === "avatar") {
           uploadFileAutomatically(file);
         }
       } else {
-        // Modo múltiplo: adicionar arquivos
         const validatedFiles: UploadFile[] = [];
 
         newFiles.forEach((file) => {
@@ -327,8 +298,6 @@ export function FileUpload({
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
       addFiles(newFiles);
-
-      // Resetar o input para permitir selecionar o mesmo arquivo novamente
       e.target.value = "";
     }
   };
@@ -353,9 +322,7 @@ export function FileUpload({
     setFiles((prev) => prev.filter((_, i) => i !== index));
     if (shouldUseSingleMode) {
       setCurrentAvatarUrl("");
-      if (onFileChange) {
-        onFileChange("");
-      }
+      onFileChange?.("");
     }
   };
 
@@ -363,9 +330,7 @@ export function FileUpload({
     setFiles([]);
     if (shouldUseSingleMode) {
       setCurrentAvatarUrl("");
-      if (onFileChange) {
-        onFileChange("");
-      }
+      onFileChange?.("");
     }
   };
 
@@ -376,10 +341,15 @@ export function FileUpload({
     const fileExt = file.file.name.split(".").pop()?.toLowerCase() || "jpg";
     let fileName = "";
 
-    // Nomeação específica por tipo
     switch (type) {
       case "avatar":
         fileName = `avatar_${userId || "user"}_${Date.now()}.${fileExt}`;
+        break;
+      case "image":
+        fileName = `noticia_${Date.now()}.${fileExt}`;
+        break;
+      case "video":
+        fileName = `video_${Date.now()}.${fileExt}`;
         break;
       default:
         fileName = `${Math.random()
@@ -387,14 +357,12 @@ export function FileUpload({
           .substring(2)}_${Date.now()}.${fileExt}`;
     }
 
-    // Atualizar status para uploading
     setFiles((prev) =>
       prev.map((f, i) =>
         i === index ? { ...f, status: "uploading", progress: 0 } : f
       )
     );
 
-    // Simular progresso
     const progressInterval = setInterval(() => {
       setFiles((prev) =>
         prev.map((f, i) =>
@@ -404,7 +372,6 @@ export function FileUpload({
     }, 200);
 
     try {
-      // 🔐 Usar admin client para upload
       const { data, error } = await supabase.storage
         .from(config.bucket)
         .upload(
@@ -426,26 +393,22 @@ export function FileUpload({
         throw error;
       }
 
-      // Completar progresso
       setFiles((prev) =>
         prev.map((f, i) => (i === index ? { ...f, progress: 100 } : f))
       );
 
-      // Obter URL pública
       const {
         data: { publicUrl },
       } = supabase.storage.from(config.bucket).getPublicUrl(data!.path);
 
-      // Marcar como completado
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index ? { ...f, status: "completed", url: publicUrl } : f
         )
       );
 
-      // Callback para upload único
-      if (shouldUseSingleMode && onFileChange) {
-        onFileChange(publicUrl);
+      if (shouldUseSingleMode) {
+        onFileChange?.(publicUrl);
         setCurrentAvatarUrl(publicUrl);
       }
 
@@ -473,7 +436,6 @@ export function FileUpload({
 
   const uploadAll = async (): Promise<string[]> => {
     if (type === "avatar") {
-      // Para avatar, o upload já é automático
       return files.filter((f) => f.url).map((f) => f.url!);
     }
 
@@ -494,8 +456,6 @@ export function FileUpload({
             const url = await uploadFile(file, i);
             urls.push(url);
             successCount++;
-
-            // Atualiza o toast de loading com progresso
             toast.loading(
               `Enviando arquivos... (${successCount + errorCount}/${
                 files.length
@@ -505,8 +465,6 @@ export function FileUpload({
           } catch (error) {
             console.error(`Erro ao fazer upload do arquivo ${i}:`, error);
             errorCount++;
-
-            // Atualiza o toast de loading com progresso
             toast.loading(
               `Enviando arquivos... (${successCount + errorCount}/${
                 files.length
@@ -520,13 +478,11 @@ export function FileUpload({
         }
       }
 
-      // Fecha o toast de loading
       toast.dismiss(loadingToastId);
 
-      if (urls.length > 0 && onUploadComplete) {
-        onUploadComplete(urls);
+      if (urls.length > 0) {
+        onUploadComplete?.(urls);
 
-        // Toast final baseado no resultado
         if (errorCount === 0) {
           toast.success("Upload concluído com sucesso!", {
             description: `${successCount} arquivo(s) enviado(s).`,
@@ -554,23 +510,29 @@ export function FileUpload({
     }
   };
 
-  // Renderização específica por tipo
   const getFileIcon = (file: File) => {
     if (file.type.startsWith("image/"))
-      return <FaImage className="w-4 h-4 text-blue-600" />;
+      return <RiImageLine className="w-4 h-4 text-blue-600" />;
     if (file.type.startsWith("video/"))
-      return <FaVideo className="w-4 h-4 text-purple-600" />;
-    return <FaFile className="w-4 h-4 text-gray-600" />;
+      return <RiVideoLine className="w-4 h-4 text-purple-600" />;
+    return <RiFileLine className="w-4 h-4 text-gray-600" />;
   };
 
   const getStatusIcon = (file: UploadFile) => {
     switch (file.status) {
       case "completed":
-        return <FaCheck className="w-4 h-4 text-green-600" />;
+        return <RiCheckLine className="w-4 h-4 text-green-600" />;
       case "error":
-        return <FaExclamationCircle className="w-4 h-4 text-red-600" />;
+        return <RiErrorWarningLine className="w-4 h-4 text-red-600" />;
       case "uploading":
-        return <FaSpinner className="w-4 h-4 text-blue-600 animate-spin" />;
+        return (
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
+            <RiLoaderLine className="w-4 h-4 text-blue-600" />
+          </motion.div>
+        );
       default:
         return null;
     }
@@ -584,7 +546,7 @@ export function FileUpload({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Renderização para Avatar (modo único com preview especial)
+  // Renderização para Avatar
   if (type === "avatar") {
     const currentUploadFile = files[0];
     const displayUrl = currentUploadFile?.url || currentAvatarUrl || "";
@@ -594,53 +556,71 @@ export function FileUpload({
     return (
       <div className={cn("flex items-center space-x-4", className)}>
         <div className="relative">
-          <Avatar className="w-20 h-20 border-2 border-gray-200">
+          <Avatar className="w-20 h-20 border-2 border-gray-200 shadow-lg">
             <AvatarImage
               src={displayUrl || undefined}
               alt="Avatar do agente"
+              className="transition-opacity duration-300"
               onError={(e) => {
-                // Fallback em caso de erro no carregamento da imagem
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
               }}
             />
-            <AvatarFallback className="bg-navy text-white text-lg font-semibold">
-              <FaUser className="w-8 h-8" />
+            <AvatarFallback className="bg-gradient-to-br from-navy-600 to-navy-800 text-white text-lg font-semibold">
+              <RiUserLine className="w-8 h-8" />
             </AvatarFallback>
           </Avatar>
 
-          {/* Overlay de progresso para avatar */}
-          {(displayStatus === "uploading" || displayStatus === "pending") && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
-              <div className="text-center text-white">
-                {displayStatus === "uploading" && currentUploadFile && (
-                  <>
-                    <Progress
-                      value={currentUploadFile.progress}
-                      className="w-16 h-2 bg-white/30 mb-2"
-                    />
-                    <span className="text-xs block">
-                      {currentUploadFile.progress}%
-                    </span>
-                  </>
-                )}
-                {displayStatus === "pending" && (
-                  <FaSpinner className="w-6 h-6 animate-spin mx-auto" />
-                )}
-              </div>
-            </div>
-          )}
+          <AnimatePresence>
+            {(displayStatus === "uploading" || displayStatus === "pending") && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full"
+              >
+                <div className="text-center text-white">
+                  {displayStatus === "uploading" && currentUploadFile && (
+                    <>
+                      <Progress
+                        value={currentUploadFile.progress}
+                        className="w-16 h-2 bg-white/30 mb-2"
+                      />
+                      <span className="text-xs block">
+                        {currentUploadFile.progress}%
+                      </span>
+                    </>
+                  )}
+                  {displayStatus === "pending" && (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity }}
+                    >
+                      <RiLoaderLine className="w-6 h-6 mx-auto" />
+                    </motion.div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Ícone de status */}
           {displayStatus === "completed" && currentUploadFile && (
-            <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
-              <FaCheck className="w-3 h-3 text-white" />
-            </div>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1 shadow-lg"
+            >
+              <RiCheckLine className="w-3 h-3 text-white" />
+            </motion.div>
           )}
           {displayStatus === "error" && currentUploadFile && (
-            <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1">
-              <FaExclamationCircle className="w-3 h-3 text-white" />
-            </div>
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1 shadow-lg"
+            >
+              <RiErrorWarningLine className="w-3 h-3 text-white" />
+            </motion.div>
           )}
         </div>
 
@@ -655,44 +635,59 @@ export function FileUpload({
           />
 
           <div className="flex space-x-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
-              className="border-navy text-navy hover:bg-navy hover:text-white"
-            >
-              {isUploading ? (
-                <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <FaUpload className="w-4 h-4 mr-2" />
-              )}
-              {isUploading
-                ? "Enviando..."
-                : displayUrl
-                ? "Alterar Foto"
-                : "Adicionar Foto"}
-            </Button>
-
-            {displayUrl && (
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={clearFiles}
+                onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                className="border-navy-600 text-navy-600 hover:bg-navy-600 hover:text-white transition-colors duration-300"
               >
-                <FaTimes className="w-4 h-4 mr-2" />
-                Remover
+                {isUploading ? (
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <RiLoaderLine className="w-4 h-4 mr-2" />
+                  </motion.div>
+                ) : (
+                  <RiUploadLine className="w-4 h-4 mr-2" />
+                )}
+                {isUploading
+                  ? "Enviando..."
+                  : displayUrl
+                  ? "Alterar Foto"
+                  : "Adicionar Foto"}
               </Button>
+            </motion.div>
+
+            {displayUrl && (
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFiles}
+                  disabled={isUploading}
+                  className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
+                >
+                  <RiDeleteBinLine className="w-4 h-4 mr-2" />
+                  Remover
+                </Button>
+              </motion.div>
             )}
           </div>
 
-          {/* Informações do upload atual */}
           {currentUploadFile && (
-            <div className="space-y-1">
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="space-y-1"
+            >
               <div className="flex justify-between text-xs text-gray-600">
                 <span className="truncate max-w-[120px]">
                   {currentUploadFile.file.name}
@@ -702,7 +697,7 @@ export function FileUpload({
               {currentUploadFile.status === "uploading" && (
                 <Progress
                   value={currentUploadFile.progress}
-                  className="h-1.5 bg-gray-200"
+                  className="h-1.5 bg-gray-200 transition-all duration-300"
                 />
               )}
               {currentUploadFile.error && (
@@ -710,7 +705,7 @@ export function FileUpload({
                   {currentUploadFile.error}
                 </p>
               )}
-            </div>
+            </motion.div>
           )}
 
           <p className="text-xs text-gray-500">
@@ -732,224 +727,285 @@ export function FileUpload({
 
   return (
     <div className={cn("space-y-4", className)}>
-      {/* Área de Drop */}
-      <Card
-        className={cn(
-          "border-2 border-dashed transition-all duration-200 cursor-pointer",
-          "hover:shadow-md",
-          hasFiles
-            ? "border-blue-500 bg-blue-50/50"
-            : "border-gray-300 hover:border-blue-400 bg-gray-50/50"
-        )}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onClick={() => fileInputRef.current?.click()}
+      <motion.div
+        whileHover={{ scale: 1.01 }}
+        transition={{ type: "spring", stiffness: 300 }}
       >
-        <CardContent className="p-6 text-center">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple={config.multiple}
-            accept={config.accept}
-            onChange={handleFileChange}
-            className="hidden"
-          />
+        <Card
+          className={cn(
+            "border-2 border-dashed transition-all duration-300 cursor-pointer",
+            "hover:shadow-lg backdrop-blur-sm",
+            hasFiles
+              ? "border-blue-500 bg-blue-50/50"
+              : "border-gray-300 hover:border-blue-400 bg-gray-50/50"
+          )}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <CardContent className="p-6 text-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple={config.multiple}
+              accept={config.accept}
+              onChange={handleFileChange}
+              className="hidden"
+            />
 
-          <div className="space-y-4">
-            <div className="flex justify-center">
-              <div
-                className={cn(
-                  "p-3 rounded-full",
-                  hasFiles ? "bg-blue-100" : "bg-gray-100"
-                )}
+            <div className="space-y-4">
+              <motion.div
+                animate={hasFiles ? { scale: 1.1 } : { scale: 1 }}
+                transition={{ type: "spring", stiffness: 300 }}
               >
-                <FaUpload
+                <div
                   className={cn(
-                    "w-6 h-6",
-                    hasFiles ? "text-blue-600" : "text-gray-400"
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Button
-                type="button"
-                variant="secondary"
-                className="mb-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileInputRef.current?.click();
-                }}
-              >
-                Selecione os arquivos
-              </Button>
-              <p className="text-sm text-gray-600">ou arraste e solte aqui</p>
-            </div>
-
-            <div className="text-xs text-gray-500 space-y-1">
-              <p>
-                <strong>Tipos permitidos:</strong> {config.accept}
-              </p>
-              <p>
-                <strong>Tamanho máximo:</strong> {config.maxSize / 1024 / 1024}
-                MB por arquivo
-              </p>
-              {config.multiple && (
-                <p>
-                  <strong>Limite:</strong> {config.maxFiles} arquivos
-                </p>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Lista de Arquivos (apenas para múltiplos) */}
-      {hasFiles && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-semibold text-gray-900">
-                Arquivos selecionados
-              </h4>
-              {config.multiple && (
-                <p className="text-sm text-gray-600">
-                  {files.length} de {config.maxFiles} arquivos
-                </p>
-              )}
-            </div>
-            <div className="flex items-center space-x-3">
-              {config.multiple && (
-                <Badge
-                  variant={
-                    completedFiles === totalFiles ? "default" : "secondary"
-                  }
-                  className={cn(
-                    completedFiles === totalFiles &&
-                      "bg-green-100 text-green-800"
+                    "p-3 rounded-full inline-flex transition-all duration-300",
+                    hasFiles
+                      ? "bg-blue-100 text-blue-600"
+                      : "bg-gray-100 text-gray-400"
                   )}
                 >
-                  {completedFiles}/{totalFiles} concluídos
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFiles}
-                disabled={isUploading}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                Limpar todos
-              </Button>
-            </div>
-          </div>
+                  <RiUploadLine className="w-6 h-6" />
+                </div>
+              </motion.div>
 
-          <div className="space-y-3 max-h-80 overflow-y-auto">
-            {files.map((file, index) => (
-              <Card
-                key={index}
-                className={cn(
-                  "p-4 transition-all border",
-                  file.status === "error" && "border-red-200 bg-red-50",
-                  file.status === "completed" && "border-green-200 bg-green-50",
-                  file.status === "uploading" && "border-blue-200 bg-blue-50"
+              <div className="space-y-2">
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="mb-2 transition-all duration-300"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fileInputRef.current?.click();
+                    }}
+                  >
+                    Selecione os arquivos
+                  </Button>
+                </motion.div>
+                <p className="text-sm text-gray-600">ou arraste e solte aqui</p>
+              </div>
+
+              <div className="text-xs text-gray-500 space-y-1">
+                <p>
+                  <strong>Tipos permitidos:</strong> {config.accept}
+                </p>
+                <p>
+                  <strong>Tamanho máximo:</strong>{" "}
+                  {config.maxSize / 1024 / 1024}MB por arquivo
+                </p>
+                {config.multiple && (
+                  <p>
+                    <strong>Limite:</strong> {config.maxFiles} arquivos
+                  </p>
                 )}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div className="flex-shrink-0 mt-1">
-                      {getFileIcon(file.file)}
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <p className="text-sm font-medium truncate text-gray-900">
-                          {file.file.name}
-                        </p>
-                        {getStatusIcon(file)}
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{formatFileSize(file.file.size)}</span>
-                        <span>{file.progress}%</span>
-                      </div>
-                      <Progress
-                        value={file.progress}
-                        className={cn(
-                          "h-2",
-                          file.status === "completed" && "bg-green-200",
-                          file.status === "error" && "bg-red-200",
-                          file.status === "uploading" && "bg-blue-200"
-                        )}
-                      />
-                      {file.error && (
-                        <p className="text-xs text-red-600 font-medium">
-                          {file.error}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      <AnimatePresence>
+        {hasFiles && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-semibold text-gray-900">
+                  Arquivos selecionados
+                </h4>
+                {config.multiple && (
+                  <p className="text-sm text-gray-600">
+                    {files.length} de {config.maxFiles} arquivos
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center space-x-3">
+                {config.multiple && (
+                  <Badge
+                    variant={
+                      completedFiles === totalFiles ? "default" : "secondary"
+                    }
+                    className={cn(
+                      completedFiles === totalFiles &&
+                        "bg-green-100 text-green-800",
+                      "transition-colors duration-300"
+                    )}
+                  >
+                    {completedFiles}/{totalFiles} concluídos
+                  </Badge>
+                )}
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeFile(index)}
+                    onClick={clearFiles}
                     disabled={isUploading}
-                    className="flex-shrink-0 ml-2 text-gray-400 hover:text-red-600"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors duration-300"
                   >
-                    <FaTimes className="w-4 h-4" />
+                    <RiDeleteBinLine className="w-4 h-4 mr-1" />
+                    Limpar todos
                   </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-
-          {/* Botões de ação - apenas para tipos que não são avatar */}
-          {(config.multiple || files.length > 0) && (
-            <div className="flex items-center justify-between pt-2 border-t">
-              <div className="text-sm text-gray-600">
-                {isUploading ? (
-                  <div className="flex items-center space-x-2">
-                    <FaSpinner className="w-4 h-4 animate-spin text-blue-600" />
-                    <span>Enviando arquivos...</span>
-                  </div>
-                ) : (
-                  <span>
-                    {completedFiles === totalFiles
-                      ? "Todos os arquivos foram enviados"
-                      : "Pronto para enviar"}
-                  </span>
-                )}
-              </div>
-              <div className="flex space-x-3">
-                <Button
-                  variant="outline"
-                  onClick={clearFiles}
-                  disabled={isUploading}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={uploadAll}
-                  disabled={!canUpload}
-                  className={cn(
-                    "bg-blue-600 hover:bg-blue-700 text-white",
-                    !canUpload && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  {isUploading ? (
-                    <>
-                      <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    `Enviar ${files.length} arquivo(s)`
-                  )}
-                </Button>
+                </motion.div>
               </div>
             </div>
-          )}
-        </div>
-      )}
+
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              <AnimatePresence>
+                {files.map((file, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -100 }}
+                    layout
+                  >
+                    <Card
+                      className={cn(
+                        "p-4 transition-all duration-300 border hover:shadow-md",
+                        file.status === "error" && "border-red-200 bg-red-50",
+                        file.status === "completed" &&
+                          "border-green-200 bg-green-50",
+                        file.status === "uploading" &&
+                          "border-blue-200 bg-blue-50"
+                      )}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3 flex-1 min-w-0">
+                          <div className="flex-shrink-0 mt-1">
+                            {getFileIcon(file.file)}
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <p className="text-sm font-medium truncate text-gray-900">
+                                {file.file.name}
+                              </p>
+                              {getStatusIcon(file)}
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500">
+                              <span>{formatFileSize(file.file.size)}</span>
+                              <span>{file.progress}%</span>
+                            </div>
+                            <Progress
+                              value={file.progress}
+                              className={cn(
+                                "h-2 transition-all duration-300",
+                                file.status === "completed" && "bg-green-200",
+                                file.status === "error" && "bg-red-200",
+                                file.status === "uploading" && "bg-blue-200"
+                              )}
+                            />
+                            {file.error && (
+                              <p className="text-xs text-red-600 font-medium">
+                                {file.error}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <motion.div
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFile(index)}
+                            disabled={isUploading}
+                            className="flex-shrink-0 ml-2 text-gray-400 hover:text-red-600 transition-colors duration-300"
+                          >
+                            <RiCloseLine className="w-4 h-4" />
+                          </Button>
+                        </motion.div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+
+            {(config.multiple || files.length > 0) && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center justify-between pt-4 border-t border-gray-200"
+              >
+                <div className="text-sm text-gray-600">
+                  {isUploading ? (
+                    <div className="flex items-center space-x-2">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      >
+                        <RiLoaderLine className="w-4 h-4 text-blue-600" />
+                      </motion.div>
+                      <span>Enviando arquivos...</span>
+                    </div>
+                  ) : (
+                    <span>
+                      {completedFiles === totalFiles
+                        ? "Todos os arquivos foram enviados"
+                        : "Pronto para enviar"}
+                    </span>
+                  )}
+                </div>
+                <div className="flex space-x-3">
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      variant="outline"
+                      onClick={clearFiles}
+                      disabled={isUploading}
+                      className="border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors duration-300"
+                    >
+                      Cancelar
+                    </Button>
+                  </motion.div>
+                  <motion.div
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <Button
+                      onClick={uploadAll}
+                      disabled={!canUpload}
+                      className={cn(
+                        "bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300",
+                        !canUpload && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      {isUploading ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity }}
+                          >
+                            <RiLoaderLine className="w-4 h-4 mr-2" />
+                          </motion.div>
+                          Enviando...
+                        </>
+                      ) : (
+                        `Enviar ${files.length} arquivo(s)`
+                      )}
+                    </Button>
+                  </motion.div>
+                </div>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
