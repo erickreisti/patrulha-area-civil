@@ -5,22 +5,31 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  FaUser,
-  FaCheckCircle,
-  FaEdit,
-  FaExclamationTriangle,
-  FaSync,
-  FaShieldAlt,
-  FaChartBar,
-  FaBan,
-  FaHome,
-  FaSignOutAlt,
-} from "react-icons/fa";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { z } from "zod";
+import {
+  RiUserLine,
+  RiCheckboxCircleLine,
+  RiEditLine,
+  RiErrorWarningLine,
+  RiRefreshLine,
+  RiBarChartLine,
+  RiForbidLine,
+  RiHomeLine,
+  RiLogoutBoxRLine,
+  RiWhatsappLine,
+  RiMailLine,
+  RiAlertLine,
+} from "react-icons/ri";
 
 const profileSchema = z.object({
   id: z.string().uuid(),
@@ -51,6 +60,112 @@ interface CacheData {
   timestamp: number;
   version: string;
 }
+
+// Componente Dialog personalizado para agente inativo
+const InactiveAgentDialog = ({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) => (
+  <Dialog open={isOpen} onOpenChange={() => {}}>
+    <DialogContent className="sm:max-w-md bg-white border-2 border-alert/20 shadow-2xl rounded-xl">
+      {/* Remove o botão X padrão */}
+      <div className="absolute right-4 top-4 opacity-0 pointer-events-none">
+        <div className="w-4 h-4" />
+      </div>
+
+      <DialogHeader>
+        <div className="flex items-center justify-center mb-4">
+          <div className="bg-alert/10 p-3 rounded-full">
+            <RiAlertLine className="w-8 h-8 text-alert" />
+          </div>
+        </div>
+        <DialogTitle className="text-center text-xl font-bold text-alert font-bebas">
+          AGENTE NÃO VINCULADO À PAC
+        </DialogTitle>
+        <DialogDescription className="text-center text-slate-700 mt-2 font-roboto">
+          Situação de credencial irregular detectada
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="space-y-4 py-4">
+        <div className="bg-alert/5 border border-alert/20 rounded-lg p-4">
+          <p className="text-sm text-slate-800 font-medium text-center font-roboto">
+            <strong className="text-alert">ATENÇÃO:</strong> Você não está mais
+            vinculado à<strong> Patrulha Aérea Civil</strong>.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm text-slate-700 font-roboto text-center">
+            <strong className="text-alert">
+              DEVOLUÇÃO IMEDIATA OBRIGATÓRIA:
+            </strong>
+            Você deve entregar imediatamente sua credencial aos responsáveis.
+          </p>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+            <p className="text-xs text-slate-600 text-center font-roboto">
+              <strong className="text-alert">PUNIÇÕES LEGAIS:</strong> A
+              retenção indevida da credencial sujeita o portador a medidas
+              disciplinares e penais conforme o regulamento interno da PAC.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3 pt-2">
+          <p className="text-sm font-semibold text-slate-800 text-center font-roboto">
+            CONTATOS OFICIAIS PARA REGULARIZAÇÃO:
+          </p>
+
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-center gap-3 bg-green-50 border border-green-200 rounded-lg p-3">
+              <RiWhatsappLine className="w-5 h-5 text-green-600" />
+              <div className="text-center">
+                <p className="text-sm font-semibold text-slate-800 font-roboto">
+                  WhatsApp Oficial
+                </p>
+                <p className="text-xs text-slate-600 font-mono">
+                  (21) 99999-9999
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-3 bg-navy/10 border border-navy/20 rounded-lg p-3">
+              <RiMailLine className="w-5 h-5 text-navy" />
+              <div className="text-center">
+                <p className="text-sm font-semibold text-slate-800 font-roboto">
+                  E-mail Oficial
+                </p>
+                <p className="text-xs text-slate-600 font-mono">
+                  comando@pac-rj.gov.br
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-center pt-2">
+        <Button
+          onClick={onClose}
+          className="bg-alert hover:bg-alert/90 text-white font-semibold py-3 px-8 text-lg transition-all duration-300 hover:scale-105 font-roboto"
+          size="lg"
+        >
+          ENTENDI - CLIQUE PARA CONTINUAR
+        </Button>
+      </div>
+
+      <div className="text-center pt-2">
+        <p className="text-xs text-slate-500 font-roboto">
+          Esta mensagem permanecerá até a confirmação do entendimento
+        </p>
+      </div>
+    </DialogContent>
+  </Dialog>
+);
 
 const useProfileCache = () => {
   const CACHE_KEY = "pac_user_data";
@@ -183,7 +298,7 @@ const ErrorState = ({
         animate={{ opacity: 1, y: 0 }}
         className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
       >
-        <FaExclamationTriangle className="w-16 h-16 text-alert mx-auto mb-6" />
+        <RiErrorWarningLine className="w-16 h-16 text-alert mx-auto mb-6" />
         <h2 className="text-2xl font-bold text-slate-800 mb-3 font-bebas">
           {error ? "Erro ao Carregar" : "Perfil Não Encontrado"}
         </h2>
@@ -197,7 +312,7 @@ const ErrorState = ({
             size="lg"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-            <FaSync className="w-5 h-5 mr-3 relative z-10" />
+            <RiRefreshLine className="w-5 h-5 mr-3 relative z-10" />
             <span className="relative z-10">Tentar Novamente</span>
           </Button>
           <Button
@@ -303,7 +418,6 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
 interface InfoSectionProps {
   label: string;
   value: string;
-  icon?: React.ComponentType<{ className?: string }>;
   isTitle?: boolean;
   isAlert?: boolean;
   isMono?: boolean;
@@ -313,13 +427,16 @@ interface InfoSectionProps {
 const InfoSection: React.FC<InfoSectionProps> = ({
   label,
   value,
-  icon: Icon,
   isTitle = false,
   isAlert = false,
   isMono = false,
   center = false,
 }) => (
-  <div className="space-y-1 sm:space-y-2">
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="space-y-1 sm:space-y-2"
+  >
     <label
       className={`text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block ${
         center ? "text-center" : "text-left"
@@ -330,15 +447,8 @@ const InfoSection: React.FC<InfoSectionProps> = ({
     <div
       className={`flex items-center ${
         center ? "justify-center" : "justify-start"
-      } space-x-2`}
+      }`}
     >
-      {Icon && (
-        <Icon
-          className={`w-3 h-3 sm:w-4 sm:h-4 ${
-            isAlert ? "text-alert" : "text-navy"
-          } flex-shrink-0`}
-        />
-      )}
       <p
         className={`
           ${
@@ -355,7 +465,7 @@ const InfoSection: React.FC<InfoSectionProps> = ({
         {value}
       </p>
     </div>
-  </div>
+  </motion.div>
 );
 
 const CertificationSection = ({
@@ -365,7 +475,11 @@ const CertificationSection = ({
   certificationInfo: CertificationInfo;
   profile: ProfileData;
 }) => (
-  <div className="space-y-1 sm:space-y-2">
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    className="space-y-1 sm:space-y-2"
+  >
     <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
       Validade
     </label>
@@ -379,16 +493,7 @@ const CertificationSection = ({
         ⚠️ Agente inativo - certificação cancelada
       </p>
     )}
-  </div>
-);
-
-const AdminBadge = () => (
-  <div className="flex justify-center lg:justify-start pt-1 sm:pt-2">
-    <Badge className="bg-navy hover:bg-navy-700 text-white px-2 sm:px-3 py-1 font-semibold text-xs transition-all duration-300 hover:scale-105 font-roboto">
-      <FaShieldAlt className="w-2 h-2 sm:w-3 sm:h-3 mr-1" />
-      ADMINISTRADOR
-    </Badge>
-  </div>
+  </motion.div>
 );
 
 interface AvatarSectionProps {
@@ -396,7 +501,11 @@ interface AvatarSectionProps {
 }
 
 const AvatarSection: React.FC<AvatarSectionProps> = ({ profile }) => (
-  <div className="space-y-2 sm:space-y-3 w-full max-w-[280px] mx-auto">
+  <motion.div
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="space-y-2 sm:space-y-3 w-full max-w-[280px] mx-auto"
+  >
     <div className="flex justify-center">
       <motion.div
         className="relative"
@@ -419,7 +528,7 @@ const AvatarSection: React.FC<AvatarSectionProps> = ({ profile }) => (
             />
           ) : (
             <div className="flex flex-col items-center justify-center text-slate-400 relative z-10">
-              <FaUser className="w-16 h-16 sm:w-20 sm:h-20 mb-2" />
+              <RiUserLine className="w-16 h-16 sm:w-20 sm:h-20 mb-2" />
               <span className="text-sm text-center px-2 font-roboto">
                 Sem foto
               </span>
@@ -428,37 +537,55 @@ const AvatarSection: React.FC<AvatarSectionProps> = ({ profile }) => (
         </div>
       </motion.div>
     </div>
-  </div>
+  </motion.div>
 );
 
 const StatusSection = ({ profile }: { profile: ProfileData }) => (
   <div className="flex flex-col items-center">
     <div className="text-center w-full">
-      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block mb-2 font-roboto">
+      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block mb-3 sm:mb-4 font-roboto">
         Situação do Patrulheiro
       </label>
       <div className="flex justify-center">
-        <motion.div whileHover={{ scale: 1.05 }} transition={{ duration: 0.3 }}>
+        <motion.div
+          whileHover={{ scale: 1.08 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.3 }}
+        >
           <Badge
             className={`
-              text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3 font-bold rounded-lg
-              min-w-[200px] sm:min-w-[240px] max-w-[280px] w-full
+              text-lg sm:text-xl lg:text-2xl 
+              px-8 sm:px-12 lg:px-16 
+              py-4 sm:py-5 lg:py-6 
+              font-extrabold rounded-xl
+              min-w-[280px] sm:min-w-[340px] lg:min-w-[400px]
+              max-w-[480px] w-full
               transition-all duration-300 cursor-default
-              shadow-lg text-center font-roboto border
+              shadow-2xl text-center font-bebas
+              border-4
               ${
                 profile.status
-                  ? "bg-success text-white hover:bg-success/90 border-success/50"
-                  : "bg-alert text-white hover:bg-alert/90 border-alert/50"
+                  ? "bg-gradient-to-r from-success to-success-600 text-white hover:from-success-600 hover:to-success-700 border-success-700/50 shadow-success/30"
+                  : "bg-gradient-to-r from-alert to-alert-600 text-white hover:from-alert-600 hover:to-alert-700 border-alert-700/50 shadow-alert/30"
               }
             `}
           >
-            <div className="flex items-center justify-center space-x-2">
-              {profile.status ? (
-                <FaCheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-              ) : (
-                <FaBan className="w-3 h-3 sm:w-4 sm:h-4" />
-              )}
-              <span className="text-xs sm:text-sm font-bold">
+            <div className="flex items-center justify-center space-x-3 sm:space-x-4">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={profile.status ? "active" : "inactive"}
+                  initial={{ scale: 0.8, rotate: -180 }}
+                  animate={{ scale: 1.2, rotate: 0 }}
+                  transition={{ duration: 0.5, type: "spring" }}
+                >
+                  {profile.status ? (
+                    <RiCheckboxCircleLine className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10" />
+                  ) : (
+                    <RiForbidLine className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10" />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+              <span className="text-xl sm:text-2xl lg:text-3xl font-black tracking-wider drop-shadow-lg">
                 {profile.status ? "ATIVO" : "INATIVO"}
               </span>
             </div>
@@ -466,9 +593,24 @@ const StatusSection = ({ profile }: { profile: ProfileData }) => (
         </motion.div>
       </div>
       {!profile.status && (
-        <p className="text-xs text-alert mt-1 max-w-md mx-auto font-roboto px-2">
-          ❗ Agente inativo - acesso limitado
-        </p>
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="text-sm sm:text-base text-alert mt-3 max-w-md mx-auto font-roboto px-2 font-semibold bg-alert/10 py-2 rounded-lg border border-alert/20"
+        >
+          AGENTE INATIVO - ACESSO LIMITADO AO SISTEMA
+        </motion.p>
+      )}
+      {profile.status && (
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="text-sm sm:text-base text-success mt-3 max-w-md mx-auto font-roboto px-2 font-semibold bg-success/10 py-2 rounded-lg border border-success/20"
+        >
+          AGENTE ATIVO - ACESSO COMPLETO AO SISTEMA
+        </motion.p>
       )}
     </div>
   </div>
@@ -535,18 +677,18 @@ const ActionButtons = ({
         <>
           <ActionButton
             href={`/admin/agentes/${profile.id}`}
-            icon={FaEdit}
+            icon={RiEditLine}
             label="Editar"
           />
           <ActionButton
             href="/admin/dashboard"
-            icon={FaChartBar}
+            icon={RiBarChartLine}
             label="Dashboard"
           />
         </>
       )}
-      <ActionButton href="/" icon={FaHome} label="Site" />
-      <ActionButton onClick={onSignOut} icon={FaSignOutAlt} label="Sair" />
+      <ActionButton href="/" icon={RiHomeLine} label="Site" />
+      <ActionButton onClick={onSignOut} icon={RiLogoutBoxRLine} label="Sair" />
     </div>
 
     <motion.div
@@ -568,6 +710,8 @@ export default function AgentPerfil() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  // NOVO ESTADO PARA CONTROLAR O DIALOG
+  const [showInactiveDialog, setShowInactiveDialog] = useState(false);
 
   const { getFromCache, setToCache, clearCache } = useProfileCache();
   const { executeWithRetry } = useRetryWithBackoff();
@@ -621,6 +765,11 @@ export default function AgentPerfil() {
       const userData = await executeWithRetry(operation, 3, 1000);
       setProfile(userData);
       setIsAdmin(userData.role?.toLowerCase().trim() === "admin");
+
+      // MOSTRAR DIALOG SE O AGENTE ESTIVER INATIVO
+      if (!userData.status) {
+        setShowInactiveDialog(true);
+      }
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
@@ -651,6 +800,10 @@ export default function AgentPerfil() {
     }
   };
 
+  const handleCloseInactiveDialog = () => {
+    setShowInactiveDialog(false);
+  };
+
   if (loading) return <LoadingState />;
   if (error || !profile)
     return (
@@ -674,6 +827,12 @@ export default function AgentPerfil() {
 
     return (
       <BaseLayout>
+        {/* DIALOG PARA AGENTE INATIVO */}
+        <InactiveAgentDialog
+          isOpen={showInactiveDialog}
+          onClose={handleCloseInactiveDialog}
+        />
+
         <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 relative z-20">
           <div className="w-full max-w-6xl">
             <motion.div
@@ -776,7 +935,6 @@ export default function AgentPerfil() {
                         certificationInfo={certificationInfo}
                         profile={profile}
                       />
-                      {isAdmin && <AdminBadge />}
                     </div>
 
                     <div className="w-full lg:w-px lg:h-40 bg-slate-300/10 my-3 lg:my-0" />
