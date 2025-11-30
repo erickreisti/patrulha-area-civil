@@ -91,7 +91,7 @@ const BackgroundImage = () => {
 };
 
 const MainTitle = () => (
-  <motion.div className="mb-3 xs:mb-4 sm:mb-5 md:mb-6" variants={itemVariants}>
+  <motion.div className="mb-2 xs:mb-3 sm:mb-4 md:mb-5" variants={itemVariants}>
     <h1
       className={cn(
         "font-bold text-white leading-tight",
@@ -112,9 +112,9 @@ const MainTitle = () => (
         <span
           className={cn(
             "block",
-            "mt-1", // Mobile base
-            "xs:mt-2", // Mobile pequeno
-            "sm:mt-2" // Tablet pequeno
+            "mt-0", // Reduzido do mt-1 original
+            "xs:mt-1", // Reduzido do xs:mt-2 original
+            "sm:mt-1" // Reduzido do sm:mt-2 original
           )}
         >
           AÉREA CIVIL
@@ -130,10 +130,10 @@ const MainTitle = () => (
 );
 
 const Subtitle = () => (
-  <motion.div className="mb-3 xs:mb-4 sm:mb-5 md:mb-6" variants={itemVariants}>
+  <motion.div className="mb-2 xs:mb-3 sm:mb-4 md:mb-5" variants={itemVariants}>
     <p
       className={cn(
-        "font-medium text-white mb-1 xs:mb-2 leading-relaxed",
+        "font-medium text-white mb-0 xs:mb-1 leading-relaxed", // Reduzido mb
         "drop-shadow-lg font-roboto text-center",
         "text-lg xs:text-xl sm:text-2xl md:text-2xl lg:text-3xl xl:text-4xl",
         "bg-gradient-to-r from-white via-offwhite-200 to-white bg-clip-text text-transparent"
@@ -147,7 +147,7 @@ const Subtitle = () => (
 const Description = () => (
   <motion.div
     className={cn(
-      "mb-6 xs:mb-7 sm:mb-8 md:mb-10",
+      "mb-4 xs:mb-5 sm:mb-6 md:mb-8", // Reduzido margin-bottom
       "mx-auto px-3 xs:px-4 sm:px-5",
       "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl"
     )}
@@ -162,7 +162,7 @@ const Description = () => (
         "shadow-xl lg:shadow-2xl",
         "font-roboto font-medium text-center",
         "text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl",
-        "p-3 xs:p-4 sm:p-5 md:p-6 lg:p-7",
+        "p-3 xs:p-4 sm:p-5 md:p-6 lg:p-7", // Mantido padding interno
         "relative overflow-hidden"
       )}
     >
@@ -177,7 +177,7 @@ const Description = () => (
 const ActionButtons = () => (
   <motion.div
     className={cn(
-      "flex flex-col gap-3 xs:gap-4 sm:gap-5 md:gap-6",
+      "flex flex-col gap-2 xs:gap-3 sm:gap-4 md:gap-5", // Reduzido gap
       "justify-center items-center",
       "px-3 xs:px-4 sm:px-5",
       "w-full mx-auto",
@@ -202,8 +202,8 @@ const ActionButtons = () => (
           "bg-navy hover:bg-navy-600 text-white",
           "text-sm xs:text-base sm:text-lg md:text-xl",
           "px-4 xs:px-5 sm:px-6 md:px-8",
-          "py-3 xs:py-3.5 sm:py-4 md:py-5",
-          "min-h-[44px] xs:min-h-[48px] sm:min-h-[52px] md:min-h-[56px]"
+          "py-2 xs:py-2.5 sm:py-3 md:py-4", // Reduzido padding vertical
+          "min-h-[40px] xs:min-h-[44px] sm:min-h-[48px] md:min-h-[52px]" // Reduzido altura mínima
         )}
         asChild
       >
@@ -241,8 +241,8 @@ const ActionButtons = () => (
           "text-white hover:bg-white hover:text-navy-800",
           "text-sm xs:text-base sm:text-lg md:text-xl",
           "px-4 xs:px-5 sm:px-6 md:px-8",
-          "py-3 xs:py-3.5 sm:py-4 md:py-5",
-          "min-h-[44px] xs:min-h-[48px] sm:min-h-[52px] md:min-h-[56px]"
+          "py-2 xs:py-2.5 sm:py-3 md:py-4", // Reduzido padding vertical
+          "min-h-[40px] xs:min-h-[44px] sm:min-h-[48px] md:min-h-[52px]" // Reduzido altura mínima
         )}
         asChild
       >
@@ -278,7 +278,7 @@ const ScrollIndicator = () => {
 
   return (
     <motion.div
-      className="mt-4 xs:mt-5 sm:mt-6 md:mt-8 hidden sm:block cursor-pointer group/scroll"
+      className="mt-3 xs:mt-4 sm:mt-5 md:mt-6 hidden sm:block cursor-pointer group/scroll" // Reduzido margin-top
       variants={itemVariants}
       onClick={scrollToAbout}
       whileHover={{ y: 5 }}
@@ -316,7 +316,8 @@ export function HeroSection() {
         <div
           className={cn(
             "mx-auto w-full",
-            "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl"
+            "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl",
+            "pt-8 xs:pt-10 sm:pt-12 md:pt-16" // 🔸 ADICIONADO: Padding top para subir o conteúdo
           )}
         >
           <div className="text-center">
