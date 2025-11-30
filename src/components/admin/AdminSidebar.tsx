@@ -185,7 +185,7 @@ export function AdminSidebar() {
             className="relative"
           >
             {/* Container estilo passaporte */}
-            <div className="w-16 h-16 bg-white rounded-xl shadow-xl overflow-hidden border-2 border-white flex items-center justify-center">
+            <div className="bg-white rounded-full shadow-xl overflow-hidden flex items-center justify-center">
               {/* Imagem da logo */}
               <div className="w-full h-full flex items-center justify-center p-1">
                 <Image

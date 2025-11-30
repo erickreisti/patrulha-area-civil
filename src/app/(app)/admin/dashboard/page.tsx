@@ -234,7 +234,6 @@ export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
   const supabase = createClient();
 
-  // CORREÇÃO: fetchData deve ser definido antes do useEffect
   const fetchData = useCallback(async () => {
     const checkDatabaseConnection = async () => {
       try {
@@ -496,7 +495,6 @@ export default function AdminDashboard() {
     };
   }, [supabase]);
 
-  // CORREÇÃO: useEffect deve vir depois da definição de fetchData
   useEffect(() => {
     setMounted(true);
     if (mounted) {
@@ -773,94 +771,22 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
-  const StatusIndicator = () => (
-    <motion.div
-      initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-200 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-md"
-    >
-      <div className="flex items-center gap-2">
-        <div
-          className={`${
-            systemStatus.status === "excellent" ? "animate-pulse-gentle" : ""
-          }`}
-        >
-          <RiDatabaseLine className="w-4 h-4 text-gray-600" />
-        </div>
-        <span className="text-sm text-gray-600 font-medium">Status:</span>
-        <div className="flex items-center gap-2">
-          <div className="relative group">
-            <div
-              className={`w-3 h-3 rounded-full ${
-                systemStatus.status === "excellent"
-                  ? "bg-green-500 animate-pulse-gentle"
-                  : systemStatus.status === "warning"
-                  ? "bg-yellow-500"
-                  : "bg-red-500"
-              } transition-colors duration-300`}
-              title={systemStatus.message}
-            />
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-              {systemStatus.message}
-            </div>
-          </div>
-          <span
-            className={`text-sm font-medium ${
-              systemStatus.status === "excellent"
-                ? "text-green-800"
-                : systemStatus.status === "warning"
-                ? "text-yellow-800"
-                : "text-red-800"
-            } transition-colors duration-300`}
-          >
-            {systemStatus.status === "excellent"
-              ? "Ótimo"
-              : systemStatus.status === "warning"
-              ? "Atenção"
-              : "Crítico"}
-          </span>
-        </div>
-      </div>
-    </motion.div>
-  );
-
-  const RefreshButton = () => (
-    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-      <Button
-        onClick={manualRefresh}
-        disabled={refreshing}
-        variant="outline"
-        size="sm"
-        className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
-      >
-        <motion.div
-          animate={{ rotate: refreshing ? 360 : 0 }}
-          transition={{
-            duration: 1,
-            repeat: refreshing ? Infinity : 0,
-          }}
-        >
-          <RiRefreshLine
-            className={`w-4 h-4 ${
-              refreshing ? "text-blue-600" : "text-gray-600"
-            }`}
-          />
-        </motion.div>
-        <span>{refreshing ? "Atualizando..." : "Atualizar"}</span>
-      </Button>
-    </motion.div>
-  );
-
-  const LastUpdateIndicator = () => (
-    <div className="flex items-center gap-1 text-sm text-gray-500 bg-white/50 rounded-lg px-3 py-2 border border-gray-200">
-      <RiTimeLine className="w-4 h-4 text-gray-400" />
-      <span>Última atualização:</span>
-      <span className="font-medium text-gray-700">
-        {formatLastUpdate(lastUpdate)}
-      </span>
-    </div>
-  );
+  const navigationButtons = [
+    {
+      href: "/perfil",
+      icon: RiEditLine,
+      label: "Editar Perfil",
+      className:
+        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
+    },
+    {
+      href: "/",
+      icon: RiHomeLine,
+      label: "Voltar ao Site",
+      className:
+        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
+    },
+  ];
 
   if (!mounted) {
     return (
@@ -878,23 +804,6 @@ export default function AdminDashboard() {
       </div>
     );
   }
-
-  const navigationButtons = [
-    {
-      href: "/perfil",
-      icon: RiEditLine,
-      label: "Editar Perfil",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
@@ -917,29 +826,131 @@ export default function AdminDashboard() {
           </div>
 
           {/* Controles Organizados - ABAIXO do título */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            {/* Status e Atualização */}
-            <div className="flex flex-col sm:flex-row gap-3 flex-1">
-              <StatusIndicator />
-              <RefreshButton />
-              <LastUpdateIndicator />
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
+            {/* Status e Atualização - LADO ESQUERDO */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
+              {/* Status Indicator */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="flex items-center gap-2 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-200 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-md"
+              >
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`${
+                      systemStatus.status === "excellent"
+                        ? "animate-pulse-gentle"
+                        : ""
+                    }`}
+                  >
+                    <RiDatabaseLine className="w-4 h-4 text-gray-600" />
+                  </div>
+                  <span className="text-sm text-gray-600 font-medium">
+                    Status:
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative group">
+                      <div
+                        className={`w-3 h-3 rounded-full ${
+                          systemStatus.status === "excellent"
+                            ? "bg-green-500 animate-pulse-gentle"
+                            : systemStatus.status === "warning"
+                            ? "bg-yellow-500"
+                            : "bg-red-500"
+                        } transition-colors duration-300`}
+                        title={systemStatus.message}
+                      />
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+                        {systemStatus.message}
+                      </div>
+                    </div>
+                    <span
+                      className={`text-sm font-medium ${
+                        systemStatus.status === "excellent"
+                          ? "text-green-800"
+                          : systemStatus.status === "warning"
+                          ? "text-yellow-800"
+                          : "text-red-800"
+                      } transition-colors duration-300`}
+                    >
+                      {systemStatus.status === "excellent"
+                        ? "Ótimo"
+                        : systemStatus.status === "warning"
+                        ? "Atenção"
+                        : "Crítico"}
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Refresh Button */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button
+                  onClick={manualRefresh}
+                  disabled={refreshing}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300 h-10 px-3"
+                >
+                  <motion.div
+                    animate={{ rotate: refreshing ? 360 : 0 }}
+                    transition={{
+                      duration: 1,
+                      repeat: refreshing ? Infinity : 0,
+                    }}
+                  >
+                    <RiRefreshLine
+                      className={`w-4 h-4 ${
+                        refreshing ? "text-blue-600" : "text-gray-600"
+                      }`}
+                    />
+                  </motion.div>
+                  <span>{refreshing ? "Atualizando..." : "Atualizar"}</span>
+                </Button>
+              </motion.div>
+
+              {/* Last Update Indicator */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="flex items-center gap-1 text-sm text-gray-500 bg-white/50 rounded-lg px-3 py-2 border border-gray-200 h-10"
+              >
+                <RiTimeLine className="w-4 h-4 text-gray-400" />
+                <span>Última atualização:</span>
+                <span className="font-medium text-gray-700">
+                  {formatLastUpdate(lastUpdate)}
+                </span>
+              </motion.div>
             </div>
 
-            {/* Navegação */}
-            <div className="flex gap-2">
+            {/* Navegação - LADO DIREITO */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="flex flex-col sm:flex-row gap-2"
+            >
               {navigationButtons.map((button, index) => (
                 <motion.div
                   key={button.href}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
                   <Link href={button.href}>
                     <Button
                       variant="outline"
-                      className={`transition-all duration-300 ${button.className}`}
+                      className={`transition-all duration-300 h-10 ${button.className}`}
                     >
                       <button.icon className="w-4 h-4 mr-2" />
                       {button.label}
@@ -947,7 +958,7 @@ export default function AdminDashboard() {
                   </Link>
                 </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </motion.div>
 

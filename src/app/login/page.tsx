@@ -42,6 +42,21 @@ const SEGURANCA = {
   COMPRIMENTO_MINIMO: 12,
 } as const;
 
+// Função para registrar atividade de login
+async function logUserLogin(userId: string) {
+  const supabase = createClient();
+
+  const { error } = await supabase.rpc("log_user_activity", {
+    p_user_id: userId,
+    p_action_type: "user_login",
+    p_description: "Usuário fez login no sistema",
+  });
+
+  if (error) {
+    console.error("Erro ao registrar login:", error);
+  }
+}
+
 const loginSchema = z.object({
   matricula: z
     .string()
@@ -292,6 +307,11 @@ export default function LoginPage() {
       console.log("✅ Login bem-sucedido!");
       updateSecurityLock(false);
       saveRememberedMatricula(data.matricula, data.rememberMe);
+
+      // 📝 REGISTRAR ATIVIDADE DE LOGIN NO BANCO DE DADOS
+      console.log("📝 Registrando atividade de login...");
+      await logUserLogin(profile.id);
+      console.log("✅ Atividade de login registrada com sucesso!");
 
       const welcomeMessage = `Bem-vindo, ${profile.full_name || "Agente"}!`;
       showAlert("success", welcomeMessage);

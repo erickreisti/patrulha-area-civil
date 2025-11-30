@@ -523,6 +523,8 @@ const AvatarSection: React.FC<AvatarSectionProps> = ({ profile }) => (
               alt="Foto de perfil"
               fill
               className="object-cover relative z-10"
+              sizes="(max-width: 640px) 160px, (max-width: 768px) 192px, 224px"
+              priority={true} // Para a imagem do avatar principal
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
@@ -862,7 +864,7 @@ export default function AgentPerfil() {
               className="flex justify-center"
             >
               <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-xl overflow-hidden w-full max-w-sm sm:max-w-md lg:max-w-3xl border border-slate-200/60 mx-2">
-                <div className="absolute inset-0 opacity-[0.02] flex items-center justify-center pointer-events-none z-0">
+                <div className="absolute inset-0 opacity-[0.05] flex items-center justify-center pointer-events-none z-0">
                   <div className="w-full h-full max-w-[800px] max-h-[800px] sm:max-w-[800px] sm:max-h-[800px] relative">
                     <Image
                       src="/images/logos/logo-pattern.svg"
@@ -895,7 +897,8 @@ export default function AgentPerfil() {
                             width={160}
                             height={160}
                             className="w-full h-full object-contain"
-                            priority
+                            priority={true} // Esta é uma imagem crítica
+                            sizes="(max-width: 640px) 96px, (max-width: 768px) 128px, 144px"
                           />
                         </div>
                       </div>
