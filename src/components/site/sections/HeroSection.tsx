@@ -96,7 +96,6 @@ const MainTitle = () => (
       className={cn(
         "font-bold text-white leading-tight",
         "drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
-        // 🔸 CORREÇÃO: Tamanhos otimizados para caber em uma linha
         "text-4xl", // Mobile base (320px+) - Quebra em duas linhas
         "xs:text-5xl", // Mobile pequeno (375px+) - Quebra em duas linhas
         "sm:text-5xl", // Tablet pequeno (640px+) - Quebra em duas linhas
@@ -317,7 +316,7 @@ export function HeroSection() {
           className={cn(
             "mx-auto w-full",
             "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl",
-            "pt-8 xs:pt-10 sm:pt-12 md:pt-16" // 🔸 ADICIONADO: Padding top para subir o conteúdo
+            "pt-4 xs:pt-6 sm:pt-8 md:pt-12 lg:pt-16" // 🔸 CORREÇÃO: Padding top reduzido
           )}
         >
           <div className="text-center">
@@ -330,7 +329,7 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-16 xs:h-20 sm:h-24 md:h-28 lg:h-32 bg-gradient-to-t from-navy-900/80 via-navy-900/40 to-transparent pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-12 xs:h-16 sm:h-20 md:h-24 lg:h-28 bg-gradient-to-t from-navy-900/80 via-navy-900/40 to-transparent pointer-events-none"></div>
     </section>
   );
 }

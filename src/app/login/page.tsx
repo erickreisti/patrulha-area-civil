@@ -190,7 +190,6 @@ export default function LoginPage() {
       const newAttempts = increment ? failedAttempts + 1 : 0;
       setFailedAttempts(newAttempts);
 
-      // ✅ USA CONSTANTES DE SEGURANÇA
       if (newAttempts >= SEGURANCA.TENTATIVAS_MAXIMAS) {
         const lockUntil = Date.now() + SEGURANCA.BLOQUEIO_MINUTOS * 60 * 1000;
         setIsLocked(true);
@@ -254,9 +253,6 @@ export default function LoginPage() {
       console.log("📧 Email do perfil:", profile.email);
       console.log("🔐 Status do agente:", profile.status);
       console.log("👑 Role do usuário:", profile.role);
-
-      // ✅ REMOVIDO: Verificação de status ativo/inativo
-      // Agora agentes ATIVOS e INATIVOS podem fazer login
 
       console.log("🔑 Tentando login com:", {
         email: profile.email,
@@ -360,33 +356,39 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
-        {/* Header Centralizado */}
+        {/* Header Centralizado - SUSPENSO MAIS ACIMA */}
         <motion.div
-          className="text-center mb-6 sm:mb-8"
+          className="text-center mb-4 sm:mb-6" // Reduzido mb
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
         >
           <Link
             href="/"
-            className="flex flex-col items-center justify-center space-y-4 sm:space-y-6 mb-6 sm:mb-8 group"
+            className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 mb-4 sm:mb-5 group" // Reduzido space-y e mb
           >
-            {/* Logo SEM animação */}
-            <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex justify-center">
+            {/* Logo */}
+            <div className="relative w-20 h-20 sm:w-28 sm:h-28 flex justify-center">
+              {" "}
+              {/* Reduzido tamanho */}
               <Image
                 src="/images/logos/logo.webp"
                 alt="Patrulha Aérea Civil"
                 fill
                 className="object-contain drop-shadow-lg"
                 priority
-                sizes="(max-width: 640px) 96px, 128px"
+                sizes="(max-width: 640px) 80px, 112px"
               />
             </div>
 
             {/* Textos */}
-            <div className="text-center space-y-3 w-full">
-              <div className="flex flex-col items-center justify-center space-y-2">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent tracking-tight sm:tracking-widest uppercase leading-tight font-bebas">
+            <div className="text-center space-y-2 w-full">
+              {" "}
+              {/* Reduzido space-y */}
+              <div className="flex flex-col items-center justify-center space-y-1">
+                {" "}
+                {/* Reduzido space-y */}
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent tracking-tight sm:tracking-widest uppercase leading-tight font-bebas">
                   PATRULHA AÉREA CIVIL
                 </h1>
                 <p className="text-gray-600 text-xs sm:text-sm font-medium leading-tight font-inter max-w-md mx-auto">
@@ -397,29 +399,30 @@ export default function LoginPage() {
           </Link>
         </motion.div>
 
-        {/* Login Card */}
+        {/* Login Card - SUSPENSO MAIS ACIMA */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/80 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden hover:shadow-2xl transition-all duration-500">
-            <CardContent className="p-4 sm:p-6 md:p-8">
+            <CardContent className="p-4 sm:p-5 md:p-6">
+              {" "}
+              {/* Reduzido padding */}
               {/* Card Header */}
               <motion.div
-                className="text-center mb-4 sm:mb-6"
+                className="text-center mb-3 sm:mb-4" // Reduzido mb
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
               >
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 text-center mb-1 sm:mb-2 tracking-tight sm:tracking-wide whitespace-nowrap font-bebas">
+                <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 text-center mb-1 sm:mb-2 tracking-tight sm:tracking-wide whitespace-nowrap font-bebas">
                   ACESSO DO AGENTE
                 </h2>
                 <p className="text-gray-500 text-xs sm:text-sm whitespace-nowrap font-inter">
                   Digite sua matrícula para acessar o sistema
                 </p>
               </motion.div>
-
               {/* Alerts */}
               <AnimatePresence>
                 {alert && (
@@ -428,7 +431,7 @@ export default function LoginPage() {
                     animate={{ opacity: 1, y: 0, height: "auto" }}
                     exit={{ opacity: 0, y: -10, height: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="mb-4 sm:mb-6"
+                    className="mb-3 sm:mb-4" // Reduzido mb
                   >
                     <Alert
                       variant={
@@ -458,14 +461,15 @@ export default function LoginPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-
               {isLocked && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <Alert variant="destructive" className="mb-4 sm:mb-6 text-sm">
+                  <Alert variant="destructive" className="mb-3 sm:mb-4 text-sm">
+                    {" "}
+                    {/* Reduzido mb */}
                     <div className="flex items-center gap-2">
                       <RiLockLine className="w-4 h-4 flex-shrink-0" />
                       <AlertDescription className="break-words flex-1">
@@ -476,12 +480,11 @@ export default function LoginPage() {
                   </Alert>
                 </motion.div>
               )}
-
               {/* Form */}
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(handleSubmit)}
-                  className="space-y-4 sm:space-y-6"
+                  className="space-y-3 sm:space-y-4" // Reduzido space-y
                 >
                   {/* Matrícula Field */}
                   <motion.div
@@ -507,7 +510,7 @@ export default function LoginPage() {
                                 onChange={(e) =>
                                   handleMatriculaChange(e.target.value)
                                 }
-                                className="text-sm sm:text-base py-2.5 sm:py-3 pl-3 sm:pl-4 pr-10 sm:pr-12 font-medium tracking-wider h-10 sm:h-12 transition-all duration-300 focus:ring-2 focus:ring-navy-500 focus:border-navy-500"
+                                className="text-sm sm:text-base py-2 sm:py-2.5 pl-3 sm:pl-4 pr-10 sm:pr-12 font-medium tracking-wider h-9 sm:h-11 transition-all duration-300 focus:ring-2 focus:ring-navy-500 focus:border-navy-500" // Reduzido height
                                 disabled={isLocked || loading}
                               />
                               <div className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -531,7 +534,9 @@ export default function LoginPage() {
                       control={form.control}
                       name="rememberMe"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2.5 sm:p-3 hover:border-navy-300 transition-colors duration-300">
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2 sm:p-2.5 hover:border-navy-300 transition-colors duration-300">
+                          {" "}
+                          {/* Reduzido padding */}
                           <div className="space-y-0.5 flex-1 min-w-0">
                             <FormLabel className="text-xs sm:text-sm whitespace-nowrap font-inter">
                               Lembrar matrícula
@@ -564,7 +569,7 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       disabled={isLocked || loading}
-                      className="w-full group relative overflow-hidden bg-gradient-to-br from-navy-600 to-navy-700 hover:from-navy-700 hover:to-navy-800 text-white font-semibold py-2.5 sm:py-3.5 text-sm sm:text-lg rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-inter h-11 sm:h-14 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full group relative overflow-hidden bg-gradient-to-br from-navy-600 to-navy-700 hover:from-navy-700 hover:to-navy-800 text-white font-semibold py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-inter h-10 sm:h-12 disabled:opacity-50 disabled:cursor-not-allowed" // Reduzido height
                     >
                       {/* Shine Effect */}
                       <motion.div
@@ -582,16 +587,20 @@ export default function LoginPage() {
                                 repeat: Infinity,
                                 ease: "linear",
                               }}
-                              className="rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-2 sm:mr-3"
+                              className="rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white mr-2 sm:mr-3" // Reduzido tamanho
                             />
-                            <span className="text-sm sm:text-base font-inter">
+                            <span className="text-xs sm:text-sm font-inter">
+                              {" "}
+                              {/* Reduzido texto */}
                               Entrando...
                             </span>
                           </>
                         ) : (
                           <>
-                            <RiLoginCircleLine className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
-                            <span className="text-sm sm:text-base whitespace-nowrap font-inter">
+                            <RiLoginCircleLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
+                            <span className="text-xs sm:text-sm whitespace-nowrap font-inter">
+                              {" "}
+                              {/* Reduzido texto */}
                               Acessar Sistema
                             </span>
                           </>
@@ -601,10 +610,9 @@ export default function LoginPage() {
                   </motion.div>
                 </form>
               </Form>
-
               {/* Separator */}
               <motion.div
-                className="relative my-4 sm:my-6"
+                className="relative my-3 sm:my-4" // Reduzido margin
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
@@ -618,7 +626,6 @@ export default function LoginPage() {
                   </span>
                 </div>
               </motion.div>
-
               {/* Back to Site */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -630,9 +637,9 @@ export default function LoginPage() {
                 <Link href="/">
                   <Button
                     variant="outline"
-                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-navy-600 hover:border-navy-600 font-medium py-2.5 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl transition-all duration-300 shadow-sm hover:shadow-md font-inter h-11 sm:h-12"
+                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-navy-600 hover:border-navy-600 font-medium py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl transition-all duration-300 shadow-sm hover:shadow-md font-inter h-9 sm:h-10" // Reduzido height
                   >
-                    <RiHomeLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
+                    <RiHomeLine className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
                     <span className="whitespace-nowrap font-inter">
                       Voltar para o Site
                     </span>
