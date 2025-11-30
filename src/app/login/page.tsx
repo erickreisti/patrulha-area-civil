@@ -1,3 +1,4 @@
+// src/app/login/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -23,7 +24,23 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Toaster } from "@/components/ui/sonner";
-import { FaUser, FaShieldAlt, FaHistory } from "react-icons/fa";
+import {
+  RiUserLine,
+  RiAlertLine,
+  RiCheckLine,
+  RiLockLine,
+  RiLoginCircleLine,
+  RiHomeLine,
+} from "react-icons/ri";
+
+// Constantes de segurança
+const SEGURANCA = {
+  SENHA_PADRAO: "PAC@2025!Secure",
+  TENTATIVAS_MAXIMAS: 5,
+  BLOQUEIO_MINUTOS: 15,
+  ROTACAO_SENHA_MESES: 6,
+  COMPRIMENTO_MINIMO: 12,
+} as const;
 
 const loginSchema = z.object({
   matricula: z
@@ -173,8 +190,9 @@ export default function LoginPage() {
       const newAttempts = increment ? failedAttempts + 1 : 0;
       setFailedAttempts(newAttempts);
 
-      if (newAttempts >= 5) {
-        const lockUntil = Date.now() + 15 * 60 * 1000;
+      // ✅ USA CONSTANTES DE SEGURANÇA
+      if (newAttempts >= SEGURANCA.TENTATIVAS_MAXIMAS) {
+        const lockUntil = Date.now() + SEGURANCA.BLOQUEIO_MINUTOS * 60 * 1000;
         setIsLocked(true);
         setLockTime(lockUntil);
         localStorage.setItem(
@@ -204,18 +222,27 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    console.log("🚀 Iniciando processo de login...");
 
     try {
       const matriculaLimpa = data.matricula.replace(/\D/g, "");
+      console.log("📝 Matrícula limpa:", matriculaLimpa);
 
+      // 🔍 BUSCA COMPLETA DO PERFIL
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("id, email, full_name, role, status")
+        .select("*")
         .eq("matricula", matriculaLimpa)
         .single();
 
-      if (profileError) {
+      console.log("👤 Resultado da busca do perfil:", {
+        profile,
+        profileError,
+      });
+
+      if (profileError || !profile) {
         updateSecurityLock();
+        console.log("❌ Perfil não encontrado");
         showAlert(
           "error",
           "Matrícula não consta no sistema. Este usuário não faz parte da PAC - Patrulha Aérea Civil"
@@ -223,37 +250,62 @@ export default function LoginPage() {
         return;
       }
 
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      console.log("✅ Perfil encontrado:", profile.full_name);
+      console.log("📧 Email do perfil:", profile.email);
+      console.log("🔐 Status do agente:", profile.status);
+      console.log("👑 Role do usuário:", profile.role);
+
+      // ✅ REMOVIDO: Verificação de status ativo/inativo
+      // Agora agentes ATIVOS e INATIVOS podem fazer login
+
+      console.log("🔑 Tentando login com:", {
         email: profile.email,
-        password: matriculaLimpa,
+        password: "PAC@2025!Secure",
       });
+
+      // 🔐 USA SENHA PADRÃO FORTE
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: profile.email,
+          password: SEGURANCA.SENHA_PADRAO,
+        });
+
+      console.log("🔐 Resultado do auth:", { authData, authError });
 
       if (authError) {
         updateSecurityLock();
+        console.log("❌ Erro de autenticação:", authError);
 
         if (authError.message.includes("Invalid login credentials")) {
-          showAlert("error", "Credenciais inválidas");
+          showAlert(
+            "error",
+            "Erro de autenticação. Contate o administrador do sistema."
+          );
+        } else if (authError.message.includes("Email not confirmed")) {
+          showAlert(
+            "warning",
+            "E-mail não confirmado. Verifique sua caixa de entrada."
+          );
         } else {
-          showAlert("error", "Erro ao fazer login");
+          showAlert("error", `Erro: ${authError.message}`);
         }
         return;
       }
 
+      // ✅ Login bem-sucedido
+      console.log("✅ Login bem-sucedido!");
       updateSecurityLock(false);
       saveRememberedMatricula(data.matricula, data.rememberMe);
 
-      // Mensagem de boas-vindas adaptada para status inativo
-      const welcomeMessage = !profile.status
-        ? `Bem-vindo, ${profile.full_name || "Agente"}! (Conta inativa)`
-        : `Bem-vindo, ${profile.full_name || "Agente"}!`;
-
+      const welcomeMessage = `Bem-vindo, ${profile.full_name || "Agente"}!`;
       showAlert("success", welcomeMessage);
 
       setTimeout(() => {
         window.location.href = "/perfil";
-      }, 1000);
-    } catch {
+      }, 1500);
+    } catch (error: unknown) {
       updateSecurityLock();
+      console.error("💥 Erro geral no login:", error);
       showAlert("error", "Erro inesperado ao fazer login");
     } finally {
       setLoading(false);
@@ -278,36 +330,49 @@ export default function LoginPage() {
         transition={{ duration: 1 }}
       />
 
+      {/* Floating Elements */}
       <motion.div
         className="absolute top-1/4 left-1/4 w-48 h-48 sm:w-72 sm:h-72 bg-blue-500/5 rounded-full blur-2xl sm:blur-3xl"
-        animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        animate={{
+          scale: [1, 1.1, 1],
+          opacity: [0.3, 0.5, 0.3],
+        }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      <motion.div
+        className="absolute bottom-1/4 right-1/4 w-32 h-32 sm:w-48 sm:h-48 bg-indigo-500/5 rounded-full blur-xl sm:blur-2xl"
+        animate={{
+          scale: [1, 1.2, 1],
+          opacity: [0.2, 0.4, 0.2],
+        }}
+        transition={{
+          duration: 5,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 1,
+        }}
       />
 
       <motion.div
         className="w-full max-w-sm sm:max-w-md relative z-10"
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
       >
-        {/* Header TOTALMENTE CENTRALIZADO */}
+        {/* Header Centralizado */}
         <motion.div
           className="text-center mb-6 sm:mb-8"
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={{ duration: 0.7, delay: 0.2 }}
         >
           <Link
             href="/"
             className="flex flex-col items-center justify-center space-y-4 sm:space-y-6 mb-6 sm:mb-8 group"
           >
-            {/* Logo Centralizada */}
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
-              className="relative w-24 h-24 sm:w-32 sm:h-32 flex justify-center"
-            >
+            {/* Logo SEM animação */}
+            <div className="relative w-24 h-24 sm:w-32 sm:h-32 flex justify-center">
               <Image
                 src="/images/logos/logo.webp"
                 alt="Patrulha Aérea Civil"
@@ -316,47 +381,41 @@ export default function LoginPage() {
                 priority
                 sizes="(max-width: 640px) 96px, 128px"
               />
-            </motion.div>
+            </div>
 
-            {/* Textos Centralizados */}
-            <motion.div
-              className="text-center space-y-3 w-full"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
-              {/* Título Principal */}
+            {/* Textos */}
+            <div className="text-center space-y-3 w-full">
               <div className="flex flex-col items-center justify-center space-y-2">
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent tracking-tight sm:tracking-widest uppercase leading-tight font-sans">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent tracking-tight sm:tracking-widest uppercase leading-tight font-bebas">
                   PATRULHA AÉREA CIVIL
                 </h1>
-                <p className="text-gray-600 text-xs sm:text-sm font-medium leading-tight font-sans max-w-md mx-auto">
+                <p className="text-gray-600 text-xs sm:text-sm font-medium leading-tight font-inter max-w-md mx-auto">
                   COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
                 </p>
               </div>
-            </motion.div>
+            </div>
           </Link>
         </motion.div>
 
         {/* Login Card */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.3 }}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
         >
-          <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/80 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden">
+          <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/80 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden hover:shadow-2xl transition-all duration-500">
             <CardContent className="p-4 sm:p-6 md:p-8">
               {/* Card Header */}
               <motion.div
                 className="text-center mb-4 sm:mb-6"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.5 }}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
               >
-                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 text-center mb-1 sm:mb-2 tracking-tight sm:tracking-wide whitespace-nowrap font-sans">
+                <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 text-center mb-1 sm:mb-2 tracking-tight sm:tracking-wide whitespace-nowrap font-bebas">
                   ACESSO DO AGENTE
                 </h2>
-                <p className="text-gray-500 text-xs sm:text-sm whitespace-nowrap font-sans">
+                <p className="text-gray-500 text-xs sm:text-sm whitespace-nowrap font-inter">
                   Digite sua matrícula para acessar o sistema
                 </p>
               </motion.div>
@@ -365,33 +424,57 @@ export default function LoginPage() {
               <AnimatePresence>
                 {alert && (
                   <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                    initial={{ opacity: 0, y: -10, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: "auto" }}
+                    exit={{ opacity: 0, y: -10, height: 0 }}
                     transition={{ duration: 0.3 }}
                     className="mb-4 sm:mb-6"
                   >
                     <Alert
                       variant={
-                        alert.type === "error" ? "destructive" : "default"
+                        alert.type === "error"
+                          ? "destructive"
+                          : alert.type === "warning"
+                          ? "warning"
+                          : "default"
                       }
-                      className="border-l-4 rounded-lg text-sm"
+                      className="border-l-4 rounded-lg text-sm shadow-sm"
                     >
-                      <AlertDescription className="font-medium font-sans break-words">
-                        {alert.message}
-                      </AlertDescription>
+                      <div className="flex items-center gap-2">
+                        {alert.type === "error" && (
+                          <RiAlertLine className="w-4 h-4 flex-shrink-0" />
+                        )}
+                        {alert.type === "warning" && (
+                          <RiAlertLine className="w-4 h-4 flex-shrink-0 text-yellow-600" />
+                        )}
+                        {alert.type === "success" && (
+                          <RiCheckLine className="w-4 h-4 flex-shrink-0 text-green-600" />
+                        )}
+                        <AlertDescription className="font-medium font-inter break-words flex-1">
+                          {alert.message}
+                        </AlertDescription>
+                      </div>
                     </Alert>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               {isLocked && (
-                <Alert variant="destructive" className="mb-4 sm:mb-6 text-sm">
-                  <AlertDescription className="break-words">
-                    Acesso bloqueado por segurança. Tente novamente em{" "}
-                    {getRemainingTime()}.
-                  </AlertDescription>
-                </Alert>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Alert variant="destructive" className="mb-4 sm:mb-6 text-sm">
+                    <div className="flex items-center gap-2">
+                      <RiLockLine className="w-4 h-4 flex-shrink-0" />
+                      <AlertDescription className="break-words flex-1">
+                        Acesso bloqueado por segurança. Tente novamente em{" "}
+                        <strong>{getRemainingTime()}</strong>.
+                      </AlertDescription>
+                    </div>
+                  </Alert>
+                </motion.div>
               )}
 
               {/* Form */}
@@ -401,78 +484,94 @@ export default function LoginPage() {
                   className="space-y-4 sm:space-y-6"
                 >
                   {/* Matrícula Field */}
-                  <FormField
-                    control={form.control}
-                    name="matricula"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm sm:text-base">
-                          Matrícula do Agente
-                        </FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              {...field}
-                              type="text"
-                              placeholder="000.000.000-00"
-                              maxLength={14}
-                              onChange={(e) =>
-                                handleMatriculaChange(e.target.value)
-                              }
-                              className="text-sm sm:text-base py-2.5 sm:py-3 pl-3 sm:pl-4 pr-10 sm:pr-12 font-medium tracking-wider h-10 sm:h-12"
-                              disabled={isLocked || loading}
-                            />
-                            <div className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
-                              <FaUser className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.1 }}
+                  >
+                    <FormField
+                      control={form.control}
+                      name="matricula"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm sm:text-base font-inter">
+                            Matrícula do Agente
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Input
+                                {...field}
+                                type="text"
+                                placeholder="000.000.000-00"
+                                maxLength={14}
+                                onChange={(e) =>
+                                  handleMatriculaChange(e.target.value)
+                                }
+                                className="text-sm sm:text-base py-2.5 sm:py-3 pl-3 sm:pl-4 pr-10 sm:pr-12 font-medium tracking-wider h-10 sm:h-12 transition-all duration-300 focus:ring-2 focus:ring-navy-500 focus:border-navy-500"
+                                disabled={isLocked || loading}
+                              />
+                              <div className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                                <RiUserLine className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-colors duration-300" />
+                              </div>
                             </div>
-                          </div>
-                        </FormControl>
-                        <FormMessage className="text-xs sm:text-sm" />
-                      </FormItem>
-                    )}
-                  />
+                          </FormControl>
+                          <FormMessage className="text-xs sm:text-sm" />
+                        </FormItem>
+                      )}
+                    />
+                  </motion.div>
 
                   {/* Remember Me */}
-                  <FormField
-                    control={form.control}
-                    name="rememberMe"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2.5 sm:p-3">
-                        <div className="space-y-0.5 flex-1 min-w-0">
-                          <FormLabel className="text-xs sm:text-sm whitespace-nowrap">
-                            Lembrar matrícula
-                          </FormLabel>
-                          <p className="text-xs text-gray-500 break-words">
-                            Salvar matrícula neste dispositivo
-                          </p>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={loading}
-                            className="scale-90 sm:scale-100"
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
+                  >
+                    <FormField
+                      control={form.control}
+                      name="rememberMe"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2.5 sm:p-3 hover:border-navy-300 transition-colors duration-300">
+                          <div className="space-y-0.5 flex-1 min-w-0">
+                            <FormLabel className="text-xs sm:text-sm whitespace-nowrap font-inter">
+                              Lembrar matrícula
+                            </FormLabel>
+                            <p className="text-xs text-gray-500 break-words font-inter">
+                              Salvar matrícula neste dispositivo
+                            </p>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              disabled={loading}
+                              className="scale-90 sm:scale-100 data-[state=checked]:bg-navy-600"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </motion.div>
 
                   {/* Submit Button */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.7 }}
+                    transition={{ duration: 0.6, delay: 0.3 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
                     <Button
                       type="submit"
                       disabled={isLocked || loading}
-                      className="w-full group relative overflow-hidden bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-2.5 sm:py-3.5 text-sm sm:text-lg rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-sans h-11 sm:h-14"
+                      className="w-full group relative overflow-hidden bg-gradient-to-br from-navy-600 to-navy-700 hover:from-navy-700 hover:to-navy-800 text-white font-semibold py-2.5 sm:py-3.5 text-sm sm:text-lg rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-inter h-11 sm:h-14 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
+                      {/* Shine Effect */}
                       <motion.div
                         className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 transform translate-x-[-100%] group-hover:translate-x-[100%]"
                         transition={{ duration: 1.2, ease: "easeInOut" }}
                       />
+
                       <div className="flex items-center justify-center relative z-10">
                         {loading ? (
                           <>
@@ -485,14 +584,14 @@ export default function LoginPage() {
                               }}
                               className="rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white mr-2 sm:mr-3"
                             />
-                            <span className="text-sm sm:text-base">
+                            <span className="text-sm sm:text-base font-inter">
                               Entrando...
                             </span>
                           </>
                         ) : (
                           <>
-                            <FaShieldAlt className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
-                            <span className="text-sm sm:text-base whitespace-nowrap">
+                            <RiLoginCircleLine className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
+                            <span className="text-sm sm:text-base whitespace-nowrap font-inter">
                               Acessar Sistema
                             </span>
                           </>
@@ -508,13 +607,13 @@ export default function LoginPage() {
                 className="relative my-4 sm:my-6"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.8 }}
+                transition={{ duration: 0.6, delay: 0.4 }}
               >
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-200/60"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="bg-white px-2 sm:px-3 text-gray-500 font-medium rounded-full border border-gray-200 font-sans text-xs sm:text-sm">
+                  <span className="bg-white px-2 sm:px-3 text-gray-500 font-medium rounded-full border border-gray-200 font-inter text-xs sm:text-sm">
                     ou
                   </span>
                 </div>
@@ -524,15 +623,17 @@ export default function LoginPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.9 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
               >
                 <Link href="/">
                   <Button
                     variant="outline"
-                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-blue-600 hover:border-blue-600 font-medium py-2.5 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl transition-all duration-300 shadow-sm hover:shadow-md font-sans h-11 sm:h-12"
+                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-navy-600 hover:border-navy-600 font-medium py-2.5 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl transition-all duration-300 shadow-sm hover:shadow-md font-inter h-11 sm:h-12"
                   >
-                    <FaHistory className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                    <span className="whitespace-nowrap">
+                    <RiHomeLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
+                    <span className="whitespace-nowrap font-inter">
                       Voltar para o Site
                     </span>
                   </Button>
@@ -540,33 +641,6 @@ export default function LoginPage() {
               </motion.div>
             </CardContent>
           </Card>
-        </motion.div>
-
-        {/* Footer */}
-        <motion.div
-          className="text-center mt-4 sm:mt-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 1 }}
-        >
-          <div className="flex items-center justify-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
-            <motion.div
-              className="w-1 h-1 bg-green-500 rounded-full"
-              animate={{ scale: [1, 1.5, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            />
-            <span className="text-green-600 text-xs font-semibold font-sans whitespace-nowrap">
-              Sistema Seguro
-            </span>
-            <motion.div
-              className="w-1 h-1 bg-green-500 rounded-full"
-              animate={{ scale: [1, 1.5, 1] }}
-              transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-            />
-          </div>
-          <p className="text-gray-400 text-xs font-sans whitespace-nowrap">
-            Autenticação Protegida • v2.4.1
-          </p>
         </motion.div>
       </motion.div>
     </div>

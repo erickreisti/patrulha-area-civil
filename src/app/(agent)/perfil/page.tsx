@@ -31,6 +31,7 @@ import {
   RiAlertLine,
 } from "react-icons/ri";
 
+// SCHEMA COMPLETO CORRIGIDO com todos os campos do banco
 const profileSchema = z.object({
   id: z.string().uuid(),
   matricula: z.string().min(1, "Matrícula é obrigatória"),
@@ -71,7 +72,6 @@ const InactiveAgentDialog = ({
 }) => (
   <Dialog open={isOpen} onOpenChange={() => {}}>
     <DialogContent className="sm:max-w-md bg-white border-2 border-alert/20 shadow-2xl rounded-xl">
-      {/* Remove o botão X padrão */}
       <div className="absolute right-4 top-4 opacity-0 pointer-events-none">
         <div className="w-4 h-4" />
       </div>
@@ -710,12 +710,12 @@ export default function AgentPerfil() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
-  // NOVO ESTADO PARA CONTROLAR O DIALOG
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
 
-  const { getFromCache, setToCache, clearCache } = useProfileCache();
+  const { clearCache } = useProfileCache();
   const { executeWithRetry } = useRetryWithBackoff();
 
+  // FUNÇÃO CORRIGIDA para buscar todos os dados do banco
   const fetchProfile = useCallback(async () => {
     try {
       setError(null);
@@ -730,55 +730,74 @@ export default function AgentPerfil() {
 
         if (!user) throw new Error("Nenhum usuário autenticado encontrado");
 
-        let userData = getFromCache();
+        console.log("🔍 Buscando dados do usuário:", user.id);
 
-        if (!userData) {
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .single();
+        // Buscar dados COMPLETOS do banco
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("*") // SELECT * para pegar TODOS os campos
+          .eq("id", user.id)
+          .single();
 
-          if (profileError)
-            throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
-          if (!profileData) throw new Error("Perfil não encontrado");
+        console.log("📊 Dados retornados do banco:", profileData);
+        console.log("❌ Erro (se houver):", profileError);
 
-          try {
-            userData = profileSchema.parse(profileData);
-          } catch {
-            userData = {
-              ...profileData,
-              full_name: profileData.full_name || "Nome não definido",
-              matricula: profileData.matricula || "NÃO DEFINIDA",
-              email: profileData.email || "email@indefinido.com",
-              status: Boolean(profileData.status),
-              role: (profileData.role as "admin" | "agent") || "agent",
-            } as ProfileData;
-          }
-
-          setToCache(userData);
+        if (profileError) {
+          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
         }
 
-        return userData;
+        if (!profileData) {
+          throw new Error("Perfil não encontrado no banco de dados");
+        }
+
+        // Validar dados com schema
+        let validatedData: ProfileData;
+        try {
+          validatedData = profileSchema.parse(profileData);
+        } catch (validationError) {
+          console.warn(
+            "⚠️ Dados não validados pelo schema, usando fallback:",
+            validationError
+          );
+          // Fallback para garantir que todos os campos existam
+          validatedData = {
+            id: profileData.id || user.id,
+            matricula: profileData.matricula || "NÃO DEFINIDA",
+            email: profileData.email || user.email || "email@indefinido.com",
+            full_name: profileData.full_name || "Nome não definido",
+            avatar_url: profileData.avatar_url || null,
+            graduacao: profileData.graduacao || null,
+            validade_certificacao: profileData.validade_certificacao || null,
+            tipo_sanguineo: profileData.tipo_sanguineo || null,
+            status: Boolean(profileData.status),
+            role: (profileData.role as "admin" | "agent") || "agent",
+            created_at: profileData.created_at || new Date().toISOString(),
+            updated_at: profileData.updated_at || new Date().toISOString(),
+          };
+        }
+
+        console.log("✅ Dados validados:", validatedData);
+        return validatedData;
       };
 
       const userData = await executeWithRetry(operation, 3, 1000);
       setProfile(userData);
       setIsAdmin(userData.role?.toLowerCase().trim() === "admin");
 
-      // MOSTRAR DIALOG SE O AGENTE ESTIVER INATIVO
+      // Mostrar dialog se agente inativo
       if (!userData.status) {
         setShowInactiveDialog(true);
       }
     } catch (err: unknown) {
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
+      console.error("💥 Erro ao carregar perfil:", errorMessage);
       setError(errorMessage);
       clearCache();
     } finally {
       setLoading(false);
     }
-  }, [executeWithRetry, getFromCache, setToCache, clearCache]);
+  }, [executeWithRetry, clearCache]);
 
   useEffect(() => {
     fetchProfile();
@@ -827,7 +846,6 @@ export default function AgentPerfil() {
 
     return (
       <BaseLayout>
-        {/* DIALOG PARA AGENTE INATIVO */}
         <InactiveAgentDialog
           isOpen={showInactiveDialog}
           onClose={handleCloseInactiveDialog}
@@ -858,14 +876,14 @@ export default function AgentPerfil() {
                 <div className="absolute inset-1 border border-slate-300/30 rounded-lg pointer-events-none z-0" />
 
                 <CardContent className="p-3 sm:p-4 lg:p-6 relative z-10">
-                  {/* HEADER REORGANIZADO NA ORDEM CORRETA */}
+                  {/* HEADER */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
                     className="flex flex-col items-center pb-4 border-b border-slate-200/30 mb-4 space-y-4"
                   >
-                    {/* 1. LOGO */}
+                    {/* LOGO */}
                     <motion.div whileHover={{ scale: 1.05 }}>
                       <div className="w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 xl:w-40 xl:h-40 flex items-center justify-center">
                         <div className="relative w-full h-full">
@@ -881,17 +899,17 @@ export default function AgentPerfil() {
                       </div>
                     </motion.div>
 
-                    {/* 2. PATRULHA AÉREA CIVIL */}
+                    {/* TÍTULO */}
                     <div className="text-center">
                       <h1 className="text-navy text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide uppercase leading-tight font-bebas">
                         Patrulha Aérea Civil
                       </h1>
-                      <p className="text-slate-600 text-xs sm:text-sm mt-1 leading-snug font-roboto">
+                      <p className="text-slate-600 text-[8px] sm:text-sm mt-1 leading-snug font-roboto">
                         COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
                       </p>
                     </div>
 
-                    {/* 3. IDENTIFICAÇÃO E 4. BANDEIRA */}
+                    {/* IDENTIFICAÇÃO E BANDEIRA */}
                     <div className="text-center space-y-2">
                       <h2 className="text-xs sm:text-sm font-bold text-slate-700 tracking-wide uppercase font-bebas">
                         Identificação
@@ -914,7 +932,7 @@ export default function AgentPerfil() {
                     <div className="flex-1 w-full space-y-3 sm:space-y-4 text-center lg:text-left">
                       <InfoSection
                         label="Nome"
-                        value={profile.full_name || "Nome não definido"}
+                        value={profile.full_name}
                         isTitle
                       />
                       <InfoSection

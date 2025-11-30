@@ -1,4 +1,4 @@
-// src/app/admin/agentes/[id]/editar/page.tsx
+// src/app/admin/agentes/[id]/editar/page.tsx - COMPONENTE COMPLETO CORRIGIDO
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -24,7 +24,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner"; // CORREÇÃO: Usando o Spinner existente
+import { Spinner } from "@/components/ui/spinner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -45,6 +46,7 @@ import {
   RiEyeOffLine,
   RiHomeLine,
   RiEditLine,
+  RiErrorWarningLine,
 } from "react-icons/ri";
 
 // Constantes
@@ -159,6 +161,8 @@ export default function EditarAgentePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [originalData, setOriginalData] = useState<FormData | null>(null);
 
   const { currentUserRole, loading: permissionsLoading } = usePermissions();
 
@@ -221,7 +225,8 @@ export default function EditarAgentePage() {
       if (data) {
         console.log("✅ Agente encontrado:", data);
         setAgent(data);
-        setFormData({
+
+        const newFormData = {
           full_name: data.full_name || "",
           email: data.email || "",
           graduacao: data.graduacao || "",
@@ -230,7 +235,11 @@ export default function EditarAgentePage() {
           role: data.role,
           status: data.status,
           avatar_url: data.avatar_url || "",
-        });
+        };
+
+        setFormData(newFormData);
+        setOriginalData(newFormData);
+        setHasUnsavedChanges(false);
       } else {
         toast.error("Agente não encontrado");
         router.push("/admin/agentes");
@@ -246,10 +255,28 @@ export default function EditarAgentePage() {
     }
   }, [agentId, supabase, router]);
 
+  // Função para verificar mudanças
+  const checkForChanges = useCallback(
+    (newData: FormData) => {
+      if (!originalData) return false;
+
+      return (
+        newData.full_name !== originalData.full_name ||
+        newData.email !== originalData.email ||
+        newData.graduacao !== originalData.graduacao ||
+        newData.tipo_sanguineo !== originalData.tipo_sanguineo ||
+        newData.validade_certificacao !== originalData.validade_certificacao ||
+        newData.role !== originalData.role ||
+        newData.status !== originalData.status ||
+        newData.avatar_url !== originalData.avatar_url
+      );
+    },
+    [originalData]
+  );
+
   // Efeitos
   useEffect(() => {
     if (agentId && !permissionsLoading) {
-      // Verificar se usuário tem permissão antes de buscar
       if (currentUserRole !== "admin") {
         toast.error("Apenas administradores podem editar agentes");
         router.push("/perfil");
@@ -259,39 +286,29 @@ export default function EditarAgentePage() {
     }
   }, [agentId, fetchAgent, currentUserRole, permissionsLoading, router]);
 
+  // Efeito para detectar mudanças
+  useEffect(() => {
+    if (originalData) {
+      const hasChanges = checkForChanges(formData);
+      setHasUnsavedChanges(hasChanges);
+    }
+  }, [formData, originalData, checkForChanges]);
+
   // Função para atualizar avatar
   const handleAvatarChange = async (avatarUrl: string) => {
     try {
       console.log("🔄 Atualizando avatar para:", avatarUrl);
 
-      // Atualiza estado local
       setFormData((prev) => ({
         ...prev,
         avatar_url: avatarUrl,
       }));
 
-      // Salva no banco
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          avatar_url: avatarUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", agentId);
-
-      if (error) {
-        console.error("❌ Erro ao atualizar avatar:", error);
-
-        if (error.code === "42501") {
-          toast.error("Sem permissão para atualizar avatar");
-          return;
-        }
-
-        throw error;
-      }
-
-      console.log("✅ Avatar atualizado com sucesso");
-      toast.success("Foto atualizada com sucesso!");
+      toast.info("Foto alterada - lembre-se de salvar as alterações", {
+        description:
+          "A foto será salva quando você clicar em 'Salvar Alterações'",
+        duration: 4000,
+      });
     } catch (error: unknown) {
       console.error("💥 Erro ao atualizar avatar:", error);
       const errorMessage =
@@ -330,66 +347,22 @@ export default function EditarAgentePage() {
     }));
   };
 
-  // Função para mudanças no Switch
-  const handleSwitchChange = async (name: keyof FormData, checked: boolean) => {
-    const previousStatus = formData.status;
-
-    // Atualiza estado local
+  // Função para mudanças no Switch - apenas atualiza estado local
+  const handleSwitchChange = (name: keyof FormData, checked: boolean) => {
     setFormData((prev) => ({
       ...prev,
       [name]: checked,
     }));
 
-    // Salva automaticamente no banco quando o status muda
     if (name === "status") {
-      try {
-        console.log("🔄 Atualizando status para:", checked);
-
-        const { error } = await supabase
-          .from("profiles")
-          .update({
-            status: checked,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", agentId);
-
-        if (error) {
-          console.error("❌ Erro ao atualizar status:", error);
-
-          if (error.code === "42501") {
-            toast.error("Sem permissão para atualizar status");
-            // Reverte estado
-            setFormData((prev) => ({
-              ...prev,
-              [name]: previousStatus,
-            }));
-            return;
-          }
-
-          throw error;
+      toast.info(
+        checked
+          ? "Status alterado para ATIVO - lembre-se de salvar"
+          : "Status alterado para INATIVO - lembre-se de salvar",
+        {
+          duration: 3000,
         }
-
-        // Recarrega os dados para garantir sincronização
-        await fetchAgent();
-        toast.success(
-          checked
-            ? "✅ Agente marcado como ATIVO na PAC"
-            : "⚠️ Agente marcado como INATIVO na PAC"
-        );
-      } catch (error: unknown) {
-        console.error("💥 Erro ao atualizar status:", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Erro desconhecido";
-        toast.error("Erro ao atualizar status", {
-          description: errorMessage,
-        });
-
-        // Reverte o estado em caso de erro
-        setFormData((prev) => ({
-          ...prev,
-          [name]: previousStatus,
-        }));
-      }
+      );
     }
   };
 
@@ -399,6 +372,15 @@ export default function EditarAgentePage() {
       ...prev,
       role: value,
     }));
+
+    toast.info(
+      value === "admin"
+        ? "Tipo alterado para ADMINISTRADOR - lembre-se de salvar"
+        : "Tipo alterado para AGENTE - lembre-se de salvar",
+      {
+        duration: 3000,
+      }
+    );
   };
 
   // Função para mudanças no Select de Graduação
@@ -431,17 +413,19 @@ export default function EditarAgentePage() {
     return errors;
   };
 
-  // CORREÇÃO: Função de submit otimizada para evitar erro PGRST116
+  // Função de submit melhorada com feedbacks
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!hasUnsavedChanges) {
+      toast.info("Nenhuma alteração foi feita para salvar");
+      return;
+    }
 
     const checkAuth = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      console.log("🔐 Session:", session);
-      console.log("👤 User:", session?.user);
-      console.log("🔑 JWT:", session?.access_token);
 
       if (!session) {
         toast.error("Usuário não autenticado!");
@@ -450,14 +434,12 @@ export default function EditarAgentePage() {
       return true;
     };
 
-    // No handleSubmit, adicionar:
     const isAuthenticated = await checkAuth();
     if (!isAuthenticated) {
       setSaving(false);
       return;
     }
 
-    // Verificar permissão novamente
     if (currentUserRole !== "admin") {
       toast.error("Apenas administradores podem editar agentes");
       return;
@@ -473,7 +455,12 @@ export default function EditarAgentePage() {
         return;
       }
 
-      const toastId = toast.loading("Atualizando agente...");
+      const toastId = toast.loading(
+        `Salvando alterações de ${formData.full_name}...`,
+        {
+          description: "Atualizando dados do agente no sistema",
+        }
+      );
 
       const updateData = {
         full_name: formData.full_name.trim(),
@@ -489,7 +476,6 @@ export default function EditarAgentePage() {
 
       console.log("🔄 Enviando dados para atualização:", updateData);
 
-      // CORREÇÃO: Usando update sem .select() para evitar erro PGRST116
       const { error } = await supabase
         .from("profiles")
         .update(updateData)
@@ -499,37 +485,47 @@ export default function EditarAgentePage() {
         console.error("❌ Erro ao atualizar agente:", error);
 
         if (error.code === "42501") {
-          toast.error("Sem permissão para atualizar este agente");
+          toast.error("Sem permissão para atualizar este agente", {
+            id: toastId,
+          });
           return;
         }
 
         if (error.code === "23505") {
-          toast.error("Erro: Email ou matrícula já existe");
+          toast.error("Erro: Email ou matrícula já existe", {
+            id: toastId,
+          });
           return;
         }
 
         throw error;
       }
 
-      // CORREÇÃO: Buscar dados atualizados separadamente
-      await fetchAgent();
-
       toast.success("✅ Agente atualizado com sucesso!", {
         id: toastId,
-        description: `As alterações em ${formData.full_name} foram salvas.`,
-        duration: 5000,
+        description: `Todas as alterações em ${formData.full_name} foram salvas no sistema.`,
+        duration: 6000,
+        action: {
+          label: "Ver Agentes",
+          onClick: () => router.push("/admin/agentes"),
+        },
       });
+
+      setOriginalData(formData);
+      setHasUnsavedChanges(false);
 
       setTimeout(() => {
         router.push("/admin/agentes");
-      }, 1500);
+      }, 2000);
     } catch (err: unknown) {
       console.error("💥 Erro ao atualizar agente:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("❌ Erro ao atualizar agente", {
+
+      toast.error("❌ Falha ao atualizar agente", {
         description: errorMessage,
-        duration: 6000,
+        duration: 8000,
+        icon: <RiErrorWarningLine className="w-5 h-5 text-red-500" />,
       });
     } finally {
       setSaving(false);
@@ -539,7 +535,6 @@ export default function EditarAgentePage() {
   const handleHardDelete = async () => {
     if (!agent) return;
 
-    // Verificar permissão
     if (currentUserRole !== "admin") {
       toast.error("Apenas administradores podem excluir agentes");
       return;
@@ -711,6 +706,24 @@ export default function EditarAgentePage() {
               Editando: <strong>{agent.full_name || "Agente"}</strong> •
               Matrícula: <strong>{agent.matricula}</strong>
             </p>
+
+            {/* Alert para mudanças não salvas */}
+            {hasUnsavedChanges && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+                className="mt-4"
+              >
+                <Alert className="bg-yellow-50 border-yellow-200">
+                  <RiAlertLine className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800">
+                    Você tem alterações não salvas. Clique em &quot;Salvar
+                    Alterações&quot; para aplicar as mudanças.
+                  </AlertDescription>
+                </Alert>
+              </motion.div>
+            )}
           </div>
 
           {/* Botões de Navegação */}
@@ -752,6 +765,14 @@ export default function EditarAgentePage() {
                   <CardTitle className="flex items-center text-xl text-gray-800">
                     <RiUserLine className="w-5 h-5 mr-2 text-navy-600" />
                     Editar Dados do Agente
+                    {hasUnsavedChanges && (
+                      <Badge
+                        variant="outline"
+                        className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300"
+                      >
+                        Alterações Pendentes
+                      </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -986,19 +1007,20 @@ export default function EditarAgentePage() {
                       >
                         <Button
                           type="submit"
-                          disabled={saving}
+                          disabled={saving || !hasUnsavedChanges}
                           className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {saving ? (
                             <>
-                              <Spinner className="w-4 h-4 mr-2" />{" "}
-                              {/* CORREÇÃO: Usando Spinner */}
+                              <Spinner className="w-4 h-4 mr-2" />
                               Salvando...
                             </>
                           ) : (
                             <>
                               <RiSaveLine className="w-4 h-4 mr-2" />
-                              Salvar Alterações
+                              {hasUnsavedChanges
+                                ? "Salvar Alterações"
+                                : "Nenhuma Alteração"}
                             </>
                           )}
                         </Button>
@@ -1014,6 +1036,7 @@ export default function EditarAgentePage() {
                             type="button"
                             variant="outline"
                             className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
+                            disabled={saving}
                           >
                             <RiCloseLine className="w-4 h-4 mr-2" />
                             Cancelar

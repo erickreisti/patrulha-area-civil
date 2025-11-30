@@ -41,6 +41,7 @@ import {
   RiHomeLine,
   RiArrowDownSLine,
   RiEditLine,
+  RiErrorWarningLine,
 } from "react-icons/ri";
 
 // Opções baseadas no schema
@@ -178,8 +179,13 @@ export default function CriarAgentePage() {
 
       console.log("🔄 Enviando dados para API...", formData);
 
-      // ✅ Toast de loading
-      const toastId = toast.loading("Cadastrando agente...");
+      // ✅ Toast de loading aprimorado
+      const toastId = toast.loading(
+        `Cadastrando agente ${formData.full_name}...`,
+        {
+          description: "Criando conta e configurando perfil",
+        }
+      );
 
       // CORREÇÃO: Usar API route em vez de admin client direto
       const response = await fetch("/api/admin/agentes/criar", {
@@ -198,11 +204,18 @@ export default function CriarAgentePage() {
 
       console.log("✅ Agente criado com sucesso:", result);
 
-      // ✅ Toast de sucesso
-      toast.success("Agente criado com sucesso!", {
+      // ✅ FEEDBACK DE SUCESSO MELHORADO (igual ao componente de edição)
+      toast.success("✅ Agente criado com sucesso!", {
         id: toastId,
         description: `O agente ${formData.full_name} foi cadastrado no sistema. Senha inicial: pac12345`,
         duration: 8000,
+        action: {
+          label: "Ver Agentes",
+          onClick: () => {
+            router.push("/admin/agentes");
+            router.refresh();
+          },
+        },
       });
 
       // Limpar formulário
@@ -217,11 +230,11 @@ export default function CriarAgentePage() {
         avatar_url: "",
       });
 
-      // Redirecionar após 2 segundos
+      // Redirecionar após 3 segundos (um pouco mais para ler a mensagem)
       setTimeout(() => {
         router.push("/admin/agentes");
         router.refresh();
-      }, 2000);
+      }, 3000);
     } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
       const errorMessage =
@@ -229,10 +242,11 @@ export default function CriarAgentePage() {
           ? err.message
           : "Erro desconhecido ao criar agente";
 
-      // ✅ Toast de erro
-      toast.error("Erro ao criar agente", {
+      // ✅ Toast de erro aprimorado
+      toast.error("❌ Falha ao criar agente", {
         description: errorMessage,
         duration: 6000,
+        icon: <RiErrorWarningLine className="w-5 h-5 text-red-500" />,
       });
     } finally {
       setLoading(false);
@@ -348,6 +362,12 @@ export default function CriarAgentePage() {
                   <CardTitle className="flex items-center text-xl text-gray-800">
                     <RiUserLine className="w-5 h-5 mr-2 text-navy-600" />
                     Dados do Agente
+                    <Badge
+                      variant="outline"
+                      className="ml-2 bg-green-100 text-green-800 border-green-300"
+                    >
+                      Novo Cadastro
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
