@@ -302,7 +302,7 @@ const ScrollIndicator = () => {
 export function HeroSection() {
   return (
     <section
-      className="relative bg-slate-800 text-white h-screen flex items-center justify-center overflow-hidden pt-16"
+      className="relative bg-slate-800 text-white h-screen flex items-center justify-center overflow-hidden"
       id="hero-section"
     >
       <BackgroundImage />
