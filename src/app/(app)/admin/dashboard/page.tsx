@@ -234,74 +234,7 @@ export default function AdminDashboard() {
   const [mounted, setMounted] = useState(false);
   const supabase = createClient();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const getActivityIcon = (actionType: string) => {
-    const iconClass = "w-4 h-4 flex-shrink-0";
-
-    switch (actionType) {
-      case "user_created":
-      case "user_registered":
-        return <RiUserAddLine className={`${iconClass} text-green-600`} />;
-      case "user_updated":
-      case "user_login":
-        return <RiUserLine className={`${iconClass} text-blue-600`} />;
-      case "news_created":
-      case "article_created":
-        return <RiNewspaperLine className={`${iconClass} text-green-600`} />;
-      case "news_updated":
-      case "article_updated":
-        return <RiNewspaperLine className={`${iconClass} text-blue-600`} />;
-      case "news_published":
-      case "article_published":
-        return <RiEyeLine className={`${iconClass} text-purple-600`} />;
-      case "gallery_item_created":
-      case "media_uploaded":
-        return <RiImageLine className={`${iconClass} text-green-600`} />;
-      case "gallery_item_updated":
-      case "media_updated":
-        return <RiImageLine className={`${iconClass} text-blue-600`} />;
-      case "gallery_item_deleted":
-      case "media_deleted":
-        return <RiAlertLine className={`${iconClass} text-red-600`} />;
-      case "category_created":
-        return <RiFolderLine className={`${iconClass} text-green-600`} />;
-      case "category_updated":
-        return <RiFolderLine className={`${iconClass} text-blue-600`} />;
-      case "system_start":
-      case "system_update":
-        return <RiServerLine className={`${iconClass} text-gray-600`} />;
-      default:
-        return <RiCheckLine className={`${iconClass} text-gray-600`} />;
-    }
-  };
-
-  const formatRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return "Agora mesmo";
-    if (diffInSeconds < 3600) return `Há ${Math.floor(diffInSeconds / 60)} min`;
-    if (diffInSeconds < 86400)
-      return `Há ${Math.floor(diffInSeconds / 3600)} h`;
-    if (diffInSeconds < 2592000)
-      return `Há ${Math.floor(diffInSeconds / 86400)} dias`;
-
-    return date.toLocaleDateString("pt-BR");
-  };
-
-  const formatLastUpdate = (date: Date) => {
-    const now = new Date();
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (diffInSeconds < 60) return "Agora mesmo";
-    if (diffInSeconds < 3600) return `Há ${Math.floor(diffInSeconds / 60)} min`;
-    return `Há ${Math.floor(diffInSeconds / 3600)} h`;
-  };
-
+  // CORREÇÃO: fetchData deve ser definido antes do useEffect
   const fetchData = useCallback(async () => {
     const checkDatabaseConnection = async () => {
       try {
@@ -533,7 +466,7 @@ export default function AdminDashboard() {
     };
 
     // Executar fetch inicial
-    fetchAllData();
+    await fetchAllData();
 
     // Auto-refresh
     const statusInterval = setInterval(checkDatabaseConnection, 30000);
@@ -561,6 +494,172 @@ export default function AdminDashboard() {
       clearInterval(dataInterval);
       supabase.removeChannel(channel);
     };
+  }, [supabase]);
+
+  // CORREÇÃO: useEffect deve vir depois da definição de fetchData
+  useEffect(() => {
+    setMounted(true);
+    if (mounted) {
+      fetchData();
+    }
+  }, [mounted, fetchData]);
+
+  const getActivityIcon = (actionType: string) => {
+    const iconClass = "w-4 h-4 flex-shrink-0";
+
+    switch (actionType) {
+      case "user_created":
+      case "user_registered":
+        return <RiUserAddLine className={`${iconClass} text-green-600`} />;
+      case "user_updated":
+      case "user_login":
+        return <RiUserLine className={`${iconClass} text-blue-600`} />;
+      case "news_created":
+      case "article_created":
+        return <RiNewspaperLine className={`${iconClass} text-green-600`} />;
+      case "news_updated":
+      case "article_updated":
+        return <RiNewspaperLine className={`${iconClass} text-blue-600`} />;
+      case "news_published":
+      case "article_published":
+        return <RiEyeLine className={`${iconClass} text-purple-600`} />;
+      case "gallery_item_created":
+      case "media_uploaded":
+        return <RiImageLine className={`${iconClass} text-green-600`} />;
+      case "gallery_item_updated":
+      case "media_updated":
+        return <RiImageLine className={`${iconClass} text-blue-600`} />;
+      case "gallery_item_deleted":
+      case "media_deleted":
+        return <RiAlertLine className={`${iconClass} text-red-600`} />;
+      case "category_created":
+        return <RiFolderLine className={`${iconClass} text-green-600`} />;
+      case "category_updated":
+        return <RiFolderLine className={`${iconClass} text-blue-600`} />;
+      case "system_start":
+      case "system_update":
+        return <RiServerLine className={`${iconClass} text-gray-600`} />;
+      default:
+        return <RiCheckLine className={`${iconClass} text-gray-600`} />;
+    }
+  };
+
+  const formatRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "Agora mesmo";
+    if (diffInSeconds < 3600) return `Há ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400)
+      return `Há ${Math.floor(diffInSeconds / 3600)} h`;
+    if (diffInSeconds < 2592000)
+      return `Há ${Math.floor(diffInSeconds / 86400)} dias`;
+
+    return date.toLocaleDateString("pt-BR");
+  };
+
+  const formatLastUpdate = (date: Date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "Agora mesmo";
+    if (diffInSeconds < 3600) return `Há ${Math.floor(diffInSeconds / 60)} min`;
+    return `Há ${Math.floor(diffInSeconds / 3600)} h`;
+  };
+
+  const manualRefresh = useCallback(async () => {
+    try {
+      setRefreshing(true);
+
+      const checkDb = async () => {
+        try {
+          const { error } = await supabase
+            .from("profiles")
+            .select("*", { count: "exact", head: true })
+            .limit(1);
+
+          if (error) throw error;
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      const connectionOk = await checkDb();
+      if (!connectionOk) {
+        setRefreshing(false);
+        return;
+      }
+
+      const [
+        agentsResponse,
+        newsResponse,
+        galleryResponse,
+        categoriesResponse,
+      ] = await Promise.all([
+        supabase.from("profiles").select("id, status, role"),
+        supabase
+          .from("noticias")
+          .select("id, destaque, status, data_publicacao"),
+        supabase.from("galeria_itens").select("id, tipo, status"),
+        supabase.from("galeria_categorias").select("id, tipo, status"),
+      ]);
+
+      const agentsData = agentsResponse.data || [];
+      const newsData = newsResponse.data || [];
+      const galleryData = galleryResponse.data || [];
+      const categoriesData = categoriesResponse.data || [];
+
+      const totalAgents = agentsData.length;
+      const activeAgents = agentsData.filter((agent) => agent.status).length;
+      const totalAdmins = agentsData.filter(
+        (agent) => agent.role?.toLowerCase() === "admin"
+      ).length;
+
+      const totalNews = newsData.length;
+      const featuredNews = newsData.filter((news) => news.destaque).length;
+      const publishedNews = newsData.filter(
+        (news) => news.status === "publicado"
+      ).length;
+
+      const totalGalleryItems = galleryData.length;
+      const photoItems = galleryData.filter(
+        (item) => item.tipo === "foto"
+      ).length;
+      const videoItems = galleryData.filter(
+        (item) => item.tipo === "video"
+      ).length;
+
+      const totalCategories = categoriesData.length;
+      const photoCategories = categoriesData.filter(
+        (cat) => cat.tipo === "fotos"
+      ).length;
+      const videoCategories = categoriesData.filter(
+        (cat) => cat.tipo === "videos"
+      ).length;
+
+      setStats({
+        totalAgents,
+        totalNews,
+        totalGalleryItems,
+        activeAgents,
+        totalCategories,
+        featuredNews,
+        publishedNews,
+        photoItems,
+        videoItems,
+        photoCategories,
+        videoCategories,
+        totalAdmins,
+      });
+
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error("Erro ao atualizar manualmente:", error);
+    } finally {
+      setRefreshing(false);
+    }
   }, [supabase]);
 
   const RecentActivity = () => (
@@ -762,107 +861,6 @@ export default function AdminDashboard() {
       </span>
     </div>
   );
-
-  const manualRefresh = useCallback(async () => {
-    try {
-      setRefreshing(true);
-
-      const checkDb = async () => {
-        try {
-          const { error } = await supabase
-            .from("profiles")
-            .select("*", { count: "exact", head: true })
-            .limit(1);
-
-          if (error) throw error;
-          return true;
-        } catch {
-          return false;
-        }
-      };
-
-      const connectionOk = await checkDb();
-      if (!connectionOk) {
-        setRefreshing(false);
-        return;
-      }
-
-      const [
-        agentsResponse,
-        newsResponse,
-        galleryResponse,
-        categoriesResponse,
-      ] = await Promise.all([
-        supabase.from("profiles").select("id, status, role"),
-        supabase
-          .from("noticias")
-          .select("id, destaque, status, data_publicacao"),
-        supabase.from("galeria_itens").select("id, tipo, status"),
-        supabase.from("galeria_categorias").select("id, tipo, status"),
-      ]);
-
-      const agentsData = agentsResponse.data || [];
-      const newsData = newsResponse.data || [];
-      const galleryData = galleryResponse.data || [];
-      const categoriesData = categoriesResponse.data || [];
-
-      const totalAgents = agentsData.length;
-      const activeAgents = agentsData.filter((agent) => agent.status).length;
-      const totalAdmins = agentsData.filter(
-        (agent) => agent.role?.toLowerCase() === "admin"
-      ).length;
-
-      const totalNews = newsData.length;
-      const featuredNews = newsData.filter((news) => news.destaque).length;
-      const publishedNews = newsData.filter(
-        (news) => news.status === "publicado"
-      ).length;
-
-      const totalGalleryItems = galleryData.length;
-      const photoItems = galleryData.filter(
-        (item) => item.tipo === "foto"
-      ).length;
-      const videoItems = galleryData.filter(
-        (item) => item.tipo === "video"
-      ).length;
-
-      const totalCategories = categoriesData.length;
-      const photoCategories = categoriesData.filter(
-        (cat) => cat.tipo === "fotos"
-      ).length;
-      const videoCategories = categoriesData.filter(
-        (cat) => cat.tipo === "videos"
-      ).length;
-
-      setStats({
-        totalAgents,
-        totalNews,
-        totalGalleryItems,
-        activeAgents,
-        totalCategories,
-        featuredNews,
-        publishedNews,
-        photoItems,
-        videoItems,
-        photoCategories,
-        videoCategories,
-        totalAdmins,
-      });
-
-      setLastUpdate(new Date());
-    } catch (error) {
-      console.error("Erro ao atualizar manualmente:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [supabase]);
-
-  // CORREÇÃO: Chamar fetchData no useEffect
-  useEffect(() => {
-    if (mounted) {
-      fetchData();
-    }
-  }, [mounted, fetchData]);
 
   if (!mounted) {
     return (

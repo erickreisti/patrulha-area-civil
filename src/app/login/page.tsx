@@ -216,13 +216,10 @@ export default function LoginPage() {
 
       if (profileError) {
         updateSecurityLock();
-        showAlert("error", "Matrícula não encontrada no sistema");
-        return;
-      }
-
-      if (!profile.status) {
-        updateSecurityLock();
-        showAlert("error", "Sua conta está inativa. Contate o administrador.");
+        showAlert(
+          "error",
+          "Matrícula não consta no sistema. Este usuário não faz parte da PAC - Patrulha Aérea Civil"
+        );
         return;
       }
 
@@ -245,7 +242,12 @@ export default function LoginPage() {
       updateSecurityLock(false);
       saveRememberedMatricula(data.matricula, data.rememberMe);
 
-      showAlert("success", `Bem-vindo, ${profile.full_name || "Agente"}!`);
+      // Mensagem de boas-vindas adaptada para status inativo
+      const welcomeMessage = !profile.status
+        ? `Bem-vindo, ${profile.full_name || "Agente"}! (Conta inativa)`
+        : `Bem-vindo, ${profile.full_name || "Agente"}!`;
+
+      showAlert("success", welcomeMessage);
 
       setTimeout(() => {
         window.location.href = "/perfil";

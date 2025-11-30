@@ -17,19 +17,19 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import {
-  FaFacebook,
-  FaInstagram,
-  FaWhatsapp,
-  FaBars,
-  FaUser,
-  FaSignOutAlt,
-  FaCog,
-  FaChartBar,
-} from "react-icons/fa";
-import { FaXTwitter } from "react-icons/fa6";
+  RiFacebookFill,
+  RiInstagramLine,
+  RiWhatsappLine,
+  RiMenuLine,
+  RiUserLine,
+  RiLogoutBoxRLine,
+  RiBarChartLine,
+  RiTwitterXLine,
+} from "react-icons/ri";
 import { motion } from "framer-motion";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
+import { Spinner } from "@/components/ui/spinner";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -42,75 +42,41 @@ const NAVIGATION = [
 
 const SOCIAL_ICONS = [
   {
-    icon: FaFacebook,
+    icon: RiFacebookFill,
     href: "https://facebook.com/patrulhaaereacivil",
     label: "Facebook",
     hoverColor: "hover:bg-blue-600",
   },
   {
-    icon: FaXTwitter,
+    icon: RiTwitterXLine,
     href: "https://twitter.com/patrulhaaereacivil",
     label: "X (Twitter)",
     hoverColor: "hover:bg-slate-900",
   },
   {
-    icon: FaInstagram,
+    icon: RiInstagramLine,
     href: "https://instagram.com/patrulhaaereacivil",
     label: "Instagram",
     hoverColor: "hover:bg-pink-600",
   },
   {
-    icon: FaWhatsapp,
+    icon: RiWhatsappLine,
     href: "https://wa.me/5521999999999",
     label: "WhatsApp",
     hoverColor: "hover:bg-green-600",
   },
 ];
 
-// 🎯 COMPONENTE DE LOADING
-const LoadingSpinner = ({ size = "sm" }: { size?: "sm" | "md" | "lg" }) => {
-  const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-5 h-5",
-    lg: "w-6 h-6",
-  };
-
-  return (
-    <div className={`relative ${sizeClasses[size]}`}>
-      <motion.div
-        className="absolute inset-0 border-2 border-white/30 rounded-full"
-        animate={{ rotate: 360 }}
-        transition={{
-          duration: 1,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-      />
-      <motion.div
-        className="absolute inset-0 border-2 border-transparent border-t-white rounded-full"
-        animate={{ rotate: 360 }}
-        transition={{
-          duration: 1,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-      />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="w-1 h-1 bg-white/50 rounded-full" />
-      </div>
-    </div>
-  );
-};
-
-// 🎯 BOTÃO DE LOADING
+// 🎯 BOTÃO DE LOADING MELHORADO
 const LoadingButton = () => {
   return (
     <Button
-      className="bg-navy text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed"
+      className="bg-navy hover:bg-navy-700 text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md group/loading"
       disabled
     >
+      {/* ✅ Animação de reflexo mantida */}
       <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
         initial={{ x: "-100%" }}
         animate={{ x: "100%" }}
         transition={{
@@ -119,9 +85,11 @@ const LoadingButton = () => {
           ease: "easeInOut",
         }}
       />
+
+      {/* ✅ Spinner profissional do Lucide */}
       <div className="flex items-center justify-center gap-2 relative z-10">
-        <LoadingSpinner size="sm" />
-        <span className="text-white/90 hidden sm:inline">Carregando...</span>
+        <Spinner className="w-4 h-4 text-white" />
+        <span className="text-white font-medium">Carregando...</span>
       </div>
     </Button>
   );
@@ -290,7 +258,7 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
   </nav>
 );
 
-// 🎯 USER MENU COM DROPDOWN DO SHADCN
+// 🎯 USER MENU COM DROPDOWN DO SHADCN - CORRIGIDO
 const UserMenuButton = () => {
   const { user, profile, isAdmin, loading, clearAuth } = useAuthStore();
   const pathname = usePathname();
@@ -319,7 +287,8 @@ const UserMenuButton = () => {
         asChild
       >
         <Link href="/login">
-          <span className="relative z-10">Área do Agente</span>
+          {/* ✅ 1. CORRIGIDO: Texto sempre branco, mesmo no hover */}
+          <span className="relative z-10 text-white">Área do Agente</span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
         </Link>
       </Button>
@@ -333,7 +302,8 @@ const UserMenuButton = () => {
           variant="outline"
           className="bg-navy hover:bg-navy-700 text-white font-medium px-4 sm:px-6 py-2.5 text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
         >
-          <span className="relative z-10">Meu Perfil</span>
+          {/* ✅ 1. CORRIGIDO: Texto sempre branco, mesmo no hover */}
+          <span className="relative z-10 text-white">Identificação</span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
         </Button>
       </DropdownMenuTrigger>
@@ -341,13 +311,15 @@ const UserMenuButton = () => {
         {/* Header do Dropdown */}
         <DropdownMenuLabel className="p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
+            {/* ✅ 3. CORRIGIDO: Avatar com imagem mais nítida e centralizada */}
             <Avatar className="w-10 h-10 border-2 border-navy/20 flex-shrink-0">
               <AvatarImage
                 src={profile?.avatar_url || ""}
                 alt={`Avatar de ${profile?.full_name || "Agente"}`}
+                className="object-cover object-center" // ✅ Melhor centralização e nitidez
               />
               <AvatarFallback className="bg-navy text-white">
-                <FaUser className="w-5 h-5" />
+                <RiUserLine className="w-5 h-5" />
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -371,7 +343,7 @@ const UserMenuButton = () => {
           {!isOnProfilePage && (
             <DropdownMenuItem asChild>
               <Link href="/perfil" className="cursor-pointer">
-                <FaUser className="w-4 h-4 mr-2 text-blue-600" />
+                <RiUserLine className="w-4 h-4 mr-2 text-blue-600" />
                 <span>Ver Meu Perfil</span>
               </Link>
             </DropdownMenuItem>
@@ -381,22 +353,13 @@ const UserMenuButton = () => {
           {isAdmin && (
             <DropdownMenuItem asChild>
               <Link href="/admin/dashboard" className="cursor-pointer">
-                <FaChartBar className="w-4 h-4 mr-2 text-purple-600" />
+                <RiBarChartLine className="w-4 h-4 mr-2 text-purple-600" />
                 <span>Ir ao Dashboard</span>
               </Link>
             </DropdownMenuItem>
           )}
 
-          {/* Configurações */}
-          <DropdownMenuItem asChild>
-            <Link
-              href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
-              className="cursor-pointer"
-            >
-              <FaCog className="w-4 h-4 mr-2 text-blue-600" />
-              <span>Configurações</span>
-            </Link>
-          </DropdownMenuItem>
+          {/* ❌ CONFIGURAÇÕES REMOVIDA */}
         </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
@@ -407,7 +370,7 @@ const UserMenuButton = () => {
             onClick={handleSignOut}
             className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
           >
-            <FaSignOutAlt className="w-4 h-4 mr-2" />
+            <RiLogoutBoxRLine className="w-4 h-4 mr-2" />
             <span>Sair do Sistema</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -416,7 +379,6 @@ const UserMenuButton = () => {
   );
 };
 
-// Resto do código do Header permanece igual...
 const MobileMenu = ({
   isOpen,
   onClose,
@@ -472,9 +434,10 @@ const MobileMenu = ({
                     <AvatarImage
                       src={profile?.avatar_url || ""}
                       alt={`Avatar de ${profile?.full_name || "Agente"}`}
+                      className="object-cover object-center"
                     />
                     <AvatarFallback className="bg-navy text-white text-xs">
-                      <FaUser className="w-4 h-4" />
+                      <RiUserLine className="w-4 h-4" />
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
@@ -496,7 +459,7 @@ const MobileMenu = ({
                   className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-blue-50 text-blue-600 border-l-4 border-blue-600"
                   onClick={onClose}
                 >
-                  <FaUser className="w-4 h-4" />
+                  <RiUserLine className="w-4 h-4" />
                   Ver Meu Perfil
                 </Link>
               )}
@@ -512,15 +475,7 @@ const MobileMenu = ({
                 </Link>
               )}
 
-              {/* 🔵 AZUL - Configurações */}
-              <Link
-                href={isAdmin ? "/admin/configuracoes" : "/configuracoes"}
-                className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium bg-blue-50 text-blue-600 border-l-4 border-blue-600"
-                onClick={onClose}
-              >
-                <FaCog className="w-4 h-4" />
-                Configurações
-              </Link>
+              {/* ❌ CONFIGURAÇÕES REMOVIDA DO MOBILE */}
 
               {/* 🔴 VERMELHO - Logout */}
               <button
@@ -614,7 +569,7 @@ export function Header() {
                 className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110"
                 aria-label="Alternar menu"
               >
-                <FaBars className="h-5 w-5" />
+                <RiMenuLine className="h-5 w-5" />
               </Button>
             </div>
           </div>

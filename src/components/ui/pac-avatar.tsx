@@ -1,3 +1,4 @@
+// src/components/ui/pac-avatar.tsx - CORRIGIDO
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
@@ -36,6 +37,22 @@ export function PacAvatar({
     xl: 80,
   };
 
+  // CORREÇÃO: Definir sizes prop baseado no tamanho
+  const getSizes = (avatarSize: "sm" | "md" | "lg" | "xl") => {
+    switch (avatarSize) {
+      case "sm":
+        return "(max-width: 768px) 32px, 32px";
+      case "md":
+        return "(max-width: 768px) 48px, 48px";
+      case "lg":
+        return "(max-width: 768px) 64px, 64px";
+      case "xl":
+        return "(max-width: 768px) 80px, 80px";
+      default:
+        return "(max-width: 768px) 48px, 48px";
+    }
+  };
+
   const getIniciais = (nomeCompleto?: string) => {
     if (!nomeCompleto) return "PAC";
 
@@ -67,12 +84,13 @@ export function PacAvatar({
       {/* Fallback - mostra imagem padrão OU iniciais */}
       <AvatarFallback className="bg-gradient-to-br from-navy-600 to-navy-800 text-white font-semibold">
         {showFallbackImage ? (
-          // Imagem padrão como fallback
+          // Imagem padrão como fallback - CORREÇÃO: Adicionado sizes prop
           <Image
             src={DEFAULT_AVATAR}
             alt="Avatar padrão PAC"
             width={imageSizes[size]}
             height={imageSizes[size]}
+            sizes={getSizes(size)} // CORREÇÃO: Adicionado sizes prop
             className="rounded-full object-cover"
             onError={(e) => {
               // Se a imagem padrão falhar, mostra iniciais

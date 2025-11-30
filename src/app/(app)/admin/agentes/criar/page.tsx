@@ -1,3 +1,4 @@
+// src/app/(app)/admin/agentes/criar/page.tsx - COMPONENTE COMPLETO CORRIGIDO
 "use client";
 
 import { useState } from "react";
@@ -21,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -39,6 +40,7 @@ import {
   RiBarChartLine,
   RiHomeLine,
   RiArrowDownSLine,
+  RiEditLine,
 } from "react-icons/ri";
 
 // Opções baseadas no schema
@@ -75,17 +77,6 @@ interface FormData {
   avatar_url?: string;
 }
 
-const slideIn = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.6,
-    },
-  },
-};
-
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
   visible: {
@@ -117,9 +108,7 @@ export default function CriarAgentePage() {
     setFormData((prev) => ({ ...prev, matricula: randomNum.toString() }));
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -127,7 +116,6 @@ export default function CriarAgentePage() {
     }));
   };
 
-  // Função para atualizar avatar usando FileUpload
   const handleAvatarChange = (avatarUrl: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -135,7 +123,6 @@ export default function CriarAgentePage() {
     }));
   };
 
-  // Função para atualizar a data
   const handleDateSelect = (date: Date | undefined) => {
     setFormData((prev) => ({
       ...prev,
@@ -144,7 +131,6 @@ export default function CriarAgentePage() {
     setDateOpen(false);
   };
 
-  // Formatar data para exibição
   const formatDate = (dateString: string) => {
     if (!dateString) return "Selecionar data";
     const date = new Date(dateString);
@@ -190,13 +176,13 @@ export default function CriarAgentePage() {
         return;
       }
 
-      console.log("🔄 Iniciando criação do agente...", formData);
+      console.log("🔄 Enviando dados para API...", formData);
 
       // ✅ Toast de loading
       const toastId = toast.loading("Cadastrando agente...");
 
-      // Chamar a API route para criar o agente
-      const response = await fetch("/api/admin/agents", {
+      // CORREÇÃO: Usar API route em vez de admin client direto
+      const response = await fetch("/api/admin/agentes/criar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -215,8 +201,8 @@ export default function CriarAgentePage() {
       // ✅ Toast de sucesso
       toast.success("Agente criado com sucesso!", {
         id: toastId,
-        description: `O agente ${formData.full_name} foi cadastrado no sistema.`,
-        duration: 5000,
+        description: `O agente ${formData.full_name} foi cadastrado no sistema. Senha inicial: pac12345`,
+        duration: 8000,
       });
 
       // Limpar formulário
@@ -239,7 +225,9 @@ export default function CriarAgentePage() {
     } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
       const errorMessage =
-        err instanceof Error ? err.message : "Erro desconhecido";
+        err instanceof Error
+          ? err.message
+          : "Erro desconhecido ao criar agente";
 
       // ✅ Toast de erro
       toast.error("Erro ao criar agente", {
@@ -251,11 +239,12 @@ export default function CriarAgentePage() {
     }
   };
 
+  // Botões de navegação
   const navigationButtons = [
     {
       href: "/admin/agentes",
       icon: RiArrowLeftLine,
-      label: "Voltar",
+      label: "Voltar para Lista",
       className:
         "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
     },
@@ -267,6 +256,13 @@ export default function CriarAgentePage() {
         "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
     },
     {
+      href: "/perfil",
+      icon: RiEditLine,
+      label: "Meu Perfil",
+      className:
+        "border-green-600 text-green-600 hover:bg-green-600 hover:text-white",
+    },
+    {
       href: "/",
       icon: RiHomeLine,
       label: "Voltar ao Site",
@@ -275,35 +271,18 @@ export default function CriarAgentePage() {
     },
   ];
 
-  // Loading skeleton para quando estiver carregando
+  // Loading skeleton
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
-            <Skeleton className="h-10 w-64 mb-2" />
-            <Skeleton className="h-4 w-96" />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <Card className="border-0 shadow-lg">
-                <CardHeader>
-                  <Skeleton className="h-6 w-48" />
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <Skeleton className="h-32 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-10 w-full" />
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="space-y-6">
-              <Skeleton className="h-48 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
+          <div className="text-center py-16">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto mb-4"
+            />
+            <p className="text-gray-600">Criando novo agente...</p>
           </div>
         </div>
       </div>
@@ -315,12 +294,13 @@ export default function CriarAgentePage() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-8"
         >
-          <div>
+          {/* Título e Descrição */}
+          <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
               CADASTRAR NOVO AGENTE
             </h1>
@@ -329,7 +309,8 @@ export default function CriarAgentePage() {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+          {/* Botões de Navegação */}
+          <div className="flex flex-col sm:flex-row gap-3">
             {navigationButtons.map((button, index) => (
               <motion.div
                 key={button.href}
@@ -371,7 +352,7 @@ export default function CriarAgentePage() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Upload de Avatar usando FileUpload */}
+                    {/* Upload de Avatar */}
                     <motion.div variants={fadeInUp} className="space-y-4">
                       <Label className="text-sm font-semibold text-gray-700">
                         Foto do Agente
@@ -381,7 +362,7 @@ export default function CriarAgentePage() {
                         onFileChange={handleAvatarChange}
                         currentFile={formData.avatar_url}
                         className="p-4 border border-gray-200 rounded-lg bg-white hover:border-blue-500 transition-colors duration-300"
-                        userId={formData.matricula}
+                        userId={formData.matricula || "new"}
                       />
                     </motion.div>
 
@@ -405,7 +386,7 @@ export default function CriarAgentePage() {
                             type="text"
                             name="matricula"
                             value={formData.matricula}
-                            onChange={handleChange}
+                            onChange={handleInputChange}
                             placeholder="00000000000"
                             maxLength={11}
                             required
@@ -453,7 +434,7 @@ export default function CriarAgentePage() {
                           type="text"
                           name="full_name"
                           value={formData.full_name}
-                          onChange={handleChange}
+                          onChange={handleInputChange}
                           placeholder="Nome completo do agente"
                           required
                           className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
@@ -481,7 +462,7 @@ export default function CriarAgentePage() {
                           type="email"
                           name="email"
                           value={formData.email}
-                          onChange={handleChange}
+                          onChange={handleInputChange}
                           placeholder="agente@pac.org.br"
                           required
                           className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
@@ -650,12 +631,7 @@ export default function CriarAgentePage() {
                         >
                           {loading ? (
                             <>
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity }}
-                              >
-                                <RiSaveLine className="w-4 h-4 mr-2" />
-                              </motion.div>
+                              <Spinner className="w-4 h-4 mr-2" />
                               Cadastrando...
                             </>
                           ) : (

@@ -1,3 +1,4 @@
+// src/app/admin/agentes/[id]/editar/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -23,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner"; // CORREÇÃO: Usando o Spinner existente
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -41,6 +43,8 @@ import {
   RiArrowDownSLine,
   RiEyeLine,
   RiEyeOffLine,
+  RiHomeLine,
+  RiEditLine,
 } from "react-icons/ri";
 
 // Constantes
@@ -90,18 +94,8 @@ interface FormData {
   validade_certificacao: string;
   role: "admin" | "agent";
   status: boolean;
+  avatar_url: string;
 }
-
-const slideIn = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.6,
-    },
-  },
-};
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -114,39 +108,23 @@ const fadeInUp = {
   },
 };
 
-export default function EditarAgentePage() {
-  const params = useParams();
-  const router = useRouter();
-  const agentId = params.id as string;
-
-  // Estados
-  const [agent, setAgent] = useState<AgentProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [dateOpen, setDateOpen] = useState(false);
+// Hook para verificar permissões
+const usePermissions = () => {
   const [currentUserRole, setCurrentUserRole] = useState<"admin" | "agent">(
     "agent"
   );
-
-  const [formData, setFormData] = useState<FormData>({
-    full_name: "",
-    email: "",
-    graduacao: "",
-    tipo_sanguineo: "",
-    validade_certificacao: "",
-    role: "agent",
-    status: true,
-  });
-
-  const supabase = createClient();
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   const checkCurrentUser = useCallback(async () => {
     try {
+      const supabase = createClient();
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (session) {
+      if (session?.user) {
+        setCurrentUserId(session.user.id);
         const { data: profile } = await supabase
           .from("profiles")
           .select("role")
@@ -158,13 +136,61 @@ export default function EditarAgentePage() {
         }
       }
     } catch (error) {
-      console.error("Erro ao verificar usuário:", error);
+      console.error("Erro ao verificar permissões:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [supabase]);
+  }, []);
 
+  useEffect(() => {
+    checkCurrentUser();
+  }, [checkCurrentUser]);
+
+  return { currentUserRole, currentUserId, loading, checkCurrentUser };
+};
+
+export default function EditarAgentePage() {
+  const params = useParams();
+  const router = useRouter();
+  const agentId = params.id as string;
+
+  // Estados
+  const [agent, setAgent] = useState<AgentProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dateOpen, setDateOpen] = useState(false);
+
+  const { currentUserRole, loading: permissionsLoading } = usePermissions();
+
+  const [formData, setFormData] = useState<FormData>({
+    full_name: "",
+    email: "",
+    graduacao: "",
+    tipo_sanguineo: "",
+    validade_certificacao: "",
+    role: "agent",
+    status: true,
+    avatar_url: "",
+  });
+
+  const supabase = createClient();
+
+  // Função para buscar agente
   const fetchAgent = useCallback(async () => {
     try {
       setLoading(true);
+
+      // Verificar autenticação primeiro
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Você precisa estar logado para acessar esta página");
+        router.push("/login");
+        return;
+      }
+
+      console.log("🔄 Buscando agente ID:", agentId);
 
       const { data, error } = await supabase
         .from("profiles")
@@ -172,49 +198,116 @@ export default function EditarAgentePage() {
         .eq("id", agentId)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao buscar agente:", error);
 
-      setAgent(data);
-      setFormData({
-        full_name: data.full_name || "",
-        email: data.email || "",
-        graduacao: data.graduacao || "",
-        tipo_sanguineo: data.tipo_sanguineo || "",
-        validade_certificacao: data.validade_certificacao || "",
-        role: data.role,
-        status: data.status,
-      });
+        // Tratamento específico para erro de RLS
+        if (error.code === "42501") {
+          toast.error("Sem permissão para visualizar este agente");
+          router.push("/admin/agentes");
+          return;
+        }
+
+        // Agente não encontrado
+        if (error.code === "PGRST116") {
+          toast.error("Agente não encontrado");
+          router.push("/admin/agentes");
+          return;
+        }
+
+        throw error;
+      }
+
+      if (data) {
+        console.log("✅ Agente encontrado:", data);
+        setAgent(data);
+        setFormData({
+          full_name: data.full_name || "",
+          email: data.email || "",
+          graduacao: data.graduacao || "",
+          tipo_sanguineo: data.tipo_sanguineo || "",
+          validade_certificacao: data.validade_certificacao || "",
+          role: data.role,
+          status: data.status,
+          avatar_url: data.avatar_url || "",
+        });
+      } else {
+        toast.error("Agente não encontrado");
+        router.push("/admin/agentes");
+      }
     } catch (error: unknown) {
-      console.error("❌ Erro ao buscar agente:", error);
+      console.error("💥 Erro ao buscar agente:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Erro desconhecido";
       toast.error(`Erro ao carregar agente: ${errorMessage}`);
+      router.push("/admin/agentes");
     } finally {
       setLoading(false);
     }
-  }, [agentId, supabase]);
+  }, [agentId, supabase, router]);
 
   // Efeitos
   useEffect(() => {
-    checkCurrentUser();
-    if (agentId) {
+    if (agentId && !permissionsLoading) {
+      // Verificar se usuário tem permissão antes de buscar
+      if (currentUserRole !== "admin") {
+        toast.error("Apenas administradores podem editar agentes");
+        router.push("/perfil");
+        return;
+      }
       fetchAgent();
     }
-  }, [agentId, checkCurrentUser, fetchAgent]);
+  }, [agentId, fetchAgent, currentUserRole, permissionsLoading, router]);
 
-  // Função para atualizar avatar usando FileUpload
-  const handleAvatarChange = (avatarUrl: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      avatar_url: avatarUrl,
-    }));
+  // Função para atualizar avatar
+  const handleAvatarChange = async (avatarUrl: string) => {
+    try {
+      console.log("🔄 Atualizando avatar para:", avatarUrl);
+
+      // Atualiza estado local
+      setFormData((prev) => ({
+        ...prev,
+        avatar_url: avatarUrl,
+      }));
+
+      // Salva no banco
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", agentId);
+
+      if (error) {
+        console.error("❌ Erro ao atualizar avatar:", error);
+
+        if (error.code === "42501") {
+          toast.error("Sem permissão para atualizar avatar");
+          return;
+        }
+
+        throw error;
+      }
+
+      console.log("✅ Avatar atualizado com sucesso");
+      toast.success("Foto atualizada com sucesso!");
+    } catch (error: unknown) {
+      console.error("💥 Erro ao atualizar avatar:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      toast.error("Erro ao atualizar foto", {
+        description: errorMessage,
+      });
+    }
   };
 
   // Função para atualizar a data
   const handleDateSelect = (date: Date | undefined) => {
+    const dateString = date ? date.toISOString().split("T")[0] : "";
     setFormData((prev) => ({
       ...prev,
-      validade_certificacao: date ? date.toISOString().split("T")[0] : "",
+      validade_certificacao: dateString,
     }));
     setDateOpen(false);
   };
@@ -226,21 +319,101 @@ export default function EditarAgentePage() {
     return date.toLocaleDateString("pt-BR");
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
+    const newValue =
+      type === "checkbox" ? (e.target as HTMLInputElement).checked : value;
+
     setFormData((prev) => ({
       ...prev,
-      [name]:
-        type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      [name]: newValue,
     }));
   };
 
-  const handleSwitchChange = (name: string, checked: boolean) => {
+  // Função para mudanças no Switch
+  const handleSwitchChange = async (name: keyof FormData, checked: boolean) => {
+    const previousStatus = formData.status;
+
+    // Atualiza estado local
     setFormData((prev) => ({
       ...prev,
       [name]: checked,
+    }));
+
+    // Salva automaticamente no banco quando o status muda
+    if (name === "status") {
+      try {
+        console.log("🔄 Atualizando status para:", checked);
+
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            status: checked,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", agentId);
+
+        if (error) {
+          console.error("❌ Erro ao atualizar status:", error);
+
+          if (error.code === "42501") {
+            toast.error("Sem permissão para atualizar status");
+            // Reverte estado
+            setFormData((prev) => ({
+              ...prev,
+              [name]: previousStatus,
+            }));
+            return;
+          }
+
+          throw error;
+        }
+
+        // Recarrega os dados para garantir sincronização
+        await fetchAgent();
+        toast.success(
+          checked
+            ? "✅ Agente marcado como ATIVO na PAC"
+            : "⚠️ Agente marcado como INATIVO na PAC"
+        );
+      } catch (error: unknown) {
+        console.error("💥 Erro ao atualizar status:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro desconhecido";
+        toast.error("Erro ao atualizar status", {
+          description: errorMessage,
+        });
+
+        // Reverte o estado em caso de erro
+        setFormData((prev) => ({
+          ...prev,
+          [name]: previousStatus,
+        }));
+      }
+    }
+  };
+
+  // Função para mudanças no Select de Role
+  const handleRoleChange = (value: "agent" | "admin") => {
+    setFormData((prev) => ({
+      ...prev,
+      role: value,
+    }));
+  };
+
+  // Função para mudanças no Select de Graduação
+  const handleGraduacaoChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      graduacao: value,
+    }));
+  };
+
+  // Função para mudanças no Select de Tipo Sanguíneo
+  const handleTipoSanguineoChange = (value: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      tipo_sanguineo: value,
     }));
   };
 
@@ -258,9 +431,38 @@ export default function EditarAgentePage() {
     return errors;
   };
 
-  // Submit Principal
+  // CORREÇÃO: Função de submit otimizada para evitar erro PGRST116
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const checkAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      console.log("🔐 Session:", session);
+      console.log("👤 User:", session?.user);
+      console.log("🔑 JWT:", session?.access_token);
+
+      if (!session) {
+        toast.error("Usuário não autenticado!");
+        return false;
+      }
+      return true;
+    };
+
+    // No handleSubmit, adicionar:
+    const isAuthenticated = await checkAuth();
+    if (!isAuthenticated) {
+      setSaving(false);
+      return;
+    }
+
+    // Verificar permissão novamente
+    if (currentUserRole !== "admin") {
+      toast.error("Apenas administradores podem editar agentes");
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -273,23 +475,46 @@ export default function EditarAgentePage() {
 
       const toastId = toast.loading("Atualizando agente...");
 
+      const updateData = {
+        full_name: formData.full_name.trim(),
+        email: formData.email.trim(),
+        graduacao: formData.graduacao || null,
+        tipo_sanguineo: formData.tipo_sanguineo || null,
+        validade_certificacao: formData.validade_certificacao || null,
+        role: formData.role,
+        status: formData.status,
+        avatar_url: formData.avatar_url || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("🔄 Enviando dados para atualização:", updateData);
+
+      // CORREÇÃO: Usando update sem .select() para evitar erro PGRST116
       const { error } = await supabase
         .from("profiles")
-        .update({
-          full_name: formData.full_name.trim(),
-          email: formData.email.trim(),
-          graduacao: formData.graduacao || null,
-          tipo_sanguineo: formData.tipo_sanguineo || null,
-          validade_certificacao: formData.validade_certificacao || null,
-          role: formData.role,
-          status: formData.status,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq("id", agentId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao atualizar agente:", error);
 
-      toast.success("Agente atualizado com sucesso!", {
+        if (error.code === "42501") {
+          toast.error("Sem permissão para atualizar este agente");
+          return;
+        }
+
+        if (error.code === "23505") {
+          toast.error("Erro: Email ou matrícula já existe");
+          return;
+        }
+
+        throw error;
+      }
+
+      // CORREÇÃO: Buscar dados atualizados separadamente
+      await fetchAgent();
+
+      toast.success("✅ Agente atualizado com sucesso!", {
         id: toastId,
         description: `As alterações em ${formData.full_name} foram salvas.`,
         duration: 5000,
@@ -299,10 +524,10 @@ export default function EditarAgentePage() {
         router.push("/admin/agentes");
       }, 1500);
     } catch (err: unknown) {
-      console.error("❌ Erro ao atualizar agente:", err);
+      console.error("💥 Erro ao atualizar agente:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("Erro ao atualizar agente", {
+      toast.error("❌ Erro ao atualizar agente", {
         description: errorMessage,
         duration: 6000,
       });
@@ -311,30 +536,52 @@ export default function EditarAgentePage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleHardDelete = async () => {
     if (!agent) return;
 
+    // Verificar permissão
+    if (currentUserRole !== "admin") {
+      toast.error("Apenas administradores podem excluir agentes");
+      return;
+    }
+
     if (
-      !confirm(`Tem certeza que deseja desativar o agente ${agent.full_name}?`)
+      !confirm(
+        `⚠️ ATENÇÃO: Esta ação é PERMANENTE e IRREVERSÍVEL!\n\nTem certeza que deseja EXCLUIR permanentemente o agente ${agent.full_name}?`
+      )
     ) {
       return;
     }
 
     try {
+      const toastId = toast.loading("Excluindo agente permanentemente...");
+
       const { error } = await supabase
         .from("profiles")
-        .update({ status: false })
+        .delete()
         .eq("id", agentId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao excluir:", error);
 
-      toast.success("Agente desativado com sucesso!");
-      router.push("/admin/agentes");
+        if (error.code === "42501") {
+          toast.error("Sem permissão para excluir agente");
+          return;
+        }
+
+        throw error;
+      }
+
+      toast.success("🗑️ Agente excluído permanentemente!", { id: toastId });
+
+      setTimeout(() => {
+        router.push("/admin/agentes");
+      }, 1000);
     } catch (err: unknown) {
-      console.error("❌ Erro ao desativar agente:", err);
+      console.error("💥 Erro ao excluir agente:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("Erro ao desativar agente", {
+      toast.error("❌ Erro ao excluir agente", {
         description: errorMessage,
       });
     }
@@ -364,6 +611,7 @@ export default function EditarAgentePage() {
     return { status: "valida", color: "bg-green-500", text: "Válida" };
   };
 
+  // Botões de navegação
   const navigationButtons = [
     {
       href: "/admin/agentes",
@@ -379,10 +627,24 @@ export default function EditarAgentePage() {
       className:
         "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
     },
+    {
+      href: "/perfil",
+      icon: RiEditLine,
+      label: "Meu Perfil",
+      className:
+        "border-green-600 text-green-600 hover:bg-green-600 hover:text-white",
+    },
+    {
+      href: "/",
+      icon: RiHomeLine,
+      label: "Voltar ao Site",
+      className:
+        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
+    },
   ];
 
   // Estados de Loading
-  if (loading) {
+  if (loading || permissionsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4">
@@ -435,21 +697,24 @@ export default function EditarAgentePage() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-8"
         >
-          <div>
+          {/* Título e Descrição */}
+          <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
               EDITAR AGENTE
             </h1>
             <p className="text-gray-600">
-              Editando: <strong>{agent.full_name || "Agente"}</strong>
+              Editando: <strong>{agent.full_name || "Agente"}</strong> •
+              Matrícula: <strong>{agent.matricula}</strong>
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
+          {/* Botões de Navegação */}
+          <div className="flex flex-col sm:flex-row gap-3">
             {navigationButtons.map((button, index) => (
               <motion.div
                 key={button.href}
@@ -495,11 +760,6 @@ export default function EditarAgentePage() {
                     <motion.div variants={fadeInUp} className="space-y-4">
                       <Label className="text-sm font-semibold text-gray-700">
                         Foto do Agente
-                        {currentUserRole !== "admin" && (
-                          <Badge className="ml-2 bg-yellow-500 text-white text-xs">
-                            Somente Admin
-                          </Badge>
-                        )}
                       </Label>
                       <FileUpload
                         type="avatar"
@@ -547,7 +807,7 @@ export default function EditarAgentePage() {
                           type="text"
                           name="full_name"
                           value={formData.full_name}
-                          onChange={handleChange}
+                          onChange={handleInputChange}
                           placeholder="Nome completo do agente"
                           className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                           required
@@ -574,7 +834,7 @@ export default function EditarAgentePage() {
                           type="email"
                           name="email"
                           value={formData.email}
-                          onChange={handleChange}
+                          onChange={handleInputChange}
                           placeholder="email@exemplo.com"
                           className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                           required
@@ -599,12 +859,7 @@ export default function EditarAgentePage() {
                         </Label>
                         <Select
                           value={formData.graduacao}
-                          onValueChange={(value) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              graduacao: value,
-                            }))
-                          }
+                          onValueChange={handleGraduacaoChange}
                           disabled={saving}
                         >
                           <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
@@ -634,12 +889,7 @@ export default function EditarAgentePage() {
                         </Label>
                         <Select
                           value={formData.tipo_sanguineo}
-                          onValueChange={(value) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              tipo_sanguineo: value,
-                            }))
-                          }
+                          onValueChange={handleTipoSanguineoChange}
                           disabled={saving}
                         >
                           <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
@@ -709,9 +959,7 @@ export default function EditarAgentePage() {
                         </Label>
                         <Select
                           value={formData.role}
-                          onValueChange={(value: "agent" | "admin") =>
-                            setFormData((prev) => ({ ...prev, role: value }))
-                          }
+                          onValueChange={handleRoleChange}
                           disabled={saving}
                         >
                           <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
@@ -743,12 +991,8 @@ export default function EditarAgentePage() {
                         >
                           {saving ? (
                             <>
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity }}
-                              >
-                                <RiSaveLine className="w-4 h-4 mr-2" />
-                              </motion.div>
+                              <Spinner className="w-4 h-4 mr-2" />{" "}
+                              {/* CORREÇÃO: Usando Spinner */}
                               Salvando...
                             </>
                           ) : (
@@ -757,22 +1001,6 @@ export default function EditarAgentePage() {
                               Salvar Alterações
                             </>
                           )}
-                        </Button>
-                      </motion.div>
-
-                      <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="flex-1"
-                      >
-                        <Button
-                          type="button"
-                          onClick={handleDelete}
-                          variant="outline"
-                          className="w-full text-red-600 border-red-600 hover:bg-red-600 hover:text-white py-3 transition-colors duration-300"
-                        >
-                          <RiDeleteBinLine className="w-4 h-4 mr-2" />
-                          Desativar
                         </Button>
                       </motion.div>
 
@@ -793,6 +1021,35 @@ export default function EditarAgentePage() {
                         </Link>
                       </motion.div>
                     </motion.div>
+
+                    {/* Botão de Exclusão Permanente (Somente Admin) */}
+                    {currentUserRole === "admin" && (
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.9 }}
+                        className="pt-4 border-t border-red-200"
+                      >
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                          <Label className="text-sm font-semibold text-red-700 block mb-2">
+                            ⚠️ Zona de Perigo
+                          </Label>
+                          <Button
+                            type="button"
+                            onClick={handleHardDelete}
+                            variant="outline"
+                            className="w-full border-red-700 text-red-700 hover:bg-red-700 hover:text-white py-2 transition-colors duration-300"
+                            size="sm"
+                          >
+                            <RiDeleteBinLine className="w-4 h-4 mr-2" />
+                            Excluir Permanentemente
+                          </Button>
+                          <p className="text-xs text-red-600 mt-2">
+                            Esta ação não pode ser desfeita. O agente será
+                            removido permanentemente do sistema.
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
                   </form>
                 </CardContent>
               </Card>
@@ -821,7 +1078,7 @@ export default function EditarAgentePage() {
                       htmlFor="status"
                       className="text-sm font-semibold text-gray-700 cursor-pointer"
                     >
-                      Agente Ativo
+                      Agente Ativo na PAC
                     </Label>
                     <Switch
                       id="status"
@@ -829,14 +1086,20 @@ export default function EditarAgentePage() {
                       onCheckedChange={(checked) =>
                         handleSwitchChange("status", checked)
                       }
+                      disabled={saving}
                     />
                   </div>
                   {!formData.status && (
-                    <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-xs text-red-600 flex items-center">
-                        <RiAlertLine className="w-3 h-3 mr-1" />
-                        ⚠️ Agente não poderá fazer login
-                      </p>
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex flex-col space-y-2">
+                        <p className="text-sm text-yellow-700 flex items-center">
+                          <RiAlertLine className="w-4 h-4 mr-2 flex-shrink-0" />
+                          ⚠️ Agente marcado como INATIVO na PAC
+                        </p>
+                        <p className="text-xs text-yellow-600 ml-6">
+                          O agente ainda poderá acessar o sistema normalmente
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -856,12 +1119,12 @@ export default function EditarAgentePage() {
                             value={role}
                             checked={formData.role === role}
                             onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                role: e.target.value as "agent" | "admin",
-                              }))
+                              handleRoleChange(
+                                e.target.value as "agent" | "admin"
+                              )
                             }
                             className="text-blue-600 focus:ring-blue-600"
+                            disabled={saving}
                           />
                           <span className="text-sm capitalize">
                             {role === "agent" ? "Agente" : "Administrador"}
@@ -963,12 +1226,12 @@ export default function EditarAgentePage() {
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span>Status:</span>
+                      <span>Status na PAC:</span>
                       <Badge
                         className={
                           formData.status
                             ? "bg-green-500 text-white"
-                            : "bg-red-500 text-white"
+                            : "bg-yellow-500 text-white"
                         }
                       >
                         {formData.status ? (
