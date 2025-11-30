@@ -63,6 +63,7 @@ interface CacheData {
 }
 
 // Componente Dialog personalizado para agente inativo
+// Componente Dialog personalizado para agente inativo - VERSÃO MOBILE OTIMIZADA
 const InactiveAgentDialog = ({
   isOpen,
   onClose,
@@ -71,43 +72,44 @@ const InactiveAgentDialog = ({
   onClose: () => void;
 }) => (
   <Dialog open={isOpen} onOpenChange={() => {}}>
-    <DialogContent className="sm:max-w-md bg-white border-2 border-alert/20 shadow-2xl rounded-xl">
-      <div className="absolute right-4 top-4 opacity-0 pointer-events-none">
+    <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-alert/20 shadow-2xl rounded-xl fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-y-auto">
+      {/* Remove o botão X padrão */}
+      <div className="absolute right-3 top-3 opacity-0 pointer-events-none">
         <div className="w-4 h-4" />
       </div>
 
-      <DialogHeader>
-        <div className="flex items-center justify-center mb-4">
-          <div className="bg-alert/10 p-3 rounded-full">
-            <RiAlertLine className="w-8 h-8 text-alert" />
+      <DialogHeader className="px-4 pt-4 pb-2">
+        <div className="flex items-center justify-center mb-3">
+          <div className="bg-alert/10 p-2.5 rounded-full">
+            <RiAlertLine className="w-6 h-6 text-alert" />
           </div>
         </div>
-        <DialogTitle className="text-center text-xl font-bold text-alert font-bebas">
+        <DialogTitle className="text-center text-lg font-bold text-alert font-bebas leading-tight">
           AGENTE NÃO VINCULADO À PAC
         </DialogTitle>
-        <DialogDescription className="text-center text-slate-700 mt-2 font-roboto">
+        <DialogDescription className="text-center text-slate-700 mt-1 text-sm font-roboto">
           Situação de credencial irregular detectada
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-4 py-4">
-        <div className="bg-alert/5 border border-alert/20 rounded-lg p-4">
-          <p className="text-sm text-slate-800 font-medium text-center font-roboto">
+      <div className="space-y-3 px-4 py-2">
+        <div className="bg-alert/5 border border-alert/20 rounded-lg p-3">
+          <p className="text-xs text-slate-800 font-medium text-center font-roboto leading-relaxed">
             <strong className="text-alert">ATENÇÃO:</strong> Você não está mais
-            vinculado à<strong> Patrulha Aérea Civil</strong>.
+            vinculado à <strong>Patrulha Aérea Civil</strong>.
           </p>
         </div>
 
-        <div className="space-y-3">
-          <p className="text-sm text-slate-700 font-roboto text-center">
+        <div className="space-y-2">
+          <p className="text-xs text-slate-700 font-roboto text-center leading-relaxed">
             <strong className="text-alert">
               DEVOLUÇÃO IMEDIATA OBRIGATÓRIA:
-            </strong>
+            </strong>{" "}
             Você deve entregar imediatamente sua credencial aos responsáveis.
           </p>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-            <p className="text-xs text-slate-600 text-center font-roboto">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
+            <p className="text-[11px] text-slate-600 text-center font-roboto leading-relaxed">
               <strong className="text-alert">PUNIÇÕES LEGAIS:</strong> A
               retenção indevida da credencial sujeita o portador a medidas
               disciplinares e penais conforme o regulamento interno da PAC.
@@ -115,31 +117,31 @@ const InactiveAgentDialog = ({
           </div>
         </div>
 
-        <div className="space-y-3 pt-2">
-          <p className="text-sm font-semibold text-slate-800 text-center font-roboto">
+        <div className="space-y-2 pt-1">
+          <p className="text-xs font-semibold text-slate-800 text-center font-roboto">
             CONTATOS OFICIAIS PARA REGULARIZAÇÃO:
           </p>
 
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-center gap-3 bg-green-50 border border-green-200 rounded-lg p-3">
-              <RiWhatsappLine className="w-5 h-5 text-green-600" />
-              <div className="text-center">
-                <p className="text-sm font-semibold text-slate-800 font-roboto">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg p-2">
+              <RiWhatsappLine className="w-4 h-4 text-green-600 flex-shrink-0" />
+              <div className="text-left min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-800 font-roboto truncate">
                   WhatsApp Oficial
                 </p>
-                <p className="text-xs text-slate-600 font-mono">
+                <p className="text-[11px] text-slate-600 font-mono">
                   (21) 99999-9999
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-3 bg-navy/10 border border-navy/20 rounded-lg p-3">
-              <RiMailLine className="w-5 h-5 text-navy" />
-              <div className="text-center">
-                <p className="text-sm font-semibold text-slate-800 font-roboto">
+            <div className="flex items-center gap-2 bg-navy/10 border border-navy/20 rounded-lg p-2">
+              <RiMailLine className="w-4 h-4 text-navy flex-shrink-0" />
+              <div className="text-left min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-800 font-roboto truncate">
                   E-mail Oficial
                 </p>
-                <p className="text-xs text-slate-600 font-mono">
+                <p className="text-[11px] text-slate-600 font-mono break-all">
                   comando@pac-rj.gov.br
                 </p>
               </div>
@@ -148,18 +150,18 @@ const InactiveAgentDialog = ({
         </div>
       </div>
 
-      <div className="flex justify-center pt-2">
+      <div className="flex justify-center pt-3 px-4 pb-4">
         <Button
           onClick={onClose}
-          className="bg-alert hover:bg-alert/90 text-white font-semibold py-3 px-8 text-lg transition-all duration-300 hover:scale-105 font-roboto"
+          className="bg-alert hover:bg-alert/90 text-white font-semibold py-2.5 px-6 text-sm transition-all duration-300 hover:scale-105 font-roboto w-full max-w-[280px]"
           size="lg"
         >
           ENTENDI - CLIQUE PARA CONTINUAR
         </Button>
       </div>
 
-      <div className="text-center pt-2">
-        <p className="text-xs text-slate-500 font-roboto">
+      <div className="text-center px-4 pb-3">
+        <p className="text-[10px] text-slate-500 font-roboto">
           Esta mensagem permanecerá até a confirmação do entendimento
         </p>
       </div>
