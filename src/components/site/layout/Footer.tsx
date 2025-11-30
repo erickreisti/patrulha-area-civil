@@ -4,36 +4,36 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
-  FaFacebook,
-  FaInstagram,
-  FaWhatsapp,
-  FaEnvelope,
-  FaPhone,
-  FaMapMarkerAlt,
-  FaExclamationTriangle,
-} from "react-icons/fa";
-import { FaXTwitter } from "react-icons/fa6";
+  RiFacebookFill,
+  RiInstagramLine,
+  RiWhatsappLine,
+  RiMailLine,
+  RiPhoneLine,
+  RiMapPinLine,
+  RiAlertLine,
+  RiTwitterXLine,
+} from "react-icons/ri";
 import { motion } from "framer-motion";
 import { IconType } from "react-icons";
 
 const SOCIAL_LINKS = [
   {
-    icon: FaFacebook,
+    icon: RiFacebookFill,
     url: "https://facebook.com/patrulhaaereacivil",
     color: "hover:bg-blue-600",
   },
   {
-    icon: FaInstagram,
+    icon: RiInstagramLine,
     url: "https://instagram.com/patrulhaaereacivil",
     color: "hover:bg-pink-600",
   },
   {
-    icon: FaXTwitter,
+    icon: RiTwitterXLine,
     url: "https://twitter.com/patrulhaaereacivil",
     color: "hover:bg-black",
   },
   {
-    icon: FaWhatsapp,
+    icon: RiWhatsappLine,
     url: "https://wa.me/5521999999999",
     color: "hover:bg-green-600",
   },
@@ -63,9 +63,12 @@ const BrandSection = () => {
       transition={{ duration: 0.6 }}
       viewport={{ once: true }}
     >
-      <Link href="/" className="flex items-center space-x-4 mb-6 group">
+      <Link
+        href="/"
+        className="flex items-center space-x-3 xs:space-x-4 mb-4 xs:mb-5 sm:mb-6 group"
+      >
         <motion.div
-          className="relative w-16 h-16"
+          className="relative w-12 h-12 xs:w-14 xs:h-14 sm:w-16 sm:h-16"
           whileHover={{ scale: 1.05 }}
           transition={{ duration: 0.3 }}
         >
@@ -78,16 +81,16 @@ const BrandSection = () => {
           />
         </motion.div>
         <div>
-          <h2 className="text-2xl font-bold text-slate-800 font-bebas tracking-wide">
+          <h2 className="text-xl xs:text-2xl font-bold text-slate-800 font-bebas tracking-wide">
             Patrulha Aérea Civil
           </h2>
-          <p className="text-navy font-roboto font-medium text-base">
+          <p className="text-navy font-roboto font-medium text-sm xs:text-base">
             COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
           </p>
         </div>
       </Link>
       <motion.p
-        className="text-slate-700 max-w-md font-roboto leading-relaxed text-base"
+        className="text-slate-700 max-w-md font-roboto leading-relaxed text-sm xs:text-base"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.2 }}
@@ -104,7 +107,7 @@ const BrandSection = () => {
 
 const SocialLinks = () => (
   <motion.div
-    className="mt-8 flex space-x-4"
+    className="mt-6 xs:mt-8 flex space-x-3 xs:space-x-4"
     initial={{ opacity: 0, y: 20 }}
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.6, delay: 0.4 }}
@@ -116,8 +119,8 @@ const SocialLinks = () => (
         href={social.url}
         target="_blank"
         rel="noopener noreferrer"
-        className={`text-slate-700 transition-all duration-300 hover:scale-110 bg-slate-100 rounded-full p-3 border border-slate-200 ${social.color} hover:text-white`}
-        title={social.icon === FaXTwitter ? "X (Twitter)" : social.icon.name}
+        className={`text-slate-700 transition-all duration-300 hover:scale-110 bg-slate-100 rounded-full p-2 xs:p-3 border border-slate-200 ${social.color} hover:text-white`}
+        title={social.icon === RiTwitterXLine ? "X (Twitter)" : "Rede Social"}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
         initial={{ opacity: 0, scale: 0.8 }}
@@ -125,7 +128,7 @@ const SocialLinks = () => (
         transition={{ duration: 0.4, delay: index * 0.1 }}
         viewport={{ once: true }}
       >
-        <social.icon className="h-5 w-5" />
+        <social.icon className="w-4 h-4 xs:w-5 xs:h-5" />
       </motion.a>
     ))}
   </motion.div>
@@ -139,7 +142,7 @@ const NavigationSection = () => (
     viewport={{ once: true }}
   >
     <SectionTitle title="Navegação" />
-    <ul className="space-y-3">
+    <ul className="space-y-2 xs:space-y-3">
       {NAVIGATION_LINKS.map((link, index) => (
         <motion.li
           key={link.href}
@@ -150,7 +153,7 @@ const NavigationSection = () => (
         >
           <Link
             href={link.href}
-            className="text-slate-700 text-base font-medium py-2 transition-all duration-300 uppercase tracking-wider font-roboto hover:text-navy hover:font-semibold block relative group/navlink w-fit"
+            className="text-slate-700 text-sm xs:text-base font-medium py-1 xs:py-2 transition-all duration-300 uppercase tracking-wider font-roboto hover:text-navy hover:font-semibold block relative group/navlink w-fit"
           >
             <span className="relative z-10 transition-colors duration-300">
               {link.label}
@@ -178,7 +181,7 @@ const ContactSection = () => (
 
 const SectionTitle = ({ title }: { title: string }) => (
   <motion.h3
-    className="text-xl font-bold text-slate-800 mb-6 font-bebas tracking-wide border-b-2 border-navy pb-2"
+    className="text-lg xs:text-xl font-bold text-slate-800 mb-4 xs:mb-5 sm:mb-6 font-bebas tracking-wide border-b-2 border-navy pb-2"
     initial={{ opacity: 0, y: -10 }}
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
@@ -189,24 +192,20 @@ const SectionTitle = ({ title }: { title: string }) => (
 );
 
 const ContactInfo = () => (
-  <ul className="space-y-4 text-slate-700 font-roboto text-base">
+  <ul className="space-y-3 xs:space-y-4 text-slate-700 font-roboto text-sm xs:text-base">
     <ContactItem
-      icon={FaEnvelope}
+      icon={RiMailLine}
       text="contato@patrulhaaereacivil.org.br"
       index={0}
     />
-    <ContactItem icon={FaPhone} text="(21) 99999-9999" index={1} />
+    <ContactItem icon={RiPhoneLine} text="(21) 99999-9999" index={1} />
     <ContactItem
-      icon={FaExclamationTriangle}
+      icon={RiAlertLine}
       text="Emergência: 24/7"
       isEmergency
       index={2}
     />
-    <ContactItem
-      icon={FaMapMarkerAlt}
-      text="Rio de Janeiro, Brasil"
-      index={3}
-    />
+    <ContactItem icon={RiMapPinLine} text="Rio de Janeiro, Brasil" index={3} />
   </ul>
 );
 
@@ -224,7 +223,7 @@ const ContactItem = ({
   index,
 }: ContactItemProps) => (
   <motion.li
-    className={`flex items-start space-x-3 transition-colors duration-300 ${
+    className={`flex items-start space-x-2 xs:space-x-3 transition-colors duration-300 ${
       isEmergency ? "hover:text-alert" : "hover:text-navy"
     }`}
     initial={{ opacity: 0, y: 10 }}
@@ -233,12 +232,14 @@ const ContactItem = ({
     viewport={{ once: true }}
   >
     <Icon
-      className={`h-5 w-5 mt-1 flex-shrink-0 ${
+      className={`w-4 h-4 xs:w-5 xs:h-5 mt-0.5 xs:mt-1 flex-shrink-0 ${
         isEmergency ? "text-alert" : "text-navy"
       }`}
     />
     <span
-      className={isEmergency ? "font-semibold text-alert" : "text-slate-700"}
+      className={`text-sm xs:text-base ${
+        isEmergency ? "font-semibold text-alert" : "text-slate-700"
+      }`}
     >
       {text}
     </span>
@@ -253,12 +254,12 @@ const EmergencyButton = () => (
     viewport={{ once: true }}
   >
     <Button
-      className="w-full mt-6 bg-alert hover:bg-alert/90 text-white font-bold py-3 transition-all duration-300 hover:scale-105 shadow-lg font-roboto border-0 group/emergency relative overflow-hidden"
+      className="w-full mt-4 xs:mt-6 bg-alert hover:bg-alert/90 text-white font-bold py-2 xs:py-3 transition-all duration-300 hover:scale-105 shadow-lg font-roboto border-0 group/emergency relative overflow-hidden text-sm xs:text-base"
       asChild
     >
       <Link href="/contato">
         <span className="relative z-10 flex items-center justify-center">
-          <FaExclamationTriangle className="mr-2 h-4 w-4" />
+          <RiAlertLine className="mr-2 w-3 h-3 xs:w-4 xs:h-4" />
           EMERGÊNCIA
         </span>
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/emergency:translate-x-[100%] transition-transform duration-1000" />
@@ -270,15 +271,15 @@ const EmergencyButton = () => (
 const BottomFooter = () => {
   return (
     <motion.div
-      className="border-t border-slate-200 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center"
+      className="border-t border-slate-200 mt-8 xs:mt-10 sm:mt-12 pt-6 xs:pt-8 flex flex-col md:flex-row justify-between items-center"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.2 }}
       viewport={{ once: true }}
     >
-      <div className="flex items-center space-x-4 mb-4 md:mb-0">
+      <div className="flex items-center space-x-3 xs:space-x-4 mb-3 xs:mb-4 md:mb-0">
         <motion.div
-          className="relative w-8 h-6"
+          className="relative w-6 h-4 xs:w-8 xs:h-6"
           whileHover={{ scale: 1.1 }}
           transition={{ duration: 0.3 }}
         >
@@ -290,7 +291,7 @@ const BottomFooter = () => {
             className="object-contain rounded w-full h-full"
           />
         </motion.div>
-        <p className="text-slate-700 text-sm font-roboto">
+        <p className="text-slate-700 text-xs xs:text-sm font-roboto">
           © 2024 Patrulha Aérea Civil. Todos os direitos reservados.
         </p>
       </div>
@@ -302,7 +303,7 @@ const BottomFooter = () => {
 
 const LegalLinks = () => (
   <motion.div
-    className="flex flex-wrap justify-center gap-4"
+    className="flex flex-wrap justify-center gap-2 xs:gap-3 sm:gap-4"
     initial={{ opacity: 0 }}
     whileInView={{ opacity: 1 }}
     transition={{ duration: 0.6, delay: 0.4 }}
@@ -320,7 +321,7 @@ const LegalLinks = () => (
           variant="ghost"
           size="sm"
           asChild
-          className="text-slate-700 hover:text-navy hover:bg-navy/10 text-sm font-roboto transition-all duration-300"
+          className="text-slate-700 hover:text-navy hover:bg-navy/10 text-xs xs:text-sm font-roboto transition-all duration-300 h-8 xs:h-9 px-2 xs:px-3"
         >
           <Link href={link.href}>{link.label}</Link>
         </Button>
@@ -332,8 +333,8 @@ const LegalLinks = () => (
 export function Footer() {
   return (
     <footer className="bg-white text-slate-700 border-t-2 border-navy">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="container mx-auto px-3 xs:px-4 py-8 xs:py-10 sm:py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 xs:gap-8">
           <BrandSection />
           <NavigationSection />
           <ContactSection />

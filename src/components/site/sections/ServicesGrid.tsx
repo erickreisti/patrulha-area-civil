@@ -3,19 +3,19 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  FaCrosshairs,
-  FaShieldAlt,
-  FaBullseye,
-  FaUsers,
-  FaMapMarkerAlt,
-  FaClock,
-  FaBroadcastTower,
-  FaSatellite,
-  FaCheckCircle,
-  FaArrowRight,
-  FaPhoneAlt,
-  FaCogs,
-} from "react-icons/fa";
+  RiCrosshairLine,
+  RiShieldCheckLine,
+  RiFocusLine,
+  RiUserLine,
+  RiMapPinLine,
+  RiTimeLine,
+  RiBroadcastLine,
+  RiRadarLine,
+  RiCheckboxCircleLine,
+  RiArrowRightLine,
+  RiPhoneLine,
+  RiSettingsLine,
+} from "react-icons/ri";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -34,7 +34,7 @@ interface Service {
 
 const SERVICES: Service[] = [
   {
-    icon: FaCrosshairs,
+    icon: RiCrosshairLine,
     title: "RESGATE AÉREO TÁTICO",
     description:
       "Operações de busca e salvamento em áreas hostis com equipe de elite",
@@ -51,7 +51,7 @@ const SERVICES: Service[] = [
     borderColor: "border-navy/30",
   },
   {
-    icon: FaShieldAlt,
+    icon: RiShieldCheckLine,
     title: "PROTEÇÃO CIVIL",
     description:
       "Resposta estratégica a desastres naturais e situações críticas",
@@ -68,7 +68,7 @@ const SERVICES: Service[] = [
     borderColor: "border-navy/30",
   },
   {
-    icon: FaBullseye,
+    icon: RiFocusLine,
     title: "OPERAÇÕES ESPECIAIS",
     description:
       "Missões de alto risco com planejamento tático e execução precisa",
@@ -85,7 +85,7 @@ const SERVICES: Service[] = [
     borderColor: "border-navy/30",
   },
   {
-    icon: FaUsers,
+    icon: RiUserLine,
     title: "CAPACITAÇÃO OPERACIONAL",
     description: "Treinamento tático em procedimentos de emergência e resgate",
     fullDescription:
@@ -101,7 +101,7 @@ const SERVICES: Service[] = [
     borderColor: "border-navy/30",
   },
   {
-    icon: FaMapMarkerAlt,
+    icon: RiMapPinLine,
     title: "BUSCA TERRITORIAL",
     description: "Operações de localização e extração em terreno hostil",
     fullDescription:
@@ -117,7 +117,7 @@ const SERVICES: Service[] = [
     borderColor: "border-navy/30",
   },
   {
-    icon: FaClock,
+    icon: RiTimeLine,
     title: "RESPOSTA RÁPIDA",
     description: "Equipe de prontidão imediata para emergências críticas",
     fullDescription:
@@ -133,7 +133,7 @@ const SERVICES: Service[] = [
     borderColor: "border-navy/30",
   },
   {
-    icon: FaBroadcastTower,
+    icon: RiBroadcastLine,
     title: "COMUNICAÇÕES TÁTICAS",
     description:
       "Sistema integrado de comunicações para coordenação operacional",
@@ -150,7 +150,7 @@ const SERVICES: Service[] = [
     borderColor: "border-navy/30",
   },
   {
-    icon: FaSatellite,
+    icon: RiRadarLine,
     title: "VIGILÂNCIA AÉREA",
     description: "Monitoramento e reconhecimento aéreo para apoio às operações",
     fullDescription:
@@ -385,7 +385,7 @@ const ServiceDetails = ({ service }: { service: Service }) => {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
             >
-              <FaCheckCircle className="h-4 w-4 text-navy flex-shrink-0" />
+              <RiCheckboxCircleLine className="h-4 w-4 text-navy flex-shrink-0" />
               <span className="text-slate-700 text-sm font-medium leading-relaxed">
                 {feature}
               </span>
@@ -409,7 +409,7 @@ const ServiceDetails = ({ service }: { service: Service }) => {
                 href="/contato"
                 className="flex items-center justify-center gap-2"
               >
-                <FaPhoneAlt className="h-3 w-3" />
+                <RiPhoneLine className="h-3 w-3" />
                 SOLICITAR SERVIÇO
               </Link>
             </Button>
@@ -429,7 +429,7 @@ const ServiceDetails = ({ service }: { service: Service }) => {
                 className="flex items-center justify-center gap-2"
               >
                 SABER MAIS
-                <FaArrowRight className="h-3 w-3" />
+                <RiArrowRightLine className="h-3 w-3" />
               </Link>
             </Button>
           </motion.div>
@@ -539,7 +539,7 @@ const MobileServiceCard = ({
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.3, delay: featureIndex * 0.1 }}
                   >
-                    <FaCheckCircle className="h-3 w-3 text-navy flex-shrink-0" />
+                    <RiCheckboxCircleLine className="h-3 w-3 text-navy flex-shrink-0" />
                     <span className="text-slate-700 text-xs">{feature}</span>
                   </motion.div>
                 ))}
@@ -561,7 +561,7 @@ const MobileServiceCard = ({
                       href="/contato"
                       className="flex items-center justify-center gap-2 py-2"
                     >
-                      <FaPhoneAlt className="h-4 w-4" />
+                      <RiPhoneLine className="h-4 w-4" />
                       Contatar
                     </Link>
                   </Button>
@@ -581,7 +581,7 @@ const MobileServiceCard = ({
                       className="flex items-center justify-center gap-2 py-2"
                     >
                       Detalhes
-                      <FaArrowRight className="h-4 w-4" />
+                      <RiArrowRightLine className="h-4 w-4" />
                     </Link>
                   </Button>
                 </motion.div>
@@ -645,7 +645,7 @@ const MobileCTASection = () => (
           href="/contato"
           className="flex items-center justify-center gap-1"
         >
-          <FaPhoneAlt className="h-3 w-3" />
+          <RiPhoneLine className="h-3 w-3" />
           SOLICITAR ATENDIMENTO
         </Link>
       </Button>
@@ -681,7 +681,7 @@ export function ServicesGrid() {
               transition={{ duration: 0.6, delay: 0.2 }}
               viewport={{ once: true }}
             >
-              <FaCogs className="h-6 w-6 text-white" />
+              <RiSettingsLine className="h-6 w-6 text-white" />
             </motion.div>
             <div className="w-16 h-1 bg-navy"></div>
           </div>
@@ -724,7 +724,7 @@ export function ServicesGrid() {
               viewport={{ once: true }}
             >
               <div className="w-10 h-10 bg-navy rounded-lg flex items-center justify-center">
-                <FaCrosshairs className="h-5 w-5 text-white" />
+                <RiCrosshairLine className="h-5 w-5 text-white" />
               </div>
               <span className="text-navy font-bold tracking-wider uppercase text-sm">
                 Nossas Especialidades
