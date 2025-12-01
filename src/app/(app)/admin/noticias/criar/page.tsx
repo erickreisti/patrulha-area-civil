@@ -1,3 +1,4 @@
+// src/app/(app)/admin/noticias/criar/page.tsx - VERSÃO MELHORADA
 "use client";
 
 import { useState, useRef } from "react";
@@ -35,9 +36,9 @@ import {
   RiStarFill,
   RiUploadCloudFill,
   RiDeleteBinFill,
+  RiEyeLine,
 } from "react-icons/ri";
 
-// Categorias pré-definidas
 const CATEGORIAS = [
   "Operações",
   "Treinamento",
@@ -70,7 +71,6 @@ function ImageUploadSection({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validações básicas
     if (!file.type.startsWith("image/")) {
       alert("Por favor, selecione apenas arquivos de imagem.");
       return;
@@ -84,11 +84,9 @@ function ImageUploadSection({
     setUploading(true);
 
     try {
-      // Criar preview local
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
 
-      // Preparar form data
       const formData = new FormData();
       formData.append("file", file);
       formData.append("type", "image");
@@ -108,10 +106,7 @@ function ImageUploadSection({
       const result = await response.json();
       console.log("✅ Upload realizado:", result.url);
 
-      // Chamar callback com a URL
       onImageUpload(result.url);
-
-      // Limpar preview local
       URL.revokeObjectURL(objectUrl);
       setPreviewUrl(result.url);
     } catch (error: unknown) {
@@ -122,7 +117,6 @@ function ImageUploadSection({
           : "Erro ao fazer upload da imagem"
       );
 
-      // Limpar preview em caso de erro
       setPreviewUrl(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -149,7 +143,6 @@ function ImageUploadSection({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Preview da Imagem */}
         {previewUrl && (
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -164,7 +157,6 @@ function ImageUploadSection({
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 400px"
               />
-              {/* Overlay com botão de remover */}
               <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
                 <Button
                   type="button"
@@ -181,7 +173,6 @@ function ImageUploadSection({
           </motion.div>
         )}
 
-        {/* Área de Upload */}
         <div
           className={`
             border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 cursor-pointer
@@ -238,7 +229,6 @@ function ImageUploadSection({
           )}
         </div>
 
-        {/* Informações de ajuda */}
         <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
           <p className="text-xs text-gray-600 text-center">
             <strong>Dica:</strong> Use imagens com proporção 16:9 para melhor
@@ -269,17 +259,6 @@ export default function CriarNoticiaPage() {
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const slideIn = {
-    hidden: { opacity: 0, x: -20 },
-    visible: {
-      opacity: 1,
-      x: 0,
-      transition: {
-        duration: 0.6,
-      },
-    },
-  };
-
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: {
@@ -291,7 +270,6 @@ export default function CriarNoticiaPage() {
     },
   };
 
-  // Gerar slug automaticamente
   const generateSlug = (text: string) => {
     return text
       .toLowerCase()
@@ -373,7 +351,6 @@ export default function CriarNoticiaPage() {
     setLoading(true);
     setErrors([]);
 
-    // Validar formulário
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
       setErrors(validationErrors);
@@ -382,37 +359,29 @@ export default function CriarNoticiaPage() {
     }
 
     try {
-      // ✅ CORREÇÃO: Verificar se slug já existe com headers apropriados
       const { data: existingSlug, error: slugError } = await supabase
         .from("noticias")
         .select("id")
         .eq("slug", formData.slug)
         .single();
 
-      // ✅ CORREÇÃO: Tratar erro 406 específico
       if (slugError) {
-        // Se for erro 406 (Not Acceptable), ignorar e continuar
-        // Isso pode acontecer por headers, mas não significa que o slug existe
         if (slugError.code === "406" || slugError.message?.includes("406")) {
           console.log("⚠️ Warning de headers ignorado, continuando...");
         } else if (slugError.code === "PGRST116") {
-          // PGRST116 = No rows returned (slug não existe) - isso é bom!
           console.log("✅ Slug disponível");
         } else {
-          // Outro erro real
           console.error("❌ Erro ao verificar slug:", slugError);
           throw slugError;
         }
       }
 
-      // ✅ CORREÇÃO: Se encontrou um slug existente (e não foi erro 406)
       if (existingSlug && !slugError) {
         setErrors(["Já existe outra notícia com este slug. Altere o título."]);
         setLoading(false);
         return;
       }
 
-      // Buscar usuário atual para o autor_id
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -425,7 +394,6 @@ export default function CriarNoticiaPage() {
 
       console.log("🔄 Criando nova notícia...", formData);
 
-      // Criar notícia
       const { error } = await supabase.from("noticias").insert([
         {
           titulo: formData.titulo.trim(),
@@ -465,11 +433,12 @@ export default function CriarNoticiaPage() {
     }
   };
 
+  // Botões de navegação abaixo do header
   const navigationButtons = [
     {
       href: "/admin/noticias",
       icon: RiArrowLeftFill,
-      label: "Voltar",
+      label: "Voltar para Notícias",
       className:
         "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
     },
@@ -492,45 +461,62 @@ export default function CriarNoticiaPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header - TÍTULO E DESCRIÇÃO */}
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-6"
         >
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-              NOVA NOTÍCIA
-            </h1>
-            <p className="text-gray-600">
-              Crie uma nova notícia para o site da Patrulha Aérea Civil
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+            NOVA NOTÍCIA
+          </h1>
+          <p className="text-gray-600">
+            Crie uma nova notícia para o site da Patrulha Aérea Civil
+          </p>
+        </motion.div>
+
+        {/* ✅ BOTÕES ABAIXO DO HEADER - Mesmo layout do outro arquivo */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="flex flex-wrap gap-3 mb-8"
+        >
+          {/* Botão para ver notícias */}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link href="/admin/noticias">
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
+              >
+                <RiEyeLine className="w-4 h-4" />
+                Ver Todas Notícias
+              </Button>
+            </Link>
+          </motion.div>
 
           {/* Botões de Navegação */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {navigationButtons.map((button, index) => (
-              <motion.div
-                key={button.href}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link href={button.href}>
-                  <Button
-                    variant="outline"
-                    className={`transition-all duration-300 ${button.className}`}
-                  >
-                    <button.icon className="w-4 h-4 mr-2" />
-                    {button.label}
-                  </Button>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
+          {navigationButtons.map((button, index) => (
+            <motion.div
+              key={button.href}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href={button.href}>
+                <Button
+                  variant="outline"
+                  className={`transition-all duration-300 ${button.className}`}
+                >
+                  <button.icon className="w-4 h-4 mr-2" />
+                  {button.label}
+                </Button>
+              </Link>
+            </motion.div>
+          ))}
         </motion.div>
 
         {/* Alertas */}
@@ -663,7 +649,7 @@ export default function CriarNoticiaPage() {
                       <div className="flex items-center gap-2 text-xs text-gray-500 transition-colors duration-300">
                         <RiLink className="w-3 h-3" />
                         <span>
-                          URL: https://seusite.com/noticias/{formData.slug}
+                          URL: https://pac.com.br/noticias/{formData.slug}
                         </span>
                       </div>
                     </motion.div>

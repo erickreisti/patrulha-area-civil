@@ -117,6 +117,28 @@ export interface Noticia {
   updated_at: string;
 }
 
+// Interface para notícia com informações do autor
+export interface NoticiaWithAutor extends Noticia {
+  autor?: {
+    full_name?: string;
+    graduacao?: string;
+    avatar_url?: string;
+  };
+}
+
+// Interface para dados do formulário de notícia
+export interface NoticiaFormData {
+  titulo: string;
+  slug: string;
+  conteudo: string;
+  resumo: string;
+  imagem: string | null;
+  categoria: string;
+  destaque: boolean;
+  data_publicacao: string;
+  status: NoticiaStatus;
+}
+
 // ==================== NOTIFICAÇÕES ====================
 export interface NotificationMetadata {
   resource_type?: string;

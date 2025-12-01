@@ -1,4 +1,4 @@
-// src/app/(app)/admin/noticias/page.tsx - VERSÃO CORRIGIDA
+// src/app/(app)/admin/noticias/page.tsx - VERSÃO MELHORADA
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -37,6 +37,7 @@ import {
   RiRocketLine,
   RiRefreshLine,
   RiImageLine,
+  RiExternalLinkLine,
 } from "react-icons/ri";
 import { NoticiaWithAutor, NoticiaStatus } from "@/types";
 
@@ -778,9 +779,12 @@ export default function NoticiasPage() {
                                     >
                                       {noticia.categoria}
                                     </Badge>
-                                    <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 font-mono transition-colors duration-300">
-                                      /{noticia.slug}
-                                    </code>
+                                    <div className="flex items-center gap-1">
+                                      <RiExternalLinkLine className="w-3 h-3" />
+                                      <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 font-mono transition-colors duration-300">
+                                        /{noticia.slug}
+                                      </code>
+                                    </div>
                                   </div>
                                 </div>
                               </div>

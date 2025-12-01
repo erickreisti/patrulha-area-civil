@@ -1,3 +1,4 @@
+// src/app/(app)/admin/noticias/[id]/page.tsx - VERSÃO CORRIGIDA E MELHORADA
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -55,17 +56,6 @@ interface PageProps {
     id: string;
   };
 }
-
-const slideIn = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.6,
-    },
-  },
-};
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -213,7 +203,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
   const handleTituloChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const titulo = e.target.value;
-    setFormData((prev) => ({
+    setFormData((prev: NoticiaFormData) => ({
       ...prev,
       titulo,
       slug: generateSlug(titulo),
@@ -224,7 +214,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
+    setFormData((prev: NoticiaFormData) => ({
       ...prev,
       [name]: value,
     }));
@@ -232,7 +222,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
   // ✅ CORREÇÃO: Função para lidar com upload de imagem
   const handleImageUpload = (imageUrl: string) => {
-    setFormData((prev) => ({
+    setFormData((prev: NoticiaFormData) => ({
       ...prev,
       imagem: imageUrl,
     }));
@@ -373,37 +363,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     }
   };
 
-  const navigationButtons = [
-    {
-      href: "/admin/noticias",
-      icon: RiArrowLeftLine,
-      label: "Voltar",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/admin/dashboard",
-      icon: RiBarChartLine,
-      label: "Dashboard",
-      className:
-        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/perfil",
-      icon: RiUserLine,
-      label: "Meu Perfil",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-  ];
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
@@ -453,61 +412,95 @@ export default function EditarNoticiaPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header - TÍTULO E DESCRIÇÃO */}
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="mb-6"
         >
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-              EDITAR NOTÍCIA
-            </h1>
-            <p className="text-gray-600">Editando: {noticia.titulo}</p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+            EDITAR NOTÍCIA
+          </h1>
+          <p className="text-gray-600">Editando: {noticia.titulo}</p>
+        </motion.div>
+
+        {/* ✅ BOTÕES ABAIXO DO HEADER */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="flex flex-wrap gap-3 mb-8"
+        >
+          {/* Botão para voltar */}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link href="/admin/noticias">
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
+              >
+                <RiArrowLeftLine className="w-4 h-4" />
+                Voltar para Notícias
+              </Button>
+            </Link>
+          </motion.div>
+
+          {/* Botão Ver Público */}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              onClick={handleViewPublic}
+              variant="outline"
+              className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
+              disabled={formData.status !== "publicado"}
+            >
+              <RiExternalLinkLine className="w-4 h-4 mr-2" />
+              Ver Público
+            </Button>
+          </motion.div>
 
           {/* Botões de Navegação */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {navigationButtons.map((button, index) => (
-              <motion.div
-                key={button.href}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link href={button.href}>
-                  <Button
-                    variant="outline"
-                    className={`transition-all duration-300 ${button.className}`}
-                  >
-                    <button.icon className="w-4 h-4 mr-2" />
-                    {button.label}
-                  </Button>
-                </Link>
-              </motion.div>
-            ))}
-
+          {[
+            {
+              href: "/admin/dashboard",
+              icon: RiBarChartLine,
+              label: "Dashboard",
+              className:
+                "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
+            },
+            {
+              href: "/perfil",
+              icon: RiUserLine,
+              label: "Meu Perfil",
+              className:
+                "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
+            },
+            {
+              href: "/",
+              icon: RiHomeLine,
+              label: "Voltar ao Site",
+              className:
+                "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
+            },
+          ].map((button, index) => (
             <motion.div
+              key={button.href}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Button
-                onClick={handleViewPublic}
-                variant="outline"
-                className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
-                disabled={formData.status !== "publicado"}
-              >
-                <RiExternalLinkLine className="w-4 h-4 mr-2" />
-                Ver Público
-              </Button>
+              <Link href={button.href}>
+                <Button
+                  variant="outline"
+                  className={`transition-all duration-300 ${button.className}`}
+                >
+                  <button.icon className="w-4 h-4 mr-2" />
+                  {button.label}
+                </Button>
+              </Link>
             </motion.div>
-          </div>
+          ))}
         </motion.div>
 
         {/* Alertas */}
@@ -629,7 +622,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setFormData((prev) => ({
+                                setFormData((prev: NoticiaFormData) => ({
                                   ...prev,
                                   imagem: null,
                                 }));
@@ -876,7 +869,10 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                     <Select
                       value={formData.status}
                       onValueChange={(value: NoticiaStatus) =>
-                        setFormData((prev) => ({ ...prev, status: value }))
+                        setFormData((prev: NoticiaFormData) => ({
+                          ...prev,
+                          status: value,
+                        }))
                       }
                     >
                       <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
@@ -902,7 +898,10 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       id="destaque"
                       checked={formData.destaque}
                       onCheckedChange={(checked) =>
-                        setFormData((prev) => ({ ...prev, destaque: checked }))
+                        setFormData((prev: NoticiaFormData) => ({
+                          ...prev,
+                          destaque: checked,
+                        }))
                       }
                     />
                   </div>
@@ -927,7 +926,10 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                   <Select
                     value={formData.categoria}
                     onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, categoria: value }))
+                      setFormData((prev: NoticiaFormData) => ({
+                        ...prev,
+                        categoria: value,
+                      }))
                     }
                   >
                     <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
