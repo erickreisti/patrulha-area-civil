@@ -36,8 +36,8 @@ import {
   RiEyeLine,
   RiEyeOffLine,
   RiStarLine,
-  RiExternalLinkLine,
 } from "react-icons/ri";
+import { FileUpload } from "@/components/ui/file-upload";
 
 interface Categoria {
   id: string;
@@ -83,9 +83,9 @@ export default function CriarItemGaleriaPage() {
 
   const [loading, setLoading] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [mediaUrl, setMediaUrl] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState("");
 
   const [formData, setFormData] = useState<FormData>({
     titulo: "",
@@ -140,6 +140,19 @@ export default function CriarItemGaleriaPage() {
       tipo,
       categoria_id: "",
     }));
+    // Limpar URL quando mudar o tipo
+    setMediaUrl("");
+  };
+
+  const handleMediaUploadComplete = (urls: string[]) => {
+    if (urls.length > 0) {
+      setMediaUrl(urls[0]);
+      toast.success("Mídia carregada com sucesso!");
+    }
+  };
+
+  const handleMediaFileChange = (url: string) => {
+    setMediaUrl(url);
   };
 
   const validateForm = (): string[] => {
@@ -149,14 +162,20 @@ export default function CriarItemGaleriaPage() {
       errors.push("Título é obrigatório");
     } else if (formData.titulo.length < 3) {
       errors.push("Título deve ter pelo menos 3 caracteres");
+    } else if (formData.titulo.length > 200) {
+      errors.push("Título não pode ter mais de 200 caracteres");
     }
 
     if (!formData.categoria_id) {
       errors.push("Categoria é obrigatória");
     }
 
-    if (!mediaUrl.trim()) {
-      errors.push("URL da mídia é obrigatória");
+    if (!mediaUrl) {
+      errors.push("É necessário fazer upload de uma mídia");
+    }
+
+    if (formData.descricao.length > 500) {
+      errors.push("Descrição não pode ter mais de 500 caracteres");
     }
 
     if (formData.ordem < 0) {
@@ -198,6 +217,7 @@ export default function CriarItemGaleriaPage() {
             tipo: formData.tipo,
             categoria_id: formData.categoria_id,
             arquivo_url: mediaUrl,
+            thumbnail_url: formData.tipo === "video" ? null : mediaUrl,
             status: formData.status,
             destaque: formData.destaque,
             ordem: formData.ordem,
@@ -209,6 +229,21 @@ export default function CriarItemGaleriaPage() {
         .single();
 
       if (insertError) throw insertError;
+
+      // Log de atividade
+      await supabase.from("system_activities").insert([
+        {
+          user_id: user.id,
+          action_type: "create",
+          description: `Criou novo item da galeria: "${formData.titulo}"`,
+          resource_type: "galeria_item",
+          metadata: {
+            tipo: formData.tipo,
+            categoria_id: formData.categoria_id,
+            url: mediaUrl,
+          },
+        },
+      ]);
 
       toast.success("Item criado com sucesso!");
       setShowSuccess(true);
@@ -223,8 +258,13 @@ export default function CriarItemGaleriaPage() {
 
       if (error.code === "23505") {
         toast.error("Já existe um item com este título.");
+        setErrors(["Já existe um item com este título na galeria"]);
+      } else if (error.code === "23503") {
+        toast.error("Categoria não encontrada.");
+        setErrors(["Categoria selecionada não existe mais"]);
       } else {
         toast.error("Erro ao criar item");
+        setErrors(["Erro interno ao salvar o item"]);
       }
     } finally {
       setLoading(false);
@@ -265,6 +305,10 @@ export default function CriarItemGaleriaPage() {
         "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
     },
   ];
+
+  // Determinar tipo de upload baseado no tipo de mídia
+  const uploadType = formData.tipo === "foto" ? "media" : "video";
+  const acceptTypes = formData.tipo === "foto" ? "image/*" : "video/*";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
@@ -405,8 +449,15 @@ export default function CriarItemGaleriaPage() {
                         placeholder="Ex: Treinamento de Resgate Aéreo"
                         className="transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         required
+                        maxLength={200}
                       />
-                      <p className="text-gray-500 text-sm transition-colors duration-300">
+                      <p
+                        className={`text-sm transition-colors duration-300 ${
+                          formData.titulo.length > 180
+                            ? "text-amber-600"
+                            : "text-gray-500"
+                        }`}
+                      >
                         {formData.titulo.length}/200 caracteres
                       </p>
                     </motion.div>
@@ -433,7 +484,13 @@ export default function CriarItemGaleriaPage() {
                         className="transition-all duration-300 focus:ring-2 focus:ring-blue-500 resize-none"
                         maxLength={500}
                       />
-                      <p className="text-gray-500 text-sm transition-colors duration-300">
+                      <p
+                        className={`text-sm transition-colors duration-300 ${
+                          formData.descricao.length > 450
+                            ? "text-amber-600"
+                            : "text-gray-500"
+                        }`}
+                      >
                         {formData.descricao.length}/500 caracteres
                       </p>
                     </motion.div>
@@ -513,9 +570,16 @@ export default function CriarItemGaleriaPage() {
                               categoria_id: value,
                             }))
                           }
+                          disabled={categoriasFiltradas.length === 0}
                         >
                           <SelectTrigger className="transition-all duration-300 hover:border-blue-500 focus:ring-blue-500">
-                            <SelectValue placeholder="Selecione uma categoria" />
+                            <SelectValue
+                              placeholder={
+                                categoriasFiltradas.length === 0
+                                  ? "Crie uma categoria primeiro"
+                                  : "Selecione uma categoria"
+                              }
+                            />
                           </SelectTrigger>
                           <SelectContent>
                             {categoriasFiltradas.length === 0 ? (
@@ -548,43 +612,71 @@ export default function CriarItemGaleriaPage() {
                       </div>
                     </motion.div>
 
-                    {/* URL da Mídia */}
+                    {/* Upload de Mídia */}
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.3 }}
                       className="space-y-2"
                     >
                       <Label className="text-sm font-semibold text-gray-700">
-                        URL da Mídia *
+                        {formData.tipo === "foto"
+                          ? "Upload de Foto"
+                          : "Upload de Vídeo"}{" "}
+                        *
                       </Label>
-                      <div className="flex items-center">
-                        <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm transition-colors duration-300">
-                          <RiExternalLinkLine className="w-3 h-3" />
-                        </span>
-                        <Input
-                          value={mediaUrl}
-                          onChange={(e) => setMediaUrl(e.target.value)}
-                          placeholder={
+
+                      <div className="space-y-4">
+                        <FileUpload
+                          type={uploadType}
+                          bucket={
                             formData.tipo === "foto"
-                              ? "https://exemplo.com/imagem.jpg"
-                              : "https://youtube.com/watch?v=..."
+                              ? "galeria-fotos"
+                              : "galeria-videos"
                           }
-                          className="flex-1 rounded-l-none transition-all duration-300 focus:ring-2 focus:ring-blue-500"
+                          multiple={false}
+                          maxFiles={1}
+                          onUploadComplete={handleMediaUploadComplete}
+                          onFileChange={handleMediaFileChange}
+                          currentFile={mediaUrl}
+                          accept={acceptTypes}
+                          className="w-full"
                         />
+
+                        {mediaUrl && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg transition-all duration-300"
+                          >
+                            <div className="flex items-center gap-2">
+                              <RiCheckLine className="w-4 h-4 text-green-600 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-green-800">
+                                  Mídia carregada com sucesso!
+                                </p>
+                                <p className="text-xs text-green-600 truncate">
+                                  {mediaUrl}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setMediaUrl("")}
+                                className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <RiCloseLine className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </motion.div>
+                        )}
                       </div>
-                      {mediaUrl && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg transition-all duration-300"
-                        >
-                          <p className="text-xs text-green-700 flex items-center gap-1">
-                            <RiCheckLine className="w-3 h-3" />✅{" "}
-                            {formData.tipo === "foto" ? "Imagem" : "Vídeo"}{" "}
-                            carregado com sucesso
-                          </p>
-                        </motion.div>
-                      )}
+
+                      <p className="text-xs text-gray-500">
+                        {formData.tipo === "foto"
+                          ? "Formatos: JPG, PNG, WEBP. Máximo 5MB."
+                          : "Formatos: MP4, AVI, MOV. Máximo 50MB. Recomendado: MP4 com codec H.264"}
+                      </p>
                     </motion.div>
 
                     {/* Configurações Avançadas */}
@@ -606,12 +698,13 @@ export default function CriarItemGaleriaPage() {
                           name="ordem"
                           type="number"
                           min="0"
+                          step="1"
                           value={formData.ordem}
                           onChange={handleInputChange}
                           className="transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         />
                         <p className="text-gray-500 text-sm transition-colors duration-300">
-                          Número menor aparece primeiro
+                          Número menor aparece primeiro (0 = primeiro)
                         </p>
                       </div>
 
@@ -681,7 +774,7 @@ export default function CriarItemGaleriaPage() {
                             </p>
                             <p className="text-gray-500 text-sm">
                               {formData.destaque
-                                ? "Destacado"
+                                ? "Destacado na página inicial"
                                 : "Listagem normal"}
                             </p>
                           </div>
@@ -702,7 +795,11 @@ export default function CriarItemGaleriaPage() {
                       >
                         <Button
                           type="submit"
-                          disabled={loading || categoriasFiltradas.length === 0}
+                          disabled={
+                            loading ||
+                            categoriasFiltradas.length === 0 ||
+                            !mediaUrl
+                          }
                           className="w-full bg-green-600 hover:bg-green-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           {loading ? (
@@ -758,7 +855,7 @@ export default function CriarItemGaleriaPage() {
               <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
-                    Configurações
+                    Resumo do Item
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -807,6 +904,23 @@ export default function CriarItemGaleriaPage() {
                       {formData.ordem}
                     </span>
                   </div>
+
+                  <div className="flex justify-between items-center py-2 border-t border-gray-200 pt-4">
+                    <span className="text-gray-600">Mídia:</span>
+                    <span className="text-sm font-medium">
+                      {mediaUrl ? "✅ Carregada" : "⏳ Aguardando"}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-600">Categoria:</span>
+                    <span className="text-sm font-medium">
+                      {formData.categoria_id
+                        ? categorias.find((c) => c.id === formData.categoria_id)
+                            ?.nome || "Selecionada"
+                        : "❌ Não selecionada"}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -821,7 +935,7 @@ export default function CriarItemGaleriaPage() {
               <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
-                    Informações
+                    Informações Importantes
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-gray-600">
@@ -834,19 +948,19 @@ export default function CriarItemGaleriaPage() {
                   <p className="flex items-start gap-2">
                     <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
                     <span>
-                      <strong>Fotos:</strong> JPG, PNG, WEBP
+                      <strong>Título:</strong> Máximo 200 caracteres
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
                     <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
                     <span>
-                      <strong>Vídeos:</strong> YouTube, Vimeo, MP4
+                      <strong>Descrição:</strong> Máximo 500 caracteres
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
                     <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
                     <span>
-                      <strong>Itens inativos</strong> não aparecem no site
+                      <strong>Ordem:</strong> Menor número = primeiro lugar
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
@@ -858,7 +972,7 @@ export default function CriarItemGaleriaPage() {
                   <p className="flex items-start gap-2">
                     <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
                     <span>
-                      A <strong>ordem</strong> define a posição na listagem
+                      <strong>Itens inativos</strong> não aparecem no site
                     </span>
                   </p>
                 </CardContent>
@@ -882,43 +996,67 @@ export default function CriarItemGaleriaPage() {
                 <CardContent>
                   <div className="space-y-2">
                     {categoriasFiltradas.length === 0 ? (
-                      <p className="text-sm text-amber-600 text-center py-4">
-                        <RiAlertLine className="w-4 h-4 mx-auto mb-1" />
-                        Nenhuma categoria disponível para{" "}
-                        {formData.tipo === "foto" ? "fotos" : "vídeos"}
-                      </p>
-                    ) : (
-                      categoriasFiltradas.map((categoria) => (
-                        <motion.div
-                          key={categoria.id}
-                          className={`flex items-center justify-between p-3 rounded transition-all duration-300 cursor-pointer ${
-                            formData.categoria_id === categoria.id
-                              ? "bg-blue-50 border border-blue-200 shadow-md"
-                              : "bg-gray-50 hover:bg-gray-100"
-                          }`}
-                          whileHover={{ scale: 1.02 }}
+                      <div className="text-center py-4">
+                        <div className="mb-2">
+                          <RiAlertLine className="w-8 h-8 text-amber-400 mx-auto" />
+                        </div>
+                        <p className="text-sm text-amber-600">
+                          Nenhuma categoria disponível para{" "}
+                          {formData.tipo === "foto" ? "fotos" : "vídeos"}
+                        </p>
+                        <Button
+                          type="button"
+                          variant="link"
+                          className="text-blue-600 text-xs mt-2"
                           onClick={() =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              categoria_id: categoria.id,
-                            }))
+                            router.push("/admin/galeria/categorias")
                           }
                         >
-                          <span className="text-sm font-medium">
-                            {categoria.nome}
-                          </span>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              categoria.tipo === "fotos"
-                                ? "bg-blue-100 text-blue-800"
-                                : "bg-purple-100 text-purple-800"
+                          Criar nova categoria →
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-600 mb-3">
+                          Clique para selecionar uma categoria:
+                        </p>
+                        {categoriasFiltradas.map((categoria) => (
+                          <motion.div
+                            key={categoria.id}
+                            className={`flex items-center justify-between p-3 rounded transition-all duration-300 cursor-pointer ${
+                              formData.categoria_id === categoria.id
+                                ? "bg-blue-50 border border-blue-200 shadow-md"
+                                : "bg-gray-50 hover:bg-gray-100"
+                            }`}
+                            whileHover={{ scale: 1.02 }}
+                            onClick={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                categoria_id: categoria.id,
+                              }))
                             }
                           >
-                            {categoria.tipo}
-                          </Badge>
-                        </motion.div>
-                      ))
+                            <div className="flex items-center">
+                              {formData.categoria_id === categoria.id && (
+                                <RiCheckLine className="w-4 h-4 text-green-600 mr-2" />
+                              )}
+                              <span className="text-sm font-medium">
+                                {categoria.nome}
+                              </span>
+                            </div>
+                            <Badge
+                              variant="secondary"
+                              className={
+                                categoria.tipo === "fotos"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-purple-100 text-purple-800"
+                              }
+                            >
+                              {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
+                            </Badge>
+                          </motion.div>
+                        ))}
+                      </>
                     )}
                   </div>
                 </CardContent>
