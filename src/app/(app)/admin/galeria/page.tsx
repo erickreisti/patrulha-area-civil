@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,11 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+} from "@/components/ui/pagination";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
@@ -46,6 +51,9 @@ import {
   RiStarFill,
   RiFolderFill,
   RiGridFill,
+  RiArrowLeftLine,
+  RiArrowRightLine,
+  RiMoreFill,
 } from "react-icons/ri";
 
 // Interfaces locais específicas
@@ -191,6 +199,12 @@ export default function GaleriaPage() {
     loading: false,
   });
 
+  // 🆕 ESTADOS DE PAGINAÇÃO
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItens, setTotalItens] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const ITEMS_PER_PAGE = 10; // Limite de 10 itens por página
+
   const supabase = createClient();
 
   // Função para verificar se usuário é admin
@@ -224,22 +238,63 @@ export default function GaleriaPage() {
     }
   }, [supabase]);
 
-  // Buscar itens
-  const fetchItens = useCallback(async () => {
-    try {
-      setLoading(true);
+  // 🆕 Função para contar total de itens
+  const contarTotalItens = useCallback(
+    async (filtrosAtuais: Filtros) => {
+      try {
+        let query = supabase
+          .from("galeria_itens")
+          .select("*", { count: "exact", head: true });
 
-      // Verificar se é admin antes de buscar
-      const isAdmin = await verificarAdmin();
-      if (!isAdmin) {
-        setItens([]);
-        return;
+        // Aplicar os mesmos filtros
+        if (filtrosAtuais.busca) {
+          query = query.ilike("titulo", `%${filtrosAtuais.busca}%`);
+        }
+        if (filtrosAtuais.categoria !== "all") {
+          query = query.eq("categoria_id", filtrosAtuais.categoria);
+        }
+        if (filtrosAtuais.tipo !== "all") {
+          query = query.eq("tipo", filtrosAtuais.tipo);
+        }
+        if (filtrosAtuais.status !== "all") {
+          query = query.eq("status", filtrosAtuais.status === "ativo");
+        }
+
+        const { count, error } = await query;
+
+        if (error) throw error;
+
+        return count || 0;
+      } catch (error) {
+        console.error("Erro ao contar itens:", error);
+        return 0;
       }
+    },
+    [supabase]
+  );
 
-      let query = supabase
-        .from("galeria_itens")
-        .select(
-          `
+  // Buscar itens com paginação
+  const fetchItens = useCallback(
+    async (page = 1) => {
+      try {
+        setLoading(true);
+
+        // Verificar se é admin antes de buscar
+        const isAdmin = await verificarAdmin();
+        if (!isAdmin) {
+          setItens([]);
+          setTotalItens(0);
+          setTotalPages(0);
+          return;
+        }
+
+        // Calcular offset
+        const offset = (page - 1) * ITEMS_PER_PAGE;
+
+        let query = supabase
+          .from("galeria_itens")
+          .select(
+            `
           *,
           galeria_categorias (
             id,
@@ -247,40 +302,53 @@ export default function GaleriaPage() {
             tipo
           )
         `
-        )
-        .order("ordem", { ascending: true })
-        .order("created_at", { ascending: false });
+          )
+          .order("ordem", { ascending: true })
+          .order("created_at", { ascending: false })
+          .range(offset, offset + ITEMS_PER_PAGE - 1); // 🆕 PAGINAÇÃO
 
-      if (filtros.busca) {
-        query = query.ilike("titulo", `%${filtros.busca}%`);
-      }
-      if (filtros.categoria !== "all") {
-        query = query.eq("categoria_id", filtros.categoria);
-      }
-      if (filtros.tipo !== "all") {
-        query = query.eq("tipo", filtros.tipo);
-      }
-      if (filtros.status !== "all") {
-        query = query.eq("status", filtros.status === "ativo");
-      }
+        // Aplicar filtros
+        if (filtros.busca) {
+          query = query.ilike("titulo", `%${filtros.busca}%`);
+        }
+        if (filtros.categoria !== "all") {
+          query = query.eq("categoria_id", filtros.categoria);
+        }
+        if (filtros.tipo !== "all") {
+          query = query.eq("tipo", filtros.tipo);
+        }
+        if (filtros.status !== "all") {
+          query = query.eq("status", filtros.status === "ativo");
+        }
 
-      const { data, error } = await query;
-      if (error) {
-        console.error("Erro Supabase:", error);
-        throw new Error(`Erro ao carregar itens: ${error.message}`);
-      }
+        const { data, error } = await query;
 
-      setItens(data || []);
-    } catch (error: unknown) {
-      console.error("Erro ao carregar itens:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      toast.error(`Erro ao carregar itens: ${errorMessage}`);
-      setItens([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [filtros, supabase, verificarAdmin]);
+        if (error) {
+          console.error("Erro Supabase:", error);
+          throw new Error(`Erro ao carregar itens: ${error.message}`);
+        }
+
+        // 🆕 Contar total de itens para paginação
+        const total = await contarTotalItens(filtros);
+        setTotalItens(total);
+        setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
+
+        setItens(data || []);
+        setCurrentPage(page); // Atualizar página atual
+      } catch (error: unknown) {
+        console.error("Erro ao carregar itens:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro desconhecido";
+        toast.error(`Erro ao carregar itens: ${errorMessage}`);
+        setItens([]);
+        setTotalItens(0);
+        setTotalPages(0);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filtros, supabase, verificarAdmin, contarTotalItens]
+  );
 
   // Buscar categorias
   const fetchCategorias = useCallback(async () => {
@@ -331,21 +399,29 @@ export default function GaleriaPage() {
   }, [supabase, verificarAdmin]);
 
   // Atualizar dados
-  const refreshData = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await Promise.all([fetchItens(), fetchCategorias()]);
-    } catch (error) {
-      console.error("Erro ao atualizar dados:", error);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [fetchItens, fetchCategorias]);
+  const refreshData = useCallback(
+    async (page = currentPage) => {
+      setRefreshing(true);
+      try {
+        await Promise.all([fetchItens(page), fetchCategorias()]);
+      } catch (error) {
+        console.error("Erro ao atualizar dados:", error);
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [fetchItens, fetchCategorias, currentPage]
+  );
 
   // Efeito inicial
   useEffect(() => {
     refreshData();
   }, [refreshData]);
+
+  // 🆕 Efeito para atualizar quando filtros mudarem
+  useEffect(() => {
+    fetchItens(1); // Sempre volta para página 1 ao filtrar
+  }, [filtros, fetchItens]);
 
   // Funções de filtro
   const handleFiltroChange = (key: keyof Filtros, value: string) => {
@@ -353,7 +429,8 @@ export default function GaleriaPage() {
   };
 
   const aplicarFiltros = () => {
-    fetchItens();
+    setCurrentPage(1); // Resetar para página 1
+    fetchItens(1);
   };
 
   const limparFiltros = () => {
@@ -363,6 +440,63 @@ export default function GaleriaPage() {
       tipo: "all",
       status: "all",
     });
+    setCurrentPage(1);
+  };
+
+  // 🆕 Funções de paginação
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    fetchItens(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      handlePageChange(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      handlePageChange(currentPage + 1);
+    }
+  };
+
+  // 🆕 Gerar números de página para exibição
+  const generatePageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+
+    if (totalPages <= maxVisiblePages) {
+      // Mostrar todas as páginas
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      // Lógica para mostrar páginas com "..." no meio
+      const startPage = Math.max(1, currentPage - 2);
+      const endPage = Math.min(totalPages, currentPage + 2);
+
+      if (startPage > 1) {
+        pages.push(1);
+        if (startPage > 2) {
+          pages.push("ellipsis-start");
+        }
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+          pages.push("ellipsis-end");
+        }
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
   };
 
   // Funções de exclusão
@@ -430,7 +564,7 @@ export default function GaleriaPage() {
       }
 
       setDeleteDialog({ open: false, item: null, type: null, loading: false });
-      refreshData();
+      refreshData(currentPage); // 🆕 Manter na mesma página
     } catch (error: unknown) {
       console.error("Erro ao excluir:", error);
       const errorMessage =
@@ -495,15 +629,18 @@ export default function GaleriaPage() {
     );
   };
 
-  // Estatísticas
-  const stats = {
-    total: itens.length,
-    fotos: itens.filter((i) => i.tipo === "foto").length,
-    videos: itens.filter((i) => i.tipo === "video").length,
-    ativos: itens.filter((i) => i.status).length,
-    categorias: categorias.length,
-    categoriasAtivas: categorias.filter((c) => c.status).length,
-  };
+  // 🆕 Calcular estatísticas apenas dos itens atuais (não do total)
+  const stats = useMemo(() => {
+    const itensFiltrados = itens; // Já são os itens da página atual
+    return {
+      total: totalItens, // 🆕 Usar total de itens
+      fotos: itensFiltrados.filter((i) => i.tipo === "foto").length,
+      videos: itensFiltrados.filter((i) => i.tipo === "video").length,
+      ativos: itensFiltrados.filter((i) => i.status).length,
+      categorias: categorias.length,
+      categoriasAtivas: categorias.filter((c) => c.status).length,
+    };
+  }, [itens, categorias, totalItens]);
 
   // Variantes de animação
   const containerVariants = {
@@ -593,7 +730,7 @@ export default function GaleriaPage() {
           <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
-                onClick={refreshData}
+                onClick={() => refreshData(currentPage)}
                 disabled={refreshing}
                 variant="outline"
                 size="sm"
@@ -673,7 +810,7 @@ export default function GaleriaPage() {
             title="Total Itens"
             value={stats.total}
             icon={<RiImageFill className="w-6 h-6" />}
-            description="Itens na galeria"
+            description="Total na galeria"
             color="blue"
             delay={0}
             loading={loading}
@@ -682,7 +819,7 @@ export default function GaleriaPage() {
             title="Fotos"
             value={stats.fotos}
             icon={<RiImageFill className="w-6 h-6" />}
-            description="Imagens"
+            description="Nesta página"
             color="green"
             delay={1}
             loading={loading}
@@ -691,7 +828,7 @@ export default function GaleriaPage() {
             title="Vídeos"
             value={stats.videos}
             icon={<RiVideoFill className="w-6 h-6" />}
-            description="Vídeos"
+            description="Nesta página"
             color="purple"
             delay={2}
             loading={loading}
@@ -736,14 +873,17 @@ export default function GaleriaPage() {
             onValueChange={setActiveTab}
             className="space-y-6"
           >
-            <TabsList className="grid w-full grid-cols-2 bg-white/50 backdrop-blur-sm border">
-              <TabsTrigger value="itens" className="flex items-center gap-2">
+            <TabsList className="grid w-full grid-cols-2 bg-white/50 backdrop-blur-sm border border-gray-200">
+              <TabsTrigger
+                value="itens"
+                className="flex items-center gap-2 data-[state=active]:bg-navy-600 data-[state=active]:text-white data-[state=active]:font-bold data-[state=active]:shadow-md transition-all duration-300"
+              >
                 <RiGridFill className="w-4 h-4" />
                 Itens da Galeria ({stats.total})
               </TabsTrigger>
               <TabsTrigger
                 value="categorias"
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 data-[state=active]:bg-navy-600 data-[state=active]:text-white data-[state=active]:font-bold data-[state=active]:shadow-md transition-all duration-300"
               >
                 <RiFolderFill className="w-4 h-4" />
                 Categorias ({stats.categorias})
@@ -867,7 +1007,8 @@ export default function GaleriaPage() {
                       </motion.div>
                       <div className="flex-1 text-right">
                         <span className="text-sm text-gray-600 transition-colors duration-300">
-                          {itens.length} itens encontrados
+                          Mostrando {itens.length} de {totalItens} itens •
+                          Página {currentPage} de {totalPages}
                         </span>
                       </div>
                     </div>
@@ -885,7 +1026,7 @@ export default function GaleriaPage() {
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="flex items-center text-gray-800">
                       <RiGridFill className="w-5 h-5 mr-2 text-navy-600" />
-                      Lista de Itens ({itens.length})
+                      Lista de Itens ({itens.length} de {totalItens})
                     </CardTitle>
                     <motion.div
                       whileHover={{ scale: 1.05 }}
@@ -951,128 +1092,264 @@ export default function GaleriaPage() {
                         )}
                       </motion.div>
                     ) : (
-                      <motion.div
-                        variants={containerVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="space-y-4"
-                      >
-                        <AnimatePresence>
-                          {itens.map((item) => (
-                            <motion.div
-                              key={item.id}
-                              variants={itemVariants}
-                              initial="hidden"
-                              animate="visible"
-                              exit="hidden"
-                              whileHover={{
-                                backgroundColor: "rgba(0, 0, 0, 0.02)",
-                              }}
-                              className="border border-gray-200 rounded-lg transition-colors duration-300"
-                            >
-                              <Card className="border-0 shadow-none">
-                                <CardContent className="p-4">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex items-start space-x-4 flex-1">
-                                      <ImageWithFallback
-                                        src={
-                                          item.thumbnail_url || item.arquivo_url
-                                        }
-                                        alt={item.titulo}
-                                        tipo={item.tipo}
-                                      />
-                                      <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <h3 className="font-semibold text-gray-800">
-                                            {item.titulo}
-                                          </h3>
-                                          {getDestaqueBadge(item.destaque)}
-                                        </div>
-                                        {item.descricao && (
-                                          <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                                            {item.descricao}
-                                          </p>
-                                        )}
-                                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                                          <div className="flex items-center gap-1">
-                                            {getTipoBadge(item.tipo)}
+                      <>
+                        {/* Lista de Itens */}
+                        <motion.div
+                          variants={containerVariants}
+                          initial="hidden"
+                          animate="visible"
+                          className="space-y-4"
+                        >
+                          <AnimatePresence>
+                            {itens.map((item) => (
+                              <motion.div
+                                key={item.id}
+                                variants={itemVariants}
+                                initial="hidden"
+                                animate="visible"
+                                exit="hidden"
+                                whileHover={{
+                                  backgroundColor: "rgba(0, 0, 0, 0.02)",
+                                }}
+                                className="border border-gray-200 rounded-lg transition-colors duration-300"
+                              >
+                                <Card className="border-0 shadow-none">
+                                  <CardContent className="p-4">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex items-start space-x-4 flex-1">
+                                        <ImageWithFallback
+                                          src={
+                                            item.thumbnail_url ||
+                                            item.arquivo_url
+                                          }
+                                          alt={item.titulo}
+                                          tipo={item.tipo}
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <h3 className="font-semibold text-gray-800">
+                                              {item.titulo}
+                                            </h3>
+                                            {getDestaqueBadge(item.destaque)}
                                           </div>
-                                          <div className="flex items-center gap-1">
-                                            {getStatusBadge(item.status)}
+                                          {item.descricao && (
+                                            <p className="text-sm text-gray-600 line-clamp-2 mb-2">
+                                              {item.descricao}
+                                            </p>
+                                          )}
+                                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                                            <div className="flex items-center gap-1">
+                                              {getTipoBadge(item.tipo)}
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              {getStatusBadge(item.status)}
+                                            </div>
+                                            <Badge
+                                              variant="secondary"
+                                              className="bg-blue-100 text-blue-700 transition-colors duration-300"
+                                            >
+                                              {item.galeria_categorias?.nome ||
+                                                "N/A"}
+                                            </Badge>
+                                            <div className="flex items-center gap-1">
+                                              <RiCalendarFill className="w-3 h-3 text-gray-400 transition-colors duration-300" />
+                                              <span>
+                                                {new Date(
+                                                  item.created_at
+                                                ).toLocaleDateString("pt-BR")}
+                                              </span>
+                                            </div>
+                                            <motion.span
+                                              className="font-mono text-sm bg-gray-100 px-2 py-1 rounded transition-colors duration-300"
+                                              whileHover={{ scale: 1.05 }}
+                                            >
+                                              Ordem: {item.ordem}
+                                            </motion.span>
                                           </div>
-                                          <Badge
-                                            variant="secondary"
-                                            className="bg-blue-100 text-blue-700 transition-colors duration-300"
-                                          >
-                                            {item.galeria_categorias?.nome ||
-                                              "N/A"}
-                                          </Badge>
-                                          <div className="flex items-center gap-1">
-                                            <RiCalendarFill className="w-3 h-3 text-gray-400 transition-colors duration-300" />
-                                            <span>
-                                              {new Date(
-                                                item.created_at
-                                              ).toLocaleDateString("pt-BR")}
-                                            </span>
-                                          </div>
-                                          <motion.span
-                                            className="font-mono text-sm bg-gray-100 px-2 py-1 rounded transition-colors duration-300"
-                                            whileHover={{ scale: 1.05 }}
-                                          >
-                                            Ordem: {item.ordem}
-                                          </motion.span>
                                         </div>
                                       </div>
-                                    </div>
-                                    <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 ml-4">
-                                      <motion.div
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                      >
-                                        <Link
-                                          href={`/admin/galeria/itens/${item.id}`}
+                                      <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 ml-4">
+                                        <motion.div
+                                          whileHover={{ scale: 1.05 }}
+                                          whileTap={{ scale: 0.95 }}
+                                        >
+                                          <Link
+                                            href={`/admin/galeria/itens/${item.id}`}
+                                          >
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors duration-300"
+                                            >
+                                              <RiEditFill className="w-3 h-3 mr-1" />
+                                              Editar
+                                            </Button>
+                                          </Link>
+                                        </motion.div>
+                                        <motion.div
+                                          whileHover={{ scale: 1.05 }}
+                                          whileTap={{ scale: 0.95 }}
                                         >
                                           <Button
                                             variant="outline"
                                             size="sm"
-                                            className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors duration-300"
+                                            onClick={() => {
+                                              handleDeleteClick(item, "item");
+                                            }}
+                                            className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
                                           >
-                                            <RiEditFill className="w-3 h-3 mr-1" />
-                                            Editar
+                                            <RiDeleteBinFill className="w-3 h-3 mr-1" />
+                                            Excluir
                                           </Button>
-                                        </Link>
-                                      </motion.div>
-                                      <motion.div
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                      >
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            handleDeleteClick(item, "item");
-                                          }}
-                                          className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
-                                        >
-                                          <RiDeleteBinFill className="w-3 h-3 mr-1" />
-                                          Excluir
-                                        </Button>
-                                      </motion.div>
+                                        </motion.div>
+                                      </div>
                                     </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
-                      </motion.div>
+                                  </CardContent>
+                                </Card>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </motion.div>
+
+                        {/* 🆕 Paginação */}
+                        {totalPages > 1 && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.6, delay: 0.3 }}
+                            className="mt-8 pt-6 border-t border-gray-200"
+                          >
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                              <div className="text-sm text-gray-600">
+                                Mostrando{" "}
+                                <span className="font-semibold">
+                                  {(currentPage - 1) * ITEMS_PER_PAGE + 1}
+                                </span>{" "}
+                                a{" "}
+                                <span className="font-semibold">
+                                  {Math.min(
+                                    currentPage * ITEMS_PER_PAGE,
+                                    totalItens
+                                  )}
+                                </span>{" "}
+                                de{" "}
+                                <span className="font-semibold">
+                                  {totalItens}
+                                </span>{" "}
+                                itens
+                              </div>
+
+                              <Pagination>
+                                <PaginationContent>
+                                  {/* Botão Anterior */}
+                                  <PaginationItem>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handlePreviousPage}
+                                      disabled={currentPage === 1}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <RiArrowLeftLine className="w-4 h-4" />
+                                      <span className="hidden sm:inline">
+                                        Anterior
+                                      </span>
+                                    </Button>
+                                  </PaginationItem>
+
+                                  {/* Números de Página */}
+                                  {generatePageNumbers().map(
+                                    (pageNum, index) => (
+                                      <PaginationItem key={index}>
+                                        {pageNum === "ellipsis-start" ||
+                                        pageNum === "ellipsis-end" ? (
+                                          <span className="flex h-9 w-9 items-center justify-center">
+                                            <RiMoreFill className="w-4 h-4 text-gray-400" />
+                                          </span>
+                                        ) : (
+                                          <Button
+                                            variant={
+                                              currentPage === pageNum
+                                                ? "default"
+                                                : "outline"
+                                            }
+                                            size="sm"
+                                            className={`min-w-9 h-9 px-3 ${
+                                              currentPage === pageNum
+                                                ? "bg-navy-600 text-white hover:bg-navy-700"
+                                                : "border-gray-300 text-gray-700 hover:bg-gray-100"
+                                            }`}
+                                            onClick={() =>
+                                              handlePageChange(
+                                                pageNum as number
+                                              )
+                                            }
+                                          >
+                                            {pageNum}
+                                          </Button>
+                                        )}
+                                      </PaginationItem>
+                                    )
+                                  )}
+
+                                  {/* Botão Próximo */}
+                                  <PaginationItem>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={handleNextPage}
+                                      disabled={currentPage === totalPages}
+                                      className="flex items-center gap-2"
+                                    >
+                                      <span className="hidden sm:inline">
+                                        Próximo
+                                      </span>
+                                      <RiArrowRightLine className="w-4 h-4" />
+                                    </Button>
+                                  </PaginationItem>
+                                </PaginationContent>
+                              </Pagination>
+
+                              {/* Seletor de Página Rápida */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">
+                                  Ir para:
+                                </span>
+                                <Select
+                                  value={currentPage.toString()}
+                                  onValueChange={(value) =>
+                                    handlePageChange(parseInt(value))
+                                  }
+                                >
+                                  <SelectTrigger className="w-20 h-9">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Array.from(
+                                      { length: totalPages },
+                                      (_, i) => i + 1
+                                    ).map((page) => (
+                                      <SelectItem
+                                        key={page}
+                                        value={page.toString()}
+                                      >
+                                        Página {page}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </>
                     )}
                   </CardContent>
                 </Card>
               </motion.div>
             </TabsContent>
 
-            {/* Tab de Categorias */}
+            {/* Tab de Categorias (sem paginação) */}
             <TabsContent value="categorias" className="space-y-6">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
