@@ -1,4 +1,3 @@
-// src/components/ui/dialog.tsx - CORRIGIDO
 "use client";
 
 import * as React from "react";

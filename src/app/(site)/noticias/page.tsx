@@ -345,7 +345,7 @@ export default function NoticiasPage() {
         </div>
       </section>
 
-      {/* Filtros e Controles - SELECTS CORRIGIDOS */}
+      {/* Filtros e Controles */}
       <section className="py-6 sm:py-8 bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-40">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start lg:items-center justify-between">
@@ -366,9 +366,9 @@ export default function NoticiasPage() {
               </div>
             </div>
 
-            {/* Controls - SELECTS CORRIGIDOS (SEM PROBLEMA DE DESLOCAMENTO) */}
+            {/* Controls */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
-              {/* Category Filter - CORRIGIDO */}
+              {/* Category Filter */}
               <Select
                 value={selectedCategory}
                 onValueChange={(value) => {
@@ -380,13 +380,7 @@ export default function NoticiasPage() {
                   <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
                   <SelectValue placeholder="Filtrar por categoria" />
                 </SelectTrigger>
-                <SelectContent
-                  className="z-[9999] w-[var(--radix-select-trigger-width)] max-h-[300px] overflow-y-auto"
-                  position="popper"
-                  sideOffset={5}
-                  align="start"
-                  avoidCollisions={false}
-                >
+                <SelectContent className="z-50">
                   {categories.map((category) => {
                     const Icon = category.icon;
                     return (
@@ -401,7 +395,7 @@ export default function NoticiasPage() {
                 </SelectContent>
               </Select>
 
-              {/* Sort - CORRIGIDO */}
+              {/* Sort */}
               <Select
                 value={sortBy}
                 onValueChange={(value: "recent" | "oldest" | "destaque") =>
@@ -412,20 +406,14 @@ export default function NoticiasPage() {
                   <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
                   <SelectValue placeholder="Ordenar por" />
                 </SelectTrigger>
-                <SelectContent
-                  className="z-[9999] w-[var(--radix-select-trigger-width)]"
-                  position="popper"
-                  sideOffset={5}
-                  align="start"
-                  avoidCollisions={false}
-                >
+                <SelectContent className="z-50">
                   <SelectItem value="recent">Mais Recentes</SelectItem>
                   <SelectItem value="oldest">Mais Antigas</SelectItem>
                   <SelectItem value="destaque">Em Destaque</SelectItem>
                 </SelectContent>
               </Select>
 
-              {/* Items per Page - CORRIGIDO */}
+              {/* Items per Page */}
               <Select
                 value={itemsPerPage.toString()}
                 onValueChange={(value) => {
@@ -436,13 +424,7 @@ export default function NoticiasPage() {
                 <SelectTrigger className="w-full sm:w-28 lg:w-32 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent
-                  className="z-[9999] w-[var(--radix-select-trigger-width)]"
-                  position="popper"
-                  sideOffset={5}
-                  align="start"
-                  avoidCollisions={false}
-                >
+                <SelectContent className="z-50">
                   {ITEMS_PER_PAGE_OPTIONS.map((num) => (
                     <SelectItem key={num} value={num.toString()}>
                       {num} por página
