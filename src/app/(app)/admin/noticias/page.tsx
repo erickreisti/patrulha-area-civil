@@ -154,6 +154,7 @@ const ImageWithFallback = ({
         src={src}
         alt={alt}
         fill
+        sizes="(max-width: 768px) 64px, 64px"
         className="object-cover"
         onError={() => setImageError(true)}
         priority={false}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import Image from "next/image";
 import {
   RiNewspaperFill,
   RiSaveFill,
@@ -32,6 +33,8 @@ import {
   RiCheckFill,
   RiAlertFill,
   RiStarFill,
+  RiUploadCloudFill,
+  RiDeleteBinFill,
 } from "react-icons/ri";
 
 // Categorias pré-definidas
@@ -45,6 +48,208 @@ const CATEGORIAS = [
   "Comunicação",
 ];
 
+// Componente de Upload de Imagem
+function ImageUploadSection({
+  onImageUpload,
+  currentImage,
+  onImageRemove,
+}: {
+  onImageUpload: (url: string) => void;
+  currentImage?: string | null;
+  onImageRemove: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(
+    currentImage || null
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validações básicas
+    if (!file.type.startsWith("image/")) {
+      alert("Por favor, selecione apenas arquivos de imagem.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem deve ter no máximo 5MB.");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Criar preview local
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewUrl(objectUrl);
+
+      // Preparar form data
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "image");
+
+      console.log("🔄 Enviando imagem para upload...");
+
+      const response = await fetch("/api/upload/general", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro no upload");
+      }
+
+      const result = await response.json();
+      console.log("✅ Upload realizado:", result.url);
+
+      // Chamar callback com a URL
+      onImageUpload(result.url);
+
+      // Limpar preview local
+      URL.revokeObjectURL(objectUrl);
+      setPreviewUrl(result.url);
+    } catch (error: unknown) {
+      console.error("❌ Erro no upload:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Erro ao fazer upload da imagem"
+      );
+
+      // Limpar preview em caso de erro
+      setPreviewUrl(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setPreviewUrl(null);
+    onImageRemove();
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  return (
+    <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+      <CardHeader>
+        <CardTitle className="text-lg flex items-center text-gray-800">
+          <RiImageFill className="w-4 h-4 mr-2 text-blue-600" />
+          Imagem de Capa
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Preview da Imagem */}
+        {previewUrl && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative group"
+          >
+            <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-gray-200">
+              <Image
+                src={previewUrl}
+                alt="Preview da imagem"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 400px"
+              />
+              {/* Overlay com botão de remover */}
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleRemoveImage}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                >
+                  <RiDeleteBinFill className="w-4 h-4 mr-1" />
+                  Remover
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Área de Upload */}
+        <div
+          className={`
+            border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 cursor-pointer
+            ${
+              previewUrl
+                ? "border-green-500 bg-green-50"
+                : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+            }
+            ${uploading ? "opacity-50 cursor-not-allowed" : ""}
+          `}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={handleFileSelect}
+            className="hidden"
+            disabled={uploading}
+          />
+
+          {uploading ? (
+            <div className="space-y-2">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              >
+                <RiUploadCloudFill className="w-8 h-8 text-blue-500 mx-auto mb-2" />
+              </motion.div>
+              <p className="text-sm text-blue-600 font-medium">
+                Enviando imagem...
+              </p>
+            </div>
+          ) : previewUrl ? (
+            <div className="space-y-2">
+              <RiCheckFill className="w-8 h-8 text-green-500 mx-auto mb-2" />
+              <p className="text-sm text-green-600 font-medium">
+                Imagem selecionada
+              </p>
+              <p className="text-xs text-gray-500">
+                Clique para alterar ou arraste uma nova imagem
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <RiImageFill className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-gray-600">
+                Clique para selecionar ou arraste uma imagem
+              </p>
+              <p className="text-xs text-gray-500">
+                JPG, PNG, WEBP ou GIF • Máximo 5MB
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Informações de ajuda */}
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+          <p className="text-xs text-gray-600 text-center">
+            <strong>Dica:</strong> Use imagens com proporção 16:9 para melhor
+            visualização
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function CriarNoticiaPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -55,6 +260,7 @@ export default function CriarNoticiaPage() {
     slug: "",
     conteudo: "",
     resumo: "",
+    imagem: null as string | null,
     categoria: "Operações",
     destaque: false,
     data_publicacao: new Date().toISOString().split("T")[0],
@@ -115,6 +321,20 @@ export default function CriarNoticiaPage() {
     }));
   };
 
+  const handleImageUpload = (imageUrl: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      imagem: imageUrl,
+    }));
+  };
+
+  const handleImageRemove = () => {
+    setFormData((prev) => ({
+      ...prev,
+      imagem: null,
+    }));
+  };
+
   const validateForm = (): string[] => {
     const errors: string[] = [];
 
@@ -162,14 +382,31 @@ export default function CriarNoticiaPage() {
     }
 
     try {
-      // Verificar se slug já existe
-      const { data: existingSlug } = await supabase
+      // ✅ CORREÇÃO: Verificar se slug já existe com headers apropriados
+      const { data: existingSlug, error: slugError } = await supabase
         .from("noticias")
         .select("id")
         .eq("slug", formData.slug)
         .single();
 
-      if (existingSlug) {
+      // ✅ CORREÇÃO: Tratar erro 406 específico
+      if (slugError) {
+        // Se for erro 406 (Not Acceptable), ignorar e continuar
+        // Isso pode acontecer por headers, mas não significa que o slug existe
+        if (slugError.code === "406" || slugError.message?.includes("406")) {
+          console.log("⚠️ Warning de headers ignorado, continuando...");
+        } else if (slugError.code === "PGRST116") {
+          // PGRST116 = No rows returned (slug não existe) - isso é bom!
+          console.log("✅ Slug disponível");
+        } else {
+          // Outro erro real
+          console.error("❌ Erro ao verificar slug:", slugError);
+          throw slugError;
+        }
+      }
+
+      // ✅ CORREÇÃO: Se encontrou um slug existente (e não foi erro 406)
+      if (existingSlug && !slugError) {
         setErrors(["Já existe outra notícia com este slug. Altere o título."]);
         setLoading(false);
         return;
@@ -195,7 +432,7 @@ export default function CriarNoticiaPage() {
           slug: formData.slug.trim(),
           conteudo: formData.conteudo.trim(),
           resumo: formData.resumo.trim(),
-          imagem: null,
+          imagem: formData.imagem,
           categoria: formData.categoria,
           autor_id: user.id,
           destaque: formData.destaque,
@@ -544,41 +781,12 @@ export default function CriarNoticiaPage() {
 
           {/* Sidebar - Configurações */}
           <div className="space-y-6">
-            {/* Imagem de Capa */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center text-gray-800">
-                    <RiImageFill className="w-4 h-4 mr-2 text-blue-600" />
-                    Imagem de Capa
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center transition-all duration-300 hover:border-blue-500 hover:bg-blue-50">
-                    <RiImageFill className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-600 mb-2">
-                      Upload de imagem (em desenvolvimento)
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled
-                      className="text-xs border-gray-700 text-gray-700 hover:bg-gray-100 transition-colors duration-300"
-                    >
-                      Selecionar Imagem
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2 transition-colors duration-300">
-                    Sistema de upload será implementado em breve
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
+            {/* Componente de Upload de Imagem */}
+            <ImageUploadSection
+              onImageUpload={handleImageUpload}
+              currentImage={formData.imagem}
+              onImageRemove={handleImageRemove}
+            />
 
             {/* Configurações de Publicação */}
             <motion.div
@@ -745,6 +953,19 @@ export default function CriarNoticiaPage() {
                         }
                       >
                         {formData.status.toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Imagem:</span>
+                      <Badge
+                        variant={formData.imagem ? "default" : "secondary"}
+                        className={
+                          formData.imagem
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-700"
+                        }
+                      >
+                        {formData.imagem ? "✓ Definida" : "Não definida"}
                       </Badge>
                     </div>
                     {formData.destaque && (

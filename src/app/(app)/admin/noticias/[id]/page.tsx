@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { FileUpload } from "@/components/ui/file-upload";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
@@ -128,6 +129,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
           src={src}
           alt={alt}
           fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           className="object-cover"
           onError={() => setImageError(true)}
           priority={false}
@@ -147,7 +149,11 @@ export default function EditarNoticiaPage({ params }: PageProps) {
         .select(
           `
           *,
-          autor:profiles(full_name, graduacao)
+          profiles!autor_id (
+            full_name,
+            graduacao,
+            avatar_url
+          )
         `
         )
         .eq("id", params.id)
@@ -156,7 +162,19 @@ export default function EditarNoticiaPage({ params }: PageProps) {
       if (error) throw error;
       if (!noticiaData) throw new Error("Notícia não encontrada");
 
-      setNoticia(noticiaData);
+      // Transformar os dados para a interface NoticiaWithAutor
+      const noticiaTransformada: NoticiaWithAutor = {
+        ...noticiaData,
+        autor: noticiaData.profiles
+          ? {
+              full_name: noticiaData.profiles.full_name,
+              graduacao: noticiaData.profiles.graduacao,
+              avatar_url: noticiaData.profiles.avatar_url,
+            }
+          : undefined,
+      };
+
+      setNoticia(noticiaTransformada);
       setFormData({
         titulo: noticiaData.titulo,
         slug: noticiaData.slug,
@@ -212,6 +230,15 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     }));
   };
 
+  // ✅ CORREÇÃO: Função para lidar com upload de imagem
+  const handleImageUpload = (imageUrl: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      imagem: imageUrl,
+    }));
+    toast.success("Imagem carregada com sucesso!");
+  };
+
   const validateForm = (): string[] => {
     const errors: string[] = [];
 
@@ -245,12 +272,18 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     }
 
     try {
-      const { data: existingSlug } = await supabase
+      // ✅ CORREÇÃO: Verificação de slug com tratamento de erro
+      const { data: existingSlug, error: slugError } = await supabase
         .from("noticias")
         .select("id")
         .eq("slug", formData.slug)
         .neq("id", params.id)
-        .single();
+        .maybeSingle();
+
+      if (slugError && slugError.code !== "PGRST116") {
+        // PGRST116 é "Não encontrado" - isso é normal
+        console.error("Erro ao verificar slug:", slugError);
+      }
 
       if (existingSlug) {
         setErrors([
@@ -261,17 +294,31 @@ export default function EditarNoticiaPage({ params }: PageProps) {
       }
 
       const updateData = {
-        ...formData,
+        titulo: formData.titulo,
+        slug: formData.slug,
+        conteudo: formData.conteudo,
+        resumo: formData.resumo,
+        imagem: formData.imagem,
+        categoria: formData.categoria,
+        destaque: formData.destaque,
+        data_publicacao: formData.data_publicacao,
+        status: formData.status,
         updated_at: new Date().toISOString(),
       };
 
-      const { error } = await supabase
+      console.log("📤 Enviando dados para atualização:", updateData);
+
+      const { error: updateError } = await supabase
         .from("noticias")
         .update(updateData)
         .eq("id", params.id);
 
-      if (error) throw error;
+      if (updateError) {
+        console.error("❌ Erro detalhado do Supabase:", updateError);
+        throw updateError;
+      }
 
+      console.log("✅ Notícia atualizada com sucesso!");
       toast.success("Notícia atualizada com sucesso!");
       setShowSuccess(true);
 
@@ -542,44 +589,73 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                 </CardHeader>
                 <CardContent className="p-6">
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Preview da Imagem */}
-                    {formData.imagem && (
-                      <motion.div
-                        variants={fadeInUp}
-                        className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border"
-                      >
-                        <ImageWithFallback
-                          src={formData.imagem}
-                          alt="Imagem da notícia"
-                          className="w-16 h-16"
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-800">
-                            Imagem atual
-                          </p>
-                          <p className="text-xs text-gray-600 truncate">
-                            {formData.imagem}
-                          </p>
+                    {/* Upload de Imagem */}
+                    <motion.div variants={fadeInUp} className="space-y-4">
+                      <Label className="text-sm font-semibold text-gray-700">
+                        Imagem da Notícia
+                      </Label>
+
+                      {/* Preview da Imagem Atual */}
+                      {formData.imagem && (
+                        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border mb-4">
+                          <ImageWithFallback
+                            src={formData.imagem}
+                            alt="Imagem atual da notícia"
+                            className="w-20 h-20"
+                          />
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-800">
+                              Imagem atual
+                            </p>
+                            <p className="text-xs text-gray-600 truncate max-w-xs">
+                              {formData.imagem}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                window.open(formData.imagem!, "_blank")
+                              }
+                              className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                            >
+                              <RiExternalLinkLine className="w-3 h-3 mr-1" />
+                              Ver
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  imagem: null,
+                                }));
+                                toast.info("Imagem removida");
+                              }}
+                              className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                            >
+                              <RiDeleteBinLine className="w-3 h-3 mr-1" />
+                              Remover
+                            </Button>
+                          </div>
                         </div>
-                        <motion.div
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              window.open(formData.imagem!, "_blank")
-                            }
-                            className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                          >
-                            <RiExternalLinkLine className="w-3 h-3 mr-1" />
-                            Ver
-                          </Button>
-                        </motion.div>
-                      </motion.div>
-                    )}
+                      )}
+
+                      {/* Componente de Upload */}
+                      <FileUpload
+                        type="image"
+                        onFileChange={handleImageUpload}
+                        currentFile={formData.imagem || undefined}
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 hover:border-blue-400 transition-colors"
+                      />
+
+                      <p className="text-xs text-gray-500">
+                        Formatos suportados: JPG, PNG, WEBP. Tamanho máximo: 5MB
+                      </p>
+                    </motion.div>
 
                     {/* Título */}
                     <motion.div variants={fadeInUp} className="space-y-2">
@@ -683,33 +759,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       <p className="text-gray-500 text-sm transition-colors duration-300">
                         {formData.conteudo.length} caracteres
                       </p>
-                    </motion.div>
-
-                    {/* URL da Imagem */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.4 }}
-                      className="space-y-2"
-                    >
-                      <Label className="text-sm font-semibold text-gray-700">
-                        URL da Imagem
-                      </Label>
-                      <div className="flex items-center">
-                        <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm transition-colors duration-300">
-                          <RiExternalLinkLine className="w-3 h-3" />
-                        </span>
-                        <Input
-                          value={formData.imagem || ""}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              imagem: e.target.value || null,
-                            }))
-                          }
-                          placeholder="https://exemplo.com/imagem.jpg"
-                          className="flex-1 rounded-l-none transition-all duration-300 focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
                     </motion.div>
 
                     {/* Botões de Ação */}

@@ -19,6 +19,56 @@ export interface AuthUser {
   email: string;
 }
 
+// ==================== NOTÍCIAS ====================
+export type NoticiaStatus = "rascunho" | "publicado" | "arquivado";
+
+export interface Noticia {
+  id: string;
+  titulo: string;
+  slug: string;
+  conteudo: string;
+  resumo: string;
+  imagem: string | null;
+  categoria: string;
+  autor_id: string;
+  destaque: boolean;
+  data_publicacao: string;
+  status: NoticiaStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NoticiaWithAutor extends Noticia {
+  autor?: {
+    full_name: string;
+    graduacao: string;
+    avatar_url?: string;
+  };
+}
+
+export interface NoticiaFormData {
+  titulo: string;
+  slug: string;
+  conteudo: string;
+  resumo: string;
+  imagem: string | null;
+  categoria: string;
+  destaque: boolean;
+  data_publicacao: string;
+  status: NoticiaStatus;
+}
+
+// Interfaces específicas para hooks (com menos campos)
+export interface NoticiaListagem {
+  id: string;
+  titulo: string;
+  slug: string;
+  resumo: string | null;
+  categoria: string | null;
+  data_publicacao: string;
+  destaque: boolean;
+}
+
 // ==================== GALERIA ====================
 export type TipoCategoria = "fotos" | "videos";
 export type TipoItem = "foto" | "video";
@@ -76,56 +126,6 @@ export interface CreateItemData {
 }
 
 export type UpdateItemData = Partial<CreateItemData>;
-
-// ==================== NOTÍCIAS ====================
-export type NoticiaStatus = "rascunho" | "publicado" | "arquivado";
-
-export interface Noticia {
-  id: string;
-  titulo: string;
-  slug: string;
-  conteudo: string;
-  resumo: string;
-  imagem: string | null;
-  categoria: string;
-  autor_id: string;
-  destaque: boolean;
-  data_publicacao: string;
-  status: NoticiaStatus;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface NoticiaWithAutor extends Noticia {
-  autor?: {
-    full_name: string;
-    graduacao: string;
-  };
-}
-
-export interface NoticiaFormData {
-  titulo: string;
-  slug: string;
-  conteudo: string;
-  resumo: string;
-  imagem: string | null;
-  categoria: string;
-  destaque: boolean;
-  data_publicacao: string;
-  status: NoticiaStatus;
-}
-
-// ==================== HOOKS SPECIFIC ====================
-// Interfaces específicas para hooks (com menos campos)
-export interface NoticiaListagem {
-  id: string;
-  titulo: string;
-  slug: string;
-  resumo: string | null;
-  categoria: string | null;
-  data_publicacao: string;
-  destaque: boolean;
-}
 
 export interface CategoriaListagem {
   id: string;
