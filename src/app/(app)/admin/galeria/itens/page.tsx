@@ -1,3 +1,4 @@
+// src/app/(app)/admin/galeria/itens/page.tsx - VERSÃO CORRIGIDA E COMPLETA
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -27,24 +28,25 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  RiAddLine,
-  RiEditLine,
-  RiDeleteBinLine,
-  RiImageLine,
-  RiVideoLine,
-  RiEyeLine,
-  RiEyeOffLine,
-  RiSearchLine,
-  RiFilterLine,
-  RiCalendarLine,
-  RiBarChartLine,
-  RiHomeLine,
-  RiUserLine,
-  RiRefreshLine,
-  RiAlertLine,
-  RiStarLine,
+  RiAddFill,
+  RiEditFill,
+  RiDeleteBinFill,
+  RiImageFill,
+  RiVideoFill,
+  RiEyeFill,
+  RiEyeOffFill,
+  RiSearchFill,
+  RiFilterFill,
+  RiCalendarFill,
+  RiBarChartFill,
+  RiHomeFill,
+  RiUserFill,
+  RiRefreshFill,
+  RiAlertFill,
+  RiStarFill,
 } from "react-icons/ri";
 
+// ✅ INTERFACE COMPLETA baseada no schema
 interface GaleriaItem {
   id: string;
   titulo: string;
@@ -57,17 +59,31 @@ interface GaleriaItem {
   destaque: boolean;
   ordem: number;
   created_at: string;
-  autor_id: string;
+  autor_id: string | null;
+  // ✅ Campos adicionais do relacionamento
   galeria_categorias: {
+    id: string;
     nome: string;
+    slug: string;
     tipo: "fotos" | "videos";
-  };
+    descricao: string | null;
+    ordem: number;
+    status: boolean;
+    created_at: string;
+    updated_at: string;
+  } | null;
 }
 
 interface Categoria {
   id: string;
   nome: string;
+  slug: string;
   tipo: "fotos" | "videos";
+  descricao: string | null;
+  ordem: number;
+  status: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Filtros {
@@ -176,10 +192,12 @@ export default function ItensGaleriaPage() {
 
   const supabase = createClient();
 
+  // ✅ FETCH COMPLETO dos itens
   const fetchItens = useCallback(async () => {
     try {
       setLoading(true);
       setRefreshing(true);
+      console.log("🔄 Buscando itens da galeria...");
 
       let query = supabase
         .from("galeria_itens")
@@ -187,14 +205,22 @@ export default function ItensGaleriaPage() {
           `
           *,
           galeria_categorias (
+            id,
             nome,
-            tipo
+            slug,
+            tipo,
+            descricao,
+            ordem,
+            status,
+            created_at,
+            updated_at
           )
         `
         )
         .order("ordem", { ascending: true })
         .order("created_at", { ascending: false });
 
+      // Aplicar filtros
       if (filtros.busca) {
         query = query.ilike("titulo", `%${filtros.busca}%`);
       }
@@ -213,11 +239,17 @@ export default function ItensGaleriaPage() {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao buscar itens:", error);
+        throw error;
+      }
+
+      console.log(`✅ ${data?.length || 0} itens carregados do banco`);
+      console.log("📊 Dados recebidos:", data);
 
       setItens(data || []);
     } catch (error: unknown) {
-      console.error("Erro ao carregar itens:", error);
+      console.error("❌ Erro ao carregar itens:", error);
       toast.error("Erro ao carregar itens da galeria");
     } finally {
       setLoading(false);
@@ -225,19 +257,26 @@ export default function ItensGaleriaPage() {
     }
   }, [filtros, supabase]);
 
+  // ✅ FETCH COMPLETO das categorias
   const fetchCategorias = useCallback(async () => {
     try {
+      console.log("🔄 Buscando categorias...");
+
       const { data, error } = await supabase
         .from("galeria_categorias")
-        .select("id, nome, tipo")
+        .select("*")
         .eq("status", true)
         .order("ordem", { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Erro ao buscar categorias:", error);
+        throw error;
+      }
 
+      console.log(`✅ ${data?.length || 0} categorias carregadas`);
       setCategorias(data || []);
     } catch (error: unknown) {
-      console.error("Erro ao carregar categorias:", error);
+      console.error("❌ Erro ao carregar categorias:", error);
       toast.error("Erro ao carregar categorias");
     }
   }, [supabase]);
@@ -272,7 +311,7 @@ export default function ItensGaleriaPage() {
       setDeleteDialog({ open: false, item: null, loading: false });
       fetchItens();
     } catch (error: unknown) {
-      console.error("Erro ao excluir item:", error);
+      console.error("❌ Erro ao excluir item:", error);
       toast.error("Erro ao excluir item");
       setDeleteDialog((prev) => ({ ...prev, loading: false }));
     }
@@ -298,12 +337,12 @@ export default function ItensGaleriaPage() {
   const getTipoBadge = (tipo: string) => {
     return tipo === "foto" ? (
       <Badge className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300">
-        <RiImageLine className="w-3 h-3 mr-1" />
+        <RiImageFill className="w-3 h-3 mr-1" />
         Foto
       </Badge>
     ) : (
       <Badge className="bg-purple-600 hover:bg-purple-700 text-white transition-colors duration-300">
-        <RiVideoLine className="w-3 h-3 mr-1" />
+        <RiVideoFill className="w-3 h-3 mr-1" />
         Vídeo
       </Badge>
     );
@@ -312,7 +351,7 @@ export default function ItensGaleriaPage() {
   const getStatusBadge = (status: boolean) => {
     return status ? (
       <Badge className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
-        <RiEyeLine className="w-3 h-3 mr-1" />
+        <RiEyeFill className="w-3 h-3 mr-1" />
         Ativo
       </Badge>
     ) : (
@@ -320,7 +359,7 @@ export default function ItensGaleriaPage() {
         variant="secondary"
         className="bg-gray-500 text-white transition-colors duration-300"
       >
-        <RiEyeOffLine className="w-3 h-3 mr-1" />
+        <RiEyeOffFill className="w-3 h-3 mr-1" />
         Inativo
       </Badge>
     );
@@ -329,17 +368,20 @@ export default function ItensGaleriaPage() {
   const getDestaqueBadge = (destaque: boolean) => {
     return destaque ? (
       <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white transition-colors duration-300">
-        <RiStarLine className="w-3 h-3 mr-1" />
+        <RiStarFill className="w-3 h-3 mr-1" />
         Destaque
       </Badge>
     ) : null;
   };
 
+  // ✅ ESTATÍSTICAS COMPLETAS
   const stats = {
     total: itens.length,
     fotos: itens.filter((i) => i.tipo === "foto").length,
     videos: itens.filter((i) => i.tipo === "video").length,
     ativos: itens.filter((i) => i.status).length,
+    inativos: itens.filter((i) => !i.status).length,
+    comDestaque: itens.filter((i) => i.destaque).length,
   };
 
   const containerVariants = {
@@ -377,7 +419,7 @@ export default function ItensGaleriaPage() {
     if (tipo === "video" || !src) {
       return (
         <div className="w-12 h-12 rounded flex items-center justify-center bg-purple-100">
-          <RiVideoLine className="w-6 h-6 text-purple-500" />
+          <RiVideoFill className="w-6 h-6 text-purple-500" />
         </div>
       );
     }
@@ -385,7 +427,7 @@ export default function ItensGaleriaPage() {
     if (imageError) {
       return (
         <div className="w-12 h-12 rounded bg-gray-200 flex items-center justify-center">
-          <RiImageLine className="w-5 h-5 text-gray-400" />
+          <RiImageFill className="w-5 h-5 text-gray-400" />
         </div>
       );
     }
@@ -406,119 +448,134 @@ export default function ItensGaleriaPage() {
     );
   };
 
+  // ✅ DEBUG: Log dos dados recebidos
+  useEffect(() => {
+    if (itens.length > 0) {
+      console.log("📋 DADOS DOS ITENS CARREGADOS:", {
+        total: itens.length,
+        primeiroItem: itens[0],
+        camposDisponiveis: Object.keys(itens[0]),
+        categoriasDisponiveis: itens[0].galeria_categorias
+          ? Object.keys(itens[0].galeria_categorias)
+          : "N/A",
+      });
+    }
+  }, [itens]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header - TÍTULO E DESCRIÇÃO */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          className="mb-6"
         >
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-              GERENCIAR ITENS DA GALERIA
-            </h1>
-            <p className="text-gray-600">
-              Gerencie fotos e vídeos da galeria da Patrulha Aérea Civil
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                onClick={() => {
-                  setRefreshing(true);
-                  fetchItens();
-                }}
-                disabled={refreshing}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
-              >
-                <motion.div
-                  animate={{ rotate: refreshing ? 360 : 0 }}
-                  transition={{
-                    duration: 1,
-                    repeat: refreshing ? Infinity : 0,
-                  }}
-                >
-                  <RiRefreshLine
-                    className={`w-4 h-4 ${
-                      refreshing ? "text-blue-600" : "text-gray-600"
-                    }`}
-                  />
-                </motion.div>
-                <span className="hidden sm:inline">
-                  {refreshing ? "Atualizando..." : "Atualizar"}
-                </span>
-              </Button>
-            </motion.div>
-
-            <div className="flex gap-3">
-              {[
-                {
-                  href: "/admin/dashboard",
-                  icon: RiBarChartLine,
-                  label: "Dashboard",
-                  variant: "outline" as const,
-                  className:
-                    "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-                },
-                {
-                  href: "/perfil",
-                  icon: RiUserLine,
-                  label: "Meu Perfil",
-                  variant: "outline" as const,
-                  className:
-                    "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-                },
-                {
-                  href: "/",
-                  icon: RiHomeLine,
-                  label: "Voltar ao Site",
-                  variant: "outline" as const,
-                  className:
-                    "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-                },
-                {
-                  href: "/admin/galeria/itens/criar",
-                  icon: RiAddLine,
-                  label: "Novo Item",
-                  variant: "default" as const,
-                  className: "bg-green-600 hover:bg-green-700 text-white",
-                },
-              ].map((item, index) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Link href={item.href}>
-                    <Button
-                      variant={item.variant}
-                      className={`transition-all duration-300 ${item.className}`}
-                    >
-                      <item.icon className="w-4 h-4 mr-2" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+            GERENCIAR ITENS DA GALERIA
+          </h1>
+          <p className="text-gray-600">
+            Gerencie fotos e vídeos da galeria da Patrulha Aérea Civil
+          </p>
         </motion.div>
 
-        {/* Estatísticas */}
+        {/* ✅ BOTÕES ABAIXO DO HEADER */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="flex flex-wrap gap-3 mb-8"
+        >
+          {/* Botão de Atualizar */}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              onClick={() => {
+                setRefreshing(true);
+                fetchItens();
+              }}
+              disabled={refreshing}
+              variant="outline"
+              className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
+            >
+              <motion.div
+                animate={{ rotate: refreshing ? 360 : 0 }}
+                transition={{
+                  duration: 1,
+                  repeat: refreshing ? Infinity : 0,
+                }}
+              >
+                <RiRefreshFill
+                  className={`w-4 h-4 ${
+                    refreshing ? "text-blue-600" : "text-gray-600"
+                  }`}
+                />
+              </motion.div>
+              {refreshing ? "Atualizando..." : "Atualizar Lista"}
+            </Button>
+          </motion.div>
+
+          {/* Botão Novo Item */}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link href="/admin/galeria/itens/criar">
+              <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
+                <RiAddFill className="w-4 h-4 mr-2" />
+                Novo Item
+              </Button>
+            </Link>
+          </motion.div>
+
+          {/* Botões de Navegação */}
+          {[
+            {
+              href: "/admin/dashboard",
+              icon: RiBarChartFill,
+              label: "Dashboard",
+              className:
+                "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
+            },
+            {
+              href: "/perfil",
+              icon: RiUserFill,
+              label: "Meu Perfil",
+              className:
+                "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
+            },
+            {
+              href: "/",
+              icon: RiHomeFill,
+              label: "Voltar ao Site",
+              className:
+                "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
+            },
+          ].map((button, index) => (
+            <motion.div
+              key={button.href}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href={button.href}>
+                <Button
+                  variant="outline"
+                  className={`transition-all duration-300 ${button.className}`}
+                >
+                  <button.icon className="w-4 h-4 mr-2" />
+                  {button.label}
+                </Button>
+              </Link>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* ✅ ESTATÍSTICAS COMPLETAS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <StatCard
             title="Total"
             value={stats.total}
-            icon={<RiImageLine className="w-6 h-6" />}
+            icon={<RiImageFill className="w-6 h-6" />}
             description="Itens na galeria"
             color="blue"
             delay={0}
@@ -527,7 +584,7 @@ export default function ItensGaleriaPage() {
           <StatCard
             title="Fotos"
             value={stats.fotos}
-            icon={<RiImageLine className="w-6 h-6" />}
+            icon={<RiImageFill className="w-6 h-6" />}
             description="Imagens"
             color="green"
             delay={1}
@@ -536,7 +593,7 @@ export default function ItensGaleriaPage() {
           <StatCard
             title="Vídeos"
             value={stats.videos}
-            icon={<RiVideoLine className="w-6 h-6" />}
+            icon={<RiVideoFill className="w-6 h-6" />}
             description="Vídeos"
             color="purple"
             delay={2}
@@ -545,7 +602,7 @@ export default function ItensGaleriaPage() {
           <StatCard
             title="Ativos"
             value={stats.ativos}
-            icon={<RiEyeLine className="w-6 h-6" />}
+            icon={<RiEyeFill className="w-6 h-6" />}
             description="Visíveis no site"
             color="amber"
             delay={3}
@@ -562,7 +619,7 @@ export default function ItensGaleriaPage() {
           <Card className="border-0 shadow-lg mb-8 transition-all duration-300 hover:shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-gray-800">
-                <RiFilterLine className="w-5 h-5 text-navy-600" />
+                <RiFilterFill className="w-5 h-5 text-navy-600" />
                 Filtros e Busca
               </CardTitle>
             </CardHeader>
@@ -570,7 +627,7 @@ export default function ItensGaleriaPage() {
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2">
                   <div className="relative">
-                    <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
+                    <RiSearchFill className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
                     <Input
                       placeholder="Buscar por título..."
                       value={filtros.busca}
@@ -647,7 +704,7 @@ export default function ItensGaleriaPage() {
                     onClick={aplicarFiltros}
                     className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300"
                   >
-                    <RiFilterLine className="w-4 h-4 mr-2" />
+                    <RiFilterFill className="w-4 h-4 mr-2" />
                     Aplicar Filtros
                   </Button>
                 </motion.div>
@@ -684,7 +741,7 @@ export default function ItensGaleriaPage() {
           <Card className="border-0 shadow-lg transition-all duration-300 hover:shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center text-gray-800">
-                <RiImageLine className="w-5 h-5 mr-2 text-navy-600" />
+                <RiImageFill className="w-5 h-5 mr-2 text-navy-600" />
                 Lista de Itens ({itens.length})
               </CardTitle>
             </CardHeader>
@@ -715,7 +772,7 @@ export default function ItensGaleriaPage() {
                   transition={{ duration: 0.5 }}
                   className="text-center py-12"
                 >
-                  <RiImageLine className="w-20 h-20 text-gray-300 mx-auto mb-4" />
+                  <RiImageFill className="w-20 h-20 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-600 mb-4">
                     {Object.values(filtros).some(
                       (val) => val !== "" && val !== "all"
@@ -732,7 +789,7 @@ export default function ItensGaleriaPage() {
                     >
                       <Link href="/admin/galeria/itens/criar">
                         <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
-                          <RiAddLine className="w-4 h-4 mr-2" />
+                          <RiAddFill className="w-4 h-4 mr-2" />
                           Adicionar Primeiro Item
                         </Button>
                       </Link>
@@ -791,10 +848,11 @@ export default function ItensGaleriaPage() {
                                       variant="secondary"
                                       className="bg-blue-100 text-blue-700 transition-colors duration-300"
                                     >
-                                      {item.galeria_categorias?.nome || "N/A"}
+                                      {item.galeria_categorias?.nome ||
+                                        "Sem categoria"}
                                     </Badge>
                                     <div className="flex items-center gap-1">
-                                      <RiCalendarLine className="w-3 h-3 text-gray-400 transition-colors duration-300" />
+                                      <RiCalendarFill className="w-3 h-3 text-gray-400 transition-colors duration-300" />
                                       <span>
                                         {new Date(
                                           item.created_at
@@ -823,7 +881,7 @@ export default function ItensGaleriaPage() {
                                       size="sm"
                                       className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors duration-300"
                                     >
-                                      <RiEditLine className="w-3 h-3 mr-1" />
+                                      <RiEditFill className="w-3 h-3 mr-1" />
                                       Editar
                                     </Button>
                                   </Link>
@@ -839,7 +897,7 @@ export default function ItensGaleriaPage() {
                                     onClick={() => handleDeleteClick(item)}
                                     className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
                                   >
-                                    <RiDeleteBinLine className="w-3 h-3 mr-1" />
+                                    <RiDeleteBinFill className="w-3 h-3 mr-1" />
                                     Excluir
                                   </Button>
                                 </motion.div>
@@ -871,7 +929,7 @@ export default function ItensGaleriaPage() {
             >
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-red-600">
-                  <RiAlertLine className="w-5 h-5" />
+                  <RiAlertFill className="w-5 h-5" />
                   Confirmar Exclusão
                 </DialogTitle>
                 <DialogDescription>
@@ -921,13 +979,13 @@ export default function ItensGaleriaPage() {
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity }}
                         >
-                          <RiRefreshLine className="w-4 h-4 mr-2" />
+                          <RiRefreshFill className="w-4 h-4 mr-2" />
                         </motion.div>
                         Excluindo...
                       </>
                     ) : (
                       <>
-                        <RiDeleteBinLine className="w-4 h-4 mr-2" />
+                        <RiDeleteBinFill className="w-4 h-4 mr-2" />
                         Excluir Item
                       </>
                     )}

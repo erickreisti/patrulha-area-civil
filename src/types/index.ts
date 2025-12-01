@@ -9,7 +9,7 @@ export interface UserProfile {
   validade_certificacao?: string;
   tipo_sanguineo?: string;
   status: boolean;
-  role: string;
+  role: "admin" | "agent"; // Especificando os valores possíveis
   created_at: string;
   updated_at: string;
 }
@@ -17,6 +17,84 @@ export interface UserProfile {
 export interface AuthUser {
   id: string;
   email: string;
+}
+
+// ==================== GALERIA ====================
+export type TipoCategoria = "fotos" | "videos";
+export type TipoItem = "foto" | "video";
+
+export interface GaleriaCategoria {
+  id: string;
+  nome: string;
+  descricao?: string;
+  slug: string;
+  tipo: TipoCategoria;
+  ordem: number;
+  status: boolean;
+  created_at: string;
+  updated_at?: string;
+  itens_count?: number;
+}
+
+export interface GaleriaItem {
+  id: string;
+  titulo: string;
+  descricao?: string;
+  categoria_id?: string | null;
+  categoria?: GaleriaCategoria;
+  tipo: TipoItem;
+  arquivo_url: string;
+  thumbnail_url?: string;
+  ordem: number;
+  autor_id?: string;
+  status: boolean;
+  destaque: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Interfaces para listagem
+export interface GaleriaItemListagem {
+  id: string;
+  titulo: string;
+  tipo: TipoItem;
+  arquivo_url: string;
+  thumbnail_url?: string;
+  status: boolean;
+  destaque: boolean;
+  created_at: string;
+  categoria_nome?: string;
+}
+
+export interface CategoriaListagem {
+  id: string;
+  nome: string;
+  tipo: TipoCategoria;
+  status: boolean;
+  ordem: number;
+  itens_count: number;
+}
+
+// Formulários
+export interface CreateCategoriaData {
+  nome: string;
+  descricao?: string;
+  slug: string;
+  tipo: TipoCategoria;
+  ordem?: number;
+  status?: boolean;
+}
+
+export interface CreateItemData {
+  titulo: string;
+  descricao?: string;
+  categoria_id?: string;
+  tipo: TipoItem;
+  arquivo_url: string;
+  thumbnail_url?: string;
+  ordem?: number;
+  status?: boolean;
+  destaque?: boolean;
 }
 
 // ==================== NOTÍCIAS ====================
@@ -36,140 +114,6 @@ export interface Noticia {
   status: NoticiaStatus;
   created_at: string;
   updated_at: string;
-}
-
-export interface NoticiaWithAutor extends Noticia {
-  autor?: {
-    full_name: string;
-    graduacao: string;
-    avatar_url?: string;
-  };
-}
-
-export interface NoticiaFormData {
-  titulo: string;
-  slug: string;
-  conteudo: string;
-  resumo: string;
-  imagem: string | null;
-  categoria: string;
-  destaque: boolean;
-  data_publicacao: string;
-  status: NoticiaStatus;
-}
-
-// Interfaces específicas para hooks (com menos campos)
-export interface NoticiaListagem {
-  id: string;
-  titulo: string;
-  slug: string;
-  resumo: string | null;
-  categoria: string | null;
-  data_publicacao: string;
-  destaque: boolean;
-}
-
-// ==================== GALERIA ====================
-export type TipoCategoria = "fotos" | "videos";
-export type TipoItem = "foto" | "video";
-export type StatusItem = "rascunho" | "publicado" | "arquivado";
-
-export interface GaleriaCategoria {
-  id: string;
-  nome: string;
-  descricao?: string;
-  slug: string;
-  tipo: TipoCategoria;
-  ordem: number;
-  status: boolean;
-  created_at: string;
-  _count?: {
-    itens: number;
-  };
-}
-
-export interface GaleriaItem {
-  id: string;
-  titulo: string;
-  descricao?: string;
-  categoria_id?: string;
-  categoria?: GaleriaCategoria;
-  tipo: TipoItem;
-  arquivo_url: string;
-  thumbnail_url?: string;
-  ordem: number;
-  autor_id?: string;
-  status: boolean;
-  created_at: string;
-}
-
-export interface CreateCategoriaData {
-  nome: string;
-  descricao?: string;
-  slug: string;
-  tipo: TipoCategoria;
-  ordem?: number;
-  status?: boolean;
-}
-
-export type UpdateCategoriaData = Partial<CreateCategoriaData>;
-
-export interface CreateItemData {
-  titulo: string;
-  descricao?: string;
-  categoria_id?: string;
-  tipo: TipoItem;
-  arquivo_url: string;
-  thumbnail_url?: string;
-  ordem?: number;
-  status?: boolean;
-}
-
-export type UpdateItemData = Partial<CreateItemData>;
-
-export interface CategoriaListagem {
-  id: string;
-  nome: string;
-  slug: string;
-  descricao: string | null;
-  tipo: string;
-  ordem: number;
-}
-
-// ==================== UPLOAD ====================
-export interface UploadFile {
-  file: File;
-  progress: number;
-  status: "pending" | "uploading" | "completed" | "error";
-  error?: string;
-  url?: string;
-  path?: string;
-}
-
-export interface UploadOptions {
-  bucket: string;
-  folder?: string;
-  onProgress?: (progress: number) => void;
-  onComplete?: (url: string) => void;
-  onError?: (error: string) => void;
-}
-
-export interface UploadResult {
-  url: string | null;
-  error: string | null;
-  path: string | null;
-  success: boolean;
-}
-
-export interface UseUploadReturn {
-  uploadFile: (file: File, options: UploadOptions) => Promise<UploadResult>;
-  deleteFile: (
-    bucket: string,
-    path: string
-  ) => Promise<{ success: boolean; error: string | null }>;
-  uploading: boolean;
-  progress: number;
-  resetProgress: () => void;
 }
 
 // ==================== NOTIFICAÇÕES ====================
@@ -199,4 +143,21 @@ export interface Notification {
   expires_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+// ==================== UPLOAD ====================
+export interface UploadFile {
+  file: File;
+  progress: number;
+  status: "pending" | "uploading" | "completed" | "error";
+  error?: string;
+  url?: string;
+  path?: string;
+}
+
+export interface UploadResult {
+  url: string | null;
+  error: string | null;
+  path: string | null;
+  success: boolean;
 }

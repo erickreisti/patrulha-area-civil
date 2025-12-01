@@ -1,3 +1,4 @@
+// src/app/(app)/admin/noticias/page.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -390,113 +391,112 @@ export default function NoticiasPage() {
     },
   };
 
-  const navigationButtons = [
-    {
-      href: "/admin/dashboard",
-      icon: RiBarChartLine,
-      label: "Dashboard",
-      variant: "outline" as const,
-      className:
-        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/perfil",
-      icon: RiUserLine,
-      label: "Meu Perfil",
-      variant: "outline" as const,
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      variant: "outline" as const,
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-    {
-      href: "/admin/noticias/criar",
-      icon: RiAddLine,
-      label: "Nova Notícia",
-      variant: "default" as const,
-      className: "bg-green-600 hover:bg-green-700 text-white",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header - TÍTULO E DESCRIÇÃO */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          className="mb-6"
         >
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-              GERENCIAR NOTÍCIAS
-            </h1>
-            <p className="text-gray-600">
-              Crie e gerencie as notícias do site da Patrulha Aérea Civil
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+            GERENCIAR NOTÍCIAS
+          </h1>
+          <p className="text-gray-600">
+            Crie e gerencie as notícias do site da Patrulha Aérea Civil
+          </p>
+        </motion.div>
 
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                onClick={() => {
-                  setRefreshing(true);
-                  fetchNoticias();
+        {/* ✅ BOTÕES ABAIXO DO HEADER */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="flex flex-wrap gap-3 mb-8"
+        >
+          {/* Botão de Atualizar */}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Button
+              onClick={() => {
+                setRefreshing(true);
+                fetchNoticias();
+              }}
+              disabled={refreshing}
+              variant="outline"
+              className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
+            >
+              <motion.div
+                animate={{ rotate: refreshing ? 360 : 0 }}
+                transition={{
+                  duration: 1,
+                  repeat: refreshing ? Infinity : 0,
                 }}
-                disabled={refreshing}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
               >
-                <motion.div
-                  animate={{ rotate: refreshing ? 360 : 0 }}
-                  transition={{
-                    duration: 1,
-                    repeat: refreshing ? Infinity : 0,
-                  }}
-                >
-                  <RiRefreshLine
-                    className={`w-4 h-4 ${
-                      refreshing ? "text-blue-600" : "text-gray-600"
-                    }`}
-                  />
-                </motion.div>
-                <span className="hidden sm:inline">
-                  {refreshing ? "Atualizando..." : "Atualizar"}
-                </span>
-              </Button>
-            </motion.div>
+                <RiRefreshLine
+                  className={`w-4 h-4 ${
+                    refreshing ? "text-blue-600" : "text-gray-600"
+                  }`}
+                />
+              </motion.div>
+              {refreshing ? "Atualizando..." : "Atualizar Lista"}
+            </Button>
+          </motion.div>
 
-            <div className="flex gap-3">
-              {navigationButtons.map((item, index) => (
-                <motion.div
-                  key={item.href}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+          {/* Botão Nova Notícia */}
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link href="/admin/noticias/criar">
+              <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
+                <RiAddLine className="w-4 h-4 mr-2" />
+                Nova Notícia
+              </Button>
+            </Link>
+          </motion.div>
+
+          {/* Botões de Navegação */}
+          {[
+            {
+              href: "/admin/dashboard",
+              icon: RiBarChartLine,
+              label: "Dashboard",
+              className:
+                "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
+            },
+            {
+              href: "/perfil",
+              icon: RiUserLine,
+              label: "Meu Perfil",
+              className:
+                "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
+            },
+            {
+              href: "/",
+              icon: RiHomeLine,
+              label: "Voltar ao Site",
+              className:
+                "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
+            },
+          ].map((button, index) => (
+            <motion.div
+              key={button.href}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href={button.href}>
+                <Button
+                  variant="outline"
+                  className={`transition-all duration-300 ${button.className}`}
                 >
-                  <Link href={item.href}>
-                    <Button
-                      variant={item.variant}
-                      className={`transition-all duration-300 ${item.className}`}
-                    >
-                      <item.icon className="w-4 h-4 mr-2" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </div>
+                  <button.icon className="w-4 h-4 mr-2" />
+                  {button.label}
+                </Button>
+              </Link>
+            </motion.div>
+          ))}
         </motion.div>
 
         {/* Estatísticas */}
