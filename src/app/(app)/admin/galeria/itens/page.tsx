@@ -620,16 +620,22 @@ export default function ItensGaleriaPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-gray-800">
                 <RiFilterFill className="w-5 h-5 text-navy-600" />
-                Filtros e Busca
+                Filtros e Busca - Itens
               </CardTitle>
             </CardHeader>
             <CardContent className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {/* Busca */}
                 <div className="md:col-span-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      Buscar:
+                    </span>
+                  </div>
                   <div className="relative">
                     <RiSearchFill className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
                     <Input
-                      placeholder="Buscar por título..."
+                      placeholder="por título..."
                       value={filtros.busca}
                       onChange={(e) =>
                         handleFiltroChange("busca", e.target.value)
@@ -639,7 +645,13 @@ export default function ItensGaleriaPage() {
                   </div>
                 </div>
 
+                {/* Categoria */}
                 <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      Categoria:
+                    </span>
+                  </div>
                   <Select
                     value={filtros.categoria}
                     onValueChange={(value) =>
@@ -647,7 +659,7 @@ export default function ItensGaleriaPage() {
                     }
                   >
                     <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
-                      <SelectValue placeholder="Todas categorias" />
+                      <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todas categorias</SelectItem>
@@ -660,13 +672,19 @@ export default function ItensGaleriaPage() {
                   </Select>
                 </div>
 
+                {/* Tipo de Mídia */}
                 <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      Mídia:
+                    </span>
+                  </div>
                   <Select
                     value={filtros.tipo}
                     onValueChange={(value) => handleFiltroChange("tipo", value)}
                   >
                     <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
-                      <SelectValue placeholder="Todos tipos" />
+                      <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos tipos</SelectItem>
@@ -676,7 +694,13 @@ export default function ItensGaleriaPage() {
                   </Select>
                 </div>
 
+                {/* Status */}
                 <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-gray-700">
+                      Status:
+                    </span>
+                  </div>
                   <Select
                     value={filtros.status}
                     onValueChange={(value) =>
@@ -684,7 +708,7 @@ export default function ItensGaleriaPage() {
                     }
                   >
                     <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
-                      <SelectValue placeholder="Todos status" />
+                      <SelectValue placeholder="Todos" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Todos</SelectItem>

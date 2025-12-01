@@ -31,6 +31,7 @@ export interface GaleriaCategoria {
   tipo: TipoCategoria;
   ordem: number;
   status: boolean;
+  arquivada?: boolean;
   created_at: string;
   updated_at?: string;
   itens_count?: number;
