@@ -35,6 +35,7 @@ import {
   RiCalendarLine,
   RiEyeLine,
   RiEyeOffLine,
+  RiCheckLine,
 } from "react-icons/ri";
 
 interface CategoriaData {
@@ -47,6 +48,7 @@ interface CategoriaData {
   ordem: number;
   created_at: string;
   updated_at: string;
+  arquivada: boolean;
 }
 
 interface FormData {
@@ -131,8 +133,8 @@ export default function EditarCategoriaPage() {
           ordem: data.ordem || 0,
         });
       }
-    } catch (err) {
-      console.error("Erro ao carregar categoria:", err);
+    } catch (error) {
+      console.error("Erro ao carregar categoria:", error);
       toast.error("Não foi possível carregar a categoria.");
     } finally {
       setLoading(false);
@@ -152,6 +154,8 @@ export default function EditarCategoriaPage() {
       newErrors.nome = "Nome é obrigatório";
     } else if (formData.nome.length < 3) {
       newErrors.nome = "Nome deve ter pelo menos 3 caracteres";
+    } else if (formData.nome.length > 100) {
+      newErrors.nome = "Nome não pode ter mais de 100 caracteres";
     }
 
     if (!formData.slug.trim()) {
@@ -159,10 +163,12 @@ export default function EditarCategoriaPage() {
     } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
       newErrors.slug =
         "Slug deve conter apenas letras minúsculas, números e hífens";
+    } else if (formData.slug.length > 100) {
+      newErrors.slug = "Slug não pode ter mais de 100 caracteres";
     }
 
-    if (formData.ordem < 0) {
-      newErrors.ordem = "Ordem não pode ser negativa";
+    if (formData.ordem < 0 || formData.ordem > 999) {
+      newErrors.ordem = "Ordem deve ser entre 0 e 999";
     }
 
     setFormErrors(newErrors);
@@ -199,18 +205,36 @@ export default function EditarCategoriaPage() {
         throw updateError;
       }
 
+      // Log da atividade
+      await supabase.from("system_activities").insert([
+        {
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          action_type: "update",
+          description: `Atualizou categoria: "${formData.nome}"`,
+          resource_type: "galeria_categoria",
+          resource_id: categoriaId,
+          metadata: {
+            tipo: formData.tipo,
+            status: formData.status,
+            ordem: formData.ordem,
+          },
+        },
+      ]);
+
       toast.success("Categoria atualizada com sucesso!");
 
       setTimeout(() => {
         router.push("/admin/galeria/categorias");
       }, 1000);
-    } catch (error: unknown) {
+    } catch (error) {
       console.error("Erro ao atualizar categoria:", error);
 
       if (error && typeof error === "object" && "code" in error) {
         const supabaseError = error as { code: string };
         if (supabaseError.code === "23505") {
           toast.error("Já existe uma categoria com este nome ou slug.");
+        } else if (supabaseError.code === "42501") {
+          toast.error("Você não tem permissão para atualizar categorias.");
         } else {
           toast.error("Não foi possível atualizar a categoria.");
         }
@@ -228,7 +252,8 @@ export default function EditarCategoriaPage() {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
+      .replace(/(^-|-$)+/g, "")
+      .slice(0, 100);
   };
 
   const handleNomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,42 +270,11 @@ export default function EditarCategoriaPage() {
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const slug = e.target.value.toLowerCase();
-    setFormData((prev) => ({ ...prev, slug }));
+    setFormData((prev) => ({ ...prev, slug: slug.slice(0, 100) }));
     if (formErrors.slug) {
       setFormErrors((prev) => ({ ...prev, slug: "" }));
     }
   };
-
-  const navigationButtons = [
-    {
-      href: "/admin/galeria/categorias",
-      icon: RiArrowLeftLine,
-      label: "Voltar",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/admin/dashboard",
-      icon: RiBarChartLine,
-      label: "Dashboard",
-      className:
-        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/perfil",
-      icon: RiUserLine,
-      label: "Meu Perfil",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-  ];
 
   if (loading) {
     return (
@@ -317,7 +311,7 @@ export default function EditarCategoriaPage() {
               A categoria que você está tentando editar não existe.
             </p>
             <Link href="/admin/galeria/categorias">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                 <RiArrowLeftLine className="w-4 h-4 mr-2" />
                 Voltar para Categorias
               </Button>
@@ -331,12 +325,12 @@ export default function EditarCategoriaPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header com botões abaixo */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          className="mb-8"
         >
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
@@ -345,28 +339,79 @@ export default function EditarCategoriaPage() {
             <p className="text-gray-600">Editando: {categoria.nome}</p>
           </div>
 
-          {/* Botões de Navegação */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {navigationButtons.map((button, index) => (
-              <motion.div
-                key={button.href}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link href={button.href}>
-                  <Button
-                    variant="outline"
-                    className={`transition-all duration-300 ${button.className}`}
-                  >
-                    <button.icon className="w-4 h-4 mr-2" />
-                    {button.label}
-                  </Button>
-                </Link>
-              </motion.div>
-            ))}
+          {/* Botões de Navegação - ABAIXO DO HEADER */}
+          <div className="flex flex-wrap gap-3 mt-6">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/galeria/categorias">
+                <Button
+                  variant="outline"
+                  className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                >
+                  <RiArrowLeftLine className="w-4 h-4 mr-2" />
+                  Voltar para Categorias
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/dashboard">
+                <Button
+                  variant="outline"
+                  className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+                >
+                  <RiBarChartLine className="w-4 h-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/perfil">
+                <Button
+                  variant="outline"
+                  className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                >
+                  <RiUserLine className="w-4 h-4 mr-2" />
+                  Meu Perfil
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/">
+                <Button
+                  variant="outline"
+                  className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
+                >
+                  <RiHomeLine className="w-4 h-4 mr-2" />
+                  Voltar ao Site
+                </Button>
+              </Link>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -379,7 +424,7 @@ export default function EditarCategoriaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.2 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader className="border-b border-gray-200">
                   <CardTitle className="flex items-center text-xl text-gray-800">
                     <RiFolderLine className="w-5 h-5 mr-2 text-navy-600" />
@@ -401,11 +446,12 @@ export default function EditarCategoriaPage() {
                         value={formData.nome}
                         onChange={handleNomeChange}
                         placeholder="Ex: Eventos Especiais, Treinamentos, etc."
-                        className={`transition-all duration-300 ${
+                        className={`${
                           formErrors.nome
                             ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                            : "focus:ring-blue-500"
+                            : ""
                         }`}
+                        maxLength={100}
                       />
                       {formErrors.nome && (
                         <motion.p
@@ -417,6 +463,9 @@ export default function EditarCategoriaPage() {
                           {formErrors.nome}
                         </motion.p>
                       )}
+                      <p className="text-gray-500 text-sm">
+                        {formData.nome.length}/100 caracteres
+                      </p>
                     </motion.div>
 
                     {/* Slug */}
@@ -432,7 +481,7 @@ export default function EditarCategoriaPage() {
                         Slug (URL) *
                       </Label>
                       <div className="flex items-center">
-                        <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm transition-colors duration-300">
+                        <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm">
                           /galeria/
                         </span>
                         <Input
@@ -440,11 +489,12 @@ export default function EditarCategoriaPage() {
                           value={formData.slug}
                           onChange={handleSlugChange}
                           placeholder="ex: eventos-especiais"
-                          className={`flex-1 rounded-l-none transition-all duration-300 ${
+                          className={`flex-1 rounded-l-none ${
                             formErrors.slug
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                              : "focus:ring-blue-500"
+                              : ""
                           }`}
+                          maxLength={100}
                         />
                       </div>
                       {formErrors.slug && (
@@ -479,7 +529,7 @@ export default function EditarCategoriaPage() {
                           setFormData((prev) => ({ ...prev, tipo: value }))
                         }
                       >
-                        <SelectTrigger className="transition-all duration-300 hover:border-blue-500 focus:ring-blue-500">
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -523,9 +573,9 @@ export default function EditarCategoriaPage() {
                         placeholder="Descreva o propósito desta categoria..."
                         rows={4}
                         maxLength={500}
-                        className="transition-all duration-300 focus:ring-blue-500 resize-none"
+                        className="resize-none"
                       />
-                      <p className="text-gray-500 text-sm transition-colors duration-300">
+                      <p className="text-gray-500 text-sm">
                         {formData.descricao.length}/500 caracteres
                       </p>
                     </motion.div>
@@ -548,6 +598,7 @@ export default function EditarCategoriaPage() {
                           id="ordem"
                           type="number"
                           min="0"
+                          max="999"
                           value={formData.ordem}
                           onChange={(e) =>
                             setFormData((prev) => ({
@@ -555,11 +606,11 @@ export default function EditarCategoriaPage() {
                               ordem: parseInt(e.target.value) || 0,
                             }))
                           }
-                          className={`transition-all duration-300 ${
+                          className={
                             formErrors.ordem
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                              : "focus:ring-blue-500"
-                          }`}
+                              : ""
+                          }
                         />
                         {formErrors.ordem && (
                           <motion.p
@@ -571,8 +622,8 @@ export default function EditarCategoriaPage() {
                             {formErrors.ordem}
                           </motion.p>
                         )}
-                        <p className="text-gray-500 text-sm transition-colors duration-300">
-                          Número menor aparece primeiro
+                        <p className="text-gray-500 text-sm">
+                          Número menor aparece primeiro (0-999)
                         </p>
                       </div>
 
@@ -582,7 +633,7 @@ export default function EditarCategoriaPage() {
                           Status da Categoria
                         </Label>
                         <motion.div
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border transition-all duration-300 hover:bg-gray-100 hover:shadow-sm"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 hover:shadow-sm"
                           whileHover={{ scale: 1.02 }}
                         >
                           <Switch
@@ -632,7 +683,7 @@ export default function EditarCategoriaPage() {
                         <Button
                           type="submit"
                           disabled={saving}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 disabled:opacity-50"
                         >
                           {saving ? (
                             <>
@@ -665,7 +716,7 @@ export default function EditarCategoriaPage() {
                           onClick={() =>
                             router.push("/admin/galeria/categorias")
                           }
-                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
+                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3"
                         >
                           <RiCloseLine className="w-4 h-4 mr-2" />
                           Cancelar
@@ -687,7 +738,7 @@ export default function EditarCategoriaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.3 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
                     Informações do Sistema
@@ -696,7 +747,7 @@ export default function EditarCategoriaPage() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="text-gray-600">ID:</span>
-                    <code className="text-sm bg-gray-100 px-2 py-1 rounded transition-colors duration-300">
+                    <code className="text-sm bg-gray-100 px-2 py-1 rounded">
                       {categoria.id}
                     </code>
                   </div>
@@ -719,6 +770,19 @@ export default function EditarCategoriaPage() {
                         "pt-BR"
                       )}
                     </div>
+                  </div>
+
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span className="text-gray-600">Arquivada:</span>
+                    <Badge
+                      className={
+                        categoria.arquivada
+                          ? "bg-amber-500 text-white"
+                          : "bg-gray-200 text-gray-700"
+                      }
+                    >
+                      {categoria.arquivada ? "Sim" : "Não"}
+                    </Badge>
                   </div>
 
                   <div className="flex justify-between items-center py-2">
@@ -744,7 +808,7 @@ export default function EditarCategoriaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.4 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
                     Status Atual
@@ -766,10 +830,54 @@ export default function EditarCategoriaPage() {
 
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600">Ordem atual:</span>
-                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded transition-colors duration-300">
+                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
                       {categoria.ordem}
                     </span>
                   </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Ajuda */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.5 }}
+            >
+              <Card className="border-0 shadow-lg hover:shadow-xl">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2 text-gray-800">
+                    <RiAlertLine className="w-4 h-4 text-amber-500" />
+                    Dicas de Edição
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm text-gray-600">
+                  <p className="flex items-start gap-2">
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
+                    <span>
+                      Categorias <strong>inativas</strong> não aparecem no site
+                    </span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
+                    <span>
+                      A <strong>ordem</strong> define a posição na listagem
+                    </span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
+                    <span>
+                      Categorias <strong>arquivadas</strong> não podem ser
+                      editadas
+                    </span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
+                    <span>
+                      O <strong>slug</strong> define a URL da categoria
+                    </span>
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>

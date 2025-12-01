@@ -19,7 +19,6 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   RiArrowLeftLine,
@@ -36,9 +35,9 @@ import {
   RiEyeLine,
   RiEyeOffLine,
   RiStarLine,
-  RiExternalLinkLine,
   RiCheckLine,
 } from "react-icons/ri";
+import { FileUpload } from "@/components/ui/file-upload";
 
 interface GaleriaItem {
   id: string;
@@ -52,7 +51,6 @@ interface GaleriaItem {
   destaque: boolean;
   ordem: number;
   created_at: string;
-  updated_at: string;
   galeria_categorias: {
     nome: string;
     tipo: "fotos" | "videos";
@@ -70,7 +68,6 @@ interface FormData {
   descricao: string;
   tipo: "foto" | "video";
   categoria_id: string;
-  url: string;
   status: boolean;
   destaque: boolean;
   ordem: number;
@@ -109,13 +106,13 @@ export default function EditarItemPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState("");
 
   const [formData, setFormData] = useState<FormData>({
     titulo: "",
     descricao: "",
     tipo: "foto",
     categoria_id: "",
-    url: "",
     status: true,
     destaque: false,
     ordem: 0,
@@ -141,25 +138,23 @@ export default function EditarItemPage() {
         .eq("id", itemId)
         .single();
 
-      if (fetchError) {
-        throw fetchError;
-      }
+      if (fetchError) throw fetchError;
 
       if (data) {
         setItem(data);
+        setMediaUrl(data.arquivo_url);
         setFormData({
           titulo: data.titulo || "",
           descricao: data.descricao || "",
           tipo: data.tipo || "foto",
           categoria_id: data.categoria_id || "",
-          url: data.arquivo_url || "",
           status: data.status ?? true,
           destaque: data.destaque ?? false,
           ordem: data.ordem || 0,
         });
       }
-    } catch (err: unknown) {
-      console.error("Erro ao carregar item:", err);
+    } catch (error) {
+      console.error("Erro ao carregar item:", error);
       toast.error("Não foi possível carregar o item.");
     } finally {
       setLoading(false);
@@ -172,12 +167,13 @@ export default function EditarItemPage() {
         .from("galeria_categorias")
         .select("id, nome, tipo")
         .eq("status", true)
+        .eq("arquivada", false)
         .order("ordem", { ascending: true });
 
       if (fetchError) throw fetchError;
       setCategorias(data || []);
-    } catch (err: unknown) {
-      console.error("Erro ao carregar categorias:", err);
+    } catch (error) {
+      console.error("Erro ao carregar categorias:", error);
       toast.error("Erro ao carregar categorias");
     }
   }, [supabase]);
@@ -196,32 +192,27 @@ export default function EditarItemPage() {
       errors.push("Título é obrigatório");
     } else if (formData.titulo.length < 3) {
       errors.push("Título deve ter pelo menos 3 caracteres");
+    } else if (formData.titulo.length > 200) {
+      errors.push("Título não pode ter mais de 200 caracteres");
     }
 
     if (!formData.categoria_id) {
       errors.push("Categoria é obrigatória");
     }
 
-    if (!formData.url.trim()) {
-      errors.push("URL é obrigatória");
-    } else if (!isValidUrl(formData.url)) {
-      errors.push("URL inválida");
+    if (!mediaUrl) {
+      errors.push("É necessário ter uma mídia");
     }
 
-    if (formData.ordem < 0) {
-      errors.push("Ordem não pode ser negativa");
+    if (formData.descricao.length > 500) {
+      errors.push("Descrição não pode ter mais de 500 caracteres");
+    }
+
+    if (formData.ordem < 0 || formData.ordem > 999) {
+      errors.push("Ordem deve ser entre 0 e 999");
     }
 
     return errors;
-  };
-
-  const isValidUrl = (url: string) => {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -237,6 +228,17 @@ export default function EditarItemPage() {
     }
 
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        setErrors(["Usuário não autenticado"]);
+        setSaving(false);
+        return;
+      }
+
       const { error: updateError } = await supabase
         .from("galeria_itens")
         .update({
@@ -244,19 +246,33 @@ export default function EditarItemPage() {
           descricao: formData.descricao.trim() || null,
           tipo: formData.tipo,
           categoria_id: formData.categoria_id,
-          arquivo_url: formData.url.trim(),
+          arquivo_url: mediaUrl,
+          thumbnail_url: formData.tipo === "video" ? null : mediaUrl,
           status: formData.status,
           destaque: formData.destaque,
           ordem: formData.ordem,
-          updated_at: new Date().toISOString(),
         })
         .eq("id", itemId)
         .select()
         .single();
 
-      if (updateError) {
-        throw updateError;
-      }
+      if (updateError) throw updateError;
+
+      // Log de atividade
+      await supabase.from("system_activities").insert([
+        {
+          user_id: user.id,
+          action_type: "update",
+          description: `Atualizou item da galeria: "${formData.titulo}"`,
+          resource_type: "galeria_item",
+          resource_id: itemId,
+          metadata: {
+            tipo: formData.tipo,
+            categoria_id: formData.categoria_id,
+            destaque: formData.destaque,
+          },
+        },
+      ]);
 
       toast.success("Item atualizado com sucesso!");
       setShowSuccess(true);
@@ -265,12 +281,20 @@ export default function EditarItemPage() {
         setShowSuccess(false);
         router.push("/admin/galeria/itens");
       }, 1500);
-    } catch (err: unknown) {
-      console.error("Erro ao atualizar item:", err);
-      const error = err as { code?: string; message: string };
+    } catch (error) {
+      console.error("Erro ao atualizar item:", error);
 
-      if (error.code === "23505") {
-        toast.error("Já existe um item com este título.");
+      if (error && typeof error === "object" && "code" in error) {
+        const supabaseError = error as { code: string };
+        if (supabaseError.code === "23505") {
+          toast.error("Já existe um item com este título.");
+        } else if (supabaseError.code === "23503") {
+          toast.error("Categoria não encontrada.");
+        } else if (supabaseError.code === "42501") {
+          toast.error("Você não tem permissão para atualizar itens.");
+        } else {
+          toast.error("Erro ao atualizar item");
+        }
       } else {
         toast.error("Erro ao atualizar item");
       }
@@ -292,46 +316,24 @@ export default function EditarItemPage() {
     }
   };
 
+  const handleMediaUploadComplete = (urls: string[]) => {
+    if (urls.length > 0) {
+      setMediaUrl(urls[0]);
+      toast.success("Mídia atualizada com sucesso!");
+    }
+  };
+
+  const handleMediaFileChange = (url: string) => {
+    setMediaUrl(url);
+  };
+
   const categoriasFiltradas = categorias.filter(
     (cat) => cat.tipo === (formData.tipo === "foto" ? "fotos" : "videos")
   );
 
-  const openMediaUrl = () => {
-    if (formData.url && isValidUrl(formData.url)) {
-      window.open(formData.url, "_blank");
-    }
-  };
-
-  const navigationButtons = [
-    {
-      href: "/admin/galeria/itens",
-      icon: RiArrowLeftLine,
-      label: "Voltar",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/admin/dashboard",
-      icon: RiBarChartLine,
-      label: "Dashboard",
-      className:
-        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/perfil",
-      icon: RiUserLine,
-      label: "Meu Perfil",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-  ];
+  const uploadType = formData.tipo === "foto" ? "media" : "video";
+  const acceptTypes = formData.tipo === "foto" ? "image/*" : "video/*";
+  const bucket = formData.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
 
   if (loading) {
     return (
@@ -368,7 +370,7 @@ export default function EditarItemPage() {
               O item que você está tentando editar não existe.
             </p>
             <Link href="/admin/galeria/itens">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                 <RiArrowLeftLine className="w-4 h-4 mr-2" />
                 Voltar para Itens
               </Button>
@@ -382,12 +384,12 @@ export default function EditarItemPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header com botões abaixo */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          className="mb-8"
         >
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
@@ -396,28 +398,79 @@ export default function EditarItemPage() {
             <p className="text-gray-600">Editando: {item.titulo}</p>
           </div>
 
-          {/* Botões de Navegação */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {navigationButtons.map((button, index) => (
-              <motion.div
-                key={button.href}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link href={button.href}>
-                  <Button
-                    variant="outline"
-                    className={`transition-all duration-300 ${button.className}`}
-                  >
-                    <button.icon className="w-4 h-4 mr-2" />
-                    {button.label}
-                  </Button>
-                </Link>
-              </motion.div>
-            ))}
+          {/* Botões de Navegação - ABAIXO DO HEADER */}
+          <div className="flex flex-wrap gap-3 mt-6">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/galeria/itens">
+                <Button
+                  variant="outline"
+                  className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                >
+                  <RiArrowLeftLine className="w-4 h-4 mr-2" />
+                  Voltar para Itens
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/dashboard">
+                <Button
+                  variant="outline"
+                  className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+                >
+                  <RiBarChartLine className="w-4 h-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/perfil">
+                <Button
+                  variant="outline"
+                  className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                >
+                  <RiUserLine className="w-4 h-4 mr-2" />
+                  Meu Perfil
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/">
+                <Button
+                  variant="outline"
+                  className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
+                >
+                  <RiHomeLine className="w-4 h-4 mr-2" />
+                  Voltar ao Site
+                </Button>
+              </Link>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -491,7 +544,7 @@ export default function EditarItemPage() {
               variants={fadeInUp}
               transition={{ delay: 0.2 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader className="border-b border-gray-200">
                   <CardTitle className="flex items-center text-xl text-gray-800">
                     <RiImageLine className="w-5 h-5 mr-2 text-navy-600" />
@@ -517,10 +570,10 @@ export default function EditarItemPage() {
                             titulo: e.target.value,
                           }))
                         }
-                        placeholder="Ex: Treinamento de Resgate Aéreo, Evento Comunitário, etc."
-                        className="transition-all duration-300 focus:ring-2 focus:ring-blue-500"
+                        placeholder="Ex: Treinamento de Resgate Aéreo"
+                        maxLength={200}
                       />
-                      <p className="text-gray-500 text-sm transition-colors duration-300">
+                      <p className="text-gray-500 text-sm">
                         {formData.titulo.length}/200 caracteres
                       </p>
                     </motion.div>
@@ -549,9 +602,9 @@ export default function EditarItemPage() {
                         placeholder="Descreva o conteúdo deste item..."
                         rows={4}
                         maxLength={500}
-                        className="transition-all duration-300 focus:ring-2 focus:ring-blue-500 resize-none"
+                        className="resize-none"
                       />
-                      <p className="text-gray-500 text-sm transition-colors duration-300">
+                      <p className="text-gray-500 text-sm">
                         {formData.descricao.length}/500 caracteres
                       </p>
                     </motion.div>
@@ -578,7 +631,7 @@ export default function EditarItemPage() {
                               variant={
                                 formData.tipo === "foto" ? "default" : "outline"
                               }
-                              className={`w-full transition-all duration-300 ${
+                              className={`w-full ${
                                 formData.tipo === "foto"
                                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                                   : "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
@@ -601,7 +654,7 @@ export default function EditarItemPage() {
                                   ? "default"
                                   : "outline"
                               }
-                              className={`w-full transition-all duration-300 ${
+                              className={`w-full ${
                                 formData.tipo === "video"
                                   ? "bg-purple-600 hover:bg-purple-700 text-white"
                                   : "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
@@ -632,18 +685,13 @@ export default function EditarItemPage() {
                             }))
                           }
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500 focus:ring-blue-500">
+                          <SelectTrigger>
                             <SelectValue placeholder="Selecione uma categoria" />
                           </SelectTrigger>
                           <SelectContent>
                             {categoriasFiltradas.length === 0 ? (
-                              <SelectItem
-                                value="no-category"
-                                disabled
-                                className="text-gray-500"
-                              >
-                                Nenhuma categoria disponível para{" "}
-                                {formData.tipo === "foto" ? "fotos" : "vídeos"}
+                              <SelectItem value="no-category" disabled>
+                                Nenhuma categoria disponível
                               </SelectItem>
                             ) : (
                               categoriasFiltradas.map((categoria) => (
@@ -671,134 +719,71 @@ export default function EditarItemPage() {
                       </div>
                     </motion.div>
 
-                    {/* URL */}
+                    {/* Upload de Mídia */}
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.3 }}
                       className="space-y-2"
                     >
-                      <Label
-                        htmlFor="url"
-                        className="text-sm font-semibold text-gray-700"
-                      >
-                        URL da Mídia *
+                      <Label className="text-sm font-semibold text-gray-700">
+                        {formData.tipo === "foto"
+                          ? "Upload de Foto"
+                          : "Upload de Vídeo"}{" "}
+                        *
                       </Label>
-                      <div className="space-y-2">
-                        <div className="flex items-center">
-                          <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm transition-colors duration-300">
-                            <RiExternalLinkLine className="w-3 h-3" />
-                          </span>
-                          <Input
-                            id="url"
-                            value={formData.url}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                url: e.target.value,
-                              }))
-                            }
-                            placeholder={
-                              formData.tipo === "foto"
-                                ? "https://exemplo.com/imagem.jpg"
-                                : "https://youtube.com/watch?v=..."
-                            }
-                            className="flex-1 rounded-l-none transition-all duration-300 focus:ring-2 focus:ring-blue-500"
-                          />
-                          <motion.div
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
+
+                      <FileUpload
+                        type={uploadType}
+                        bucket={bucket}
+                        multiple={false}
+                        maxFiles={1}
+                        onUploadComplete={handleMediaUploadComplete}
+                        onFileChange={handleMediaFileChange}
+                        currentFile={mediaUrl}
+                        accept={acceptTypes}
+                        className="w-full"
+                      />
+
+                      {mediaUrl && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RiCheckLine className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-green-800">
+                                Mídia carregada com sucesso!
+                              </p>
+                              <p className="text-xs text-green-600 truncate">
+                                {mediaUrl}
+                              </p>
+                            </div>
                             <Button
                               type="button"
-                              variant="outline"
-                              onClick={openMediaUrl}
-                              disabled={
-                                !formData.url || !isValidUrl(formData.url)
-                              }
-                              className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white rounded-l-none transition-colors duration-300"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setMediaUrl("")}
+                              className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
-                              <RiExternalLinkLine className="w-4 h-4" />
+                              <RiCloseLine className="w-3 h-3" />
                             </Button>
-                          </motion.div>
-                        </div>
-                        <p className="text-gray-500 text-sm transition-colors duration-300">
-                          {formData.tipo === "foto"
-                            ? "URL da imagem (JPG, PNG, WebP)"
-                            : "URL do vídeo (YouTube, Vimeo, etc.)"}
-                        </p>
-                      </div>
-                    </motion.div>
+                          </div>
+                        </motion.div>
+                      )}
 
-                    {/* Preview da Mídia */}
-                    {formData.url && isValidUrl(formData.url) && (
-                      <motion.div
-                        variants={fadeInUp}
-                        transition={{ delay: 0.4 }}
-                        className="space-y-2"
-                      >
-                        <Label className="text-sm font-semibold text-gray-700">
-                          Preview da Mídia
-                        </Label>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 bg-gray-50 transition-all duration-300 hover:shadow-md">
-                          {formData.tipo === "foto" ? (
-                            <div className="flex flex-col items-center justify-center text-center">
-                              <motion.div
-                                className="relative w-full max-h-64 mb-3"
-                                whileHover={{ scale: 1.02 }}
-                                transition={{ duration: 0.3 }}
-                              >
-                                <Image
-                                  src={formData.url}
-                                  alt="Preview"
-                                  width={400}
-                                  height={256}
-                                  className="max-w-full max-h-64 object-contain rounded transition-transform duration-300"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.style.display = "none";
-                                  }}
-                                />
-                              </motion.div>
-                              <p className="text-sm text-gray-600 break-all">
-                                {formData.url}
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="text-center">
-                              <motion.div
-                                animate={{ scale: [1, 1.1, 1] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                              >
-                                <RiVideoLine className="w-16 h-16 text-purple-400 mx-auto mb-3" />
-                              </motion.div>
-                              <p className="text-sm text-gray-600 mb-2">
-                                Link de vídeo: {formData.url}
-                              </p>
-                              <motion.div
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={openMediaUrl}
-                                  className="border-purple-500 text-purple-600 hover:bg-purple-500 hover:text-white transition-colors duration-300"
-                                >
-                                  <RiExternalLinkLine className="w-3 h-3 mr-1" />
-                                  Abrir Vídeo
-                                </Button>
-                              </motion.div>
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
+                      <p className="text-xs text-gray-500">
+                        {formData.tipo === "foto"
+                          ? "Formatos: JPG, PNG, WEBP. Máximo 5MB."
+                          : "Formatos: MP4, AVI, MOV. Máximo 50MB."}
+                      </p>
+                    </motion.div>
 
                     {/* Configurações Avançadas */}
                     <motion.div
                       variants={fadeInUp}
-                      transition={{ delay: 0.5 }}
+                      transition={{ delay: 0.4 }}
                       className="grid grid-cols-1 md:grid-cols-3 gap-6"
                     >
                       {/* Ordem */}
@@ -813,6 +798,7 @@ export default function EditarItemPage() {
                           id="ordem"
                           type="number"
                           min="0"
+                          max="999"
                           value={formData.ordem}
                           onChange={(e) =>
                             setFormData((prev) => ({
@@ -820,10 +806,9 @@ export default function EditarItemPage() {
                               ordem: parseInt(e.target.value) || 0,
                             }))
                           }
-                          className="transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-gray-500 text-sm transition-colors duration-300">
-                          Número menor aparece primeiro
+                        <p className="text-gray-500 text-sm">
+                          Número menor aparece primeiro (0-999)
                         </p>
                       </div>
 
@@ -833,7 +818,7 @@ export default function EditarItemPage() {
                           Status do Item
                         </Label>
                         <motion.div
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border transition-all duration-300 hover:bg-gray-100 hover:shadow-sm"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 hover:shadow-sm"
                           whileHover={{ scale: 1.02 }}
                         >
                           <Switch
@@ -874,7 +859,7 @@ export default function EditarItemPage() {
                           Item em Destaque
                         </Label>
                         <motion.div
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border transition-all duration-300 hover:bg-gray-100 hover:shadow-sm"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 hover:shadow-sm"
                           whileHover={{ scale: 1.02 }}
                         >
                           <Switch
@@ -910,7 +895,7 @@ export default function EditarItemPage() {
                     {/* Botões de Ação */}
                     <motion.div
                       variants={fadeInUp}
-                      transition={{ delay: 0.6 }}
+                      transition={{ delay: 0.5 }}
                       className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200"
                     >
                       <motion.div
@@ -921,7 +906,7 @@ export default function EditarItemPage() {
                         <Button
                           type="submit"
                           disabled={saving}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 disabled:opacity-50"
                         >
                           {saving ? (
                             <>
@@ -952,7 +937,7 @@ export default function EditarItemPage() {
                           variant="outline"
                           disabled={saving}
                           onClick={() => router.push("/admin/galeria/itens")}
-                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
+                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3"
                         >
                           <RiCloseLine className="w-4 h-4 mr-2" />
                           Cancelar
@@ -974,7 +959,7 @@ export default function EditarItemPage() {
               variants={fadeInUp}
               transition={{ delay: 0.3 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
                     Informações do Sistema
@@ -983,7 +968,7 @@ export default function EditarItemPage() {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="text-gray-600">ID:</span>
-                    <code className="text-sm bg-gray-100 px-2 py-1 rounded transition-colors duration-300">
+                    <code className="text-sm bg-gray-100 px-2 py-1 rounded">
                       {item.id}
                     </code>
                   </div>
@@ -997,19 +982,8 @@ export default function EditarItemPage() {
                   </div>
 
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-600">Última atualização:</span>
-                    <div className="flex items-center gap-1 text-sm text-gray-700">
-                      <RiCalendarLine className="w-3 h-3" />
-                      {new Date(item.updated_at).toLocaleDateString("pt-BR")}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="text-gray-600">Categoria atual:</span>
-                    <Badge
-                      variant="outline"
-                      className="bg-gray-100 transition-colors duration-300"
-                    >
+                    <Badge variant="outline" className="bg-gray-100">
                       {item.galeria_categorias?.nome || "N/A"}
                     </Badge>
                   </div>
@@ -1037,7 +1011,7 @@ export default function EditarItemPage() {
               variants={fadeInUp}
               transition={{ delay: 0.4 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
                     Status Atual
@@ -1086,7 +1060,7 @@ export default function EditarItemPage() {
 
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600">Ordem atual:</span>
-                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded transition-colors duration-300">
+                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
                       {item.ordem}
                     </span>
                   </div>
@@ -1101,7 +1075,7 @@ export default function EditarItemPage() {
               variants={fadeInUp}
               transition={{ delay: 0.5 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2 text-gray-800">
                     <RiAlertLine className="w-4 h-4 text-amber-500" />
@@ -1110,37 +1084,31 @@ export default function EditarItemPage() {
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-gray-600">
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
-                      Atualize a <strong>URL</strong> se a mídia foi movida
+                      Atualize a <strong>mídia</strong> se necessário
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       <strong>Itens inativos</strong> não aparecem no site
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       <strong>Destaques</strong> aparecem em posição especial
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       A <strong>ordem</strong> define a posição na listagem
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span>
-                      Use o botão <strong>🔗</strong> para testar a URL
-                    </span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       Escolha a <strong>categoria</strong> correta
                     </span>

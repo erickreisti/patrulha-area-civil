@@ -77,11 +77,29 @@ const fadeInUp = {
   },
 };
 
+// Função helper para verificar se é admin
+async function checkIsAdmin(supabase: ReturnType<typeof createClient>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return false;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role, status")
+    .eq("id", user.id)
+    .single();
+
+  return profile && profile.role === "admin" && profile.status === true;
+}
+
 export default function CriarItemGaleriaPage() {
   const router = useRouter();
   const supabase = createClient();
 
   const [loading, setLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -97,12 +115,30 @@ export default function CriarItemGaleriaPage() {
     destaque: false,
   });
 
+  // Verificar se usuário é admin
+  useEffect(() => {
+    async function verifyAdmin() {
+      const adminStatus = await checkIsAdmin(supabase);
+      setIsAdmin(adminStatus);
+
+      if (!adminStatus) {
+        toast.error("Acesso negado. Apenas administradores podem criar itens.");
+        setTimeout(() => {
+          router.push("/admin/galeria/itens");
+        }, 2000);
+      }
+    }
+
+    verifyAdmin();
+  }, [supabase, router]);
+
   const fetchCategorias = useCallback(async () => {
     try {
       const { data, error: fetchError } = await supabase
         .from("galeria_categorias")
         .select("id, nome, tipo")
         .eq("status", true)
+        .eq("arquivada", false)
         .order("ordem", { ascending: true });
 
       if (fetchError) throw fetchError;
@@ -114,8 +150,10 @@ export default function CriarItemGaleriaPage() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchCategorias();
-  }, [fetchCategorias]);
+    if (isAdmin) {
+      fetchCategorias();
+    }
+  }, [fetchCategorias, isAdmin]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -140,7 +178,6 @@ export default function CriarItemGaleriaPage() {
       tipo,
       categoria_id: "",
     }));
-    // Limpar URL quando mudar o tipo
     setMediaUrl("");
   };
 
@@ -178,8 +215,8 @@ export default function CriarItemGaleriaPage() {
       errors.push("Descrição não pode ter mais de 500 caracteres");
     }
 
-    if (formData.ordem < 0) {
-      errors.push("Ordem não pode ser negativa");
+    if (formData.ordem < 0 || formData.ordem > 999) {
+      errors.push("Ordem deve ser entre 0 e 999");
     }
 
     return errors;
@@ -187,6 +224,15 @@ export default function CriarItemGaleriaPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Verificar novamente se é admin antes de prosseguir
+    const adminCheck = await checkIsAdmin(supabase);
+    if (!adminCheck) {
+      setErrors(["Acesso negado. Apenas administradores podem criar itens."]);
+      toast.error("Permissão negada");
+      return;
+    }
+
     setLoading(true);
     setErrors([]);
 
@@ -200,15 +246,29 @@ export default function CriarItemGaleriaPage() {
     try {
       const {
         data: { user },
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (!user) {
+      if (userError || !user) {
         setErrors(["Usuário não autenticado"]);
         setLoading(false);
         return;
       }
 
-      const { error: insertError } = await supabase
+      // Verificação adicional de permissão
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role, status")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile || profile.role !== "admin" || !profile.status) {
+        setErrors(["Acesso negado. Permissão de administrador necessária."]);
+        setLoading(false);
+        return;
+      }
+
+      const { data: itemData, error: insertError } = await supabase
         .from("galeria_itens")
         .insert([
           {
@@ -228,7 +288,28 @@ export default function CriarItemGaleriaPage() {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        // Type assertion para acessar propriedades específicas do erro
+        const error = insertError as { code?: string; message?: string };
+
+        if (error.code === "23505") {
+          toast.error("Já existe um item com este título.");
+          setErrors(["Já existe um item com este título na galeria"]);
+        } else if (error.code === "23503") {
+          toast.error("Categoria não encontrada.");
+          setErrors(["Categoria selecionada não existe mais"]);
+        } else if (error.code === "42501") {
+          toast.error("Você não tem permissão para criar itens.");
+          setErrors(["Permissão negada. Verifique se você é administrador."]);
+        } else {
+          toast.error("Erro ao criar item");
+          setErrors([
+            "Erro interno ao salvar o item: " +
+              (error.message || "Erro desconhecido"),
+          ]);
+        }
+        throw insertError;
+      }
 
       // Log de atividade
       await supabase.from("system_activities").insert([
@@ -237,10 +318,12 @@ export default function CriarItemGaleriaPage() {
           action_type: "create",
           description: `Criou novo item da galeria: "${formData.titulo}"`,
           resource_type: "galeria_item",
+          resource_id: itemData.id,
           metadata: {
             tipo: formData.tipo,
             categoria_id: formData.categoria_id,
             url: mediaUrl,
+            destaque: formData.destaque,
           },
         },
       ]);
@@ -254,16 +337,8 @@ export default function CriarItemGaleriaPage() {
       }, 1500);
     } catch (err: unknown) {
       console.error("Erro ao criar item:", err);
-      const error = err as { code?: string; message: string };
-
-      if (error.code === "23505") {
-        toast.error("Já existe um item com este título.");
-        setErrors(["Já existe um item com este título na galeria"]);
-      } else if (error.code === "23503") {
-        toast.error("Categoria não encontrada.");
-        setErrors(["Categoria selecionada não existe mais"]);
-      } else {
-        toast.error("Erro ao criar item");
+      // Se não for um erro que já tratamos acima
+      if (!errors.length) {
         setErrors(["Erro interno ao salvar o item"]);
       }
     } finally {
@@ -271,54 +346,67 @@ export default function CriarItemGaleriaPage() {
     }
   };
 
+  // Se não for admin, mostrar mensagem de acesso negado
+  if (isAdmin === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8 flex items-center justify-center">
+        <Card className="border-0 shadow-lg max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">
+              <RiAlertLine className="w-12 h-12 mx-auto mb-4" />
+              Acesso Negado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-gray-600">
+              Apenas administradores podem criar itens na galeria.
+            </p>
+            <Button
+              onClick={() => router.push("/admin/galeria/itens")}
+              className="w-full"
+            >
+              <RiArrowLeftLine className="w-4 h-4 mr-2" />
+              Voltar para Itens
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Se ainda está verificando admin
+  if (isAdmin === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-gray-600">Verificando permissões...</p>
+        </div>
+      </div>
+    );
+  }
+
   const categoriasFiltradas = categorias.filter(
     (cat) => cat.tipo === (formData.tipo === "foto" ? "fotos" : "videos")
   );
 
-  const navigationButtons = [
-    {
-      href: "/admin/galeria/itens",
-      icon: RiArrowLeftLine,
-      label: "Voltar",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/admin/dashboard",
-      icon: RiBarChartLine,
-      label: "Dashboard",
-      className:
-        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/perfil",
-      icon: RiUserLine,
-      label: "Meu Perfil",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-  ];
-
-  // Determinar tipo de upload baseado no tipo de mídia
   const uploadType = formData.tipo === "foto" ? "media" : "video";
   const acceptTypes = formData.tipo === "foto" ? "image/*" : "video/*";
+  const bucket = formData.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header com botões abaixo */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          className="mb-8"
         >
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
@@ -329,28 +417,79 @@ export default function CriarItemGaleriaPage() {
             </p>
           </div>
 
-          {/* Botões de Navegação */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {navigationButtons.map((button, index) => (
-              <motion.div
-                key={button.href}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link href={button.href}>
-                  <Button
-                    variant="outline"
-                    className={`transition-all duration-300 ${button.className}`}
-                  >
-                    <button.icon className="w-4 h-4 mr-2" />
-                    {button.label}
-                  </Button>
-                </Link>
-              </motion.div>
-            ))}
+          {/* Botões de Navegação - ABAIXO DO HEADER */}
+          <div className="flex flex-wrap gap-3 mt-6">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/galeria/itens">
+                <Button
+                  variant="outline"
+                  className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                >
+                  <RiArrowLeftLine className="w-4 h-4 mr-2" />
+                  Voltar para Itens
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/dashboard">
+                <Button
+                  variant="outline"
+                  className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
+                >
+                  <RiBarChartLine className="w-4 h-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/perfil">
+                <Button
+                  variant="outline"
+                  className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                >
+                  <RiUserLine className="w-4 h-4 mr-2" />
+                  Meu Perfil
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/">
+                <Button
+                  variant="outline"
+                  className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
+                >
+                  <RiHomeLine className="w-4 h-4 mr-2" />
+                  Voltar ao Site
+                </Button>
+              </Link>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -424,11 +563,12 @@ export default function CriarItemGaleriaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.2 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader className="border-b border-gray-200">
                   <CardTitle className="flex items-center text-xl text-gray-800">
                     <RiImageLine className="w-5 h-5 mr-2 text-navy-600" />
                     Novo Item da Galeria
+                    <Badge className="ml-2 bg-green-600">Admin</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -447,12 +587,11 @@ export default function CriarItemGaleriaPage() {
                         value={formData.titulo}
                         onChange={handleInputChange}
                         placeholder="Ex: Treinamento de Resgate Aéreo"
-                        className="transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         required
                         maxLength={200}
                       />
                       <p
-                        className={`text-sm transition-colors duration-300 ${
+                        className={`text-sm ${
                           formData.titulo.length > 180
                             ? "text-amber-600"
                             : "text-gray-500"
@@ -481,11 +620,11 @@ export default function CriarItemGaleriaPage() {
                         onChange={handleInputChange}
                         placeholder="Descreva o conteúdo deste item..."
                         rows={4}
-                        className="transition-all duration-300 focus:ring-2 focus:ring-blue-500 resize-none"
                         maxLength={500}
+                        className="resize-none"
                       />
                       <p
-                        className={`text-sm transition-colors duration-300 ${
+                        className={`text-sm ${
                           formData.descricao.length > 450
                             ? "text-amber-600"
                             : "text-gray-500"
@@ -517,7 +656,7 @@ export default function CriarItemGaleriaPage() {
                               variant={
                                 formData.tipo === "foto" ? "default" : "outline"
                               }
-                              className={`w-full transition-all duration-300 ${
+                              className={`w-full ${
                                 formData.tipo === "foto"
                                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                                   : "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
@@ -540,7 +679,7 @@ export default function CriarItemGaleriaPage() {
                                   ? "default"
                                   : "outline"
                               }
-                              className={`w-full transition-all duration-300 ${
+                              className={`w-full ${
                                 formData.tipo === "video"
                                   ? "bg-purple-600 hover:bg-purple-700 text-white"
                                   : "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
@@ -572,7 +711,7 @@ export default function CriarItemGaleriaPage() {
                           }
                           disabled={categoriasFiltradas.length === 0}
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500 focus:ring-blue-500">
+                          <SelectTrigger>
                             <SelectValue
                               placeholder={
                                 categoriasFiltradas.length === 0
@@ -625,57 +764,51 @@ export default function CriarItemGaleriaPage() {
                         *
                       </Label>
 
-                      <div className="space-y-4">
-                        <FileUpload
-                          type={uploadType}
-                          bucket={
-                            formData.tipo === "foto"
-                              ? "galeria-fotos"
-                              : "galeria-videos"
-                          }
-                          multiple={false}
-                          maxFiles={1}
-                          onUploadComplete={handleMediaUploadComplete}
-                          onFileChange={handleMediaFileChange}
-                          currentFile={mediaUrl}
-                          accept={acceptTypes}
-                          className="w-full"
-                        />
+                      <FileUpload
+                        type={uploadType}
+                        bucket={bucket}
+                        multiple={false}
+                        maxFiles={1}
+                        onUploadComplete={handleMediaUploadComplete}
+                        onFileChange={handleMediaFileChange}
+                        currentFile={mediaUrl}
+                        accept={acceptTypes}
+                        className="w-full"
+                      />
 
-                        {mediaUrl && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg transition-all duration-300"
-                          >
-                            <div className="flex items-center gap-2">
-                              <RiCheckLine className="w-4 h-4 text-green-600 flex-shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium text-green-800">
-                                  Mídia carregada com sucesso!
-                                </p>
-                                <p className="text-xs text-green-600 truncate">
-                                  {mediaUrl}
-                                </p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setMediaUrl("")}
-                                className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <RiCloseLine className="w-3 h-3" />
-                              </Button>
+                      {mediaUrl && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RiCheckLine className="w-4 h-4 text-green-600 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-green-800">
+                                Mídia carregada com sucesso!
+                              </p>
+                              <p className="text-xs text-green-600 truncate">
+                                {mediaUrl}
+                              </p>
                             </div>
-                          </motion.div>
-                        )}
-                      </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setMediaUrl("")}
+                              className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <RiCloseLine className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </motion.div>
+                      )}
 
                       <p className="text-xs text-gray-500">
                         {formData.tipo === "foto"
                           ? "Formatos: JPG, PNG, WEBP. Máximo 5MB."
-                          : "Formatos: MP4, AVI, MOV. Máximo 50MB. Recomendado: MP4 com codec H.264"}
+                          : "Formatos: MP4, AVI, MOV. Máximo 50MB. Recomendado: MP4"}
                       </p>
                     </motion.div>
 
@@ -698,13 +831,13 @@ export default function CriarItemGaleriaPage() {
                           name="ordem"
                           type="number"
                           min="0"
+                          max="999"
                           step="1"
                           value={formData.ordem}
                           onChange={handleInputChange}
-                          className="transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         />
-                        <p className="text-gray-500 text-sm transition-colors duration-300">
-                          Número menor aparece primeiro (0 = primeiro)
+                        <p className="text-gray-500 text-sm">
+                          Número menor aparece primeiro (0-999)
                         </p>
                       </div>
 
@@ -714,7 +847,7 @@ export default function CriarItemGaleriaPage() {
                           Status do Item
                         </Label>
                         <motion.div
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border transition-all duration-300 hover:bg-gray-100 hover:shadow-sm"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 hover:shadow-sm"
                           whileHover={{ scale: 1.02 }}
                         >
                           <Switch
@@ -752,7 +885,7 @@ export default function CriarItemGaleriaPage() {
                           Item em Destaque
                         </Label>
                         <motion.div
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border transition-all duration-300 hover:bg-gray-100 hover:shadow-sm"
+                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 hover:shadow-sm"
                           whileHover={{ scale: 1.02 }}
                         >
                           <Switch
@@ -798,9 +931,10 @@ export default function CriarItemGaleriaPage() {
                           disabled={
                             loading ||
                             categoriasFiltradas.length === 0 ||
-                            !mediaUrl
+                            !mediaUrl ||
+                            !isAdmin
                           }
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 disabled:opacity-50"
                         >
                           {loading ? (
                             <>
@@ -830,7 +964,7 @@ export default function CriarItemGaleriaPage() {
                           type="button"
                           onClick={() => router.push("/admin/galeria/itens")}
                           variant="outline"
-                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
+                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3"
                         >
                           <RiCloseLine className="w-4 h-4 mr-2" />
                           Cancelar
@@ -852,13 +986,20 @@ export default function CriarItemGaleriaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.3 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
                     Resumo do Item
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span className="text-gray-600">Permissão:</span>
+                    <Badge className="bg-green-600 text-white">
+                      {isAdmin ? "Admin ✓" : "Não Admin ✗"}
+                    </Badge>
+                  </div>
+
                   <div className="flex justify-between items-center py-2 border-b border-gray-200">
                     <span className="text-gray-600">Tipo:</span>
                     <Badge
@@ -900,7 +1041,7 @@ export default function CriarItemGaleriaPage() {
 
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-600">Ordem:</span>
-                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded transition-colors duration-300">
+                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
                       {formData.ordem}
                     </span>
                   </div>
@@ -932,7 +1073,7 @@ export default function CriarItemGaleriaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.4 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg text-gray-800">
                     Informações Importantes
@@ -940,37 +1081,43 @@ export default function CriarItemGaleriaPage() {
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-gray-600">
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiAlertLine className="w-3 h-3 text-red-600 mt-0.5" />
+                    <span>
+                      <strong>Apenas administradores</strong> podem criar itens
+                    </span>
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       Campos com <strong>*</strong> são obrigatórios
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       <strong>Título:</strong> Máximo 200 caracteres
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       <strong>Descrição:</strong> Máximo 500 caracteres
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       <strong>Ordem:</strong> Menor número = primeiro lugar
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       <strong>Destaques</strong> aparecem em posição especial
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       <strong>Itens inativos</strong> não aparecem no site
                     </span>
@@ -986,7 +1133,7 @@ export default function CriarItemGaleriaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.5 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+              <Card className="border-0 shadow-lg hover:shadow-xl">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center text-gray-800">
                     <RiFolderLine className="w-4 h-4 mr-2 text-blue-600" />
@@ -1018,12 +1165,12 @@ export default function CriarItemGaleriaPage() {
                     ) : (
                       <>
                         <p className="text-sm text-gray-600 mb-3">
-                          Clique para selecionar uma categoria:
+                          Categorias disponíveis:
                         </p>
                         {categoriasFiltradas.map((categoria) => (
                           <motion.div
                             key={categoria.id}
-                            className={`flex items-center justify-between p-3 rounded transition-all duration-300 cursor-pointer ${
+                            className={`flex items-center justify-between p-3 rounded cursor-pointer ${
                               formData.categoria_id === categoria.id
                                 ? "bg-blue-50 border border-blue-200 shadow-md"
                                 : "bg-gray-50 hover:bg-gray-100"

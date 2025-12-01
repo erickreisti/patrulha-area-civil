@@ -63,17 +63,6 @@ const slideIn = {
   },
 };
 
-const slideInRight = {
-  hidden: { opacity: 0, x: 20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.6,
-    },
-  },
-};
-
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
   visible: {
@@ -107,6 +96,8 @@ export default function CriarCategoriaPage() {
       newErrors.nome = "Nome é obrigatório";
     } else if (formData.nome.length < 3) {
       newErrors.nome = "Nome deve ter pelo menos 3 caracteres";
+    } else if (formData.nome.length > 100) {
+      newErrors.nome = "Nome não pode ter mais de 100 caracteres";
     }
 
     if (!formData.slug.trim()) {
@@ -114,10 +105,12 @@ export default function CriarCategoriaPage() {
     } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
       newErrors.slug =
         "Slug deve conter apenas letras minúsculas, números e hífens";
+    } else if (formData.slug.length > 100) {
+      newErrors.slug = "Slug não pode ter mais de 100 caracteres";
     }
 
-    if (formData.ordem < 0) {
-      newErrors.ordem = "Ordem não pode ser negativa";
+    if (formData.ordem < 0 || formData.ordem > 999) {
+      newErrors.ordem = "Ordem deve ser entre 0 e 999";
     }
 
     setFormErrors(newErrors);
@@ -135,7 +128,7 @@ export default function CriarCategoriaPage() {
     try {
       setLoading(true);
 
-      const { error: insertError } = await supabase
+      const { data, error: insertError } = await supabase
         .from("galeria_categorias")
         .insert([
           {
@@ -152,23 +145,38 @@ export default function CriarCategoriaPage() {
         .select()
         .single();
 
-      if (insertError) {
-        throw insertError;
-      }
+      if (insertError) throw insertError;
+
+      // Log da atividade
+      await supabase.from("system_activities").insert([
+        {
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          action_type: "create",
+          description: `Criou nova categoria: "${formData.nome}"`,
+          resource_type: "galeria_categoria",
+          resource_id: data.id,
+          metadata: {
+            tipo: formData.tipo,
+            status: formData.status,
+            ordem: formData.ordem,
+          },
+        },
+      ]);
 
       toast.success("Categoria criada com sucesso!");
 
-      // Redirecionar para a lista
       setTimeout(() => {
         router.push("/admin/galeria/categorias");
       }, 1000);
-    } catch (error: unknown) {
+    } catch (error) {
       console.error("Erro ao criar categoria:", error);
 
       if (error && typeof error === "object" && "code" in error) {
         const supabaseError = error as { code: string };
         if (supabaseError.code === "23505") {
           toast.error("Já existe uma categoria com este nome ou slug.");
+        } else if (supabaseError.code === "42501") {
+          toast.error("Você não tem permissão para criar categorias.");
         } else {
           toast.error("Não foi possível criar a categoria.");
         }
@@ -186,7 +194,8 @@ export default function CriarCategoriaPage() {
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "");
+      .replace(/(^-|-$)+/g, "")
+      .slice(0, 100);
   };
 
   const handleNomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,84 +212,104 @@ export default function CriarCategoriaPage() {
 
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const slug = e.target.value.toLowerCase();
-    setFormData((prev) => ({ ...prev, slug }));
+    setFormData((prev) => ({ ...prev, slug: slug.slice(0, 100) }));
     if (formErrors.slug) {
       setFormErrors((prev) => ({ ...prev, slug: "" }));
     }
   };
 
-  const navigationButtons = [
-    {
-      href: "/admin/galeria/categorias",
-      icon: RiArrowLeftLine,
-      label: "Voltar",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/admin/dashboard",
-      icon: RiBarChartLine,
-      label: "Dashboard",
-      className:
-        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/perfil",
-      icon: RiUserLine,
-      label: "Meu Perfil",
-      className:
-        "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header */}
+        {/* Header com botões abaixo */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={slideIn}
-          className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8"
+          className="mb-8"
         >
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-              CRIAR CATEGORIA
+              NOVA CATEGORIA
             </h1>
             <p className="text-gray-600">
-              Adicione uma nova categoria para organizar a galeria
+              Crie uma nova categoria para organizar a galeria
             </p>
           </div>
 
-          {/* Botões de Navegação */}
-          <div className="flex flex-col sm:flex-row gap-3 mt-4 lg:mt-0">
-            {navigationButtons.map((button, index) => (
-              <motion.div
-                key={button.href}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Link href={button.href}>
-                  <Button
-                    variant="outline"
-                    className={`transition-all duration-300 ${button.className}`}
-                  >
-                    <button.icon className="w-4 h-4 mr-2" />
-                    {button.label}
-                  </Button>
-                </Link>
-              </motion.div>
-            ))}
+          {/* Botões de Navegação - ABAIXO DO HEADER */}
+          <div className="flex flex-wrap gap-3 mt-6">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/galeria/categorias">
+                <Button
+                  variant="outline"
+                  className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-300"
+                >
+                  <RiArrowLeftLine className="w-4 h-4 mr-2" />
+                  Voltar para Categorias
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/admin/dashboard">
+                <Button
+                  variant="outline"
+                  className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white transition-all duration-300"
+                >
+                  <RiBarChartLine className="w-4 h-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/perfil">
+                <Button
+                  variant="outline"
+                  className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-all duration-300"
+                >
+                  <RiUserLine className="w-4 h-4 mr-2" />
+                  Meu Perfil
+                </Button>
+              </Link>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/">
+                <Button
+                  variant="outline"
+                  className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white transition-all duration-300"
+                >
+                  <RiHomeLine className="w-4 h-4 mr-2" />
+                  Voltar ao Site
+                </Button>
+              </Link>
+            </motion.div>
           </div>
         </motion.div>
 
@@ -320,6 +349,7 @@ export default function CriarCategoriaPage() {
                             ? "border-red-500 focus:border-red-500 focus:ring-red-500"
                             : "focus:ring-blue-500"
                         }`}
+                        maxLength={100}
                       />
                       {formErrors.nome && (
                         <motion.p
@@ -331,6 +361,9 @@ export default function CriarCategoriaPage() {
                           {formErrors.nome}
                         </motion.p>
                       )}
+                      <p className="text-gray-500 text-sm">
+                        {formData.nome.length}/100 caracteres
+                      </p>
                     </motion.div>
 
                     {/* Slug */}
@@ -359,6 +392,7 @@ export default function CriarCategoriaPage() {
                               ? "border-red-500 focus:border-red-500 focus:ring-red-500"
                               : "focus:ring-blue-500"
                           }`}
+                          maxLength={100}
                         />
                       </div>
                       {formErrors.slug && (
@@ -439,7 +473,7 @@ export default function CriarCategoriaPage() {
                         maxLength={500}
                         className="transition-all duration-300 focus:ring-blue-500 resize-none"
                       />
-                      <p className="text-gray-500 text-sm transition-colors duration-300">
+                      <p className="text-gray-500 text-sm">
                         {formData.descricao.length}/500 caracteres
                       </p>
                     </motion.div>
@@ -462,6 +496,7 @@ export default function CriarCategoriaPage() {
                           id="ordem"
                           type="number"
                           min="0"
+                          max="999"
                           value={formData.ordem}
                           onChange={(e) =>
                             setFormData((prev) => ({
@@ -485,8 +520,8 @@ export default function CriarCategoriaPage() {
                             {formErrors.ordem}
                           </motion.p>
                         )}
-                        <p className="text-gray-500 text-sm transition-colors duration-300">
-                          Número menor aparece primeiro
+                        <p className="text-gray-500 text-sm">
+                          Número menor aparece primeiro (0-999)
                         </p>
                       </div>
 
@@ -598,7 +633,7 @@ export default function CriarCategoriaPage() {
             <motion.div
               initial="hidden"
               animate="visible"
-              variants={slideInRight}
+              variants={fadeInUp}
               transition={{ delay: 0.3 }}
             >
               <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -648,7 +683,7 @@ export default function CriarCategoriaPage() {
             <motion.div
               initial="hidden"
               animate="visible"
-              variants={slideInRight}
+              variants={fadeInUp}
               transition={{ delay: 0.4 }}
             >
               <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -660,31 +695,31 @@ export default function CriarCategoriaPage() {
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm text-gray-600">
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       Campos com <strong>*</strong> são obrigatórios
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       O <strong>slug</strong> deve ser único e será usado na URL
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       Categorias <strong>inativas</strong> não aparecem no site
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       A <strong>ordem</strong> define a posição na listagem
                     </span>
                   </p>
                   <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
                     <span>
                       Escolha o <strong>tipo</strong> correto para organizar o
                       conteúdo
