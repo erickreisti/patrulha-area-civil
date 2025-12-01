@@ -1,8 +1,7 @@
-// app/galeria/[slug]/page.tsx - CORRIGIDO COM FRAMER MOTION E TIPOS
 "use client";
 
 import { notFound } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Card,
@@ -13,28 +12,39 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Link from "next/link";
 import Image from "next/image";
-
-// ✅ IMPORT CORRETO DO FRAMER MOTION
 import { motion } from "framer-motion";
-
-// Remix Icons
 import {
   RiArrowLeftLine,
   RiCameraLine,
   RiImageLine,
   RiVideoLine,
   RiCalendarLine,
-  RiMapPinLine,
   RiDownloadLine,
   RiPlayLine,
   RiEyeLine,
   RiFolderLine,
   RiStackLine,
+  RiStarFill,
+  RiFilterLine,
 } from "react-icons/ri";
-
-// ✅ IMPORTANDO TIPOS DO SEU ARQUIVO
 import { GaleriaCategoria, GaleriaItem } from "@/types";
 
 interface PageProps {
@@ -43,64 +53,123 @@ interface PageProps {
   };
 }
 
+type SortType = "recent" | "oldest" | "name" | "destaque";
+
 export default function CategoriaGaleriaPage({ params }: PageProps) {
   const [categoria, setCategoria] = useState<GaleriaCategoria | null>(null);
-  const [itensDaCategoria, setItensDaCategoria] = useState<GaleriaItem[]>([]);
+  const [itens, setItens] = useState<GaleriaItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItens, setTotalItens] = useState(0);
+  const [filterDestaque, setFilterDestaque] = useState<boolean | null>(null);
+  const [sortBy, setSortBy] = useState<SortType>("destaque");
+
+  const ITEMS_PER_PAGE = 12;
+  const supabase = createClient();
+
+  // Buscar dados da categoria
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      // 1. Buscar categoria pelo slug
+      const { data: categoriaData, error: categoriaError } = await supabase
+        .from("galeria_categorias")
+        .select("*")
+        .eq("slug", params.slug)
+        .eq("status", true)
+        .single();
+
+      if (categoriaError || !categoriaData) {
+        setError("Categoria não encontrada");
+        return;
+      }
+
+      setCategoria(categoriaData as GaleriaCategoria);
+
+      // 2. Contar total de itens da categoria
+      let countQuery = supabase
+        .from("galeria_itens")
+        .select("*", { count: "exact", head: true })
+        .eq("categoria_id", categoriaData.id)
+        .eq("status", true);
+
+      if (filterDestaque !== null) {
+        countQuery = countQuery.eq("destaque", filterDestaque);
+      }
+
+      const { count, error: countError } = await countQuery;
+
+      if (countError) {
+        console.error("Erro ao contar itens:", countError);
+      }
+
+      const totalCount = count || 0;
+      const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+      setTotalItens(totalCount);
+      setTotalPages(totalPages);
+
+      // 3. Buscar itens com paginação
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
+      let query = supabase
+        .from("galeria_itens")
+        .select("*")
+        .eq("categoria_id", categoriaData.id)
+        .eq("status", true)
+        .range(from, to);
+
+      // Aplicar filtro de destaque
+      if (filterDestaque !== null) {
+        query = query.eq("destaque", filterDestaque);
+      }
+
+      // Aplicar ordenação
+      switch (sortBy) {
+        case "recent":
+          query = query.order("created_at", { ascending: false });
+          break;
+        case "oldest":
+          query = query.order("created_at", { ascending: true });
+          break;
+        case "name":
+          query = query.order("titulo", { ascending: true });
+          break;
+        case "destaque":
+          // Primeiro os em destaque, depois pelo created_at
+          query = query.order("destaque", { ascending: false });
+          query = query.order("created_at", { ascending: false });
+          break;
+      }
+
+      const { data: itensData, error: itensError } = await query;
+
+      if (itensError) {
+        console.error("Erro ao buscar itens:", itensError);
+      }
+
+      setItens((itensData as GaleriaItem[]) || []);
+    } catch (err) {
+      console.error("Erro ao carregar dados:", err);
+      setError("Erro ao carregar dados da galeria");
+    } finally {
+      setLoading(false);
+    }
+  }, [params.slug, page, filterDestaque, sortBy, supabase]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const supabase = createClient();
-
-        // Buscar categoria pelo slug
-        const { data: categoriaData, error: categoriaError } = await supabase
-          .from("galeria_categorias")
-          .select("*")
-          .eq("slug", params.slug)
-          .eq("status", true)
-          .single();
-
-        if (categoriaError || !categoriaData) {
-          setError("Categoria não encontrada");
-          return;
-        }
-
-        setCategoria(categoriaData);
-
-        // Buscar itens da categoria
-        const { data: itensData, error: itensError } = await supabase
-          .from("galeria_itens")
-          .select(
-            `
-            *,
-            categoria:galeria_categorias(*)
-          `
-          )
-          .eq("categoria_id", categoriaData.id)
-          .eq("status", true)
-          .order("ordem", { ascending: true })
-          .order("created_at", { ascending: false });
-
-        if (itensError) {
-          console.error("Erro ao buscar itens:", itensError);
-        }
-
-        setItensDaCategoria((itensData as GaleriaItem[]) || []);
-      } catch (err) {
-        console.error("Erro ao carregar dados:", err);
-        setError("Erro ao carregar dados da galeria");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [params.slug]);
+  }, [fetchData]);
 
-  if (loading) {
+  // Resetar página quando mudar filtros
+  useEffect(() => {
+    setPage(1);
+  }, [filterDestaque, sortBy]);
+
+  if (loading && !categoria) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
@@ -117,6 +186,11 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
     notFound();
   }
 
+  // Estatísticas da categoria
+  const itensEmDestaque = itens.filter((item) => item.destaque).length;
+  const totalFotos = itens.filter((item) => item.tipo === "foto").length;
+  const totalVideos = itens.filter((item) => item.tipo === "video").length;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
       {/* Hero Section */}
@@ -131,7 +205,6 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
         <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-navy-300/5 rounded-full blur-2xl animate-pulse delay-1000" />
 
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          {/* ✅ motion.div CORRETO */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
@@ -170,32 +243,103 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
       {/* Conteúdo da Galeria */}
       <section className="py-12 sm:py-16 bg-gradient-to-b from-white to-offwhite-100">
         <div className="container mx-auto px-4 sm:px-6">
-          {/* Estatísticas */}
+          {/* Estatísticas e Filtros */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
+            className="mb-8"
           >
-            <Card className="border-2 border-navy-100 bg-gradient-to-br from-white to-navy-50/50 backdrop-blur-sm mb-8 shadow-navy">
+            <Card className="border-2 border-navy-100 bg-gradient-to-br from-white to-navy-50/50 backdrop-blur-sm shadow-navy">
               <CardContent className="p-6">
-                <div className="flex flex-col sm:flex-row justify-between items-center">
-                  <div className="text-center sm:text-left mb-4 sm:mb-0">
-                    <div className="text-2xl font-bold text-navy-700 mb-1 font-bebas tracking-wide">
-                      {itensDaCategoria.length}{" "}
-                      {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                  {/* Estatísticas */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-navy-700 mb-1 font-bebas tracking-wide">
+                        {totalItens}
+                      </div>
+                      <div className="text-slate-600 text-sm">Total</div>
                     </div>
-                    <div className="text-slate-600 text-sm">
-                      nesta categoria
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-navy-700 mb-1 font-bebas tracking-wide">
+                        {itensEmDestaque}
+                      </div>
+                      <div className="text-slate-600 text-sm">Em Destaque</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-navy-700 mb-1 font-bebas tracking-wide">
+                        {totalFotos}
+                      </div>
+                      <div className="text-slate-600 text-sm">Fotos</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-navy-700 mb-1 font-bebas tracking-wide">
+                        {totalVideos}
+                      </div>
+                      <div className="text-slate-600 text-sm">Vídeos</div>
                     </div>
                   </div>
 
+                  {/* Botão voltar */}
                   <Button
                     asChild
                     variant="outline"
                     className="border-2 border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white font-semibold py-2 px-6 transition-all duration-300 hover:scale-105"
                   >
-                    <Link href="/galeria">Explorar Outras Categorias</Link>
+                    <Link href="/galeria">Ver Todas Categorias</Link>
                   </Button>
+                </div>
+
+                {/* Filtros */}
+                <div className="mt-6 pt-6 border-t border-navy-100">
+                  <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge
+                        variant={
+                          filterDestaque === null ? "default" : "outline"
+                        }
+                        className="cursor-pointer hover:bg-navy-100 transition-colors"
+                        onClick={() => setFilterDestaque(null)}
+                      >
+                        Todos ({totalItens})
+                      </Badge>
+                      <Badge
+                        variant={
+                          filterDestaque === true ? "default" : "outline"
+                        }
+                        className="cursor-pointer hover:bg-amber-100 transition-colors"
+                        onClick={() => setFilterDestaque(true)}
+                      >
+                        <RiStarFill className="w-3 h-3 mr-1" />
+                        Em Destaque ({itensEmDestaque})
+                      </Badge>
+                    </div>
+
+                    {/* Ordenação - SELECT CORRIGIDO */}
+                    <div className="flex items-center gap-2">
+                      <RiFilterLine className="w-4 h-4 text-slate-500" />
+                      <Select
+                        value={sortBy}
+                        onValueChange={(value: SortType) => setSortBy(value)}
+                      >
+                        <SelectTrigger className="border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none min-w-[160px]">
+                          <SelectValue placeholder="Ordenar por" />
+                        </SelectTrigger>
+                        <SelectContent
+                          position="popper"
+                          sideOffset={5}
+                          className="w-[var(--radix-select-trigger-width)] z-50"
+                          avoidCollisions={true}
+                        >
+                          <SelectItem value="destaque">Em Destaque</SelectItem>
+                          <SelectItem value="recent">Mais Recentes</SelectItem>
+                          <SelectItem value="oldest">Mais Antigos</SelectItem>
+                          <SelectItem value="name">Ordem Alfabética</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -209,160 +353,242 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
             <div className="w-20 h-1 bg-navy-600 mx-auto rounded-full"></div>
           </div>
 
-          {itensDaCategoria.length > 0 ? (
+          {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {itensDaCategoria.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                >
-                  <Card
-                    className={`group border-2 ${
-                      item.tipo === "video"
-                        ? "border-slate-200 hover:border-slate-300"
-                        : "border-navy-100 hover:border-navy-200"
-                    } bg-white/90 backdrop-blur-sm shadow-navy hover:shadow-navy-lg transition-all duration-500 overflow-hidden h-full flex flex-col`}
-                  >
-                    {/* Thumbnail */}
-                    <div
-                      className={`relative h-48 bg-gradient-to-br ${
-                        item.tipo === "video"
-                          ? "from-slate-100 to-slate-200"
-                          : "from-navy-50 to-blue-50"
-                      } flex items-center justify-center overflow-hidden`}
-                    >
-                      {item.thumbnail_url ? (
-                        <Image
-                          src={item.thumbnail_url}
-                          alt={item.titulo}
-                          width={400}
-                          height={192}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        />
-                      ) : (
-                        <div className="text-center p-4">
-                          {item.tipo === "video" ? (
-                            <RiVideoLine className="h-12 w-12 text-slate-600/70 mx-auto mb-3" />
-                          ) : (
-                            <RiImageLine className="h-12 w-12 text-navy-600/70 mx-auto mb-3" />
-                          )}
-                          <span
-                            className={`font-medium text-sm ${
-                              item.tipo === "video"
-                                ? "text-slate-700"
-                                : "text-navy-700"
-                            }`}
-                          >
-                            {item.titulo}
-                          </span>
-                        </div>
-                      )}
-
-                      {item.tipo === "video" && (
-                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <RiPlayLine className="h-12 w-12 text-white" />
-                        </div>
-                      )}
-
-                      <Badge
-                        variant={
-                          item.tipo === "video" ? "secondary" : "default"
-                        }
-                        className={`absolute top-3 right-3 backdrop-blur-sm text-xs ${
-                          item.tipo === "video"
-                            ? "bg-slate-100 text-slate-700 border-slate-200"
-                            : "bg-navy-100 text-navy-700 border-navy-200"
-                        }`}
-                      >
-                        {item.tipo === "video" ? (
-                          <RiVideoLine className="w-2.5 h-2.5 mr-1" />
-                        ) : (
-                          <RiImageLine className="w-2.5 h-2.5 mr-1" />
-                        )}
-                        {item.tipo === "video" ? "Vídeo" : "Foto"}
-                      </Badge>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="border-2 border-slate-200">
+                  <Skeleton className="h-48 w-full rounded-t-lg" />
+                  <CardContent className="p-4">
+                    <Skeleton className="h-5 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-full mb-3" />
+                    <div className="flex justify-between">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="h-4 w-16" />
                     </div>
-
-                    <CardContent className="p-4 sm:p-6 flex-grow flex flex-col">
-                      <h3 className="font-bebas tracking-wide text-lg text-slate-800 mb-2 group-hover:text-navy-600 transition-colors leading-tight">
-                        {item.titulo}
-                      </h3>
-
-                      {item.descricao && (
-                        <p className="text-slate-600 text-sm leading-relaxed mb-3 flex-grow line-clamp-3">
-                          {item.descricao}
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                        <div className="flex items-center">
-                          <RiCalendarLine className="h-3 w-3 mr-1" />
-                          <span>
-                            {new Date(item.created_at).toLocaleDateString(
-                              "pt-BR"
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : itens.length > 0 ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {itens.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                  >
+                    <Card
+                      className={`group border-2 ${
+                        item.destaque
+                          ? "border-amber-200 hover:border-amber-300"
+                          : item.tipo === "video"
+                          ? "border-slate-200 hover:border-slate-300"
+                          : "border-navy-100 hover:border-navy-200"
+                      } bg-white/90 backdrop-blur-sm shadow-navy hover:shadow-navy-lg transition-all duration-500 overflow-hidden h-full flex flex-col`}
+                    >
+                      {/* Thumbnail */}
+                      <div
+                        className={`relative h-48 bg-gradient-to-br ${
+                          item.tipo === "video"
+                            ? "from-slate-100 to-slate-200"
+                            : "from-navy-50 to-blue-50"
+                        } flex items-center justify-center overflow-hidden`}
+                      >
+                        {item.thumbnail_url ||
+                        (item.tipo === "foto" && item.arquivo_url) ? (
+                          <Image
+                            src={item.thumbnail_url || item.arquivo_url}
+                            alt={item.titulo}
+                            width={400}
+                            height={192}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          />
+                        ) : (
+                          <div className="text-center p-4">
+                            {item.tipo === "video" ? (
+                              <RiVideoLine className="h-12 w-12 text-slate-600/70 mx-auto mb-3" />
+                            ) : (
+                              <RiImageLine className="h-12 w-12 text-navy-600/70 mx-auto mb-3" />
                             )}
-                          </span>
-                        </div>
-                        {item.tipo === "foto" && (
-                          <div className="flex items-center">
-                            <RiMapPinLine className="h-3 w-3 mr-1" />
-                            <span>PAC</span>
+                            <span
+                              className={`font-medium text-sm ${
+                                item.tipo === "video"
+                                  ? "text-slate-700"
+                                  : "text-navy-700"
+                              }`}
+                            >
+                              {item.titulo}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Badge de Destaque */}
+                        {item.destaque && (
+                          <div className="absolute top-3 right-3">
+                            <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
+                              <RiStarFill className="w-3 h-3 mr-1" />
+                              Destaque
+                            </Badge>
+                          </div>
+                        )}
+
+                        {/* Overlay para vídeo */}
+                        {item.tipo === "video" && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+                              <RiPlayLine className="h-8 w-8 text-white" />
+                            </div>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={`flex-1 border-2 ${
-                            item.tipo === "video"
-                              ? "border-slate-300 text-slate-700 hover:bg-slate-600 hover:text-white"
-                              : "border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white"
-                          } transition-all duration-300 group/btn text-xs`}
-                          asChild
-                        >
-                          {item.tipo === "video" ? (
-                            <a
-                              href={item.arquivo_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center justify-center"
-                            >
-                              Assistir
-                              <RiPlayLine className="ml-2 h-3 w-3 transition-transform duration-300 group-hover/btn:translate-x-1" />
-                            </a>
-                          ) : (
-                            <a
-                              href={item.arquivo_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center justify-center"
-                            >
-                              Visualizar
-                              <RiEyeLine className="ml-2 h-3 w-3 transition-transform duration-300 group-hover/btn:translate-x-1" />
-                            </a>
-                          )}
-                        </Button>
+                      <CardContent className="p-4 sm:p-6 flex-grow flex flex-col">
+                        <h3 className="font-bebas tracking-wide text-lg text-slate-800 mb-2 group-hover:text-navy-600 transition-colors leading-tight">
+                          {item.titulo}
+                        </h3>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-10 h-10 rounded-full hover:bg-navy-600 hover:text-white transition-all duration-300 border border-slate-200"
-                          asChild
-                        >
-                          <a href={item.arquivo_url} download>
-                            <RiDownloadLine className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        {item.descricao && (
+                          <p className="text-slate-600 text-sm leading-relaxed mb-3 flex-grow line-clamp-3">
+                            {item.descricao}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
+                          <div className="flex items-center">
+                            <RiCalendarLine className="h-3 w-3 mr-1" />
+                            <span>
+                              {new Date(item.created_at).toLocaleDateString(
+                                "pt-BR"
+                              )}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {item.tipo === "video" ? "Vídeo" : "Foto"}
+                          </Badge>
+                        </div>
+
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`flex-1 border-2 ${
+                              item.tipo === "video"
+                                ? "border-slate-300 text-slate-700 hover:bg-slate-600 hover:text-white"
+                                : "border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white"
+                            } transition-all duration-300 group/btn text-xs`}
+                            asChild
+                          >
+                            {item.tipo === "video" ? (
+                              <a
+                                href={item.arquivo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center"
+                              >
+                                Assistir
+                                <RiPlayLine className="ml-2 h-3 w-3 transition-transform duration-300 group-hover/btn:translate-x-1" />
+                              </a>
+                            ) : (
+                              <a
+                                href={item.arquivo_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center justify-center"
+                              >
+                                Visualizar
+                                <RiEyeLine className="ml-2 h-3 w-3 transition-transform duration-300 group-hover/btn:translate-x-1" />
+                              </a>
+                            )}
+                          </Button>
+
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-10 h-10 rounded-full hover:bg-navy-600 hover:text-white transition-all duration-300 border border-slate-200"
+                            asChild
+                          >
+                            <a href={item.arquivo_url} download>
+                              <RiDownloadLine className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Paginação */}
+              {totalPages > 1 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex justify-center mt-12"
+                >
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() =>
+                            setPage((prev) => Math.max(1, prev - 1))
+                          }
+                          className={
+                            page === 1 ? "pointer-events-none opacity-50" : ""
+                          }
+                        />
+                      </PaginationItem>
+
+                      {Array.from(
+                        { length: Math.min(5, totalPages) },
+                        (_, i) => {
+                          let pageNum = i + 1;
+                          if (totalPages > 5) {
+                            if (page <= 3) {
+                              pageNum = i + 1;
+                            } else if (page >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = page - 2 + i;
+                            }
+                          }
+
+                          return (
+                            <PaginationItem key={pageNum}>
+                              <PaginationLink
+                                isActive={page === pageNum}
+                                onClick={() => setPage(pageNum)}
+                              >
+                                {pageNum}
+                              </PaginationLink>
+                            </PaginationItem>
+                          );
+                        }
+                      )}
+
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() =>
+                            setPage((prev) => Math.min(totalPages, prev + 1))
+                          }
+                          className={
+                            page === totalPages
+                              ? "pointer-events-none opacity-50"
+                              : ""
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+
+                  <div className="text-sm text-slate-500 ml-4 flex items-center">
+                    Página {page} de {totalPages} • {totalItens} itens no total
+                  </div>
                 </motion.div>
-              ))}
-            </div>
+              )}
+            </>
           ) : (
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -373,23 +599,26 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
                 <CardContent className="p-8">
                   <RiImageLine className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                    Nenhum item disponível
+                    {filterDestaque === true
+                      ? "Nenhum item em destaque"
+                      : "Nenhum item disponível"}
                   </h3>
                   <p className="text-slate-600 text-sm mb-4">
-                    Esta categoria ainda não possui{" "}
-                    {categoria.tipo === "fotos" ? "fotos" : "vídeos"}{" "}
-                    publicados.
+                    {filterDestaque === true
+                      ? "Esta categoria ainda não possui itens em destaque."
+                      : `Esta categoria ainda não possui ${
+                          categoria.tipo === "fotos" ? "fotos" : "vídeos"
+                        } publicados.`}
                   </p>
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="border-2 border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white transition-all duration-300"
-                  >
-                    <Link href="/galeria">
-                      <RiArrowLeftLine className="mr-2 h-4 w-4" />
-                      Voltar para Galeria
-                    </Link>
-                  </Button>
+                  {filterDestaque !== null && (
+                    <Button
+                      variant="outline"
+                      className="border-2 border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white transition-all duration-300"
+                      onClick={() => setFilterDestaque(null)}
+                    >
+                      Ver todos os itens
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

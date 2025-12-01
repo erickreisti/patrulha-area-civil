@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
   Pagination,
   PaginationContent,
   PaginationItem,
@@ -20,14 +28,6 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   RiNewspaperLine,
   RiSearchLine,
@@ -44,59 +44,12 @@ import {
   RiNotificationLine,
   RiStackLine,
 } from "react-icons/ri";
+import type { IconType } from "react-icons";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-
-// ==================== INTERFACES INTEGRADAS ====================
-export type NoticiaStatus = "rascunho" | "publicado" | "arquivado";
-
-export interface Noticia {
-  id: string;
-  titulo: string;
-  slug: string;
-  conteudo: string;
-  resumo: string;
-  imagem: string | null;
-  categoria: string;
-  autor_id: string;
-  destaque: boolean;
-  data_publicacao: string;
-  status: NoticiaStatus;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface NoticiaWithAutor extends Noticia {
-  autor?: {
-    full_name: string;
-    graduacao: string;
-    avatar_url?: string;
-  };
-}
-
-export interface NoticiaFormData {
-  titulo: string;
-  slug: string;
-  conteudo: string;
-  resumo: string;
-  imagem: string | null;
-  categoria: string;
-  destaque: boolean;
-  data_publicacao: string;
-  status: NoticiaStatus;
-}
-
-export interface NoticiaListagem {
-  id: string;
-  titulo: string;
-  slug: string;
-  resumo: string | null;
-  categoria: string | null;
-  data_publicacao: string;
-  destaque: boolean;
-}
+import { NoticiaWithAutor } from "@/types";
 
 // ==================== CONFIGURAÇÕES ====================
 const ITEMS_PER_PAGE_OPTIONS = [6, 12, 24, 48];
@@ -110,159 +63,179 @@ export default function NoticiasPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
-  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "popular">(
+  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "destaque">(
     "recent"
   );
+  const [totalCount, setTotalCount] = useState(0);
+  const [categories, setCategories] = useState<
+    Array<{ value: string; label: string; icon: IconType }>
+  >([{ value: "all", label: "Todas as Categorias", icon: RiStackLine }]);
 
   const supabase = createClient();
 
-  useEffect(() => {
-    const fetchNoticias = async () => {
-      try {
-        setLoading(true);
+  // Buscar categorias únicas
+  const fetchCategories = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("noticias")
+        .select("categoria")
+        .not("categoria", "is", null);
 
-        // ✅ CORREÇÃO: Buscar notícias primeiro (query mais simples)
-        let query = supabase.from("noticias").select("*");
+      if (error) throw error;
 
-        // Verificar se usuário é admin
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        let isAdmin = false;
+      const uniqueCategories = Array.from(
+        new Set(data?.map((n) => n.categoria).filter(Boolean) as string[])
+      ).map((cat) => ({
+        value: cat,
+        label: cat,
+        icon: RiNewspaperLine,
+      }));
 
-        if (user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .maybeSingle();
-          isAdmin = profile?.role === "admin";
-        }
+      setCategories([
+        { value: "all", label: "Todas as Categorias", icon: RiStackLine },
+        ...uniqueCategories,
+      ]);
+    } catch (error) {
+      console.error("Erro ao buscar categorias:", error);
+    }
+  }, [supabase]);
 
-        // ✅ CORREÇÃO: Aplicar filtro de status baseado nas políticas RLS
-        if (!isAdmin) {
-          query = query.eq("status", "publicado");
-        }
+  // Buscar notícias com paginação
+  const fetchNoticias = useCallback(async () => {
+    try {
+      setLoading(true);
 
-        // Ordenação
-        switch (sortBy) {
-          case "recent":
-            query = query.order("data_publicacao", { ascending: false });
-            break;
-          case "oldest":
-            query = query.order("data_publicacao", { ascending: true });
-            break;
-          case "popular":
-            query = query
-              .order("destaque", { ascending: false })
-              .order("data_publicacao", { ascending: false });
-            break;
-        }
+      // Calcular offset para paginação
+      const from = (currentPage - 1) * itemsPerPage;
+      const to = from + itemsPerPage - 1;
 
-        const { data: noticiasData, error } = await query;
+      // Construir query com paginação
+      let query = supabase
+        .from("noticias")
+        .select(
+          `
+          *,
+          autor:profiles(full_name, graduacao, avatar_url)
+        `,
+          { count: "exact" }
+        )
+        .range(from, to);
 
-        if (error) {
-          console.error("Erro ao buscar notícias:", error);
-          throw error;
-        }
-
-        console.log("Notícias encontradas:", noticiasData); // Debug
-
-        // ✅ CORREÇÃO: Buscar autores separadamente se houver notícias
-        if (noticiasData && noticiasData.length > 0) {
-          // Filtrar autor_ids válidos
-          const autorIds = noticiasData
-            .map((n) => n.autor_id)
-            .filter(Boolean) as string[];
-
-          let autoresMap = new Map();
-
-          if (autorIds.length > 0) {
-            const { data: autoresData } = await supabase
-              .from("profiles")
-              .select("id, full_name, graduacao, avatar_url")
-              .in("id", autorIds);
-
-            autoresMap = new Map(
-              autoresData?.map((autor) => [autor.id, autor]) || []
-            );
-          }
-
-          // Combinar notícias com autores
-          const noticiasComAutor: NoticiaWithAutor[] = noticiasData.map(
-            (noticia) => ({
-              ...noticia,
-              autor: noticia.autor_id
-                ? autoresMap.get(noticia.autor_id)
-                : undefined,
-            })
-          );
-
-          setNoticias(noticiasComAutor);
-        } else {
-          setNoticias([]);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar notícias:", error);
-        setNoticias([]);
-      } finally {
-        setLoading(false);
+      // Aplicar filtro de categoria
+      if (selectedCategory !== "all") {
+        query = query.eq("categoria", selectedCategory);
       }
-    };
 
+      // Aplicar busca
+      if (searchTerm.trim()) {
+        query = query.or(
+          `titulo.ilike.%${searchTerm}%,resumo.ilike.%${searchTerm}%,conteudo.ilike.%${searchTerm}%`
+        );
+      }
+
+      // Aplicar ordenação
+      switch (sortBy) {
+        case "recent":
+          query = query.order("data_publicacao", { ascending: false });
+          break;
+        case "oldest":
+          query = query.order("data_publicacao", { ascending: true });
+          break;
+        case "destaque":
+          query = query
+            .order("destaque", { ascending: false })
+            .order("data_publicacao", { ascending: false });
+          break;
+      }
+
+      const { data: noticiasData, error, count } = await query;
+
+      if (error) {
+        console.error("Erro ao buscar notícias:", error);
+        throw error;
+      }
+
+      setNoticias((noticiasData as NoticiaWithAutor[]) || []);
+      setTotalCount(count || 0);
+    } catch (error) {
+      console.error("Erro ao buscar notícias:", error);
+      setNoticias([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    currentPage,
+    itemsPerPage,
+    selectedCategory,
+    searchTerm,
+    sortBy,
+    supabase,
+  ]);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
+  useEffect(() => {
     fetchNoticias();
-  }, [supabase, sortBy]);
+  }, [fetchNoticias]);
 
-  // Categorias únicas
-  const categories = [
-    { value: "all", label: "Todas as Categorias", icon: RiStackLine },
-    ...Array.from(
-      new Set(noticias.map((n) => n.categoria).filter(Boolean))
-    ).map((cat) => ({
-      value: cat,
-      label: cat,
-      icon: RiNewspaperLine,
-    })),
-  ];
+  // Debounce para busca
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      } else {
+        fetchNoticias();
+      }
+    }, 500);
 
-  // Filtragem
-  const filteredNoticias = noticias.filter((noticia) => {
-    const matchesSearch =
-      noticia.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      noticia.resumo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      noticia.conteudo.toLowerCase().includes(searchTerm.toLowerCase());
+    return () => clearTimeout(timer);
+  }, [
+    searchTerm,
+    selectedCategory,
+    sortBy,
+    itemsPerPage,
+    currentPage,
+    fetchNoticias,
+  ]);
 
-    const matchesCategory =
-      selectedCategory === "all" || noticia.categoria === selectedCategory;
+  // Calcular total de páginas
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
 
-    return matchesSearch && matchesCategory;
-  });
-
-  // Paginação
-  const totalPages = Math.ceil(filteredNoticias.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedNoticias = filteredNoticias.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
-
-  // Estatísticas
-  const totalNoticias = noticias.length;
-  const noticiasPublicadas = noticias.filter(
-    (n) => n.status === "publicado"
-  ).length;
-  const noticiasDestaque = noticias.filter((n) => n.destaque).length;
-
-  // Função para formatar nome do autor - APENAS PRIMEIRO NOME
+  // Função para formatar nome do autor
   const formatAuthorName = (name: string) => {
     if (!name) return "Autor";
-
-    const firstName = name.split(" ")[0]; // Pega apenas o primeiro nome
+    const firstName = name.split(" ")[0];
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
   };
 
+  // Função para corrigir URL da imagem
+  const getImageUrl = (url: string | null) => {
+    if (!url) return null;
+
+    // Se já é uma URL completa
+    if (url.startsWith("http")) return url;
+
+    // Se é um caminho do Supabase Storage
+    if (url.includes("/") && !url.startsWith("http")) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const bucket = "imagens-noticias";
+
+      // Verificar se já tem o bucket no caminho
+      if (url.includes(bucket)) {
+        return `${supabaseUrl}/storage/v1/object/public/${url}`;
+      } else {
+        return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
+      }
+    }
+
+    return url;
+  };
+
   // Loading Skeleton
-  if (loading) {
+  if (loading && noticias.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -306,7 +279,6 @@ export default function NoticiasPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 overflow-hidden">
-        {/* Background Elements */}
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
         <div className="absolute top-0 left-0 w-48 h-48 sm:w-60 sm:h-60 lg:w-72 lg:h-72 bg-blue-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-indigo-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
@@ -346,7 +318,7 @@ export default function NoticiasPage() {
             >
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                  {totalNoticias}
+                  {totalCount}
                 </div>
                 <div className="text-blue-200 text-xs sm:text-sm font-medium">
                   Total
@@ -354,7 +326,7 @@ export default function NoticiasPage() {
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                  {noticiasPublicadas}
+                  {noticias.filter((n) => n.status === "publicado").length}
                 </div>
                 <div className="text-blue-200 text-xs sm:text-sm font-medium">
                   Publicadas
@@ -362,7 +334,7 @@ export default function NoticiasPage() {
               </div>
               <div className="text-center">
                 <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                  {noticiasDestaque}
+                  {noticias.filter((n) => n.destaque).length}
                 </div>
                 <div className="text-blue-200 text-xs sm:text-sm font-medium">
                   Em Destaque
@@ -373,7 +345,7 @@ export default function NoticiasPage() {
         </div>
       </section>
 
-      {/* Filtros e Controles */}
+      {/* Filtros e Controles - SELECTS CORRIGIDOS */}
       <section className="py-6 sm:py-8 bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-40">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start lg:items-center justify-between">
@@ -394,9 +366,9 @@ export default function NoticiasPage() {
               </div>
             </div>
 
-            {/* Controls */}
+            {/* Controls - SELECTS CORRIGIDOS (SEM PROBLEMA DE DESLOCAMENTO) */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
-              {/* Category Filter */}
+              {/* Category Filter - CORRIGIDO */}
               <Select
                 value={selectedCategory}
                 onValueChange={(value) => {
@@ -408,22 +380,31 @@ export default function NoticiasPage() {
                   <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
                   <SelectValue placeholder="Filtrar por categoria" />
                 </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.value} value={category.value}>
-                      <div className="flex items-center">
-                        <category.icon className="w-4 h-4 mr-2" />
-                        {category.label}
-                      </div>
-                    </SelectItem>
-                  ))}
+                <SelectContent
+                  className="z-[9999] w-[var(--radix-select-trigger-width)] max-h-[300px] overflow-y-auto"
+                  position="popper"
+                  sideOffset={5}
+                  align="start"
+                  avoidCollisions={false}
+                >
+                  {categories.map((category) => {
+                    const Icon = category.icon;
+                    return (
+                      <SelectItem key={category.value} value={category.value}>
+                        <div className="flex items-center">
+                          <Icon className="w-4 h-4 mr-2" />
+                          {category.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
 
-              {/* Sort */}
+              {/* Sort - CORRIGIDO */}
               <Select
                 value={sortBy}
-                onValueChange={(value: "recent" | "oldest" | "popular") =>
+                onValueChange={(value: "recent" | "oldest" | "destaque") =>
                   setSortBy(value)
                 }
               >
@@ -431,14 +412,20 @@ export default function NoticiasPage() {
                   <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
                   <SelectValue placeholder="Ordenar por" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  className="z-[9999] w-[var(--radix-select-trigger-width)]"
+                  position="popper"
+                  sideOffset={5}
+                  align="start"
+                  avoidCollisions={false}
+                >
                   <SelectItem value="recent">Mais Recentes</SelectItem>
                   <SelectItem value="oldest">Mais Antigas</SelectItem>
-                  <SelectItem value="popular">Em Destaque</SelectItem>
+                  <SelectItem value="destaque">Em Destaque</SelectItem>
                 </SelectContent>
               </Select>
 
-              {/* Items per Page */}
+              {/* Items per Page - CORRIGIDO */}
               <Select
                 value={itemsPerPage.toString()}
                 onValueChange={(value) => {
@@ -449,7 +436,13 @@ export default function NoticiasPage() {
                 <SelectTrigger className="w-full sm:w-28 lg:w-32 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  className="z-[9999] w-[var(--radix-select-trigger-width)]"
+                  position="popper"
+                  sideOffset={5}
+                  align="start"
+                  avoidCollisions={false}
+                >
                   {ITEMS_PER_PAGE_OPTIONS.map((num) => (
                     <SelectItem key={num} value={num.toString()}>
                       {num} por página
@@ -469,7 +462,7 @@ export default function NoticiasPage() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-3 sm:gap-0">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-800 font-bebas tracking-wide">
-                {filteredNoticias.length} NOTÍCIAS ENCONTRADAS
+                {totalCount} NOTÍCIAS ENCONTRADAS
               </h2>
               <p className="text-slate-600 mt-1 text-sm sm:text-base">
                 {searchTerm && `Buscando por: "${searchTerm}"`}
@@ -480,26 +473,40 @@ export default function NoticiasPage() {
               </p>
             </div>
 
-            {filteredNoticias.length > 0 && (
+            {noticias.length > 0 && (
               <div className="text-xs sm:text-sm text-slate-500">
-                Página {currentPage} de {totalPages} • {filteredNoticias.length}{" "}
-                resultados
+                Página {currentPage} de {totalPages} • {totalCount} resultados
               </div>
             )}
           </div>
 
           {/* Grid de Notícias */}
           <AnimatePresence mode="wait">
-            {filteredNoticias.length > 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {Array.from({ length: itemsPerPage }).map((_, i) => (
+                  <Card key={i} className="border-0 shadow-lg">
+                    <CardHeader className="pb-3 sm:pb-4">
+                      <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <Skeleton className="h-4 w-2/3" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-4 w-1/2" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : noticias.length > 0 ? (
               <motion.div
-                key={`grid-${currentPage}-${itemsPerPage}`}
+                key={`grid-${currentPage}-${selectedCategory}-${searchTerm}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12"
               >
-                {paginatedNoticias.map((noticia, index) => (
+                {noticias.map((noticia, index) => (
                   <motion.div
                     key={noticia.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -509,6 +516,7 @@ export default function NoticiasPage() {
                     <NewsCard
                       noticia={noticia}
                       formatAuthorName={formatAuthorName}
+                      getImageUrl={getImageUrl}
                     />
                   </motion.div>
                 ))}
@@ -663,27 +671,30 @@ export default function NoticiasPage() {
 function NewsCard({
   noticia,
   formatAuthorName,
+  getImageUrl,
 }: {
   noticia: NoticiaWithAutor;
   formatAuthorName: (name: string) => string;
+  getImageUrl: (url: string | null) => string | null;
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const readingTime = Math.ceil(noticia.conteudo.length / 1000);
   const isPublished = noticia.status === "publicado";
+  const imageUrl = getImageUrl(noticia.imagem);
 
   return (
     <Card className="group border-2 border-slate-200/60 hover:border-navy-300/50 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden h-full flex flex-col">
       {/* Image Container */}
       <div className="relative h-40 sm:h-44 lg:h-48 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
-        {noticia.imagem && !imageError ? (
+        {imageUrl && !imageError ? (
           <>
             {!imageLoaded && (
               <div className="absolute inset-0 bg-slate-200 animate-pulse" />
             )}
             <Image
-              src={noticia.imagem}
+              src={imageUrl}
               alt={noticia.titulo}
               fill
               className={`object-cover transition-all duration-700 group-hover:scale-110 ${

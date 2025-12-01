@@ -95,6 +95,44 @@ const fadeInUp = {
   },
 };
 
+// ✅ Mesma função verificadora de admin
+async function checkIsAdmin(
+  supabase: ReturnType<typeof createClient>
+): Promise<boolean> {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.error("❌ Erro na autenticação:", authError?.message);
+      return false;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, status")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error("❌ Erro ao buscar perfil:", profileError.message);
+      return false;
+    }
+
+    if (!profile) {
+      console.log("❌ Perfil não encontrado");
+      return false;
+    }
+
+    return profile.role === "admin" && profile.status === true;
+  } catch (error) {
+    console.error("💥 Erro inesperado ao verificar admin:", error);
+    return false;
+  }
+}
+
 export default function EditarItemPage() {
   const params = useParams();
   const router = useRouter();
@@ -102,6 +140,7 @@ export default function EditarItemPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [item, setItem] = useState<GaleriaItem | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
@@ -120,7 +159,28 @@ export default function EditarItemPage() {
 
   const itemId = params.id as string;
 
+  // Verificar se usuário é admin
+  useEffect(() => {
+    async function verifyAdmin() {
+      const adminStatus = await checkIsAdmin(supabase);
+      setIsAdmin(adminStatus);
+
+      if (!adminStatus) {
+        toast.error(
+          "Acesso negado. Apenas administradores podem editar itens."
+        );
+        setTimeout(() => {
+          router.push("/admin/galeria/itens");
+        }, 2000);
+      }
+    }
+
+    verifyAdmin();
+  }, [supabase, router]);
+
   const fetchItem = useCallback(async () => {
+    if (!isAdmin) return;
+
     try {
       setLoading(true);
 
@@ -159,7 +219,7 @@ export default function EditarItemPage() {
     } finally {
       setLoading(false);
     }
-  }, [itemId, supabase]);
+  }, [itemId, supabase, isAdmin]);
 
   const fetchCategorias = useCallback(async () => {
     try {
@@ -179,11 +239,11 @@ export default function EditarItemPage() {
   }, [supabase]);
 
   useEffect(() => {
-    if (itemId) {
+    if (itemId && isAdmin === true) {
       fetchItem();
       fetchCategorias();
     }
-  }, [itemId, fetchItem, fetchCategorias]);
+  }, [itemId, fetchItem, fetchCategorias, isAdmin]);
 
   const validateForm = (): string[] => {
     const errors: string[] = [];
@@ -217,6 +277,15 @@ export default function EditarItemPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Verificar se é admin
+    const adminCheck = await checkIsAdmin(supabase);
+    if (!adminCheck) {
+      toast.error("Acesso negado. Apenas administradores podem editar itens.");
+      setErrors(["Permissão negada. Você precisa ser administrador."]);
+      return;
+    }
+
     setSaving(true);
     setErrors([]);
 
@@ -256,7 +325,10 @@ export default function EditarItemPage() {
         .select()
         .single();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Erro ao atualizar:", updateError);
+        throw updateError;
+      }
 
       // Log de atividade
       await supabase.from("system_activities").insert([
@@ -285,18 +357,23 @@ export default function EditarItemPage() {
       console.error("Erro ao atualizar item:", error);
 
       if (error && typeof error === "object" && "code" in error) {
-        const supabaseError = error as { code: string };
+        const supabaseError = error as { code: string; message: string };
         if (supabaseError.code === "23505") {
           toast.error("Já existe um item com este título.");
+          setErrors(["Já existe um item com este título"]);
         } else if (supabaseError.code === "23503") {
           toast.error("Categoria não encontrada.");
+          setErrors(["Categoria não encontrada"]);
         } else if (supabaseError.code === "42501") {
           toast.error("Você não tem permissão para atualizar itens.");
+          setErrors(["Permissão negada. Verifique se você é administrador."]);
         } else {
-          toast.error("Erro ao atualizar item");
+          toast.error("Erro ao atualizar item: " + supabaseError.message);
+          setErrors(["Erro interno: " + supabaseError.message]);
         }
       } else {
         toast.error("Erro ao atualizar item");
+        setErrors(["Erro interno ao atualizar o item"]);
       }
     } finally {
       setSaving(false);
@@ -327,13 +404,49 @@ export default function EditarItemPage() {
     setMediaUrl(url);
   };
 
-  const categoriasFiltradas = categorias.filter(
-    (cat) => cat.tipo === (formData.tipo === "foto" ? "fotos" : "videos")
-  );
+  // Se não for admin, mostrar mensagem de acesso negado
+  if (isAdmin === false) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8 flex items-center justify-center">
+        <Card className="border-0 shadow-lg max-w-md w-full">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">
+              <RiAlertLine className="w-12 h-12 mx-auto mb-4" />
+              Acesso Negado
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-gray-600">
+              Apenas administradores podem editar itens na galeria.
+            </p>
+            <Button
+              onClick={() => router.push("/admin/galeria/itens")}
+              className="w-full"
+            >
+              <RiArrowLeftLine className="w-4 h-4 mr-2" />
+              Voltar para Itens
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  const uploadType = formData.tipo === "foto" ? "media" : "video";
-  const acceptTypes = formData.tipo === "foto" ? "image/*" : "video/*";
-  const bucket = formData.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
+  // Se ainda está verificando admin
+  if (isAdmin === null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8 flex items-center justify-center">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"
+          />
+          <p className="text-gray-600">Verificando permissões...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -380,6 +493,14 @@ export default function EditarItemPage() {
       </div>
     );
   }
+
+  const categoriasFiltradas = categorias.filter(
+    (cat) => cat.tipo === (formData.tipo === "foto" ? "fotos" : "videos")
+  );
+
+  const uploadType = formData.tipo === "foto" ? "media" : "video";
+  const acceptTypes = formData.tipo === "foto" ? "image/*" : "video/*";
+  const bucket = formData.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
@@ -549,6 +670,7 @@ export default function EditarItemPage() {
                   <CardTitle className="flex items-center text-xl text-gray-800">
                     <RiImageLine className="w-5 h-5 mr-2 text-navy-600" />
                     Editar Item da Galeria
+                    <Badge className="ml-2 bg-green-600">Admin</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
@@ -719,7 +841,7 @@ export default function EditarItemPage() {
                       </div>
                     </motion.div>
 
-                    {/* Upload de Mídia */}
+                    {/* ✅ Upload de Mídia COM FileUpload COMPONENT */}
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.3 }}
@@ -728,8 +850,7 @@ export default function EditarItemPage() {
                       <Label className="text-sm font-semibold text-gray-700">
                         {formData.tipo === "foto"
                           ? "Upload de Foto"
-                          : "Upload de Vídeo"}{" "}
-                        *
+                          : "Upload de Vídeo"}
                       </Label>
 
                       <FileUpload

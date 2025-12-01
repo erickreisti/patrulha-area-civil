@@ -52,7 +52,7 @@ interface FormData {
   categoria_id: string;
   ordem: number;
   status: boolean;
-  destaque: boolean;
+  destaque: boolean; // ✅ AGORA A COLUNA EXISTE NO BANCO
 }
 
 const slideIn = {
@@ -77,21 +77,50 @@ const fadeInUp = {
   },
 };
 
-// Função helper para verificar se é admin
-async function checkIsAdmin(supabase: ReturnType<typeof createClient>) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+// ✅ Função verificadora de admin CORRIGIDA
+async function checkIsAdmin(
+  supabase: ReturnType<typeof createClient>
+): Promise<boolean> {
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  if (!user) return false;
+    if (authError || !user) {
+      console.error("❌ Erro na autenticação:", authError?.message);
+      return false;
+    }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role, status")
-    .eq("id", user.id)
-    .single();
+    console.log("✅ Usuário autenticado:", user.id);
 
-  return profile && profile.role === "admin" && profile.status === true;
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, status")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error("❌ Erro ao buscar perfil:", profileError.message);
+      return false;
+    }
+
+    if (!profile) {
+      console.log("❌ Perfil não encontrado");
+      return false;
+    }
+
+    console.log("📊 Perfil encontrado:", {
+      role: profile.role,
+      status: profile.status,
+      isAdmin: profile.role === "admin" && profile.status === true,
+    });
+
+    return profile.role === "admin" && profile.status === true;
+  } catch (error) {
+    console.error("💥 Erro inesperado ao verificar admin:", error);
+    return false;
+  }
 }
 
 export default function CriarItemGaleriaPage() {
@@ -112,20 +141,24 @@ export default function CriarItemGaleriaPage() {
     categoria_id: "",
     ordem: 0,
     status: true,
-    destaque: false,
+    destaque: false, // ✅ INICIALIZADO CORRETAMENTE
   });
 
   // Verificar se usuário é admin
   useEffect(() => {
     async function verifyAdmin() {
+      console.log("🔄 Verificando se é admin...");
       const adminStatus = await checkIsAdmin(supabase);
       setIsAdmin(adminStatus);
 
       if (!adminStatus) {
+        console.log("❌ Não é admin, redirecionando...");
         toast.error("Acesso negado. Apenas administradores podem criar itens.");
         setTimeout(() => {
           router.push("/admin/galeria/itens");
         }, 2000);
+      } else {
+        console.log("✅ É admin, carregando categorias...");
       }
     }
 
@@ -134,6 +167,7 @@ export default function CriarItemGaleriaPage() {
 
   const fetchCategorias = useCallback(async () => {
     try {
+      console.log("🔄 Buscando categorias...");
       const { data, error: fetchError } = await supabase
         .from("galeria_categorias")
         .select("id, nome, tipo")
@@ -141,16 +175,21 @@ export default function CriarItemGaleriaPage() {
         .eq("arquivada", false)
         .order("ordem", { ascending: true });
 
-      if (fetchError) throw fetchError;
+      if (fetchError) {
+        console.error("❌ Erro ao buscar categorias:", fetchError);
+        throw fetchError;
+      }
+
+      console.log(`✅ ${data?.length || 0} categorias carregadas`);
       setCategorias(data || []);
     } catch (err: unknown) {
-      console.error("Erro ao carregar categorias:", err);
+      console.error("❌ Erro ao carregar categorias:", err);
       toast.error("Erro ao carregar categorias");
     }
   }, [supabase]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin === true) {
       fetchCategorias();
     }
   }, [fetchCategorias, isAdmin]);
@@ -225,19 +264,24 @@ export default function CriarItemGaleriaPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    console.log("🔄 Iniciando submit...");
+
     // Verificar novamente se é admin antes de prosseguir
     const adminCheck = await checkIsAdmin(supabase);
     if (!adminCheck) {
+      console.error("❌ Permissão negada no submit");
       setErrors(["Acesso negado. Apenas administradores podem criar itens."]);
       toast.error("Permissão negada");
       return;
     }
 
+    console.log("✅ Permissão confirmada");
     setLoading(true);
     setErrors([]);
 
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
+      console.error("❌ Erros de validação:", validationErrors);
       setErrors(validationErrors);
       setLoading(false);
       return;
@@ -250,24 +294,15 @@ export default function CriarItemGaleriaPage() {
       } = await supabase.auth.getUser();
 
       if (userError || !user) {
+        console.error("❌ Usuário não autenticado:", userError?.message);
         setErrors(["Usuário não autenticado"]);
         setLoading(false);
         return;
       }
 
-      // Verificação adicional de permissão
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, status")
-        .eq("id", user.id)
-        .single();
+      console.log("✅ Usuário autenticado:", user.id);
 
-      if (!profile || profile.role !== "admin" || !profile.status) {
-        setErrors(["Acesso negado. Permissão de administrador necessária."]);
-        setLoading(false);
-        return;
-      }
-
+      // ✅ INSERIR NOVO ITEM - COM COLUNA destaque INCLUÍDA
       const { data: itemData, error: insertError } = await supabase
         .from("galeria_itens")
         .insert([
@@ -279,7 +314,7 @@ export default function CriarItemGaleriaPage() {
             arquivo_url: mediaUrl,
             thumbnail_url: formData.tipo === "video" ? null : mediaUrl,
             status: formData.status,
-            destaque: formData.destaque,
+            destaque: formData.destaque, // ✅ COLUNA AGORA EXISTE
             ordem: formData.ordem,
             autor_id: user.id,
             created_at: new Date().toISOString(),
@@ -289,29 +324,32 @@ export default function CriarItemGaleriaPage() {
         .single();
 
       if (insertError) {
-        // Type assertion para acessar propriedades específicas do erro
-        const error = insertError as { code?: string; message?: string };
+        console.error("❌ Erro ao criar item:", insertError);
 
-        if (error.code === "23505") {
+        if (insertError.code === "23505") {
           toast.error("Já existe um item com este título.");
           setErrors(["Já existe um item com este título na galeria"]);
-        } else if (error.code === "23503") {
+        } else if (insertError.code === "23503") {
           toast.error("Categoria não encontrada.");
           setErrors(["Categoria selecionada não existe mais"]);
-        } else if (error.code === "42501") {
+        } else if (insertError.code === "42501") {
           toast.error("Você não tem permissão para criar itens.");
           setErrors(["Permissão negada. Verifique se você é administrador."]);
-        } else {
-          toast.error("Erro ao criar item");
+        } else if (insertError.code === "42703") {
+          toast.error("Erro de coluna no banco de dados.");
           setErrors([
-            "Erro interno ao salvar o item: " +
-              (error.message || "Erro desconhecido"),
+            "Erro de configuração do banco. Contate o administrador.",
           ]);
+        } else {
+          toast.error("Erro ao criar item: " + insertError.message);
+          setErrors(["Erro interno ao salvar o item: " + insertError.message]);
         }
         throw insertError;
       }
 
-      // Log de atividade
+      console.log("✅ Item criado:", itemData.id);
+
+      // ✅ LOG DE ATIVIDADE
       await supabase.from("system_activities").insert([
         {
           user_id: user.id,
@@ -328,6 +366,8 @@ export default function CriarItemGaleriaPage() {
         },
       ]);
 
+      console.log("✅ Log de atividade criado");
+
       toast.success("Item criado com sucesso!");
       setShowSuccess(true);
 
@@ -336,9 +376,8 @@ export default function CriarItemGaleriaPage() {
         router.push("/admin/galeria/itens");
       }, 1500);
     } catch (err: unknown) {
-      console.error("Erro ao criar item:", err);
-      // Se não for um erro que já tratamos acima
-      if (!errors.length) {
+      console.error("💥 Erro ao criar item:", err);
+      if (errors.length === 0) {
         setErrors(["Erro interno ao salvar o item"]);
       }
     } finally {
@@ -751,7 +790,7 @@ export default function CriarItemGaleriaPage() {
                       </div>
                     </motion.div>
 
-                    {/* Upload de Mídia */}
+                    {/* ✅ Upload de Mídia COM FileUpload COMPONENT */}
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.3 }}
@@ -879,7 +918,7 @@ export default function CriarItemGaleriaPage() {
                         </motion.div>
                       </div>
 
-                      {/* Destaque */}
+                      {/* Destaque - ✅ AGORA FUNCIONA */}
                       <div className="space-y-2">
                         <Label className="text-sm font-semibold text-gray-700">
                           Item em Destaque

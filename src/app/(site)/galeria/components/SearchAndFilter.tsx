@@ -1,4 +1,3 @@
-// app/galeria/components/SearchAndFilter.tsx - COM CORES DA PAC
 "use client";
 
 import { useState, useEffect } from "react";
@@ -23,20 +22,22 @@ import {
 interface SearchAndFilterProps {
   initialSearch?: string;
   initialTipo?: string;
+  onSearchChange?: (search: string, tipo: string) => void;
 }
 
 export function SearchAndFilter({
   initialSearch = "",
-  initialTipo = "Todas",
+  initialTipo = "all",
+  onSearchChange,
 }: SearchAndFilterProps) {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [selectedType, setSelectedType] = useState(initialTipo);
 
   const tipos = [
-    { value: "Todas", label: "Todas as Categorias", icon: RiStackLine },
-    { value: "Fotos", label: "Fotos", icon: RiImageLine },
-    { value: "Vídeos", label: "Vídeos", icon: RiVideoLine },
+    { value: "all", label: "Todos os Tipos", icon: RiStackLine },
+    { value: "fotos", label: "Fotos", icon: RiImageLine },
+    { value: "videos", label: "Vídeos", icon: RiVideoLine },
   ];
 
   useEffect(() => {
@@ -44,12 +45,17 @@ export function SearchAndFilter({
       const params = new URLSearchParams();
 
       if (search) params.set("search", search);
-      if (tipo !== "Todas") params.set("tipo", tipo);
+      if (tipo !== "all") params.set("tipo", tipo);
 
       const queryString = params.toString();
       const newUrl = queryString ? `/galeria?${queryString}` : "/galeria";
 
       router.push(newUrl, { scroll: false });
+
+      // Notificar componente pai se houver callback
+      if (onSearchChange) {
+        onSearchChange(search, tipo);
+      }
     };
 
     const timer = setTimeout(() => {
@@ -57,7 +63,7 @@ export function SearchAndFilter({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, selectedType, router]);
+  }, [searchTerm, selectedType, router, onSearchChange]);
 
   return (
     <section className="py-6 sm:py-8 bg-white/90 backdrop-blur-sm border-b border-navy-100">
@@ -105,12 +111,12 @@ export function SearchAndFilter({
             </Select>
 
             {/* Clear Filters Button */}
-            {(searchTerm || selectedType !== "Todas") && (
+            {(searchTerm || selectedType !== "all") && (
               <Button
                 variant="outline"
                 onClick={() => {
                   setSearchTerm("");
-                  setSelectedType("Todas");
+                  setSelectedType("all");
                 }}
                 className="border-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-all duration-300 text-sm sm:text-base"
               >
