@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/client";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { SEGURANCA } from "@/lib/security-config";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,6 +45,12 @@ const loginSchema = z.object({
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
+
+// Configurações de segurança locais
+const SECURITY_CONFIG = {
+  MAX_ATTEMPTS: 5,
+  LOCK_TIME_MINUTES: 15,
+};
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
@@ -122,8 +127,9 @@ export default function LoginPage() {
       const newAttempts = increment ? failedAttempts + 1 : 0;
       setFailedAttempts(newAttempts);
 
-      if (newAttempts >= SEGURANCA.TENTATIVAS_MAXIMAS) {
-        const lockUntil = Date.now() + SEGURANCA.BLOQUEIO_MINUTOS * 60 * 1000;
+      if (newAttempts >= SECURITY_CONFIG.MAX_ATTEMPTS) {
+        const lockUntil =
+          Date.now() + SECURITY_CONFIG.LOCK_TIME_MINUTES * 60 * 1000;
         setIsLocked(true);
         setLockTime(lockUntil);
 
@@ -149,7 +155,7 @@ export default function LoginPage() {
     [failedAttempts]
   );
 
-  // 🎯 FUNÇÃO PRINCIPAL DE LOGIN
+  // 🎯 FUNÇÃO PRINCIPAL DE LOGIN - CORRIGIDA
   const handleSubmit = async (data: LoginFormData) => {
     if (isLocked) {
       showAlert("error", "Acesso temporariamente bloqueado por segurança");
@@ -157,7 +163,7 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    console.log("🚀 Iniciando processo de login seguro...");
+    console.log("🚀 Iniciando processo de login...");
 
     try {
       const matriculaLimpa = data.matricula.replace(/\D/g, "");
@@ -201,15 +207,17 @@ export default function LoginPage() {
         return;
       }
 
+      // ✅ CORREÇÃO AQUI: Pegar email e senha padrão da API
       const { email, id: profileId } = apiResult.data;
-      console.log("✅ Email encontrado:", email);
+      const senhaPadrao = apiResult.security.default_password;
+      console.log("✅ Credenciais encontradas:", { email, senhaPadrao });
 
       // 🔐 PASSO 2: Tentar login com Supabase Auth
       console.log("🔑 Autenticando com Supabase...");
       const { data: authData, error: authError } =
         await supabase.auth.signInWithPassword({
           email,
-          password: SEGURANCA.SENHA_PADRAO,
+          password: senhaPadrao, // ✅ Usando senha da API
         });
 
       if (authError) {
@@ -217,10 +225,7 @@ export default function LoginPage() {
         console.error("❌ Erro de autenticação:", authError);
 
         if (authError.message.includes("Invalid login credentials")) {
-          showAlert(
-            "error",
-            `Credenciais inválidas. Use a senha padrão: ${SEGURANCA.SENHA_PADRAO}`
-          );
+          showAlert("error", "Credenciais inválidas. Verifique sua matrícula.");
         } else {
           showAlert("error", `Erro de autenticação: ${authError.message}`);
         }
@@ -348,7 +353,7 @@ export default function LoginPage() {
     return `${remaining} minuto${remaining !== 1 ? "s" : ""}`;
   };
 
-  // Renderização do componente (DESIGN ORIGINAL)
+  // Renderização do componente
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
       <Toaster position="top-center" />
