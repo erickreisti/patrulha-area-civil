@@ -1,4 +1,3 @@
-// components/ui/file-upload.tsx
 "use client";
 
 import React, { useState, useRef, useCallback } from "react";
@@ -30,6 +29,7 @@ interface UploadFile {
   status: UploadStatus;
   error?: string;
   url?: string;
+  preview?: string;
 }
 
 interface FileUploadProps {
@@ -39,48 +39,49 @@ interface FileUploadProps {
   maxFiles?: number;
   maxSize?: number;
   onUploadComplete?: (urls: string[]) => void;
-  onFileChange?: (url: string) => void;
+  onFileChange?: (url: string | null) => void;
+  onFileSelected?: (file: File | null) => void;
   currentFile?: string;
   accept?: string;
   className?: string;
   userId?: string;
+  autoUpload?: boolean;
 }
 
-// Configurações alinhadas com o schema do banco
 const UPLOAD_CONFIGS = {
   avatar: {
     bucket: "avatares-agentes",
     multiple: false,
     maxFiles: 1,
-    maxSize: 2 * 1024 * 1024, // 2MB
+    maxSize: 2 * 1024 * 1024,
     accept: "image/*" as const,
   },
   image: {
     bucket: "imagens-noticias",
     multiple: false,
     maxFiles: 1,
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: 5 * 1024 * 1024,
     accept: "image/*" as const,
   },
   video: {
     bucket: "galeria-videos",
     multiple: false,
     maxFiles: 1,
-    maxSize: 50 * 1024 * 1024, // 50MB
+    maxSize: 50 * 1024 * 1024,
     accept: "video/*" as const,
   },
   file: {
     bucket: "documentos-oficiais",
     multiple: true,
     maxFiles: 10,
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 10 * 1024 * 1024,
     accept: "*/*" as const,
   },
   media: {
     bucket: "galeria-fotos",
     multiple: true,
     maxFiles: 20,
-    maxSize: 5 * 1024 * 1024, // 5MB
+    maxSize: 5 * 1024 * 1024,
     accept: "image/*,video/*" as const,
   },
 } as const;
@@ -93,23 +94,23 @@ export function FileUpload({
   maxSize,
   onUploadComplete,
   onFileChange,
+  onFileSelected,
   currentFile,
   accept,
   className,
   userId,
+  autoUpload = false,
 }: FileUploadProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState(currentFile || "");
 
-  // ✅ CORRIGIDO: Upload via API Route com useCallback
   const uploadFileToAPI = useCallback(
     async (file: File, uploadType: UploadType): Promise<string> => {
       const formData = new FormData();
       formData.append("file", file);
 
-      // Escolher endpoint baseado no tipo
       const endpoint =
         uploadType === "avatar" ? "/api/upload/avatar" : "/api/upload/general";
 
@@ -150,7 +151,27 @@ export function FileUpload({
     [bucket, userId]
   );
 
-  // Obter configurações baseadas no tipo
+  const createLocalPreview = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith("image/")) {
+        resolve("");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (typeof result === "string") {
+          resolve(result);
+        } else {
+          resolve("");
+        }
+      };
+      reader.onerror = () => reject(new Error("Erro ao ler arquivo"));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const config = {
     ...UPLOAD_CONFIGS[type],
     bucket: bucket || UPLOAD_CONFIGS[type].bucket,
@@ -182,48 +203,47 @@ export function FileUpload({
     [config.maxSize, config.accept]
   );
 
-  // ✅ ATUALIZADO: Upload automático para avatar (usando API)
   const uploadFileAutomatically = useCallback(
-    async (file: File) => {
+    async (uploadFile: UploadFile) => {
       setIsUploading(true);
 
       try {
-        // Atualizar estado para uploading
         setFiles((prev) =>
           prev.map((f) =>
-            f.file === file ? { ...f, status: "uploading", progress: 0 } : f
+            f.file === uploadFile.file
+              ? { ...f, status: "uploading", progress: 0 }
+              : f
           )
         );
 
-        // Simular progresso
         const progressInterval = setInterval(() => {
           setFiles((prev) =>
             prev.map((f) =>
-              f.file === file
+              f.file === uploadFile.file
                 ? { ...f, progress: Math.min(f.progress + 20, 90) }
                 : f
             )
           );
         }, 200);
 
-        // ✅ USAR API ROUTE EM VEZ DO ADMIN CLIENT DIRETO
-        const publicUrl = await uploadFileToAPI(file, type);
+        const publicUrl = await uploadFileToAPI(uploadFile.file, type);
 
         clearInterval(progressInterval);
 
-        // Completar progresso
-        setFiles((prev) =>
-          prev.map((f) => (f.file === file ? { ...f, progress: 100 } : f))
-        );
-
-        // Atualizar estado final
         setFiles((prev) =>
           prev.map((f) =>
-            f.file === file ? { ...f, status: "completed", url: publicUrl } : f
+            f.file === uploadFile.file ? { ...f, progress: 100 } : f
           )
         );
 
-        // Atualizar URL atual e chamar callback
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.file === uploadFile.file
+              ? { ...f, status: "completed", url: publicUrl }
+              : f
+          )
+        );
+
         setCurrentAvatarUrl(publicUrl);
         if (onFileChange) {
           onFileChange(publicUrl);
@@ -239,7 +259,7 @@ export function FileUpload({
 
         setFiles((prev) =>
           prev.map((f) =>
-            f.file === file
+            f.file === uploadFile.file
               ? {
                   ...f,
                   status: "error",
@@ -259,70 +279,89 @@ export function FileUpload({
     [type, onFileChange, uploadFileToAPI]
   );
 
-  const addFiles = useCallback(
-    (newFiles: File[]) => {
-      if (shouldUseSingleMode) {
-        // Modo único: substituir arquivo atual
-        const file = newFiles[0];
-        const error = validateFile(file);
+  const handleFileProcessing = useCallback(
+    async (file: File) => {
+      const error = validateFile(file);
+      if (error) {
+        toast.error("Erro de validação", { description: error });
+        return null;
+      }
 
-        if (error) {
-          toast.error("Erro de validação", {
-            description: error,
-          });
-          return;
+      let preview = "";
+      try {
+        preview = await createLocalPreview(file);
+      } catch {
+        preview = "";
+      }
+
+      const uploadFile: UploadFile = {
+        file,
+        progress: 0,
+        status: "pending",
+        preview,
+      };
+
+      if (autoUpload && type === "avatar") {
+        await uploadFileAutomatically(uploadFile);
+      }
+
+      return uploadFile;
+    },
+    [autoUpload, type, validateFile, uploadFileAutomatically]
+  );
+
+  const addFiles = useCallback(
+    async (newFiles: File[]) => {
+      if (shouldUseSingleMode) {
+        const file = newFiles[0];
+
+        const uploadFile = await handleFileProcessing(file);
+        if (!uploadFile) return;
+
+        setFiles([uploadFile]);
+
+        if (onFileSelected) {
+          onFileSelected(file);
         }
 
-        setFiles([
-          {
-            file,
-            progress: 0,
-            status: "pending",
-          },
-        ]);
-
-        // Upload automático para avatar
-        if (type === "avatar") {
-          uploadFileAutomatically(file);
+        if (autoUpload && type === "avatar") {
+          await uploadFileAutomatically(uploadFile);
         }
       } else {
-        // Modo múltiplo: adicionar arquivos
         const validatedFiles: UploadFile[] = [];
 
-        newFiles.forEach((file) => {
+        for (const file of newFiles) {
           if (files.length + validatedFiles.length >= config.maxFiles) {
             toast.error("Limite de arquivos", {
               description: `Máximo de ${config.maxFiles} arquivos permitido.`,
             });
-            return;
+            break;
           }
 
-          const error = validateFile(file);
-
-          if (error) {
-            toast.error("Erro de validação", {
-              description: error,
-            });
-            return;
+          const uploadFile = await handleFileProcessing(file);
+          if (uploadFile) {
+            validatedFiles.push(uploadFile);
           }
+        }
 
-          validatedFiles.push({
-            file,
-            progress: 0,
-            status: "pending",
-          });
-        });
+        if (validatedFiles.length > 0) {
+          setFiles((prev) => [...prev, ...validatedFiles]);
 
-        setFiles((prev) => [...prev, ...validatedFiles]);
+          if (onFileSelected && validatedFiles.length === 1) {
+            onFileSelected(validatedFiles[0].file);
+          }
+        }
       }
     },
     [
       shouldUseSingleMode,
       files.length,
       config.maxFiles,
-      validateFile,
+      autoUpload,
       type,
       uploadFileAutomatically,
+      handleFileProcessing,
+      onFileSelected,
     ]
   );
 
@@ -330,7 +369,7 @@ export function FileUpload({
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
       addFiles(newFiles);
-      e.target.value = ""; // Resetar input
+      e.target.value = "";
     }
   };
 
@@ -352,9 +391,11 @@ export function FileUpload({
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+
     if (shouldUseSingleMode) {
       setCurrentAvatarUrl("");
-      onFileChange?.("");
+      onFileChange?.(null);
+      onFileSelected?.(null);
     }
   };
 
@@ -362,87 +403,13 @@ export function FileUpload({
     setFiles([]);
     if (shouldUseSingleMode) {
       setCurrentAvatarUrl("");
-      onFileChange?.("");
+      onFileChange?.(null);
+      onFileSelected?.(null);
     }
   };
 
-  // ✅ ATUALIZADO: Upload de arquivos múltiplos (usando API)
-  const uploadFile = async (
-    file: UploadFile,
-    index: number
-  ): Promise<string> => {
-    // Atualizar status para uploading
-    setFiles((prev) =>
-      prev.map((f, i) =>
-        i === index ? { ...f, status: "uploading", progress: 0 } : f
-      )
-    );
-
-    // Simular progresso
-    const progressInterval = setInterval(() => {
-      setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index ? { ...f, progress: Math.min(f.progress + 10, 90) } : f
-        )
-      );
-    }, 200);
-
-    try {
-      // ✅ USAR API ROUTE EM VEZ DO ADMIN CLIENT DIRETO
-      const publicUrl = await uploadFileToAPI(file.file, type);
-
-      clearInterval(progressInterval);
-
-      // Completar progresso
-      setFiles((prev) =>
-        prev.map((f, i) => (i === index ? { ...f, progress: 100 } : f))
-      );
-
-      // Marcar como completado
-      setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "completed", url: publicUrl } : f
-        )
-      );
-
-      // Callback para upload único
-      if (shouldUseSingleMode) {
-        onFileChange?.(publicUrl);
-        setCurrentAvatarUrl(publicUrl);
-      }
-
-      return publicUrl;
-    } catch (error: unknown) {
-      clearInterval(progressInterval);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erro desconhecido";
-
-      setFiles((prev) =>
-        prev.map((f, i) =>
-          i === index
-            ? {
-                ...f,
-                status: "error",
-                error: errorMessage,
-                progress: 0,
-              }
-            : f
-        )
-      );
-      throw error;
-    }
-  };
-
-  // ✅ ATUALIZADO: Upload de múltiplos arquivos
-  const uploadAll = async (): Promise<string[]> => {
-    if (type === "avatar") {
-      return files.filter((f) => f.url).map((f) => f.url!);
-    }
-
+  const uploadManually = async (): Promise<string[]> => {
     setIsUploading(true);
-    const loadingToastId = toast.loading(
-      `Enviando ${files.length} arquivo(s)...`
-    );
     const urls: string[] = [];
     let successCount = 0;
     let errorCount = 0;
@@ -453,36 +420,52 @@ export function FileUpload({
 
         if (file.status === "pending" || file.status === "error") {
           try {
-            const url = await uploadFile(file, i);
-            urls.push(url);
-            successCount++;
-            toast.loading(
-              `Enviando arquivos... (${successCount + errorCount}/${
-                files.length
-              })`,
-              {
-                id: loadingToastId,
-              }
+            setFiles((prev) =>
+              prev.map((f, idx) =>
+                idx === i ? { ...f, status: "uploading", progress: 0 } : f
+              )
             );
+
+            const progressInterval = setInterval(() => {
+              setFiles((prev) =>
+                prev.map((f, idx) =>
+                  idx === i
+                    ? { ...f, progress: Math.min(f.progress + 10, 90) }
+                    : f
+                )
+              );
+            }, 200);
+
+            const publicUrl = await uploadFileToAPI(file.file, type);
+
+            clearInterval(progressInterval);
+
+            setFiles((prev) =>
+              prev.map((f, idx) => (idx === i ? { ...f, progress: 100 } : f))
+            );
+
+            setFiles((prev) =>
+              prev.map((f, idx) =>
+                idx === i ? { ...f, status: "completed", url: publicUrl } : f
+              )
+            );
+
+            urls.push(publicUrl);
+            successCount++;
+
+            if (shouldUseSingleMode) {
+              onFileChange?.(publicUrl);
+              setCurrentAvatarUrl(publicUrl);
+            }
           } catch (error) {
             console.error(`Erro ao fazer upload do arquivo ${i}:`, error);
             errorCount++;
-            toast.loading(
-              `Enviando arquivos... (${successCount + errorCount}/${
-                files.length
-              })`,
-              {
-                id: loadingToastId,
-              }
-            );
           }
         } else if (file.status === "completed" && file.url) {
           urls.push(file.url);
           successCount++;
         }
       }
-
-      toast.dismiss(loadingToastId);
 
       if (urls.length > 0) {
         onUploadComplete?.(urls);
@@ -504,7 +487,6 @@ export function FileUpload({
 
       return urls;
     } catch (error) {
-      toast.dismiss(loadingToastId);
       toast.error("Erro no processo de upload", {
         description: "Ocorreu um erro durante o upload dos arquivos.",
       });
@@ -514,7 +496,6 @@ export function FileUpload({
     }
   };
 
-  // Utilitários de renderização (mantidos iguais)
   const getFileIcon = (file: File) => {
     if (file.type.startsWith("image/"))
       return <FaImage className="w-4 h-4 text-blue-600" />;
@@ -544,13 +525,16 @@ export function FileUpload({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  // Renderização para Avatar - CORRIGIDA
   if (type === "avatar") {
     const currentUploadFile = files[0];
-    const displayUrl = currentUploadFile?.url || currentAvatarUrl || "";
 
-    // ✅ CORREÇÃO: Lógica de status corrigida
-    const hasCurrentFile = !!currentAvatarUrl;
+    const displayUrl =
+      currentUploadFile?.preview ||
+      currentUploadFile?.url ||
+      currentAvatarUrl ||
+      "";
+
+    const hasCurrentFile = !!displayUrl;
     const isUploading = currentUploadFile?.status === "uploading";
     const isPending = currentUploadFile?.status === "pending";
     const hasError = currentUploadFile?.status === "error";
@@ -573,11 +557,10 @@ export function FileUpload({
             </AvatarFallback>
           </Avatar>
 
-          {/* ✅ CORREÇÃO: Mostrar overlay APENAS durante upload/pending */}
-          {(isUploading || isPending) && (
+          {isUploading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-full">
               <div className="text-center text-white">
-                {isUploading && currentUploadFile && (
+                {currentUploadFile && (
                   <>
                     <Progress
                       value={currentUploadFile.progress}
@@ -588,17 +571,18 @@ export function FileUpload({
                     </span>
                   </>
                 )}
-                {isPending && (
-                  <FaSpinner className="w-6 h-6 animate-spin mx-auto" />
-                )}
               </div>
             </div>
           )}
 
-          {/* ✅ CORREÇÃO: Ícones de status APENAS quando há currentUploadFile */}
           {currentUploadFile && (
             <>
-              {isCompleted && (
+              {isCompleted && !autoUpload && (
+                <div className="absolute -top-1 -right-1 bg-yellow-500 rounded-full p-1">
+                  <span className="text-xs text-white">!</span>
+                </div>
+              )}
+              {isCompleted && autoUpload && (
                 <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
                   <FaCheck className="w-3 h-3 text-white" />
                 </div>
@@ -640,7 +624,7 @@ export function FileUpload({
                 ? "Enviando..."
                 : hasCurrentFile
                 ? "Alterar Foto"
-                : "Adicionar Foto"}
+                : "Selecionar Foto"}
             </Button>
 
             {hasCurrentFile && (
@@ -672,6 +656,11 @@ export function FileUpload({
                   className="h-1.5 bg-gray-200"
                 />
               )}
+              {!autoUpload && isPending && (
+                <p className="text-xs text-yellow-600 font-medium">
+                  ⚠️ Foto selecionada - será enviada ao salvar
+                </p>
+              )}
               {hasError && currentUploadFile.error && (
                 <p className="text-xs text-red-600 font-medium">
                   {currentUploadFile.error}
@@ -682,13 +671,13 @@ export function FileUpload({
 
           <p className="text-xs text-gray-500">
             JPG, PNG ou WEBP. Máximo {config.maxSize / 1024 / 1024}MB.
+            {!autoUpload && " (Upload ao salvar)"}
           </p>
         </div>
       </div>
     );
   }
 
-  // Renderização padrão para outros tipos (mantida igual)
   const hasFiles = files.length > 0;
   const completedFiles = files.filter((f) => f.status === "completed").length;
   const totalFiles = files.length;
@@ -764,6 +753,11 @@ export function FileUpload({
               {config.multiple && (
                 <p>
                   <strong>Limite:</strong> {config.maxFiles} arquivos
+                </p>
+              )}
+              {!autoUpload && (
+                <p className="text-blue-600 font-medium">
+                  ⚠️ Upload será feito ao salvar
                 </p>
               )}
             </div>
@@ -846,6 +840,11 @@ export function FileUpload({
                           file.status === "uploading" && "bg-blue-200"
                         )}
                       />
+                      {!autoUpload && file.status === "pending" && (
+                        <p className="text-xs text-yellow-600 font-medium">
+                          ⚠️ Aguardando upload manual
+                        </p>
+                      )}
                       {file.error && (
                         <p className="text-xs text-red-600 font-medium">
                           {file.error}
@@ -867,7 +866,7 @@ export function FileUpload({
             ))}
           </div>
 
-          {(config.multiple || files.length > 0) && (
+          {(config.multiple || files.length > 0) && autoUpload && (
             <div className="flex items-center justify-between pt-2 border-t">
               <div className="text-sm text-gray-600">
                 {isUploading ? (
@@ -893,7 +892,7 @@ export function FileUpload({
                   Cancelar
                 </Button>
                 <Button
-                  onClick={uploadAll}
+                  onClick={uploadManually}
                   disabled={!canUpload}
                   className={cn(
                     "bg-blue-600 hover:bg-blue-700 text-white",

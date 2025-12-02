@@ -53,37 +53,89 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+
+    /* 🔥 PREVENIR LOCK DE SCROLL */
+    overflow-y: scroll !important;
+    overflow-x: hidden !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  /* 🔥 CORREÇÃO CRÍTICA PARA O RADIX UI */
+  html {
+    overflow-y: scroll !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  html[data-scroll-locked],
+  html[data-scroll-locked] body {
+    overflow-y: scroll !important;
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+    scrollbar-gutter: stable !important;
+  }
+
+  /* 🔥 GARANTIR QUE O PORTAL DO RADIX TENHA Z-INDEX ALTO */
+  [data-radix-portal] {
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  [data-radix-select-content] {
+    z-index: 9999 !important;
+  }
+
+  [data-radix-popper-content-wrapper] {
+    z-index: 9999 !important;
   }
 }
 
-/* Scrollbar personalizada */
+/* 🔥 UTILITÁRIOS PERSONALIZADOS */
 @layer utilities {
+  /* Scrollbar fina */
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
 
   .scrollbar-thin::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
+    height: 8px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
+    border-radius: 4px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
-    border-radius: 3px;
+    border-radius: 4px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground));
   }
+
+  /* Garantir que elementos com portal fiquem acima de tudo */
+  .radix-portal-fix {
+    position: relative;
+    z-index: 9999;
+  }
+
+  /* Prevenir seleção de texto indesejada */
+  .prevent-text-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
 }
 
-/* Animações customizadas */
+/* 🔥 ANIMAÇÕES PERSONALIZADAS */
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -95,6 +147,35 @@
   }
 }
 
+@keyframes fade-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
 .animate-fade-in {
-  animation: fade-in 0.6s ease-out;
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-fade-out {
+  animation: fade-out 0.3s ease-in;
+}
+
+/* 🔥 CORREÇÃO PARA DIALOGS/MODALS DO RADIX */
+[data-radix-dialog-overlay] {
+  backdrop-filter: none !important;
+  background-color: transparent !important;
+}
+
+/* 🔥 GARANTIR QUE O BODY SEMPRE TENHA SCROLL VISÍVEL */
+body::after {
+  content: "";
+  display: block;
+  height: 1px;
+  visibility: hidden;
 }

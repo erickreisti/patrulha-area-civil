@@ -67,69 +67,11 @@ const SOCIAL_ICONS = [
   },
 ];
 
-const HEADER_CONFIG = {
-  logo: {
-    mobile: "w-10 h-10",
-    tablet: "w-12 h-12",
-    desktop: "w-14 h-14",
-  },
-  padding: {
-    mobile: "py-3",
-    tablet: "py-3",
-    desktop: "py-4",
-  },
-  button: {
-    mobile: "px-3 py-2 text-xs min-h-[40px]",
-    tablet: "px-4 py-2.5 text-sm min-h-[44px]",
-    desktop: "px-4 py-2.5 text-sm min-h-[44px]",
-  },
-};
-
-const LoadingButton = () => {
-  return (
-    <Button
-      className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md group/loading"
-      disabled
-    >
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-        initial={{ x: "-100%" }}
-        animate={{ x: "100%" }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
-      <div className="flex items-center justify-center gap-2 relative z-10">
-        <Spinner className="w-4 h-4 text-white" />
-        <span className="text-white font-medium">Carregando...</span>
-      </div>
-    </Button>
-  );
-};
-
-const useScrollDetection = (threshold = 30) => {
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > threshold);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [threshold]);
-
-  return isScrolled;
-};
-
 const TopBar = () => {
   return (
     <div className="bg-navy py-2">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center text-white text-sm">
-          {/* 🔸 ATÉ TABLET (767px): APENAS BANDEIRA */}
           <div className="flex md:hidden items-center gap-2">
             <div className="relative w-6 h-4">
               <Image
@@ -144,7 +86,6 @@ const TopBar = () => {
             <span className="text-slate-200 text-xs font-medium">Brasil</span>
           </div>
 
-          {/* 🔸 TABLET EM DIANTE (768px+): BANDEIRA + TEXTO COMPLETO */}
           <div className="hidden md:flex items-center gap-3">
             <div className="relative w-6 h-4">
               <Image
@@ -188,61 +129,27 @@ const TopBar = () => {
   );
 };
 
-const Logo = ({
-  size = "mobile",
-}: {
-  size?: "mobile" | "tablet" | "desktop";
-}) => {
-  const logoSize = HEADER_CONFIG.logo[size];
-
+const Logo = () => {
   return (
     <Link
       href="/"
-      className={cn(
-        "flex items-center group transition-all duration-300",
-        size === "mobile" && "gap-2",
-        size === "tablet" && "gap-3",
-        size === "desktop" && "gap-4"
-      )}
+      className="flex items-center group transition-all duration-300 gap-2 md:gap-3 lg:gap-4"
     >
-      <div className={cn("relative transition-all duration-300", logoSize)}>
+      <div className="relative w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 transition-all duration-300">
         <Image
           src="/images/logos/logo.webp"
           alt="Patrulha Aérea Civil"
-          width={size === "desktop" ? 56 : size === "tablet" ? 48 : 40}
-          height={size === "desktop" ? 56 : size === "tablet" ? 48 : 40}
+          width={56}
+          height={56}
           className="object-contain drop-shadow-md w-full h-full transition-all duration-300"
           priority
         />
       </div>
       <div className="text-left transition-all duration-300">
-        {/* 🔸 TÍTULO PRINCIPAL MAIOR - RESPONSIVO */}
-        <h1
-          className={cn(
-            "font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300",
-            // Mobile (320px+)
-            "text-xl sm:text-2xl",
-            // Tablet (768px+)
-            size === "tablet" && "md:text-2xl",
-            // Desktop (1280px+)
-            size === "desktop" && "xl:text-2xl"
-          )}
-        >
+        <h1 className="font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 text-xl sm:text-2xl">
           PATRULHA AÉREA CIVIL
         </h1>
-
-        {/* 🔸 SUBTÍTULO MENOR - RESPONSIVO */}
-        <p
-          className={cn(
-            "text-slate-600 leading-tight mt-0.5 font-roboto transition-all duration-300",
-            // Mobile (320px+)
-            "text-[10px] xs:text-xs sm:text-xs",
-            // Tablet (768px+)
-            size === "tablet" && "md:text-xs",
-            // Desktop (1280px+)
-            size === "desktop" && "xl:text-xs"
-          )}
-        >
+        <p className="text-slate-600 leading-tight mt-0.5 font-roboto transition-all duration-300 text-xs">
           COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
         </p>
       </div>
@@ -293,6 +200,30 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
     </ul>
   </nav>
 );
+
+const LoadingButton = () => {
+  return (
+    <Button
+      className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md group/loading"
+      disabled
+    >
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+        initial={{ x: "-100%" }}
+        animate={{ x: "100%" }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+      <div className="flex items-center justify-center gap-2 relative z-10">
+        <Spinner className="w-4 h-4 text-white" />
+        <span className="text-white font-medium">Carregando...</span>
+      </div>
+    </Button>
+  );
+};
 
 const IdentificationButton = () => {
   const { user, profile, isAdmin, loading, clearAuth } = useAuthStore();
@@ -435,7 +366,6 @@ const MobileMenu = ({
   return (
     <div className="xl:hidden bg-white border-t border-slate-200 shadow-lg animate-slide-down">
       <div className="container mx-auto px-4 py-4">
-        {/* Seção de Navegação */}
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
             Navegação
@@ -459,7 +389,6 @@ const MobileMenu = ({
           </nav>
         </div>
 
-        {/* Seção do Usuário - Mesmo design do dropdown */}
         {user ? (
           <div className="border-t border-slate-200 pt-4">
             <div className="flex items-center gap-3 px-3 py-3 bg-slate-50 rounded-lg mb-3">
@@ -537,7 +466,6 @@ const MobileMenu = ({
           </div>
         )}
 
-        {/* Redes Sociais */}
         <div className="border-t border-slate-200 pt-4 mt-4">
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
             Redes Sociais
@@ -572,7 +500,6 @@ const MobileMenu = ({
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const isScrolled = useScrollDetection();
   const pathname = usePathname();
   const { initializeAuth } = useAuthStore();
 
@@ -584,19 +511,13 @@ export function Header() {
   }, [initializeAuth]);
 
   return (
-    <header
-      className={cn(
-        "bg-white fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        isScrolled ? "shadow-lg" : "shadow-none"
-      )}
-    >
+    <header className="bg-white fixed top-0 left-0 right-0 z-50 h-[90px] md:h-[100px] lg:h-[120px] shadow-sm">
       <TopBar />
 
-      <div className="bg-white transition-all duration-300">
+      <div className="bg-white border-b border-slate-200">
         <div className="container mx-auto px-4 sm:px-6">
-          {/* 📱 MOBILE: Até 767px - Logo + hamburguer */}
           <div className="md:hidden flex items-center justify-between w-full py-3">
-            <Logo size="mobile" />
+            <Logo />
             <Button
               variant="ghost"
               size="icon"
@@ -608,9 +529,8 @@ export function Header() {
             </Button>
           </div>
 
-          {/* 📟 TABLET: 768px-1279px - Logo + botão Identificação + hamburguer */}
           <div className="hidden md:flex xl:hidden items-center justify-between w-full py-3">
-            <Logo size="tablet" />
+            <Logo />
             <div className="flex items-center gap-2">
               <IdentificationButton />
               <Button
@@ -625,9 +545,8 @@ export function Header() {
             </div>
           </div>
 
-          {/* 💻 DESKTOP: 1280px+ - Logo + navegação + botão Identificação */}
           <div className="hidden xl:flex items-center justify-between w-full py-4">
-            <Logo size="desktop" />
+            <Logo />
             <DesktopNavigation pathname={pathname} />
             <IdentificationButton />
           </div>

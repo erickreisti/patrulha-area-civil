@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,6 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { z } from "zod";
 import {
   RiUserLine,
   RiCheckboxCircleLine,
@@ -25,29 +23,16 @@ import {
   RiBarChartLine,
   RiForbidLine,
   RiHomeLine,
-  RiLogoutBoxRLine,
+  RiLogoutBoxLine,
   RiWhatsappLine,
   RiMailLine,
   RiAlertLine,
 } from "react-icons/ri";
+import { useAuth } from "@/hooks/useAuth";
+import { UserProfile } from "@/types"; // Importar do types
 
-// SCHEMA COMPLETO CORRIGIDO com todos os campos do banco
-const profileSchema = z.object({
-  id: z.string().uuid(),
-  matricula: z.string().min(1, "Matrícula é obrigatória"),
-  email: z.string().email("Email inválido"),
-  full_name: z.string().min(1, "Nome completo é obrigatório"),
-  avatar_url: z.string().nullable().optional(),
-  graduacao: z.string().nullable().optional(),
-  validade_certificacao: z.string().nullable().optional(),
-  tipo_sanguineo: z.string().nullable().optional(),
-  status: z.boolean().default(true),
-  role: z.enum(["admin", "agent"]).default("agent"),
-  created_at: z.string(),
-  updated_at: z.string(),
-});
-
-type ProfileData = z.infer<typeof profileSchema>;
+// Usar UserProfile do types em vez de criar nova interface
+type ProfileData = UserProfile;
 
 interface CertificationInfo {
   text: string;
@@ -56,14 +41,7 @@ interface CertificationInfo {
   badgeVariant: "default" | "secondary" | "destructive";
 }
 
-interface CacheData {
-  data: ProfileData;
-  timestamp: number;
-  version: string;
-}
-
-// Componente Dialog personalizado para agente inativo
-// Componente Dialog personalizado para agente inativo - VERSÃO MOBILE OTIMIZADA
+// Componente Dialog para agente inativo
 const InactiveAgentDialog = ({
   isOpen,
   onClose,
@@ -71,9 +49,8 @@ const InactiveAgentDialog = ({
   isOpen: boolean;
   onClose: () => void;
 }) => (
-  <Dialog open={isOpen} onOpenChange={() => {}}>
+  <Dialog open={isOpen} onOpenChange={onClose}>
     <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-alert/20 shadow-2xl rounded-xl fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-y-auto">
-      {/* Remove o botão X padrão */}
       <div className="absolute right-3 top-3 opacity-0 pointer-events-none">
         <div className="w-4 h-4" />
       </div>
@@ -168,72 +145,6 @@ const InactiveAgentDialog = ({
     </DialogContent>
   </Dialog>
 );
-
-const useProfileCache = () => {
-  const CACHE_KEY = "pac_user_data";
-  const CACHE_VERSION = "1.0.0";
-  const CACHE_DURATION = 5 * 60 * 1000;
-
-  const getFromCache = useCallback((): ProfileData | null => {
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      if (!cached) return null;
-      const cacheData: CacheData = JSON.parse(cached);
-      if (cacheData.version !== CACHE_VERSION) return null;
-      if (Date.now() - cacheData.timestamp > CACHE_DURATION) return null;
-      const validatedData = profileSchema.parse(cacheData.data);
-      return validatedData;
-    } catch {
-      localStorage.removeItem(CACHE_KEY);
-      return null;
-    }
-  }, [CACHE_DURATION]);
-
-  const setToCache = useCallback((data: ProfileData) => {
-    try {
-      const validatedData = profileSchema.parse(data);
-      const cacheData: CacheData = {
-        data: validatedData,
-        timestamp: Date.now(),
-        version: CACHE_VERSION,
-      };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
-    } catch (error) {
-      console.error("Erro ao salvar cache:", error);
-    }
-  }, []);
-
-  const clearCache = useCallback(() => {
-    localStorage.removeItem(CACHE_KEY);
-  }, []);
-
-  return { getFromCache, setToCache, clearCache };
-};
-
-const useRetryWithBackoff = () => {
-  const executeWithRetry = useCallback(
-    async <T,>(
-      operation: () => Promise<T>,
-      maxRetries = 3,
-      baseDelay = 1000
-    ): Promise<T> => {
-      let lastError: Error;
-      for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-          return await operation();
-        } catch (error) {
-          lastError = error as Error;
-          if (attempt === maxRetries - 1) break;
-          const delay = baseDelay * Math.pow(2, attempt);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
-      }
-      throw lastError!;
-    },
-    []
-  );
-  return { executeWithRetry };
-};
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center space-x-3">
@@ -331,7 +242,7 @@ const ErrorState = ({
   </BaseLayout>
 );
 
-const formatDate = (dateString: string | null): string => {
+const formatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return "Não definida";
   try {
     const date = new Date(dateString);
@@ -342,7 +253,7 @@ const formatDate = (dateString: string | null): string => {
   }
 };
 
-const formatMatricula = (matricula: string | null): string => {
+const formatMatricula = (matricula: string | null | undefined): string => {
   if (!matricula) return "NÃO DEFINIDA";
   const onlyNumbers = matricula.replace(/\D/g, "");
   if (onlyNumbers.length === 11) {
@@ -524,7 +435,7 @@ const AvatarSection: React.FC<AvatarSectionProps> = ({ profile }) => (
               fill
               className="object-cover relative z-10"
               sizes="(max-width: 640px) 160px, (max-width: 768px) 192px, 224px"
-              priority={true} // Para a imagem do avatar principal
+              priority={true}
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = "none";
@@ -692,7 +603,7 @@ const ActionButtons = ({
         </>
       )}
       <ActionButton href="/" icon={RiHomeLine} label="Site" />
-      <ActionButton onClick={onSignOut} icon={RiLogoutBoxRLine} label="Sair" />
+      <ActionButton onClick={onSignOut} icon={RiLogoutBoxLine} label="Sair" />
     </div>
 
     <motion.div
@@ -708,300 +619,188 @@ const ActionButtons = ({
   </motion.div>
 );
 
+// Componente principal
 export default function AgentPerfil() {
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { profile, loading, signOut, isAdmin } = useAuth();
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
 
-  const { clearCache } = useProfileCache();
-  const { executeWithRetry } = useRetryWithBackoff();
-
-  // FUNÇÃO CORRIGIDA para buscar todos os dados do banco
-  const fetchProfile = useCallback(async () => {
-    try {
-      setError(null);
-      setLoading(true);
-
-      const operation = async (): Promise<ProfileData> => {
-        const supabase = createClient();
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) throw new Error("Nenhum usuário autenticado encontrado");
-
-        console.log("🔍 Buscando dados do usuário:", user.id);
-
-        // Buscar dados COMPLETOS do banco
-        const { data: profileData, error: profileError } = await supabase
-          .from("profiles")
-          .select("*") // SELECT * para pegar TODOS os campos
-          .eq("id", user.id)
-          .single();
-
-        console.log("📊 Dados retornados do banco:", profileData);
-        console.log("❌ Erro (se houver):", profileError);
-
-        if (profileError) {
-          throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
-        }
-
-        if (!profileData) {
-          throw new Error("Perfil não encontrado no banco de dados");
-        }
-
-        // Validar dados com schema
-        let validatedData: ProfileData;
-        try {
-          validatedData = profileSchema.parse(profileData);
-        } catch (validationError) {
-          console.warn(
-            "⚠️ Dados não validados pelo schema, usando fallback:",
-            validationError
-          );
-          // Fallback para garantir que todos os campos existam
-          validatedData = {
-            id: profileData.id || user.id,
-            matricula: profileData.matricula || "NÃO DEFINIDA",
-            email: profileData.email || user.email || "email@indefinido.com",
-            full_name: profileData.full_name || "Nome não definido",
-            avatar_url: profileData.avatar_url || null,
-            graduacao: profileData.graduacao || null,
-            validade_certificacao: profileData.validade_certificacao || null,
-            tipo_sanguineo: profileData.tipo_sanguineo || null,
-            status: Boolean(profileData.status),
-            role: (profileData.role as "admin" | "agent") || "agent",
-            created_at: profileData.created_at || new Date().toISOString(),
-            updated_at: profileData.updated_at || new Date().toISOString(),
-          };
-        }
-
-        console.log("✅ Dados validados:", validatedData);
-        return validatedData;
-      };
-
-      const userData = await executeWithRetry(operation, 3, 1000);
-      setProfile(userData);
-      setIsAdmin(userData.role?.toLowerCase().trim() === "admin");
-
-      // Mostrar dialog se agente inativo
-      if (!userData.status) {
-        setShowInactiveDialog(true);
-      }
-    } catch (err: unknown) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Erro desconhecido";
-      console.error("💥 Erro ao carregar perfil:", errorMessage);
-      setError(errorMessage);
-      clearCache();
-    } finally {
-      setLoading(false);
-    }
-  }, [executeWithRetry, clearCache]);
-
+  // Usar um callback para evitar chamada direta no useEffect
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile, retryCount]);
+    const shouldShowDialog = profile && !profile.status;
+
+    if (shouldShowDialog) {
+      // Usar setTimeout para evitar cascading renders
+      const timer = setTimeout(() => {
+        setShowInactiveDialog(true);
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [profile]);
 
   const handleRetry = () => {
-    setRetryCount((prev) => prev + 1);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      clearCache();
-      localStorage.removeItem("supabase.auth.token");
-      window.location.href = "/login";
-    } catch {
-      console.error("Erro ao fazer logout");
-    }
-  };
-
-  const handleCloseInactiveDialog = () => {
-    setShowInactiveDialog(false);
+    window.location.reload();
   };
 
   if (loading) return <LoadingState />;
-  if (error || !profile)
+
+  if (!profile) {
     return (
       <ErrorState
-        error={error}
+        error="Perfil não encontrado"
         onRetry={handleRetry}
-        onSignOut={handleSignOut}
+        onSignOut={signOut}
       />
     );
+  }
 
-  const ProfileContent = ({
-    profile,
-    isAdmin,
-    onSignOut,
-  }: {
-    profile: ProfileData;
-    isAdmin: boolean;
-    onSignOut: () => void;
-  }) => {
-    const certificationInfo = getCertificationInfo(profile);
+  const certificationInfo = getCertificationInfo(profile);
 
-    return (
-      <BaseLayout>
-        <InactiveAgentDialog
-          isOpen={showInactiveDialog}
-          onClose={handleCloseInactiveDialog}
-        />
+  return (
+    <BaseLayout>
+      <InactiveAgentDialog
+        isOpen={showInactiveDialog}
+        onClose={() => setShowInactiveDialog(false)}
+      />
 
-        <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 relative z-20">
-          <div className="w-full max-w-6xl">
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
-              className="flex justify-center"
-            >
-              <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-xl overflow-hidden w-full max-w-sm sm:max-w-md lg:max-w-3xl border border-slate-200/60 mx-2">
-                <div className="absolute inset-0 opacity-[0.05] flex items-center justify-center pointer-events-none z-0">
-                  <div className="w-full h-full max-w-[800px] max-h-[800px] sm:max-w-[800px] sm:max-h-[800px] relative">
-                    <Image
-                      src="/images/logos/logo-pattern.svg"
-                      alt="Marca d'água Patrulha Aérea Civil"
-                      fill
-                      sizes="300px"
-                      className="object-contain"
-                      priority
-                    />
-                  </div>
+      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 relative z-20">
+        <div className="w-full max-w-6xl">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="flex justify-center"
+          >
+            <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-xl overflow-hidden w-full max-w-sm sm:max-w-md lg:max-w-3xl border border-slate-200/60 mx-2">
+              <div className="absolute inset-0 opacity-[0.05] flex items-center justify-center pointer-events-none z-0">
+                <div className="w-full h-full max-w-[800px] max-h-[800px] sm:max-w-[800px] sm:max-h-[800px] relative">
+                  <Image
+                    src="/images/logos/logo-pattern.svg"
+                    alt="Marca d'água Patrulha Aérea Civil"
+                    fill
+                    sizes="300px"
+                    className="object-contain"
+                    priority
+                  />
                 </div>
+              </div>
 
-                <div className="absolute inset-1 border border-slate-300/30 rounded-lg pointer-events-none z-0" />
+              <div className="absolute inset-1 border border-slate-300/30 rounded-lg pointer-events-none z-0" />
 
-                <CardContent className="p-3 sm:p-4 lg:p-6 relative z-10">
-                  {/* HEADER */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className="flex flex-col items-center pb-4 border-b border-slate-200/30 mb-4 space-y-4"
-                  >
-                    {/* LOGO */}
-                    <motion.div whileHover={{ scale: 1.05 }}>
-                      <div className="w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 xl:w-40 xl:h-40 flex items-center justify-center">
-                        <div className="relative w-full h-full">
-                          <Image
-                            src="/images/logos/logo.webp"
-                            alt="Patrulha Aérea Civil"
-                            width={160}
-                            height={160}
-                            className="w-full h-full object-contain"
-                            priority={true} // Esta é uma imagem crítica
-                            sizes="(max-width: 640px) 96px, (max-width: 768px) 128px, 144px"
-                          />
-                        </div>
-                      </div>
-                    </motion.div>
-
-                    {/* TÍTULO */}
-                    <div className="text-center">
-                      <h1 className="text-navy text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide uppercase leading-tight font-bebas">
-                        Patrulha Aérea Civil
-                      </h1>
-                      <p className="text-slate-600 text-[8px] sm:text-sm mt-1 leading-snug font-roboto">
-                        COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
-                      </p>
-                    </div>
-
-                    {/* IDENTIFICAÇÃO E BANDEIRA */}
-                    <div className="text-center space-y-2">
-                      <h2 className="text-xs sm:text-sm font-bold text-slate-700 tracking-wide uppercase font-bebas">
-                        Identificação
-                      </h2>
-                      <div className="w-12 h-8 sm:w-14 sm:h-10 border border-slate-300 rounded flex items-center justify-center justify-self-center overflow-hidden">
+              <CardContent className="p-3 sm:p-4 lg:p-6 relative z-10">
+                {/* HEADER */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  className="flex flex-col items-center pb-4 border-b border-slate-200/30 mb-4 space-y-4"
+                >
+                  {/* LOGO */}
+                  <motion.div whileHover={{ scale: 1.05 }}>
+                    <div className="w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 xl:w-40 xl:h-40 flex items-center justify-center">
+                      <div className="relative w-full h-full">
                         <Image
-                          src="/images/logos/flag-br.webp"
-                          alt="Bandeira do Brasil"
-                          width={56}
-                          height={40}
-                          className="w-full h-full object-cover rounded"
-                          priority
+                          src="/images/logos/logo.webp"
+                          alt="Patrulha Aérea Civil"
+                          width={160}
+                          height={160}
+                          className="w-full h-full object-contain"
+                          priority={true}
+                          sizes="(max-width: 640px) 96px, (max-width: 768px) 128px, 144px"
                         />
                       </div>
                     </div>
                   </motion.div>
 
-                  <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-center lg:items-start">
-                    {/* LADO ESQUERDO - INFORMAÇÕES */}
-                    <div className="flex-1 w-full space-y-3 sm:space-y-4 text-center lg:text-left">
-                      <InfoSection
-                        label="Nome"
-                        value={profile.full_name}
-                        isTitle
-                      />
-                      <InfoSection
-                        label="Graduação"
-                        value={
-                          profile.graduacao
-                            ? `${profile.graduacao.toUpperCase()}`
-                            : "GRADUAÇÃO NÃO DEFINIDA - PAC"
-                        }
-                        isAlert
-                      />
-                      <InfoSection
-                        label="Matrícula"
-                        value={`${formatMatricula(profile.matricula)} RJ`}
-                        isMono
-                      />
-                      <CertificationSection
-                        certificationInfo={certificationInfo}
-                        profile={profile}
-                      />
-                    </div>
-
-                    <div className="w-full lg:w-px lg:h-40 bg-slate-300/10 my-3 lg:my-0" />
-
-                    {/* LADO DIREITO - AVATAR E TIPO SANGUÍNEO */}
-                    <div className="flex-1 w-full space-y-3 sm:space-y-4 flex flex-col items-center">
-                      <AvatarSection profile={profile} />
-
-                      <div className="w-full text-center">
-                        <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
-                          Tipo Sanguíneo
-                        </label>
-                        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-alert uppercase font-bebas leading-tight">
-                          {profile.tipo_sanguineo || "NÃO DEFINIDO"}
-                        </p>
-                      </div>
-                    </div>
+                  {/* TÍTULO */}
+                  <div className="text-center">
+                    <h1 className="text-navy text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide uppercase leading-tight font-bebas">
+                      Patrulha Aérea Civil
+                    </h1>
+                    <p className="text-slate-600 text-[8px] sm:text-sm mt-1 leading-snug font-roboto">
+                      COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
+                    </p>
                   </div>
 
-                  <div className="my-4 border-t border-slate-300/30 relative">
-                    <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-navy/20 rounded-full" />
+                  {/* IDENTIFICAÇÃO E BANDEIRA */}
+                  <div className="text-center space-y-2">
+                    <h2 className="text-xs sm:text-sm font-bold text-slate-700 tracking-wide uppercase font-bebas">
+                      Identificação
+                    </h2>
+                    <div className="w-12 h-8 sm:w-14 sm:h-10 border border-slate-300 rounded flex items-center justify-center justify-self-center overflow-hidden">
+                      <Image
+                        src="/images/logos/flag-br.webp"
+                        alt="Bandeira do Brasil"
+                        width={56}
+                        height={40}
+                        className="w-full h-full object-cover rounded"
+                        priority
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+
+                <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-center lg:items-start">
+                  {/* LADO ESQUERDO - INFORMAÇÕES */}
+                  <div className="flex-1 w-full space-y-3 sm:space-y-4 text-center lg:text-left">
+                    <InfoSection
+                      label="Nome"
+                      value={profile.full_name || "NÃO DEFINIDO"}
+                      isTitle
+                    />
+                    <InfoSection
+                      label="Graduação"
+                      value={
+                        profile.graduacao
+                          ? `${profile.graduacao.toUpperCase()}`
+                          : "GRADUAÇÃO NÃO DEFINIDA - PAC"
+                      }
+                      isAlert
+                    />
+                    <InfoSection
+                      label="Matrícula"
+                      value={`${formatMatricula(profile.matricula)} RJ`}
+                      isMono
+                    />
+                    <CertificationSection
+                      certificationInfo={certificationInfo}
+                      profile={profile}
+                    />
                   </div>
 
-                  <StatusSection profile={profile} />
-                </CardContent>
-              </Card>
-            </motion.div>
+                  <div className="w-full lg:w-px lg:h-40 bg-slate-300/10 my-3 lg:my-0" />
 
-            <ActionButtons
-              profile={profile}
-              isAdmin={isAdmin}
-              onSignOut={onSignOut}
-            />
-          </div>
+                  {/* LADO DIREITO - AVATAR E TIPO SANGUÍNEO */}
+                  <div className="flex-1 w-full space-y-3 sm:space-y-4 flex flex-col items-center">
+                    <AvatarSection profile={profile} />
+
+                    <div className="w-full text-center">
+                      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
+                        Tipo Sanguíneo
+                      </label>
+                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-alert uppercase font-bebas leading-tight">
+                        {profile.tipo_sanguineo || "NÃO DEFINIDO"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="my-4 border-t border-slate-300/30 relative">
+                  <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-navy/20 rounded-full" />
+                </div>
+
+                <StatusSection profile={profile} />
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          <ActionButtons
+            profile={profile}
+            isAdmin={isAdmin}
+            onSignOut={signOut}
+          />
         </div>
-      </BaseLayout>
-    );
-  };
-
-  return (
-    <ProfileContent
-      profile={profile}
-      isAdmin={isAdmin}
-      onSignOut={handleSignOut}
-    />
+      </div>
+    </BaseLayout>
   );
 }

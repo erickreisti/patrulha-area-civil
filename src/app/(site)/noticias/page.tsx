@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -52,8 +52,8 @@ import { createClient } from "@/lib/supabase/client";
 import { NoticiaWithAutor } from "@/types";
 
 // ==================== CONFIGURAÇÕES ====================
-const ITEMS_PER_PAGE_OPTIONS = [6, 12, 24, 48];
-const DEFAULT_ITEMS_PER_PAGE = 12;
+const ITEMS_PER_PAGE_OPTIONS = [6, 10, 20, 30, 50];
+const DEFAULT_ITEMS_PER_PAGE = 10;
 
 // ==================== COMPONENTE PRINCIPAL ====================
 export default function NoticiasPage() {
@@ -71,7 +71,48 @@ export default function NoticiasPage() {
     Array<{ value: string; label: string; icon: IconType }>
   >([{ value: "all", label: "Todas as Categorias", icon: RiStackLine }]);
 
-  const supabase = createClient();
+  // Otimização: useMemo para criar o cliente Supabase apenas uma vez
+  const supabase = useMemo(() => createClient(), []);
+
+  // 🔥 HOOK PARA PREVENIR LOCK DE SCROLL DO RADIX UI
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const preventScrollLock = () => {
+      // Observar mudanças no estilo do body
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.attributeName === "style") {
+            const target = mutation.target as HTMLElement;
+            // Se o Radix tentar esconder o scroll, impedir
+            if (target.style.overflow === "hidden") {
+              target.style.overflow = "auto";
+              target.style.paddingRight = "0";
+              target.style.marginRight = "0";
+            }
+          }
+        });
+      });
+
+      observer.observe(document.body, {
+        attributes: true,
+        attributeFilter: ["style"],
+      });
+
+      // Forçar scroll visível no início
+      document.body.style.overflow = "auto";
+      document.body.style.paddingRight = "0";
+
+      return () => {
+        observer.disconnect();
+        document.body.style.overflow = "auto";
+        document.body.style.paddingRight = "0";
+      };
+    };
+
+    const cleanup = preventScrollLock();
+    return cleanup;
+  }, []);
 
   // Buscar categorias únicas
   const fetchCategories = useCallback(async () => {
@@ -105,11 +146,9 @@ export default function NoticiasPage() {
     try {
       setLoading(true);
 
-      // Calcular offset para paginação
       const from = (currentPage - 1) * itemsPerPage;
       const to = from + itemsPerPage - 1;
 
-      // Construir query com paginação
       let query = supabase
         .from("noticias")
         .select(
@@ -121,19 +160,16 @@ export default function NoticiasPage() {
         )
         .range(from, to);
 
-      // Aplicar filtro de categoria
       if (selectedCategory !== "all") {
         query = query.eq("categoria", selectedCategory);
       }
 
-      // Aplicar busca
       if (searchTerm.trim()) {
         query = query.or(
           `titulo.ilike.%${searchTerm}%,resumo.ilike.%${searchTerm}%,conteudo.ilike.%${searchTerm}%`
         );
       }
 
-      // Aplicar ordenação
       switch (sortBy) {
         case "recent":
           query = query.order("data_publicacao", { ascending: false });
@@ -218,20 +254,16 @@ export default function NoticiasPage() {
     // Se já é uma URL completa
     if (url.startsWith("http")) return url;
 
-    // Se é um caminho do Supabase Storage
-    if (url.includes("/") && !url.startsWith("http")) {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const bucket = "imagens-noticias";
+    // Corrigir barras duplicadas
+    const cleanUrl = url.startsWith("/") ? url.substring(1) : url;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const bucket = "imagens-noticias";
 
-      // Verificar se já tem o bucket no caminho
-      if (url.includes(bucket)) {
-        return `${supabaseUrl}/storage/v1/object/public/${url}`;
-      } else {
-        return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
-      }
+    if (cleanUrl.includes(bucket)) {
+      return `${supabaseUrl}/storage/v1/object/public/${cleanUrl}`;
+    } else {
+      return `${supabaseUrl}/storage/v1/object/public/${bucket}/${cleanUrl}`;
     }
-
-    return url;
   };
 
   // Loading Skeleton
@@ -239,25 +271,13 @@ export default function NoticiasPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          {/* Header Skeleton */}
           <div className="text-center mb-8 sm:mb-12">
             <Skeleton className="h-10 sm:h-12 w-48 sm:w-64 mx-auto mb-3 sm:mb-4" />
             <Skeleton className="h-5 sm:h-6 w-80 sm:w-96 mx-auto" />
           </div>
 
-          {/* Filters Skeleton */}
-          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <Skeleton className="h-12 flex-1" />
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-4 w-full lg:w-auto">
-              <Skeleton className="h-12 w-full sm:w-48" />
-              <Skeleton className="h-12 w-full sm:w-48" />
-              <Skeleton className="h-12 w-full sm:w-32" />
-            </div>
-          </div>
-
-          {/* Grid Skeleton */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: DEFAULT_ITEMS_PER_PAGE }).map((_, i) => (
               <Card key={i} className="border-0 shadow-lg">
                 <CardHeader className="pb-3 sm:pb-4">
                   <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
@@ -278,7 +298,7 @@ export default function NoticiasPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-16 pb-16 sm:pb-20 lg:pb-24 overflow-hidden">
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
         <div className="absolute top-0 left-0 w-48 h-48 sm:w-60 sm:h-60 lg:w-72 lg:h-72 bg-blue-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-indigo-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
@@ -345,9 +365,9 @@ export default function NoticiasPage() {
         </div>
       </section>
 
-      {/* Filtros e Controles */}
-      <section className="py-6 sm:py-8 bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-40">
-        <div className="container mx-auto px-4 sm:px-6">
+      {/* 🔥 SEÇÃO DE FILTROS CORRIGIDA - SEM DESLOCAMENTO */}
+      <div className="bg-white/95 backdrop-blur-sm border-b border-slate-200/60 relative z-50">
+        <div className="container mx-auto px-4 sm:px-6 py-6">
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start lg:items-center justify-between">
             {/* Search */}
             <div className="flex-1 w-full max-w-2xl">
@@ -366,76 +386,120 @@ export default function NoticiasPage() {
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
+            {/* Controls - COM WRAPPER PARA PREVENIR DESLOCAMENTO */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto relative radix-portal-fix">
               {/* Category Filter */}
-              <Select
-                value={selectedCategory}
-                onValueChange={(value) => {
-                  setSelectedCategory(value);
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                  <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
-                  <SelectValue placeholder="Filtrar por categoria" />
-                </SelectTrigger>
-                <SelectContent className="z-50">
-                  {categories.map((category) => {
-                    const Icon = category.icon;
-                    return (
-                      <SelectItem key={category.value} value={category.value}>
-                        <div className="flex items-center">
-                          <Icon className="w-4 h-4 mr-2" />
-                          {category.label}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select
+                  value={selectedCategory}
+                  onValueChange={(value) => {
+                    setSelectedCategory(value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                    <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
+                    <SelectValue placeholder="Filtrar por categoria" />
+                  </SelectTrigger>
+                  <SelectContent
+                    className="z-[9999] bg-white shadow-xl border-slate-200"
+                    position="popper"
+                    align="start"
+                    sideOffset={5}
+                  >
+                    {categories.map((category) => {
+                      const Icon = category.icon;
+                      return (
+                        <SelectItem
+                          key={category.value}
+                          value={category.value}
+                          className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                        >
+                          <div className="flex items-center">
+                            <Icon className="w-4 h-4 mr-2" />
+                            {category.label}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Sort */}
-              <Select
-                value={sortBy}
-                onValueChange={(value: "recent" | "oldest" | "destaque") =>
-                  setSortBy(value)
-                }
-              >
-                <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                  <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent className="z-50">
-                  <SelectItem value="recent">Mais Recentes</SelectItem>
-                  <SelectItem value="oldest">Mais Antigas</SelectItem>
-                  <SelectItem value="destaque">Em Destaque</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select
+                  value={sortBy}
+                  onValueChange={(value: "recent" | "oldest" | "destaque") =>
+                    setSortBy(value)
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                    <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent
+                    className="z-[9999] bg-white shadow-xl border-slate-200"
+                    position="popper"
+                    align="start"
+                    sideOffset={5}
+                  >
+                    <SelectItem
+                      value="recent"
+                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                    >
+                      Mais Recentes
+                    </SelectItem>
+                    <SelectItem
+                      value="oldest"
+                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                    >
+                      Mais Antigas
+                    </SelectItem>
+                    <SelectItem
+                      value="destaque"
+                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                    >
+                      Em Destaque
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Items per Page */}
-              <Select
-                value={itemsPerPage.toString()}
-                onValueChange={(value) => {
-                  setItemsPerPage(Number(value));
-                  setCurrentPage(1);
-                }}
-              >
-                <SelectTrigger className="w-full sm:w-28 lg:w-32 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-50">
-                  {ITEMS_PER_PAGE_OPTIONS.map((num) => (
-                    <SelectItem key={num} value={num.toString()}>
-                      {num} por página
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select
+                  value={itemsPerPage.toString()}
+                  onValueChange={(value) => {
+                    setItemsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    className="z-[9999] bg-white shadow-xl border-slate-200"
+                    position="popper"
+                    align="start"
+                    sideOffset={5}
+                  >
+                    {ITEMS_PER_PAGE_OPTIONS.map((num) => (
+                      <SelectItem
+                        key={num}
+                        value={num.toString()}
+                        className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                      >
+                        {num} por página
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
       {/* Conteúdo Principal */}
       <section className="py-8 sm:py-12">
@@ -458,6 +522,9 @@ export default function NoticiasPage() {
             {noticias.length > 0 && (
               <div className="text-xs sm:text-sm text-slate-500">
                 Página {currentPage} de {totalPages} • {totalCount} resultados
+                <span className="ml-2 font-medium">
+                  • {itemsPerPage} por página
+                </span>
               </div>
             )}
           </div>
@@ -481,7 +548,7 @@ export default function NoticiasPage() {
               </div>
             ) : noticias.length > 0 ? (
               <motion.div
-                key={`grid-${currentPage}-${selectedCategory}-${searchTerm}`}
+                key={`grid-${currentPage}-${selectedCategory}-${searchTerm}-${itemsPerPage}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -499,6 +566,7 @@ export default function NoticiasPage() {
                       noticia={noticia}
                       formatAuthorName={formatAuthorName}
                       getImageUrl={getImageUrl}
+                      isFirst={index === 0}
                     />
                   </motion.div>
                 ))}
@@ -654,10 +722,12 @@ function NewsCard({
   noticia,
   formatAuthorName,
   getImageUrl,
+  isFirst = false,
 }: {
   noticia: NoticiaWithAutor;
   formatAuthorName: (name: string) => string;
   getImageUrl: (url: string | null) => string | null;
+  isFirst?: boolean;
 }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -685,6 +755,8 @@ function NewsCard({
               onLoad={() => setImageLoaded(true)}
               onError={() => setImageError(true)}
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              priority={isFirst}
+              loading={isFirst ? "eager" : "lazy"}
             />
           </>
         ) : (

@@ -1,4 +1,3 @@
-// src/app/login/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -9,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SEGURANCA } from "@/lib/security-config";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -31,32 +31,10 @@ import {
   RiLockLine,
   RiLoginCircleLine,
   RiHomeLine,
+  RiMailLine,
 } from "react-icons/ri";
 
-// Constantes de segurança
-const SEGURANCA = {
-  SENHA_PADRAO: "PAC@2025!Secure",
-  TENTATIVAS_MAXIMAS: 5,
-  BLOQUEIO_MINUTOS: 15,
-  ROTACAO_SENHA_MESES: 6,
-  COMPRIMENTO_MINIMO: 12,
-} as const;
-
-// Função para registrar atividade de login
-async function logUserLogin(userId: string) {
-  const supabase = createClient();
-
-  const { error } = await supabase.rpc("log_user_activity", {
-    p_user_id: userId,
-    p_action_type: "user_login",
-    p_description: "Usuário fez login no sistema",
-  });
-
-  if (error) {
-    console.error("Erro ao registrar login:", error);
-  }
-}
-
+// Schema de validação
 const loginSchema = z.object({
   matricula: z
     .string()
@@ -120,71 +98,205 @@ export default function LoginPage() {
     [form, formatMatricula]
   );
 
-  const checkExistingSession = useCallback(async () => {
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (session?.user) {
-        window.location.href = "/perfil";
-      }
-    } catch (error) {
-      console.error("Erro ao verificar sessão:", error);
-    }
-  }, [supabase.auth]);
-
-  const loadRememberedMatricula = useCallback(() => {
-    try {
-      const remembered = localStorage.getItem("pac_remember_matricula");
-      if (remembered) {
-        const { matricula, rememberMe } = JSON.parse(remembered);
-        form.setValue("matricula", matricula);
-        form.setValue("rememberMe", rememberMe);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar matrícula lembrada:", error);
-    }
-  }, [form]);
-
-  const saveRememberedMatricula = useCallback(
-    (matricula: string, rememberMe: boolean) => {
-      if (rememberMe) {
-        localStorage.setItem(
-          "pac_remember_matricula",
-          JSON.stringify({
-            matricula,
-            rememberMe: true,
-          })
-        );
-      } else {
-        localStorage.removeItem("pac_remember_matricula");
-      }
-    },
-    []
-  );
-
+  // 🔒 Funções de segurança local
   const checkSecurityLock = useCallback(() => {
     const lockData = localStorage.getItem("pac_security_lock");
     if (lockData) {
-      const { attempts, lockUntil } = JSON.parse(lockData);
-      setFailedAttempts(attempts);
+      try {
+        const { attempts, lockUntil } = JSON.parse(lockData);
+        setFailedAttempts(attempts);
 
-      if (lockUntil > Date.now()) {
-        setIsLocked(true);
-        setLockTime(lockUntil);
-      } else {
+        if (lockUntil > Date.now()) {
+          setIsLocked(true);
+          setLockTime(lockUntil);
+        }
+      } catch (error) {
+        console.error("Erro ao ler bloqueio:", error);
         localStorage.removeItem("pac_security_lock");
       }
     }
   }, []);
 
-  useEffect(() => {
-    checkExistingSession();
-    checkSecurityLock();
-    loadRememberedMatricula();
-  }, [checkExistingSession, checkSecurityLock, loadRememberedMatricula]);
+  const updateSecurityLock = useCallback(
+    (increment: boolean = true) => {
+      const newAttempts = increment ? failedAttempts + 1 : 0;
+      setFailedAttempts(newAttempts);
 
+      if (newAttempts >= SEGURANCA.TENTATIVAS_MAXIMAS) {
+        const lockUntil = Date.now() + SEGURANCA.BLOQUEIO_MINUTOS * 60 * 1000;
+        setIsLocked(true);
+        setLockTime(lockUntil);
+
+        localStorage.setItem(
+          "pac_security_lock",
+          JSON.stringify({
+            attempts: newAttempts,
+            lockUntil,
+            timestamp: new Date().toISOString(),
+          })
+        );
+      } else {
+        localStorage.setItem(
+          "pac_security_lock",
+          JSON.stringify({
+            attempts: newAttempts,
+            lockUntil: null,
+            timestamp: new Date().toISOString(),
+          })
+        );
+      }
+    },
+    [failedAttempts]
+  );
+
+  // 🎯 FUNÇÃO PRINCIPAL DE LOGIN
+  const handleSubmit = async (data: LoginFormData) => {
+    if (isLocked) {
+      showAlert("error", "Acesso temporariamente bloqueado por segurança");
+      return;
+    }
+
+    setLoading(true);
+    console.log("🚀 Iniciando processo de login seguro...");
+
+    try {
+      const matriculaLimpa = data.matricula.replace(/\D/g, "");
+      console.log("📝 Matrícula processada:", matriculaLimpa);
+
+      // 🔍 PASSO 1: Buscar perfil via API
+      console.log("🌐 Consultando API de autenticação...");
+      const apiResponse = await fetch("/api/auth/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ matricula: matriculaLimpa }),
+      });
+
+      const apiResult = await apiResponse.json();
+      console.log("📊 Resposta da API:", apiResult);
+
+      if (!apiResult.success) {
+        updateSecurityLock();
+
+        switch (apiResult.error) {
+          case "PROFILE_NOT_FOUND":
+            showAlert("error", "Matrícula não encontrada ou agente inativo");
+            break;
+          case "PROFILE_INACTIVE":
+            showAlert("error", "Conta de agente está inativa");
+            break;
+          case "IP_BLOCKED":
+            showAlert(
+              "error",
+              apiResult.message || "IP temporariamente bloqueado"
+            );
+            break;
+          default:
+            showAlert(
+              "error",
+              apiResult.message || "Erro ao verificar matrícula"
+            );
+        }
+        return;
+      }
+
+      const { email, id: profileId } = apiResult.data;
+      console.log("✅ Email encontrado:", email);
+
+      // 🔐 PASSO 2: Tentar login com Supabase Auth
+      console.log("🔑 Autenticando com Supabase...");
+      const { data: authData, error: authError } =
+        await supabase.auth.signInWithPassword({
+          email,
+          password: SEGURANCA.SENHA_PADRAO,
+        });
+
+      if (authError) {
+        updateSecurityLock();
+        console.error("❌ Erro de autenticação:", authError);
+
+        if (authError.message.includes("Invalid login credentials")) {
+          showAlert(
+            "error",
+            `Credenciais inválidas. Use a senha padrão: ${SEGURANCA.SENHA_PADRAO}`
+          );
+        } else {
+          showAlert("error", `Erro de autenticação: ${authError.message}`);
+        }
+        return;
+      }
+
+      console.log("✅ Autenticação bem-sucedida");
+
+      // 🔒 PASSO 3: Verificar consistência (segurança extra)
+      if (authData.user.id !== profileId) {
+        console.error("❌ Inconsistência nos IDs");
+        await supabase.auth.signOut();
+        updateSecurityLock();
+        showAlert("error", "Erro de verificação de segurança");
+        return;
+      }
+
+      // 🎉 PASSO 4: Login bem-sucedido
+      updateSecurityLock(false);
+
+      // Salvar matrícula se solicitado
+      if (data.rememberMe) {
+        localStorage.setItem(
+          "pac_remember_matricula",
+          JSON.stringify({
+            matricula: data.matricula,
+            rememberMe: true,
+            timestamp: new Date().toISOString(),
+          })
+        );
+      } else {
+        localStorage.removeItem("pac_remember_matricula");
+      }
+
+      // 📋 PASSO 5: Atualizar metadados do usuário
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, role, avatar_url, graduacao")
+          .eq("id", authData.user.id)
+          .single();
+
+        if (profile) {
+          await supabase.auth.updateUser({
+            data: {
+              full_name: profile.full_name,
+              role: profile.role,
+              avatar_url: profile.avatar_url,
+              graduacao: profile.graduacao,
+            },
+          });
+        }
+      } catch (updateError) {
+        console.warn("⚠️ Não foi possível atualizar metadados:", updateError);
+      }
+
+      // ✅ Mostrar mensagem de sucesso
+      showAlert("success", "Login realizado com sucesso! Redirecionando...");
+
+      // 🔄 Redirecionar para perfil
+      setTimeout(() => {
+        window.location.href = "/perfil";
+      }, 1500);
+    } catch (error: unknown) {
+      updateSecurityLock();
+      console.error("💥 Erro geral no login:", error);
+      showAlert("error", "Erro inesperado. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🕐 Gerenciar contador de bloqueio
   useEffect(() => {
+    checkSecurityLock();
+
     if (isLocked && lockTime) {
       const timer = setInterval(() => {
         const remaining = lockTime - Date.now();
@@ -196,144 +308,47 @@ export default function LoginPage() {
           clearInterval(timer);
         }
       }, 1000);
+
       return () => clearInterval(timer);
     }
-  }, [isLocked, lockTime]);
+  }, [isLocked, lockTime, checkSecurityLock]);
 
-  const updateSecurityLock = useCallback(
-    (increment: boolean = true) => {
-      const newAttempts = increment ? failedAttempts + 1 : 0;
-      setFailedAttempts(newAttempts);
-
-      if (newAttempts >= SEGURANCA.TENTATIVAS_MAXIMAS) {
-        const lockUntil = Date.now() + SEGURANCA.BLOQUEIO_MINUTOS * 60 * 1000;
-        setIsLocked(true);
-        setLockTime(lockUntil);
-        localStorage.setItem(
-          "pac_security_lock",
-          JSON.stringify({
-            attempts: newAttempts,
-            lockUntil,
-          })
-        );
-      } else {
-        localStorage.setItem(
-          "pac_security_lock",
-          JSON.stringify({
-            attempts: newAttempts,
-            lockUntil: null,
-          })
-        );
-      }
-    },
-    [failedAttempts]
-  );
-
-  const handleSubmit = async (data: LoginFormData) => {
-    if (isLocked) {
-      showAlert("error", "Acesso temporariamente bloqueado por segurança");
-      return;
-    }
-
-    setLoading(true);
-    console.log("🚀 Iniciando processo de login...");
-
+  // 📝 Carregar matrícula lembrada
+  useEffect(() => {
     try {
-      const matriculaLimpa = data.matricula.replace(/\D/g, "");
-      console.log("📝 Matrícula limpa:", matriculaLimpa);
-
-      // 🔍 BUSCA COMPLETA DO PERFIL
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("matricula", matriculaLimpa)
-        .single();
-
-      console.log("👤 Resultado da busca do perfil:", {
-        profile,
-        profileError,
-      });
-
-      if (profileError || !profile) {
-        updateSecurityLock();
-        console.log("❌ Perfil não encontrado");
-        showAlert(
-          "error",
-          "Matrícula não consta no sistema. Este usuário não faz parte da PAC - Patrulha Aérea Civil"
-        );
-        return;
+      const remembered = localStorage.getItem("pac_remember_matricula");
+      if (remembered) {
+        const { matricula, rememberMe } = JSON.parse(remembered);
+        form.setValue("matricula", matricula);
+        form.setValue("rememberMe", rememberMe);
       }
-
-      console.log("✅ Perfil encontrado:", profile.full_name);
-      console.log("📧 Email do perfil:", profile.email);
-      console.log("🔐 Status do agente:", profile.status);
-      console.log("👑 Role do usuário:", profile.role);
-
-      console.log("🔑 Tentando login com:", {
-        email: profile.email,
-        password: "PAC@2025!Secure",
-      });
-
-      // 🔐 USA SENHA PADRÃO FORTE
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email: profile.email,
-          password: SEGURANCA.SENHA_PADRAO,
-        });
-
-      console.log("🔐 Resultado do auth:", { authData, authError });
-
-      if (authError) {
-        updateSecurityLock();
-        console.log("❌ Erro de autenticação:", authError);
-
-        if (authError.message.includes("Invalid login credentials")) {
-          showAlert(
-            "error",
-            "Erro de autenticação. Contate o administrador do sistema."
-          );
-        } else if (authError.message.includes("Email not confirmed")) {
-          showAlert(
-            "warning",
-            "E-mail não confirmado. Verifique sua caixa de entrada."
-          );
-        } else {
-          showAlert("error", `Erro: ${authError.message}`);
-        }
-        return;
-      }
-
-      // ✅ Login bem-sucedido
-      console.log("✅ Login bem-sucedido!");
-      updateSecurityLock(false);
-      saveRememberedMatricula(data.matricula, data.rememberMe);
-
-      // 📝 REGISTRAR ATIVIDADE DE LOGIN NO BANCO DE DADOS
-      console.log("📝 Registrando atividade de login...");
-      await logUserLogin(profile.id);
-      console.log("✅ Atividade de login registrada com sucesso!");
-
-      const welcomeMessage = `Bem-vindo, ${profile.full_name || "Agente"}!`;
-      showAlert("success", welcomeMessage);
-
-      setTimeout(() => {
-        window.location.href = "/perfil";
-      }, 1500);
-    } catch (error: unknown) {
-      updateSecurityLock();
-      console.error("💥 Erro geral no login:", error);
-      showAlert("error", "Erro inesperado ao fazer login");
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error("Erro ao carregar matrícula:", error);
     }
-  };
+  }, [form]);
 
+  // 🏠 Verificar sessão existente
+  useEffect(() => {
+    const checkSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        window.location.href = "/perfil";
+      }
+    };
+
+    checkSession();
+  }, [supabase.auth]);
+
+  // Função para mostrar tempo restante do bloqueio
   const getRemainingTime = () => {
     if (!lockTime) return "";
     const remaining = Math.ceil((lockTime - Date.now()) / 1000 / 60);
     return `${remaining} minuto${remaining !== 1 ? "s" : ""}`;
   };
 
+  // Renderização do componente (DESIGN ORIGINAL)
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
       <Toaster position="top-center" />
@@ -376,21 +391,19 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
-        {/* Header Centralizado - SUSPENSO MAIS ACIMA */}
+        {/* Header Centralizado */}
         <motion.div
-          className="text-center mb-4 sm:mb-6" // Reduzido mb
+          className="text-center mb-4 sm:mb-6"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.2 }}
         >
           <Link
             href="/"
-            className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 mb-4 sm:mb-5 group" // Reduzido space-y e mb
+            className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 mb-4 sm:mb-5 group"
           >
             {/* Logo */}
             <div className="relative w-20 h-20 sm:w-28 sm:h-28 flex justify-center">
-              {" "}
-              {/* Reduzido tamanho */}
               <Image
                 src="/images/logos/logo.webp"
                 alt="Patrulha Aérea Civil"
@@ -403,11 +416,7 @@ export default function LoginPage() {
 
             {/* Textos */}
             <div className="text-center space-y-2 w-full">
-              {" "}
-              {/* Reduzido space-y */}
               <div className="flex flex-col items-center justify-center space-y-1">
-                {" "}
-                {/* Reduzido space-y */}
                 <h1 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent tracking-tight sm:tracking-widest uppercase leading-tight font-bebas">
                   PATRULHA AÉREA CIVIL
                 </h1>
@@ -419,7 +428,7 @@ export default function LoginPage() {
           </Link>
         </motion.div>
 
-        {/* Login Card - SUSPENSO MAIS ACIMA */}
+        {/* Login Card */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -427,11 +436,9 @@ export default function LoginPage() {
         >
           <Card className="bg-white/90 backdrop-blur-sm border border-gray-200/80 rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl overflow-hidden hover:shadow-2xl transition-all duration-500">
             <CardContent className="p-4 sm:p-5 md:p-6">
-              {" "}
-              {/* Reduzido padding */}
               {/* Card Header */}
               <motion.div
-                className="text-center mb-3 sm:mb-4" // Reduzido mb
+                className="text-center mb-3 sm:mb-4"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.6, delay: 0.3 }}
@@ -443,6 +450,7 @@ export default function LoginPage() {
                   Digite sua matrícula para acessar o sistema
                 </p>
               </motion.div>
+
               {/* Alerts */}
               <AnimatePresence>
                 {alert && (
@@ -451,7 +459,7 @@ export default function LoginPage() {
                     animate={{ opacity: 1, y: 0, height: "auto" }}
                     exit={{ opacity: 0, y: -10, height: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="mb-3 sm:mb-4" // Reduzido mb
+                    className="mb-3 sm:mb-4"
                   >
                     <Alert
                       variant={
@@ -481,6 +489,8 @@ export default function LoginPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
+
+              {/* Bloqueio de Segurança */}
               {isLocked && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -488,8 +498,6 @@ export default function LoginPage() {
                   transition={{ duration: 0.5 }}
                 >
                   <Alert variant="destructive" className="mb-3 sm:mb-4 text-sm">
-                    {" "}
-                    {/* Reduzido mb */}
                     <div className="flex items-center gap-2">
                       <RiLockLine className="w-4 h-4 flex-shrink-0" />
                       <AlertDescription className="break-words flex-1">
@@ -500,11 +508,12 @@ export default function LoginPage() {
                   </Alert>
                 </motion.div>
               )}
+
               {/* Form */}
               <Form {...form}>
                 <form
                   onSubmit={form.handleSubmit(handleSubmit)}
-                  className="space-y-3 sm:space-y-4" // Reduzido space-y
+                  className="space-y-3 sm:space-y-4"
                 >
                   {/* Matrícula Field */}
                   <motion.div
@@ -530,7 +539,7 @@ export default function LoginPage() {
                                 onChange={(e) =>
                                   handleMatriculaChange(e.target.value)
                                 }
-                                className="text-sm sm:text-base py-2 sm:py-2.5 pl-3 sm:pl-4 pr-10 sm:pr-12 font-medium tracking-wider h-9 sm:h-11 transition-all duration-300 focus:ring-2 focus:ring-navy-500 focus:border-navy-500" // Reduzido height
+                                className="text-sm sm:text-base py-2 sm:py-2.5 pl-3 sm:pl-4 pr-10 sm:pr-12 font-medium tracking-wider h-9 sm:h-11 transition-all duration-300 focus:ring-2 focus:ring-navy-500 focus:border-navy-500"
                                 disabled={isLocked || loading}
                               />
                               <div className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
@@ -544,6 +553,21 @@ export default function LoginPage() {
                     />
                   </motion.div>
 
+                  {/* Email Helper */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.15 }}
+                    className="text-xs text-gray-500 italic bg-blue-50 p-2 rounded border border-blue-100"
+                  >
+                    <div className="flex items-center gap-1">
+                      <RiMailLine className="w-3 h-3" />
+                      <span>
+                        O sistema usará o e-mail vinculado à sua matrícula
+                      </span>
+                    </div>
+                  </motion.div>
+
                   {/* Remember Me */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -555,8 +579,6 @@ export default function LoginPage() {
                       name="rememberMe"
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-2 sm:p-2.5 hover:border-navy-300 transition-colors duration-300">
-                          {" "}
-                          {/* Reduzido padding */}
                           <div className="space-y-0.5 flex-1 min-w-0">
                             <FormLabel className="text-xs sm:text-sm whitespace-nowrap font-inter">
                               Lembrar matrícula
@@ -589,7 +611,7 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       disabled={isLocked || loading}
-                      className="w-full group relative overflow-hidden bg-gradient-to-br from-navy-600 to-navy-700 hover:from-navy-700 hover:to-navy-800 text-white font-semibold py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-inter h-10 sm:h-12 disabled:opacity-50 disabled:cursor-not-allowed" // Reduzido height
+                      className="w-full group relative overflow-hidden bg-gradient-to-br from-navy-600 to-navy-700 hover:from-navy-700 hover:to-navy-800 text-white font-semibold py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-inter h-10 sm:h-12 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {/* Shine Effect */}
                       <motion.div
@@ -607,11 +629,9 @@ export default function LoginPage() {
                                 repeat: Infinity,
                                 ease: "linear",
                               }}
-                              className="rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white mr-2 sm:mr-3" // Reduzido tamanho
+                              className="rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-white mr-2 sm:mr-3"
                             />
                             <span className="text-xs sm:text-sm font-inter">
-                              {" "}
-                              {/* Reduzido texto */}
                               Entrando...
                             </span>
                           </>
@@ -619,8 +639,6 @@ export default function LoginPage() {
                           <>
                             <RiLoginCircleLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
                             <span className="text-xs sm:text-sm whitespace-nowrap font-inter">
-                              {" "}
-                              {/* Reduzido texto */}
                               Acessar Sistema
                             </span>
                           </>
@@ -630,9 +648,10 @@ export default function LoginPage() {
                   </motion.div>
                 </form>
               </Form>
+
               {/* Separator */}
               <motion.div
-                className="relative my-3 sm:my-4" // Reduzido margin
+                className="relative my-3 sm:my-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.6, delay: 0.4 }}
@@ -646,6 +665,7 @@ export default function LoginPage() {
                   </span>
                 </div>
               </motion.div>
+
               {/* Back to Site */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -657,7 +677,7 @@ export default function LoginPage() {
                 <Link href="/">
                   <Button
                     variant="outline"
-                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-navy-600 hover:border-navy-600 font-medium py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl transition-all duration-300 shadow-sm hover:shadow-md font-inter h-9 sm:h-10" // Reduzido height
+                    className="w-full group bg-white/80 backdrop-blur-sm hover:bg-gray-50 border-2 border-gray-200 text-gray-600 hover:text-navy-600 hover:border-navy-600 font-medium py-2 sm:py-2.5 text-xs sm:text-sm rounded-lg sm:rounded-xl transition-all duration-300 shadow-sm hover:shadow-md font-inter h-9 sm:h-10"
                   >
                     <RiHomeLine className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1.5 sm:mr-2 transition-transform duration-300 group-hover:scale-110" />
                     <span className="whitespace-nowrap font-inter">

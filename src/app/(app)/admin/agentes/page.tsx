@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import {
   RiUserLine,
   RiSearchLine,
@@ -36,16 +38,16 @@ import {
   RiShieldKeyholeLine,
   RiIdCardLine,
   RiMailLine,
-  RiBarChartLine,
   RiHomeLine,
   RiDeleteBinLine,
   RiRefreshLine,
   RiUserAddLine,
   RiShieldUserLine,
-  RiCheckboxCircleLine,
-  RiCloseCircleLine,
   RiCalendarLine,
   RiDropLine,
+  RiDashboardLine,
+  RiCheckLine,
+  RiCloseLine,
 } from "react-icons/ri";
 
 interface AgentProfile {
@@ -73,6 +75,7 @@ const fadeInUp = {
   },
 };
 
+// Componente de estatísticas
 const StatCard = ({
   title,
   value,
@@ -247,7 +250,6 @@ const CustomPagination = ({
   return (
     <Pagination>
       <PaginationContent>
-        {/* Botão Anterior */}
         <PaginationItem>
           <PaginationPrevious
             href="#"
@@ -263,7 +265,6 @@ const CustomPagination = ({
           />
         </PaginationItem>
 
-        {/* Primeira página + ellipsis se necessário */}
         {visiblePages[0] > 1 && (
           <>
             <PaginationItem>
@@ -286,7 +287,6 @@ const CustomPagination = ({
           </>
         )}
 
-        {/* Páginas visíveis */}
         {visiblePages.map((page) => (
           <PaginationItem key={page}>
             <PaginationLink
@@ -302,7 +302,6 @@ const CustomPagination = ({
           </PaginationItem>
         ))}
 
-        {/* Última página + ellipsis se necessário */}
         {visiblePages[visiblePages.length - 1] < totalPages && (
           <>
             {visiblePages[visiblePages.length - 1] < totalPages - 1 && (
@@ -325,7 +324,6 @@ const CustomPagination = ({
           </>
         )}
 
-        {/* Botão Próximo */}
         <PaginationItem>
           <PaginationNext
             href="#"
@@ -345,7 +343,49 @@ const CustomPagination = ({
   );
 };
 
+// Hook customizado para verificar permissões
+const usePermissions = () => {
+  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "agent">(
+    "agent"
+  );
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  const checkCurrentUser = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user) {
+        setCurrentUserId(session.user.id);
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single();
+
+        if (profile) {
+          setCurrentUserRole(profile.role);
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao verificar permissões:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkCurrentUser();
+  }, [checkCurrentUser]);
+
+  return { currentUserRole, currentUserId, loading, checkCurrentUser };
+};
+
 export default function AgentesPage() {
+  const router = useRouter();
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -360,68 +400,222 @@ export default function AgentesPage() {
   const itemsPerPage = 10;
 
   const supabase = createClient();
+  const { currentUserRole, loading: permissionsLoading } = usePermissions();
 
-  // Buscar TODOS os dados do banco
+  // Função para buscar TODOS os agentes - VERSÃO CORRIGIDA (usando API)
   const fetchAgents = useCallback(async () => {
     try {
       setLoading(true);
       setRefreshing(true);
-      console.log("🔄 Buscando agentes...");
 
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
+      console.log("🔄 [AGENTES PAGE] Iniciando busca de agentes via API...");
 
-      if (error) throw error;
+      // 1. Verificar se há sessão ativa
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      console.log(`✅ ${data?.length || 0} agentes carregados`);
-      setAgents(data || []);
-      setCurrentPage(1); // Reset para primeira página ao buscar novos dados
+      if (!session) {
+        console.log("❌ Nenhuma sessão ativa");
+        toast.error("Sessão expirada. Faça login novamente.");
+        router.push("/login");
+        return;
+      }
+
+      console.log("✅ Sessão ativa encontrada:", {
+        userId: session.user.id,
+        email: session.user.email,
+      });
+
+      // 2. Verificar se o usuário atual é admin
+      if (currentUserRole !== "admin") {
+        console.log("❌ Usuário não é admin, redirecionando...");
+        toast.error("Apenas administradores podem acessar esta página");
+        router.push("/perfil");
+        return;
+      }
+
+      console.log("✅ Usuário é admin, buscando agentes via API...");
+
+      // 3. Buscar agentes via API segura
+      const response = await fetch("/api/admin/agentes", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(`✅ ${result.count} agentes carregados via API`);
+        setAgents(result.data || []);
+      } else {
+        throw new Error(result.error || "Erro ao buscar agentes");
+      }
+
+      setCurrentPage(1);
+
+      // Log detalhado para debug
+      if (result.data && result.data.length > 0) {
+        console.log("📊 DETALHES DOS AGENTES CARREGADOS:");
+        result.data
+          .slice(0, 3)
+          .forEach((agent: AgentProfile, index: number) => {
+            console.log(
+              `  ${index + 1}. ${agent.full_name || "Sem nome"} - ${
+                agent.email
+              } - ${agent.matricula}`
+            );
+          });
+        if (result.data.length > 3) {
+          console.log(`  ... e mais ${result.data.length - 3} agentes`);
+        }
+      }
     } catch (error: unknown) {
-      console.error("❌ Erro ao buscar agentes:", error);
+      console.error("💥 ERRO CRÍTICO ao buscar agentes:", error);
+
+      if (error instanceof Error) {
+        console.error("Stack trace:", error.stack);
+        console.error("Error name:", error.name);
+        console.error("Error message:", error.message);
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+
+      toast.error(`Falha ao carregar agentes: ${errorMessage}`, {
+        description: "Verifique o console para mais detalhes",
+        duration: 8000,
+      });
+
+      // Verificar se é erro de permissão
+      const errorString =
+        error instanceof Error ? error.toString() : String(error);
+      if (errorString.includes("permission") || errorString.includes("42501")) {
+        console.log("⚠️ Erro de permissão detectado, redirecionando...");
+        router.push("/perfil");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [supabase]);
+  }, [supabase, currentUserRole, router]);
 
-  useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
-
+  // Função para alterar status do agente - VERSÃO CORRIGIDA (usando API)
   const toggleAgentStatus = async (agentId: string, currentStatus: boolean) => {
+    if (currentUserRole !== "admin") {
+      toast.error("Apenas administradores podem alterar status");
+      return;
+    }
+
+    const newStatus = !currentStatus;
+    const actionName = newStatus ? "ativar" : "desativar";
+    const agentName =
+      agents.find((a) => a.id === agentId)?.full_name || "Agente";
+
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ status: !currentStatus })
-        .eq("id", agentId);
+      console.log(
+        `🔄 Alterando status do agente ${agentId} para ${
+          newStatus ? "ATIVO" : "INATIVO"
+        }`
+      );
 
-      if (error) throw error;
+      // Obter sessão para o token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
+      if (!session) {
+        throw new Error("Sessão expirada");
+      }
+
+      // Usar API para alterar status
+      const response = await fetch(`/api/admin/agentes/${agentId}/status`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao alterar status");
+      }
+
+      // Atualiza o estado local
       setAgents((prev) =>
         prev.map((agent) =>
-          agent.id === agentId ? { ...agent, status: !currentStatus } : agent
+          agent.id === agentId ? { ...agent, status: newStatus } : agent
         )
+      );
+
+      console.log(
+        `✅ Status alterado com sucesso para ${newStatus ? "ATIVO" : "INATIVO"}`
+      );
+      toast.success(
+        `${agentName} ${newStatus ? "ativado" : "desativado"} com sucesso!`
       );
     } catch (error: unknown) {
       console.error("❌ Erro ao alterar status:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+      toast.error(`Falha ao ${actionName} agente: ${errorMessage}`);
     }
   };
 
+  // Função para excluir agente - VERSÃO CORRIGIDA (usando API)
   const deleteAgent = async (agentId: string, agentName: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o agente ${agentName}?`)) {
+    if (currentUserRole !== "admin") {
+      toast.error("Apenas administradores podem excluir agentes");
+      return;
+    }
+
+    if (
+      !confirm(
+        `🚨 EXCLUSÃO PERMANENTE!\n\nTem certeza que deseja excluir o agente "${agentName}"?\n\nEsta ação removerá permanentemente o agente do sistema.\n\nDigite "CONFIRMAR" para continuar:`
+      )
+    ) {
+      toast.info("Exclusão cancelada");
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .delete()
-        .eq("id", agentId);
+      console.log(`🗑️ Iniciando exclusão do agente ${agentId} (${agentName})`);
 
-      if (error) throw error;
+      // Obter sessão para o token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
+      if (!session) {
+        throw new Error("Sessão expirada");
+      }
+
+      // Usar API para exclusão
+      const response = await fetch(`/api/admin/agentes/${agentId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Erro ao excluir agente");
+      }
+
+      console.log(`✅ Agente ${agentName} excluído com sucesso`);
+      toast.success(`Agente ${agentName} excluído com sucesso`);
+
+      // Remove do estado local
       setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
 
       // Ajustar página atual se necessário
@@ -433,11 +627,18 @@ export default function AgentesPage() {
         setCurrentPage(newTotalPages);
       }
     } catch (error: unknown) {
-      console.error("❌ Erro ao excluir agente:", error);
+      console.error("💥 ERRO ao excluir agente:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Erro desconhecido";
+
+      toast.error(`Falha ao excluir agente: ${errorMessage}`, {
+        description: "Verifique as permissões ou tente novamente",
+        duration: 8000,
+      });
     }
   };
 
-  // Função de filtro - CORREÇÃO: movida para dentro do useCallback
+  // Função de filtro
   const filterAgents = useCallback(
     (agentsList: AgentProfile[]) => {
       return agentsList.filter((agent) => {
@@ -457,12 +658,12 @@ export default function AgentesPage() {
       });
     },
     [searchTerm, filterRole, filterStatus]
-  ); // ✅ Agora inclui todas as dependências
+  );
 
-  // Aplicar filtros e paginação - CORREÇÃO: useMemo corrigido
+  // Aplicar filtros e paginação
   const filteredAgents = useMemo(() => {
     return filterAgents(agents);
-  }, [agents, filterAgents]); // ✅ Agora inclui filterAgents nas dependências
+  }, [agents, filterAgents]);
 
   // Calcular agentes paginados
   const paginatedAgents = useMemo(() => {
@@ -479,18 +680,23 @@ export default function AgentesPage() {
     setCurrentPage(1);
   }, [searchTerm, filterRole, filterStatus]);
 
-  const stats = {
-    total: agents.length,
-    active: agents.filter((a) => a.status).length,
-    inactive: agents.filter((a) => !a.status).length,
-    admins: agents.filter((a) => a.role === "admin").length,
-  };
+  // Calcular estatísticas
+  const stats = useMemo(
+    () => ({
+      total: agents.length,
+      active: agents.filter((a) => a.status).length,
+      inactive: agents.filter((a) => !a.status).length,
+      admins: agents.filter((a) => a.role === "admin").length,
+      agents: agents.filter((a) => a.role === "agent").length,
+    }),
+    [agents]
+  );
 
   // Botões de navegação
   const navigationButtons = [
     {
       href: "/admin/dashboard",
-      icon: RiBarChartLine,
+      icon: RiDashboardLine,
       label: "Dashboard",
       className:
         "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
@@ -525,6 +731,36 @@ export default function AgentesPage() {
     },
   };
 
+  // Efeito para buscar agentes quando permissões carregarem
+  useEffect(() => {
+    if (!permissionsLoading) {
+      fetchAgents();
+    }
+  }, [fetchAgents, permissionsLoading]);
+
+  // Mostrar loading enquanto verifica permissões
+  if (permissionsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
+        <div className="container mx-auto px-4">
+          <div className="text-center py-16">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto mb-4"
+            />
+            <p className="text-gray-600">Verificando permissões...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não for admin, não mostra nada (já redirecionou)
+  if (currentUserRole !== "admin") {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
       <div className="container mx-auto px-4">
@@ -540,6 +776,9 @@ export default function AgentesPage() {
           </h1>
           <p className="text-gray-600">
             Gerencie todos os agentes da Patrulha Aérea Civil
+            <span className="block text-sm text-gray-500 mt-1">
+              Total de agentes carregados: <strong>{agents.length}</strong>
+            </span>
           </p>
         </motion.div>
 
@@ -553,10 +792,7 @@ export default function AgentesPage() {
           {/* Botão de Atualizar */}
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
-              onClick={() => {
-                setRefreshing(true);
-                fetchAgents();
-              }}
+              onClick={() => fetchAgents()}
               disabled={refreshing}
               variant="outline"
               className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
@@ -651,7 +887,7 @@ export default function AgentesPage() {
           />
           <StatCard
             title="Agentes"
-            value={stats.total - stats.admins}
+            value={stats.agents}
             icon={<RiIdCardLine className="w-6 h-6" />}
             description="Com acesso básico"
             color="gray"
@@ -877,12 +1113,12 @@ export default function AgentesPage() {
                                         >
                                           {agent.status ? (
                                             <>
-                                              <RiCheckboxCircleLine className="w-3 h-3 mr-1" />{" "}
+                                              <RiCheckLine className="w-3 h-3 mr-1" />{" "}
                                               ATIVO
                                             </>
                                           ) : (
                                             <>
-                                              <RiCloseCircleLine className="w-3 h-3 mr-1" />{" "}
+                                              <RiCloseLine className="w-3 h-3 mr-1" />{" "}
                                               INATIVO
                                             </>
                                           )}

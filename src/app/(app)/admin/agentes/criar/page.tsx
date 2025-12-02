@@ -1,4 +1,3 @@
-// src/app/(app)/admin/agentes/criar/page.tsx - COMPONENTE COMPLETO CORRIGIDO
 "use client";
 
 import { useState } from "react";
@@ -34,7 +33,6 @@ import {
   RiArrowLeftLine,
   RiSaveLine,
   RiAddLine,
-  RiKeyLine,
   RiInformationLine,
   RiImageLine,
   RiBarChartLine,
@@ -101,7 +99,7 @@ export default function CriarAgentePage() {
     tipo_sanguineo: "",
     validade_certificacao: "",
     role: "agent",
-    avatar_url: "",
+    avatar_url: "", // Mantém string vazia
   });
 
   const generateMatricula = () => {
@@ -117,10 +115,11 @@ export default function CriarAgentePage() {
     }));
   };
 
-  const handleAvatarChange = (avatarUrl: string) => {
+  // 🔧 CORREÇÃO: Aceitar string | null
+  const handleAvatarChange = (avatarUrl: string | null) => {
     setFormData((prev) => ({
       ...prev,
-      avatar_url: avatarUrl,
+      avatar_url: avatarUrl || "", // Converte null para string vazia
     }));
   };
 
@@ -179,7 +178,7 @@ export default function CriarAgentePage() {
 
       console.log("🔄 Enviando dados para API...", formData);
 
-      // ✅ Toast de loading aprimorado
+      // Toast de loading
       const toastId = toast.loading(
         `Cadastrando agente ${formData.full_name}...`,
         {
@@ -187,7 +186,7 @@ export default function CriarAgentePage() {
         }
       );
 
-      // CORREÇÃO: Usar API route em vez de admin client direto
+      // Enviar dados para API
       const response = await fetch("/api/admin/agentes/criar", {
         method: "POST",
         headers: {
@@ -204,11 +203,11 @@ export default function CriarAgentePage() {
 
       console.log("✅ Agente criado com sucesso:", result);
 
-      // ✅ FEEDBACK DE SUCESSO MELHORADO (igual ao componente de edição)
+      // FEEDBACK DE SUCESSO
       toast.success("✅ Agente criado com sucesso!", {
         id: toastId,
-        description: `O agente ${formData.full_name} foi cadastrado no sistema. Senha inicial: pac12345`,
-        duration: 8000,
+        description: `O agente ${formData.full_name} foi cadastrado no sistema com sucesso.`,
+        duration: 3000,
         action: {
           label: "Ver Agentes",
           onClick: () => {
@@ -227,14 +226,14 @@ export default function CriarAgentePage() {
         tipo_sanguineo: "",
         validade_certificacao: "",
         role: "agent",
-        avatar_url: "",
+        avatar_url: "", // Mantém string vazia
       });
 
-      // Redirecionar após 3 segundos (um pouco mais para ler a mensagem)
+      // Redirecionar após 2 segundos
       setTimeout(() => {
         router.push("/admin/agentes");
         router.refresh();
-      }, 3000);
+      }, 2000);
     } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
       const errorMessage =
@@ -242,7 +241,7 @@ export default function CriarAgentePage() {
           ? err.message
           : "Erro desconhecido ao criar agente";
 
-      // ✅ Toast de erro aprimorado
+      // Toast de erro
       toast.error("❌ Falha ao criar agente", {
         description: errorMessage,
         duration: 6000,
@@ -379,7 +378,7 @@ export default function CriarAgentePage() {
                       </Label>
                       <FileUpload
                         type="avatar"
-                        onFileChange={handleAvatarChange}
+                        onFileChange={handleAvatarChange} // ✅ Corrigido
                         currentFile={formData.avatar_url}
                         className="p-4 border border-gray-200 rounded-lg bg-white hover:border-blue-500 transition-colors duration-300"
                         userId={formData.matricula || "new"}
@@ -706,7 +705,9 @@ export default function CriarAgentePage() {
                 <CardContent className="space-y-4 text-sm text-gray-600">
                   <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
                     <RiAddLine className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                    <p>O agente receberá um email para definir sua senha</p>
+                    <p>
+                      O sistema criará uma conta automaticamente para o agente
+                    </p>
                   </div>
                   <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
                     <RiIdCardLine className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -730,39 +731,12 @@ export default function CriarAgentePage() {
               </Card>
             </motion.div>
 
-            {/* Senha Inicial */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg text-gray-800">
-                    <RiKeyLine className="w-5 h-5 mr-2 text-navy-600" />
-                    Senha Inicial
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 transition-colors duration-300 hover:bg-yellow-100">
-                    <p className="text-sm font-medium text-yellow-800 mb-2">
-                      <strong>Senha padrão:</strong> pac12345
-                    </p>
-                    <p className="text-xs text-yellow-600">
-                      O agente deverá alterar esta senha no primeiro acesso
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
             {/* Preview Rápido */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeInUp}
-              transition={{ delay: 0.5 }}
+              transition={{ delay: 0.4 }}
             >
               <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
                 <CardHeader>
