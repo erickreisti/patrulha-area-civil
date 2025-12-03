@@ -45,7 +45,6 @@ import {
   RiUserLine,
   RiIdCardLine,
   RiMailLine,
-  RiShieldKeyholeLine,
   RiArrowLeftLine,
   RiSaveLine,
   RiDeleteBinLine,
@@ -1075,6 +1074,7 @@ export default function EditarAgentePage() {
           transition={{ duration: 0.6 }}
           className="mb-10"
         >
+          {/* Cabeçalho */}
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
               <div className="space-y-3">
@@ -1154,7 +1154,8 @@ export default function EditarAgentePage() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-3 mb-6">
+          {/* Botões de Navegação */}
+          <div className="flex flex-wrap gap-3 mb-8">
             <Link href={isAdmin ? "/admin/agentes" : "/perfil"}>
               <Button
                 variant="outline"
@@ -1177,6 +1178,7 @@ export default function EditarAgentePage() {
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Conteúdo Principal */}
           <div className="lg:col-span-2">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -1486,39 +1488,69 @@ export default function EditarAgentePage() {
                       </div>
                     </div>
 
-                    {/* Botões de Ação */}
-                    <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-200 mt-10">
-                      <Button
-                        type="submit"
-                        disabled={saving || !hasUnsavedChanges}
-                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
-                      >
-                        {saving ? (
-                          <>
-                            <Spinner className="w-5 h-5 mr-3" />
-                            Salvando...
-                          </>
-                        ) : (
-                          <>
-                            <RiSaveLine className="w-5 h-5 mr-3" />
-                            {hasUnsavedChanges
-                              ? "Salvar Alterações"
-                              : "Nenhuma Alteração"}
-                          </>
-                        )}
-                      </Button>
+                    {/* Status */}
+                    <div className="pt-4">
+                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
+                        <Label className="text-base font-semibold text-gray-700 cursor-pointer">
+                          Agente Ativo na PAC
+                        </Label>
+                        <Switch
+                          checked={formData.status}
+                          onCheckedChange={(checked) =>
+                            handleSwitchChange("status", checked)
+                          }
+                          disabled={saving || !isAdmin}
+                          className="scale-110"
+                        />
+                      </div>
+                      {!isAdmin && (
+                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                          <p className="text-sm text-gray-600">
+                            <RiLockLine className="inline w-4 h-4 mr-1" />
+                            Apenas administradores podem alterar o status
+                          </p>
+                        </div>
+                      )}
+                    </div>
 
-                      <Link href={isAdmin ? "/admin/agentes" : "/perfil"}>
+                    {/* Botões de Ação */}
+                    <div className="pt-8 border-t border-gray-200 mt-8">
+                      <div className="flex flex-col sm:flex-row gap-4">
                         <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-4 h-14 text-lg transition-all duration-300 rounded-xl"
-                          disabled={saving}
+                          type="submit"
+                          disabled={saving || !hasUnsavedChanges}
+                          className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
                         >
-                          <RiCloseLine className="w-5 h-5 mr-3" />
-                          Cancelar
+                          {saving ? (
+                            <>
+                              <Spinner className="w-5 h-5 mr-3" />
+                              Salvando...
+                            </>
+                          ) : (
+                            <>
+                              <RiSaveLine className="w-5 h-5 mr-3" />
+                              {hasUnsavedChanges
+                                ? "Salvar Alterações"
+                                : "Nenhuma Alteração"}
+                            </>
+                          )}
                         </Button>
-                      </Link>
+
+                        <Link
+                          href={isAdmin ? "/admin/agentes" : "/perfil"}
+                          className="flex-1"
+                        >
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-4 h-14 text-lg transition-all duration-300 rounded-xl"
+                            disabled={saving}
+                          >
+                            <RiCloseLine className="w-5 h-5 mr-3" />
+                            Cancelar
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
 
                     {/* Zona de Perigo (Apenas Admin) */}
@@ -1648,74 +1680,7 @@ export default function EditarAgentePage() {
 
           {/* Sidebar */}
           <div className="space-y-8">
-            {/* Status e Permissões */}
-            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
-              <CardHeader className="pb-6 px-6 pt-6">
-                <CardTitle className="flex items-center text-xl text-gray-800">
-                  <RiShieldKeyholeLine className="w-6 h-6 mr-3 text-navy-600" />
-                  Status e Permissões
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6 px-6 pb-6">
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
-                  <Label className="text-base font-semibold text-gray-700 cursor-pointer">
-                    Agente Ativo na PAC
-                  </Label>
-                  <Switch
-                    checked={formData.status}
-                    onCheckedChange={(checked) =>
-                      handleSwitchChange("status", checked)
-                    }
-                    disabled={saving || !isAdmin}
-                    className="scale-110"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <Label className="text-base font-semibold text-gray-700">
-                    Tipo de Acesso
-                  </Label>
-                  <div className="space-y-2">
-                    {(["agent", "admin"] as const).map((role) => (
-                      <label
-                        key={role}
-                        className={`flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 ${
-                          formData.role === role
-                            ? "bg-blue-50 border-2 border-blue-200"
-                            : "hover:bg-gray-50 border border-gray-200"
-                        } ${
-                          !isAdmin
-                            ? "cursor-not-allowed opacity-60"
-                            : "cursor-pointer"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="role"
-                          value={role}
-                          checked={formData.role === role}
-                          onChange={(e) =>
-                            handleRoleChange(
-                              e.target.value as "agent" | "admin"
-                            )
-                          }
-                          className="text-blue-600 focus:ring-blue-600 scale-125"
-                          disabled={saving || !isAdmin}
-                        />
-                        <span className="text-base capitalize">
-                          {role === "agent" ? "Agente" : "Administrador"}
-                        </span>
-                        {role === "admin" && (
-                          <Badge className="bg-purple-100 text-purple-800 text-sm border-purple-200 py-1 px-2 ml-auto">
-                            Acesso Total
-                          </Badge>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Status e Permissões - Removido pois foi movido para o card principal */}
 
             {/* Status da Certificação */}
             <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
