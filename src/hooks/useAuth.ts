@@ -1,90 +1,72 @@
-"use client";
-
+// src/hooks/useAuth.ts
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { User } from "@supabase/supabase-js";
 import { UserProfile } from "@/types";
-import { useEffect, useState } from "react";
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
-    const getAuthData = async () => {
+    const fetchProfile = async () => {
       try {
         const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (userError) {
-          console.error("❌ useAuth: Erro ao buscar usuário:", userError);
+        if (!session) {
           setLoading(false);
           return;
         }
 
-        setUser(user);
+        const { data: profileData, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
 
-        if (user) {
-          const { data: profileData, error: profileError } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", user.id)
-            .single();
-
-          if (profileError) {
-            console.error("❌ useAuth: Erro ao buscar perfil:", profileError);
-          } else {
-            setProfile(profileData);
-          }
-        } else {
-          setProfile(null);
+        if (error) {
+          console.error("Erro ao buscar perfil:", error);
+          setLoading(false);
+          return;
         }
+
+        setProfile(profileData);
+        setIsAdmin(profileData.role === "admin");
       } catch (error) {
-        console.error("💥 useAuth: Erro geral:", error);
+        console.error("Erro no useAuth:", error);
       } finally {
         setLoading(false);
       }
     };
 
-    getAuthData();
+    fetchProfile();
 
+    // Escutar mudanças na autenticação
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-
-      if (currentUser) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", currentUser.id)
-          .single();
-        setProfile(profileData);
-      } else {
-        setProfile(null);
-      }
-
-      setLoading(false);
+    } = supabase.auth.onAuthStateChange(() => {
+      fetchProfile();
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [supabase]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/login";
+    setProfile(null);
+    setIsAdmin(false);
   };
 
   return {
-    user,
     profile,
     loading,
+    isAdmin,
     signOut,
-    isAdmin: profile?.role === "admin",
-    isAgent: profile?.role === "agent" || profile?.role === "admin",
+    supabase,
   };
 }

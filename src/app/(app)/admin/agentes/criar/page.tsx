@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { FileUpload } from "@/components/ui/file-upload";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -40,6 +44,7 @@ import {
   RiArrowDownSLine,
   RiEditLine,
   RiErrorWarningLine,
+  RiAlertLine,
 } from "react-icons/ri";
 
 // Opções baseadas no schema
@@ -89,8 +94,12 @@ const fadeInUp = {
 
 export default function CriarAgentePage() {
   const router = useRouter();
+  const supabase = createClient();
   const [loading, setLoading] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const [dateOpen, setDateOpen] = useState(false);
+  const [currentSession, setCurrentSession] = useState<Session | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     matricula: "",
     email: "",
@@ -99,8 +108,76 @@ export default function CriarAgentePage() {
     tipo_sanguineo: "",
     validade_certificacao: "",
     role: "agent",
-    avatar_url: "", // Mantém string vazia
+    avatar_url: "",
   });
+
+  // Verificar autenticação e permissões
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setAuthLoading(true);
+
+        // Obter sessão atual
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          toast.error("Sessão expirada", {
+            description: "Faça login novamente para acessar esta página.",
+          });
+          router.push("/login");
+          return;
+        }
+
+        console.log("✅ Sessão encontrada:", session.user.email);
+        console.log("✅ Token disponível:", !!session.access_token);
+        setCurrentSession(session);
+
+        // Verificar se é admin
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("role, full_name, status")
+          .eq("id", session.user.id)
+          .single();
+
+        if (error) {
+          console.error("❌ Erro ao buscar perfil:", error);
+          toast.error("Erro ao verificar permissões");
+          router.push("/login");
+          return;
+        }
+
+        if (!profile || profile.role !== "admin") {
+          toast.error("Acesso restrito", {
+            description: "Apenas administradores podem criar agentes.",
+          });
+          router.push("/perfil");
+          return;
+        }
+
+        if (!profile.status) {
+          toast.error("Conta inativa", {
+            description:
+              "Sua conta está inativa. Entre em contato com o administrador.",
+          });
+          router.push("/login");
+          return;
+        }
+
+        setIsAdmin(true);
+        console.log("✅ Usuário é admin:", profile.full_name);
+      } catch (error) {
+        console.error("💥 Erro na verificação de autenticação:", error);
+        toast.error("Erro de autenticação");
+        router.push("/login");
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router, supabase]);
 
   const generateMatricula = () => {
     const randomNum = Math.floor(10000000000 + Math.random() * 90000000000);
@@ -115,11 +192,10 @@ export default function CriarAgentePage() {
     }));
   };
 
-  // 🔧 CORREÇÃO: Aceitar string | null
   const handleAvatarChange = (avatarUrl: string | null) => {
     setFormData((prev) => ({
       ...prev,
-      avatar_url: avatarUrl || "", // Converte null para string vazia
+      avatar_url: avatarUrl || "",
     }));
   };
 
@@ -133,8 +209,12 @@ export default function CriarAgentePage() {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "Selecionar data";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("pt-BR");
+    try {
+      const date = new Date(dateString);
+      return format(date, "dd/MM/yyyy", { locale: ptBR });
+    } catch {
+      return "Data inválida";
+    }
   };
 
   const validateForm = (): string[] => {
@@ -165,6 +245,22 @@ export default function CriarAgentePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!currentSession) {
+      toast.error("Sessão expirada", {
+        description: "Faça login novamente para continuar.",
+      });
+      router.push("/login");
+      return;
+    }
+
+    if (!isAdmin) {
+      toast.error("Acesso negado", {
+        description: "Apenas administradores podem criar agentes.",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -176,7 +272,9 @@ export default function CriarAgentePage() {
         return;
       }
 
-      console.log("🔄 Enviando dados para API...", formData);
+      console.log("🔄 [CRIAR AGENTE] Iniciando criação...");
+      console.log("🔍 Usuário atual:", currentSession.user.email);
+      console.log("🔍 Token disponível:", !!currentSession.access_token);
 
       // Toast de loading
       const toastId = toast.loading(
@@ -186,19 +284,25 @@ export default function CriarAgentePage() {
         }
       );
 
-      // Enviar dados para API
+      // Enviar dados para API com token de autenticação
       const response = await fetch("/api/admin/agentes/criar", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${currentSession.access_token}`,
         },
         body: JSON.stringify(formData),
       });
 
+      console.log("📥 Status da resposta:", response.status);
+
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Erro ao criar agente");
+        console.error("❌ Erro da API:", result);
+        throw new Error(
+          result.error || result.details || "Erro ao criar agente"
+        );
       }
 
       console.log("✅ Agente criado com sucesso:", result);
@@ -207,7 +311,7 @@ export default function CriarAgentePage() {
       toast.success("✅ Agente criado com sucesso!", {
         id: toastId,
         description: `O agente ${formData.full_name} foi cadastrado no sistema com sucesso.`,
-        duration: 3000,
+        duration: 5000,
         action: {
           label: "Ver Agentes",
           onClick: () => {
@@ -226,14 +330,14 @@ export default function CriarAgentePage() {
         tipo_sanguineo: "",
         validade_certificacao: "",
         role: "agent",
-        avatar_url: "", // Mantém string vazia
+        avatar_url: "",
       });
 
-      // Redirecionar após 2 segundos
+      // Redirecionar após 3 segundos
       setTimeout(() => {
         router.push("/admin/agentes");
         router.refresh();
-      }, 2000);
+      }, 3000);
     } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
       const errorMessage =
@@ -284,7 +388,80 @@ export default function CriarAgentePage() {
     },
   ];
 
-  // Loading skeleton
+  // Loading durante verificação de autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
+        <div className="container mx-auto px-4">
+          <div className="text-center py-16">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto mb-4"
+            />
+            <p className="text-gray-600">Verificando permissões...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Se não for admin, mostrar mensagem
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-2xl mx-auto"
+          >
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b border-red-200">
+                <CardTitle className="flex items-center text-xl text-gray-800">
+                  <RiAlertLine className="w-6 h-6 mr-2 text-red-500" />
+                  Acesso Restrito
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 text-center">
+                <div className="mb-4">
+                  <RiShieldKeyholeLine className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Permissão Insuficiente
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Apenas administradores podem criar novos agentes no sistema.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  {navigationButtons.map((button, index) => (
+                    <motion.div
+                      key={button.href}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <Link href={button.href}>
+                        <Button
+                          variant="outline"
+                          className={`transition-all duration-300 ${button.className}`}
+                        >
+                          <button.icon className="w-4 h-4 mr-2" />
+                          {button.label}
+                        </Button>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading skeleton durante criação
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
@@ -304,7 +481,7 @@ export default function CriarAgentePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -313,17 +490,21 @@ export default function CriarAgentePage() {
           className="mb-8"
         >
           {/* Título e Descrição */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-3 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
               CADASTRAR NOVO AGENTE
             </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-600 text-lg mb-2">
               Preencha os dados para cadastrar um novo agente no sistema
             </p>
+            <div className="flex items-center text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200 w-fit">
+              <RiShieldKeyholeLine className="w-4 h-4 mr-2" />
+              <span>Usuário autenticado como administrador</span>
+            </div>
           </div>
 
           {/* Botões de Navegação */}
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-wrap gap-3">
             {navigationButtons.map((button, index) => (
               <motion.div
                 key={button.href}
@@ -336,7 +517,7 @@ export default function CriarAgentePage() {
                 <Link href={button.href}>
                   <Button
                     variant="outline"
-                    className={`transition-all duration-300 ${button.className}`}
+                    className={`transition-all duration-300 ${button.className} h-11 px-4`}
                   >
                     <button.icon className="w-4 h-4 mr-2" />
                     {button.label}
@@ -356,31 +537,32 @@ export default function CriarAgentePage() {
               variants={fadeInUp}
               transition={{ delay: 0.2 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="flex items-center text-xl text-gray-800">
-                    <RiUserLine className="w-5 h-5 mr-2 text-navy-600" />
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="border-b border-gray-200 pb-6">
+                  <CardTitle className="flex items-center text-2xl text-gray-800">
+                    <RiUserLine className="w-6 h-6 mr-3 text-navy-600" />
                     Dados do Agente
                     <Badge
                       variant="outline"
-                      className="ml-2 bg-green-100 text-green-800 border-green-300"
+                      className="ml-3 bg-green-100 text-green-800 border-green-300 text-sm py-1 px-3"
                     >
                       Novo Cadastro
                     </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                <CardContent className="p-8">
+                  <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Upload de Avatar */}
                     <motion.div variants={fadeInUp} className="space-y-4">
-                      <Label className="text-sm font-semibold text-gray-700">
+                      <Label className="text-base font-semibold text-gray-700 flex items-center">
+                        <RiImageLine className="w-5 h-5 mr-2 text-navy-500" />
                         Foto do Agente
                       </Label>
                       <FileUpload
                         type="avatar"
-                        onFileChange={handleAvatarChange} // ✅ Corrigido
+                        onFileChange={handleAvatarChange}
                         currentFile={formData.avatar_url}
-                        className="p-4 border border-gray-200 rounded-lg bg-white hover:border-blue-500 transition-colors duration-300"
+                        className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-500 transition-all duration-300"
                         userId={formData.matricula || "new"}
                       />
                     </motion.div>
@@ -389,17 +571,21 @@ export default function CriarAgentePage() {
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.1 }}
-                      className="space-y-2"
+                      className="space-y-3"
                     >
                       <Label
                         htmlFor="matricula"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiIdCardLine className="w-5 h-5 mr-2 text-navy-500" />
                         Matrícula *
+                        <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">
+                          Única
+                        </Badge>
                       </Label>
-                      <div className="flex gap-3">
+                      <div className="flex gap-4">
                         <div className="relative flex-1">
-                          <RiIdCardLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
+                          <RiIdCardLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
                           <Input
                             id="matricula"
                             type="text"
@@ -409,7 +595,7 @@ export default function CriarAgentePage() {
                             placeholder="00000000000"
                             maxLength={11}
                             required
-                            className="pl-10 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
+                            className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
                             disabled={loading}
                           />
                         </div>
@@ -421,15 +607,15 @@ export default function CriarAgentePage() {
                             type="button"
                             onClick={generateMatricula}
                             variant="outline"
-                            className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
+                            className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300 h-14 px-5"
                             disabled={loading}
                           >
-                            <RiAddLine className="w-4 h-4 mr-2" />
+                            <RiAddLine className="w-5 h-5 mr-2" />
                             Gerar
                           </Button>
                         </motion.div>
                       </div>
-                      <p className="text-xs text-gray-500 transition-colors duration-300">
+                      <p className="text-sm text-gray-500 pl-1">
                         11 dígitos numéricos
                       </p>
                     </motion.div>
@@ -438,16 +624,17 @@ export default function CriarAgentePage() {
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.2 }}
-                      className="space-y-2"
+                      className="space-y-3"
                     >
                       <Label
                         htmlFor="full_name"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiUserLine className="w-5 h-5 mr-2 text-navy-500" />
                         Nome Completo *
                       </Label>
                       <div className="relative">
-                        <RiUserLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
+                        <RiUserLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
                         <Input
                           id="full_name"
                           type="text"
@@ -456,7 +643,7 @@ export default function CriarAgentePage() {
                           onChange={handleInputChange}
                           placeholder="Nome completo do agente"
                           required
-                          className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
+                          className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
                           disabled={loading}
                         />
                       </div>
@@ -466,16 +653,17 @@ export default function CriarAgentePage() {
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.3 }}
-                      className="space-y-2"
+                      className="space-y-3"
                     >
                       <Label
                         htmlFor="email"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiMailLine className="w-5 h-5 mr-2 text-navy-500" />
                         Email *
                       </Label>
                       <div className="relative">
-                        <RiMailLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
+                        <RiMailLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
                         <Input
                           id="email"
                           type="email"
@@ -484,23 +672,23 @@ export default function CriarAgentePage() {
                           onChange={handleInputChange}
                           placeholder="agente@pac.org.br"
                           required
-                          className="pl-10 text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
+                          className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
                           disabled={loading}
                         />
                       </div>
                     </motion.div>
 
                     {/* Graduação e Tipo Sanguíneo */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {/* Graduação */}
                       <motion.div
                         variants={fadeInUp}
                         transition={{ delay: 0.4 }}
-                        className="space-y-2"
+                        className="space-y-3"
                       >
                         <Label
                           htmlFor="graduacao"
-                          className="text-sm font-semibold text-gray-700"
+                          className="text-base font-semibold text-gray-700"
                         >
                           Graduação
                         </Label>
@@ -514,7 +702,7 @@ export default function CriarAgentePage() {
                           }
                           disabled={loading}
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione uma graduação" />
                           </SelectTrigger>
                           <SelectContent>
@@ -531,11 +719,11 @@ export default function CriarAgentePage() {
                       <motion.div
                         variants={fadeInUp}
                         transition={{ delay: 0.5 }}
-                        className="space-y-2"
+                        className="space-y-3"
                       >
                         <Label
                           htmlFor="tipo_sanguineo"
-                          className="text-sm font-semibold text-gray-700"
+                          className="text-base font-semibold text-gray-700"
                         >
                           Tipo Sanguíneo
                         </Label>
@@ -549,7 +737,7 @@ export default function CriarAgentePage() {
                           }
                           disabled={loading}
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo sanguíneo" />
                           </SelectTrigger>
                           <SelectContent>
@@ -564,26 +752,29 @@ export default function CriarAgentePage() {
                     </div>
 
                     {/* Validade da Certificação e Tipo de Usuário */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       {/* Validade da Certificação */}
                       <motion.div
                         variants={fadeInUp}
                         transition={{ delay: 0.6 }}
-                        className="space-y-2"
+                        className="space-y-3"
                       >
-                        <Label className="text-sm font-semibold text-gray-700">
+                        <Label className="text-base font-semibold text-gray-700">
                           Validade da Certificação
                         </Label>
                         <Popover open={dateOpen} onOpenChange={setDateOpen}>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-between font-normal transition-all duration-300 hover:border-blue-500"
+                              className="w-full h-14 justify-between text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
                               disabled={loading}
                             >
-                              {formData.validade_certificacao
-                                ? formatDate(formData.validade_certificacao)
-                                : "Selecionar data"}
+                              <div className="flex items-center">
+                                <RiArrowDownSLine className="w-5 h-5 mr-3 text-navy-500" />
+                                {formData.validade_certificacao
+                                  ? formatDate(formData.validade_certificacao)
+                                  : "Selecionar data"}
+                              </div>
                               <RiArrowDownSLine className="w-4 h-4" />
                             </Button>
                           </PopoverTrigger>
@@ -597,20 +788,39 @@ export default function CriarAgentePage() {
                               }
                               onSelect={handleDateSelect}
                               initialFocus
+                              locale={ptBR}
+                              className="rounded-xl border shadow-2xl"
                             />
                           </PopoverContent>
                         </Popover>
+                        {formData.validade_certificacao && (
+                          <div className="flex items-center justify-between text-sm mt-2 px-1">
+                            <span className="text-gray-600">
+                              Selecionado:{" "}
+                              {formatDate(formData.validade_certificacao)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDateSelect(undefined)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-3 rounded-lg"
+                            >
+                              Limpar
+                            </Button>
+                          </div>
+                        )}
                       </motion.div>
 
                       {/* Tipo de Usuário */}
                       <motion.div
                         variants={fadeInUp}
                         transition={{ delay: 0.7 }}
-                        className="space-y-2"
+                        className="space-y-3"
                       >
                         <Label
                           htmlFor="role"
-                          className="text-sm font-semibold text-gray-700"
+                          className="text-base font-semibold text-gray-700"
                         >
                           Tipo de Usuário
                         </Label>
@@ -621,12 +831,22 @@ export default function CriarAgentePage() {
                           }
                           disabled={loading}
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="agent">Agente</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
+                            <SelectItem
+                              value="agent"
+                              className="text-base py-3"
+                            >
+                              Agente
+                            </SelectItem>
+                            <SelectItem
+                              value="admin"
+                              className="text-base py-3"
+                            >
+                              Administrador
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                       </motion.div>
@@ -636,7 +856,7 @@ export default function CriarAgentePage() {
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.8 }}
-                      className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200"
+                      className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-200 mt-8"
                     >
                       <motion.div
                         whileHover={{ scale: 1.02 }}
@@ -646,16 +866,16 @@ export default function CriarAgentePage() {
                         <Button
                           type="submit"
                           disabled={loading}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
                         >
                           {loading ? (
                             <>
-                              <Spinner className="w-4 h-4 mr-2" />
+                              <Spinner className="w-5 h-5 mr-3" />
                               Cadastrando...
                             </>
                           ) : (
                             <>
-                              <RiSaveLine className="w-4 h-4 mr-2" />
+                              <RiSaveLine className="w-5 h-5 mr-3" />
                               Cadastrar Agente
                             </>
                           )}
@@ -671,10 +891,10 @@ export default function CriarAgentePage() {
                           <Button
                             type="button"
                             variant="outline"
-                            className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
+                            className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-4 h-14 text-lg transition-all duration-300 rounded-xl"
                             disabled={loading}
                           >
-                            <RiArrowLeftLine className="w-4 h-4 mr-2" />
+                            <RiArrowLeftLine className="w-5 h-5 mr-3" />
                             Cancelar
                           </Button>
                         </Link>
@@ -687,7 +907,7 @@ export default function CriarAgentePage() {
           </div>
 
           {/* Sidebar - Informações */}
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Informações Importantes */}
             <motion.div
               initial="hidden"
@@ -695,35 +915,41 @@ export default function CriarAgentePage() {
               variants={fadeInUp}
               transition={{ delay: 0.3 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-lg text-gray-800">
-                    <RiInformationLine className="w-5 h-5 mr-2 text-navy-600" />
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center text-xl text-gray-800">
+                    <RiInformationLine className="w-6 h-6 mr-3 text-navy-600" />
                     Informações Importantes
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 text-sm text-gray-600">
-                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
-                    <RiAddLine className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                    <p>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiAddLine className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
                       O sistema criará uma conta automaticamente para o agente
                     </p>
                   </div>
-                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
-                    <RiIdCardLine className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <p>A matrícula deve conter exatamente 11 dígitos</p>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiIdCardLine className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      A matrícula deve conter exatamente 11 dígitos
+                    </p>
                   </div>
-                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
-                    <RiShieldKeyholeLine className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
-                    <p>Administradores têm acesso total ao sistema</p>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiShieldKeyholeLine className="w-5 h-5 text-purple-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      Administradores têm acesso total ao sistema
+                    </p>
                   </div>
-                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
-                    <RiUserLine className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
-                    <p>Agentes têm acesso apenas ao seu perfil</p>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiUserLine className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      Agentes têm acesso apenas ao seu perfil
+                    </p>
                   </div>
-                  <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200 transition-colors duration-300 hover:bg-blue-100">
-                    <RiImageLine className="w-4 h-4 text-blue-300 mt-0.5 flex-shrink-0" />
-                    <p>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiImageLine className="w-5 h-5 text-blue-300 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
                       A foto de perfil é opcional e pode ser adicionada depois
                     </p>
                   </div>
@@ -738,48 +964,45 @@ export default function CriarAgentePage() {
               variants={fadeInUp}
               transition={{ delay: 0.4 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg text-gray-800">
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-xl text-gray-800">
                     Preview Rápido
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-sm space-y-2 text-gray-600">
-                    <div className="flex justify-between">
-                      <span>Matrícula:</span>
-                      <span className="font-medium font-mono">
+                <CardContent className="space-y-4">
+                  <div className="space-y-3 text-gray-700">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Matrícula:</span>
+                      <span className="font-bold font-mono text-navy-600">
                         {formData.matricula || "Não definida"}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Nome:</span>
-                      <span className="font-medium text-right max-w-[120px] truncate">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Nome:</span>
+                      <span className="font-bold text-right max-w-[120px] truncate text-navy-600">
                         {formData.full_name || "Não definido"}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Email:</span>
-                      <span className="font-medium text-right max-w-[120px] truncate">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Email:</span>
+                      <span className="font-medium text-right max-w-[120px] truncate text-blue-600">
                         {formData.email || "Não definido"}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Graduação:</span>
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-100 text-blue-700"
-                      >
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Graduação:</span>
+                      <Badge className="bg-blue-100 text-blue-700 text-sm py-1 px-2">
                         {formData.graduacao || "Não definida"}
                       </Badge>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Tipo:</span>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="font-medium">Tipo:</span>
                       <Badge
                         className={
                           formData.role === "admin"
-                            ? "bg-purple-500 text-white"
-                            : "bg-blue-500 text-white"
+                            ? "bg-purple-500 text-white text-sm py-1 px-3"
+                            : "bg-blue-500 text-white text-sm py-1 px-3"
                         }
                       >
                         {formData.role === "admin" ? "ADMIN" : "AGENTE"}

@@ -1,9 +1,16 @@
-// middleware.ts - VERSÃO CORRIGIDA
+// middleware.ts - VERSÃO FINAL CORRIGIDA
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  console.log("🛡️ Middleware: Processando rota", request.nextUrl.pathname);
+  const pathname = request.nextUrl.pathname;
+  console.log("🛡️ Middleware: Processando rota", pathname);
+
+  // ⚠️ NÃO APLICAR MIDDLEWARE A ROTAS DE API
+  if (pathname.startsWith("/api/")) {
+    console.log("🔧 Middleware: Rota de API, permitindo acesso...");
+    return NextResponse.next();
+  }
 
   let supabaseResponse = NextResponse.next({
     request,
@@ -46,7 +53,7 @@ export async function middleware(request: NextRequest) {
     console.log("👤 Middleware: Usuário encontrado:", user?.id);
 
     // 🛡️ PROTEÇÃO DAS ROTAS DE ADMINISTRADOR
-    if (request.nextUrl.pathname.startsWith("/admin")) {
+    if (pathname.startsWith("/admin")) {
       console.log("🛡️ Middleware: Protegendo rota admin...");
 
       if (!user) {
@@ -54,7 +61,7 @@ export async function middleware(request: NextRequest) {
           "❌ Middleware: Usuário não autenticado, redirecionando para login"
         );
         const redirectUrl = new URL("/login", request.url);
-        redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
+        redirectUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(redirectUrl);
       }
 
@@ -79,7 +86,7 @@ export async function middleware(request: NextRequest) {
 
       if (profile?.role !== "admin") {
         console.log("🚫 Middleware: Acesso negado - usuário não é admin");
-        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ CORRIGIDO: /agent/perfil → /perfil
+        return NextResponse.redirect(new URL("/perfil", request.url));
       }
 
       if (!profile?.status) {
@@ -91,7 +98,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // 🛡️ PROTEÇÃO DAS ROTAS DE AGENTE
-    if (request.nextUrl.pathname.startsWith("/agent")) {
+    if (pathname.startsWith("/agent")) {
       console.log("🛡️ Middleware: Protegendo rota agent...");
 
       if (!user) {
@@ -99,7 +106,7 @@ export async function middleware(request: NextRequest) {
           "❌ Middleware: Usuário não autenticado, redirecionando para login"
         );
         const redirectUrl = new URL("/login", request.url);
-        redirectUrl.searchParams.set("redirect", request.nextUrl.pathname);
+        redirectUrl.searchParams.set("redirect", pathname);
         return NextResponse.redirect(redirectUrl);
       }
 
@@ -124,7 +131,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // 🔄 REDIRECIONAMENTO PARA LOGIN
-    if (request.nextUrl.pathname === "/login" && user) {
+    if (pathname === "/login" && user) {
       console.log(
         "🔄 Middleware: Usuário logado acessando login, redirecionando..."
       );
@@ -136,16 +143,15 @@ export async function middleware(request: NextRequest) {
         .eq("id", user.id)
         .single();
 
-      // ✅ REDIRECIONAR PARA A ROTA CORRETA
       if (profile?.role === "admin") {
         return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       } else {
-        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ CORRIGIDO: /agent/perfil → /perfil
+        return NextResponse.redirect(new URL("/perfil", request.url));
       }
     }
 
     // 🔄 REDIRECIONAMENTO DE ROTA RAIZ
-    if (request.nextUrl.pathname === "/" && user) {
+    if (pathname === "/" && user) {
       console.log(
         "🔄 Middleware: Usuário logado acessando raiz, redirecionando..."
       );
@@ -160,7 +166,7 @@ export async function middleware(request: NextRequest) {
       if (profile?.role === "admin") {
         return NextResponse.redirect(new URL("/admin/dashboard", request.url));
       } else {
-        return NextResponse.redirect(new URL("/perfil", request.url)); // ✅ CORRIGIDO: /agent/perfil → /perfil
+        return NextResponse.redirect(new URL("/perfil", request.url));
       }
     }
   } catch (error) {
@@ -172,5 +178,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/agent/:path*", "/login", "/"],
+  matcher: [
+    "/admin/:path*",
+    "/agent/:path*",
+    "/login",
+    "/",
+    // Permite que o middleware processe todas as rotas,
+    // mas pularemos rotas de API no código
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };

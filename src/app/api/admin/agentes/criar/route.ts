@@ -6,7 +6,42 @@ export async function POST(request: NextRequest) {
   try {
     const supabaseAdmin = createAdminClient();
 
-    // 1. Obter dados do corpo
+    // 1. Verificar autenticação
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    // Verificar se o usuário atual é admin
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error("❌ Erro ao verificar token:", authError);
+      return NextResponse.json(
+        { error: "Token inválido ou expirado" },
+        { status: 401 }
+      );
+    }
+
+    const { data: currentUserProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (!currentUserProfile || currentUserProfile.role !== "admin") {
+      return NextResponse.json(
+        { error: "Apenas administradores podem criar agentes" },
+        { status: 403 }
+      );
+    }
+
+    // 2. Obter dados do corpo
     const body = await request.json();
     const {
       matricula,
@@ -19,7 +54,7 @@ export async function POST(request: NextRequest) {
       avatar_url = "",
     } = body;
 
-    // 2. Validações básicas
+    // 3. Validações básicas
     if (!matricula || !email || !full_name) {
       return NextResponse.json(
         { error: "Matrícula, email e nome são obrigatórios" },
@@ -27,14 +62,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!/^\d{11}$/.test(matricula)) {
+    if (!/^\d{11}$/.test(matricula.replace(/\D/g, ""))) {
       return NextResponse.json(
         { error: "Matrícula deve conter exatamente 11 dígitos" },
         { status: 400 }
       );
     }
 
-    // 3. Verificar se matrícula já existe
+    // 4. Verificar se matrícula já existe
     const { data: existingMatricula } = await supabaseAdmin
       .from("profiles")
       .select("id")
@@ -48,7 +83,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 4. Verificar se email já existe
+    // 5. Verificar se email já existe
     const { data: existingEmail } = await supabaseAdmin
       .from("profiles")
       .select("id")
@@ -64,11 +99,11 @@ export async function POST(request: NextRequest) {
 
     console.log("🔐 Criando usuário no Auth...", { email, matricula });
 
-    // 5. CRIAR USUÁRIO NO SUPABASE AUTH - CORRIGIDO METADADOS
+    // 6. CRIAR USUÁRIO NO SUPABASE AUTH COM SENHA PADRÃO
     const { data: authUser, error: createAuthError } =
       await supabaseAdmin.auth.admin.createUser({
         email: email.trim(),
-        password: SEGURANCA.SENHA_PADRAO,
+        password: SEGURANCA.SENHA_PADRAO, // ← SENHA PADRÃO
         email_confirm: true,
         user_metadata: {
           full_name: full_name.trim(),
@@ -77,7 +112,7 @@ export async function POST(request: NextRequest) {
           graduacao: graduacao?.trim() || "",
           tipo_sanguineo: tipo_sanguineo?.trim() || "",
           avatar_url: avatar_url?.trim() || "",
-          email_verified: true, // IMPORTANTE: manter este campo
+          email_verified: true,
         },
       });
 
@@ -94,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     console.log("✅ Usuário criado no Auth:", authUser.user.id);
 
-    // 6. CRIAR PERFIL NA TABELA PROFILES
+    // 7. CRIAR PERFIL NA TABELA PROFILES
     const { error: createProfileError } = await supabaseAdmin
       .from("profiles")
       .insert({
@@ -131,28 +166,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 7. REGISTRAR ATIVIDADE NO LOG (OPCIONAL MAS RECOMENDADO)
+    console.log("✅ Perfil criado com sucesso!");
+
+    // 8. Registrar atividade no sistema
     try {
       await supabaseAdmin.from("system_activities").insert({
-        user_id: authUser.user.id, // Ou o ID do admin que está criando
-        action_type: "user_created",
+        user_id: user.id,
+        action_type: "agent_created",
         description: `Novo agente criado: ${full_name} (${matricula})`,
         resource_type: "profile",
         resource_id: authUser.user.id,
         metadata: {
-          created_by: "admin", // Você pode passar o ID do admin logado
-          role: role,
-          email: email,
+          created_by: user.id,
+          created_by_email: user.email,
+          agent_email: email,
+          agent_matricula: matricula,
+          agent_role: role,
+          used_default_password: true,
+          timestamp: new Date().toISOString(),
         },
       });
     } catch (logError) {
       console.warn("⚠️ Não foi possível registrar atividade:", logError);
-      // Não falha a criação por causa do log
     }
 
-    console.log("✅ Perfil criado com sucesso!");
-
-    // 8. Retornar sucesso
+    // 9. Retornar sucesso
     return NextResponse.json({
       success: true,
       message: "Agente criado com sucesso",
@@ -164,6 +202,11 @@ export async function POST(request: NextRequest) {
         role: role,
         graduacao: graduacao,
         avatar_url: avatar_url,
+      },
+      security: {
+        default_password_used: true,
+        password: SEGURANCA.SENHA_PADRAO,
+        message: "Senha padrão configurada: PAC@2025!Secure",
       },
     });
   } catch (error: unknown) {

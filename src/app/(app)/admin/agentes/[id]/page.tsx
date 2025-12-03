@@ -1052,7 +1052,7 @@ export default function EditarAgentePage() {
   if (loading || permissionsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 max-w-7xl">
           <div className="text-center py-16">
             <motion.div
               animate={{ rotate: 360 }}
@@ -1069,7 +1069,7 @@ export default function EditarAgentePage() {
   if (!agent) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 max-w-7xl">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1084,8 +1084,8 @@ export default function EditarAgentePage() {
               O agente que você está tentando editar não existe ou foi removido.
             </p>
             <Link href={isAdmin ? "/admin/agentes" : "/perfil"}>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300">
-                <RiArrowLeftLine className="w-4 h-4 mr-2" />
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300 h-12 px-6">
+                <RiArrowLeftLine className="w-5 h-5 mr-2" />
                 {isAdmin
                   ? "Voltar para Lista de Agentes"
                   : "Voltar ao Meu Perfil"}
@@ -1102,56 +1102,64 @@ export default function EditarAgentePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="mb-8"
         >
-          <div className="mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+          <div className="mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold text-gray-800 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
                   {isEditingOwnProfile ? "EDITAR MEU PERFIL" : "EDITAR AGENTE"}
                 </h1>
-                <p className="text-gray-600">
+                <p className="text-gray-600 text-lg">
                   {isEditingOwnProfile ? (
                     <>
                       Editando seu próprio perfil • Matrícula:{" "}
-                      <strong>{agent.matricula}</strong>
+                      <strong className="text-navy-700">
+                        {agent.matricula}
+                      </strong>
                     </>
                   ) : (
                     <>
-                      Editando: <strong>{agent.full_name || "Agente"}</strong> •
-                      Matrícula: <strong>{agent.matricula}</strong>
+                      Editando:{" "}
+                      <strong className="text-navy-700">
+                        {agent.full_name || "Agente"}
+                      </strong>{" "}
+                      • Matrícula:{" "}
+                      <strong className="text-navy-700">
+                        {agent.matricula}
+                      </strong>
                     </>
                   )}
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Badge
                   className={
                     isAdmin
-                      ? "bg-purple-500 text-white"
-                      : "bg-blue-500 text-white"
+                      ? "bg-purple-500 text-white text-sm py-1.5 px-3"
+                      : "bg-blue-500 text-white text-sm py-1.5 px-3"
                   }
                 >
                   {isAdmin ? (
                     <>
-                      <RiShieldUserLine className="w-3 h-3 mr-1" /> ADMIN
+                      <RiShieldUserLine className="w-4 h-4 mr-1" /> ADMIN
                     </>
                   ) : (
                     <>
-                      <RiUserLine className="w-3 h-3 mr-1" /> AGENTE
+                      <RiUserLine className="w-4 h-4 mr-1" /> AGENTE
                     </>
                   )}
                 </Badge>
 
                 {isEditingOwnProfile && (
-                  <Badge className="bg-green-500 text-white">
-                    <RiEditLine className="w-3 h-3 mr-1" /> MEU PERFIL
+                  <Badge className="bg-green-500 text-white text-sm py-1.5 px-3">
+                    <RiEditLine className="w-4 h-4 mr-1" /> MEU PERFIL
                   </Badge>
                 )}
               </div>
@@ -1164,13 +1172,13 @@ export default function EditarAgentePage() {
                 transition={{ duration: 0.3 }}
                 className="mt-4"
               >
-                <Alert className="bg-yellow-50 border-yellow-200">
-                  <RiAlertLine className="h-4 w-4 text-yellow-600" />
-                  <AlertDescription className="text-yellow-800">
+                <Alert className="bg-yellow-50 border-yellow-200 rounded-xl">
+                  <RiAlertLine className="h-5 w-5 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800 text-base">
                     Você tem alterações não salvas. Clique em &quot;Salvar
-                    Alterações &quot; para aplicar as mudanças.
+                    Alterações&quot; para aplicar as mudanças.
                     {avatarFile && (
-                      <span className="block mt-1 font-semibold">
+                      <span className="block mt-2 font-semibold">
                         📸 Nova foto será enviada ao salvar
                       </span>
                     )}
@@ -1180,22 +1188,22 @@ export default function EditarAgentePage() {
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link href={isAdmin ? "/admin/agentes" : "/perfil"}>
               <Button
                 variant="outline"
-                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-300"
+                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-300 h-11 px-4"
               >
-                <RiArrowLeftLine className="w-4 h-4 mr-2" />
+                <RiArrowLeftLine className="w-5 h-5 mr-2" />
                 {isAdmin ? "Voltar para Lista" : "Voltar ao Perfil"}
               </Button>
             </Link>
             <Link href="/">
               <Button
                 variant="outline"
-                className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white transition-all duration-300"
+                className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white transition-all duration-300 h-11 px-4"
               >
-                <RiHomeLine className="w-4 h-4 mr-2" />
+                <RiHomeLine className="w-5 h-5 mr-2" />
                 Voltar ao Site
               </Button>
             </Link>
@@ -1205,38 +1213,36 @@ export default function EditarAgentePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-              }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="flex items-center text-xl text-gray-800">
-                    <RiUserLine className="w-5 h-5 mr-2 text-navy-600" />
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="border-b border-gray-200 pb-6">
+                  <CardTitle className="flex items-center text-2xl text-gray-800">
+                    <RiUserLine className="w-6 h-6 mr-3 text-navy-600" />
                     {isEditingOwnProfile
                       ? "Editar Meu Perfil"
                       : "Editar Dados do Agente"}
                     {hasUnsavedChanges && (
                       <Badge
                         variant="outline"
-                        className="ml-2 bg-yellow-100 text-yellow-800 border-yellow-300"
+                        className="ml-3 bg-yellow-100 text-yellow-800 border-yellow-300 text-sm py-1 px-3"
                       >
                         Alterações Pendentes
                       </Badge>
                     )}
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                <CardContent className="p-8">
+                  <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Avatar Upload */}
                     <div className="space-y-4">
-                      <Label className="text-sm font-semibold text-gray-700">
+                      <Label className="text-base font-semibold text-gray-700 flex items-center">
+                        <RiUserLine className="w-5 h-5 mr-2 text-navy-500" />
                         Foto do Agente
                         {avatarFile && (
-                          <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">
+                          <Badge className="ml-2 bg-blue-100 text-blue-800 text-sm py-1 px-2">
                             Nova foto selecionada
                           </Badge>
                         )}
@@ -1246,12 +1252,12 @@ export default function EditarAgentePage() {
                         onFileChange={handleAvatarUrlChange}
                         onFileSelected={handleFileSelected}
                         currentFile={currentAvatarUrl}
-                        className="p-4 border border-gray-200 rounded-lg bg-white hover:border-blue-500 transition-colors duration-300"
+                        className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-500 transition-all duration-300"
                         userId={agent.matricula}
                         autoUpload={false}
                       />
                       {avatarFile && (
-                        <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
                           <p className="text-sm text-blue-700">
                             📸 <strong>Nova foto selecionada:</strong>{" "}
                             {avatarFile.name}
@@ -1265,34 +1271,35 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Matrícula */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Label
                         htmlFor="matricula"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiIdCardLine className="w-5 h-5 mr-2 text-navy-500" />
                         Matrícula *
-                        <Badge className="ml-2 text-xs bg-purple-100 text-purple-800">
+                        <Badge className="ml-2 bg-purple-100 text-purple-800 text-sm">
                           Única
                         </Badge>
                       </Label>
                       <div className="relative">
-                        <RiIdCardLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <RiIdCardLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <Input
                           type="text"
                           name="matricula"
                           value={formData.matricula}
                           onChange={handleInputChange}
                           placeholder="Número da matrícula"
-                          className="pl-10 text-lg py-3 font-mono"
+                          className="pl-12 text-lg py-3 h-14 font-mono border-2 rounded-xl"
                           required
                           disabled={saving || !isAdmin}
                           readOnly={!isAdmin}
                         />
                       </div>
                       {!isAdmin && (
-                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                          <p className="text-xs text-yellow-700">
-                            <RiAlertLine className="inline w-3 h-3 mr-1" />
+                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-700">
+                            <RiAlertLine className="inline w-4 h-4 mr-1" />
                             Apenas administradores podem alterar a matrícula
                           </p>
                         </div>
@@ -1300,22 +1307,23 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Nome Completo */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Label
                         htmlFor="full_name"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiUserLine className="w-5 h-5 mr-2 text-navy-500" />
                         Nome Completo *
                       </Label>
                       <div className="relative">
-                        <RiUserLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <RiUserLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <Input
                           type="text"
                           name="full_name"
                           value={formData.full_name}
                           onChange={handleInputChange}
                           placeholder="Nome completo do agente"
-                          className="pl-10 text-lg py-3"
+                          className="pl-12 text-lg py-3 h-14 border-2 rounded-xl"
                           required
                           disabled={saving}
                         />
@@ -1323,31 +1331,32 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Email */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <Label
                         htmlFor="email"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiMailLine className="w-5 h-5 mr-2 text-navy-500" />
                         Email *
                       </Label>
                       <div className="relative">
-                        <RiMailLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        <RiMailLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <Input
                           type="email"
                           name="email"
                           value={formData.email}
                           onChange={handleInputChange}
                           placeholder="email@exemplo.com"
-                          className="pl-10 text-lg py-3"
+                          className="pl-12 text-lg py-3 h-14 border-2 rounded-xl"
                           required
                           disabled={saving || !isAdmin}
                           readOnly={!isAdmin}
                         />
                       </div>
                       {!isAdmin && (
-                        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                          <p className="text-xs text-yellow-700">
-                            <RiAlertLine className="inline w-3 h-3 mr-1" />
+                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm text-yellow-700">
+                            <RiAlertLine className="inline w-4 h-4 mr-1" />
                             Para alterar o email, entre em contato com um
                             administrador
                           </p>
@@ -1356,11 +1365,11 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Graduação e Tipo Sanguíneo */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-3">
                         <Label
                           htmlFor="graduacao"
-                          className="text-sm font-semibold text-gray-700"
+                          className="text-base font-semibold text-gray-700"
                         >
                           Graduação
                         </Label>
@@ -1369,12 +1378,16 @@ export default function EditarAgentePage() {
                           onValueChange={handleGraduacaoChange}
                           disabled={saving}
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione uma graduação" />
                           </SelectTrigger>
                           <SelectContent>
                             {GRADUACOES.map((graduacao) => (
-                              <SelectItem key={graduacao} value={graduacao}>
+                              <SelectItem
+                                key={graduacao}
+                                value={graduacao}
+                                className="text-base py-3"
+                              >
                                 {graduacao}
                               </SelectItem>
                             ))}
@@ -1382,10 +1395,10 @@ export default function EditarAgentePage() {
                         </Select>
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Label
                           htmlFor="tipo_sanguineo"
-                          className="text-sm font-semibold text-gray-700"
+                          className="text-base font-semibold text-gray-700"
                         >
                           Tipo Sanguíneo
                         </Label>
@@ -1394,12 +1407,16 @@ export default function EditarAgentePage() {
                           onValueChange={handleTipoSanguineoChange}
                           disabled={saving}
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo sanguíneo" />
                           </SelectTrigger>
                           <SelectContent>
                             {TIPOS_SANGUINEOS.map((tipo) => (
-                              <SelectItem key={tipo} value={tipo}>
+                              <SelectItem
+                                key={tipo}
+                                value={tipo}
+                                className="text-base py-3"
+                              >
                                 {tipo}
                               </SelectItem>
                             ))}
@@ -1409,19 +1426,19 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Validade Certificação e Tipo de Usuário */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-gray-700">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-3">
+                        <Label className="text-base font-semibold text-gray-700">
                           Validade da Certificação
                         </Label>
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-start text-left font-normal transition-all duration-300 hover:border-blue-500"
+                              className="w-full h-14 justify-start text-left text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
                               disabled={saving}
                             >
-                              <RiCalendar2Line className="mr-2 h-4 w-4" />
+                              <RiCalendar2Line className="mr-3 h-5 w-5 text-navy-500" />
                               {formData.validade_certificacao ? (
                                 formatDate(formData.validade_certificacao)
                               ) : (
@@ -1442,53 +1459,17 @@ export default function EditarAgentePage() {
                               onSelect={handleDateSelect}
                               initialFocus
                               locale={ptBR}
-                              className="rounded-md border shadow-lg bg-white"
+                              className="rounded-xl border shadow-2xl"
                               disabled={(date) => {
-                                // Desabilitar datas passadas
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
                                 return date < today;
-                              }}
-                              classNames={{
-                                root: "w-full",
-                                months:
-                                  "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-                                month: "space-y-4",
-                                caption:
-                                  "flex justify-center pt-1 relative items-center",
-                                caption_label: "text-sm font-medium",
-                                nav: "space-x-1 flex items-center",
-                                nav_button: cn(
-                                  "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
-                                ),
-                                nav_button_previous: "absolute left-1",
-                                nav_button_next: "absolute right-1",
-                                table: "w-full border-collapse space-y-1",
-                                head_row: "flex",
-                                head_cell:
-                                  "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
-                                row: "flex w-full mt-2",
-                                cell: "h-9 w-9 text-center text-sm p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                                day: cn(
-                                  "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
-                                ),
-                                day_range_end: "day-range-end",
-                                day_selected:
-                                  "bg-navy-600 text-primary-foreground hover:bg-navy-600 hover:text-primary-foreground focus:bg-navy-600 focus:text-primary-foreground",
-                                day_today: "bg-accent text-accent-foreground",
-                                day_outside:
-                                  "day-outside text-muted-foreground opacity-50 aria-selected:bg-accent/50 aria-selected:text-muted-foreground aria-selected:opacity-30",
-                                day_disabled:
-                                  "text-muted-foreground opacity-50",
-                                day_range_middle:
-                                  "aria-selected:bg-accent aria-selected:text-accent-foreground",
-                                day_hidden: "invisible",
                               }}
                             />
                           </PopoverContent>
                         </Popover>
                         {formData.validade_certificacao && (
-                          <div className="flex items-center justify-between text-sm mt-1">
+                          <div className="flex items-center justify-between text-sm mt-2 px-1">
                             <span className="text-gray-600">
                               Selecionado:{" "}
                               {formatDate(formData.validade_certificacao)}
@@ -1498,7 +1479,7 @@ export default function EditarAgentePage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDateSelect(undefined)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-6 px-2"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-3 rounded-lg"
                             >
                               Limpar
                             </Button>
@@ -1506,10 +1487,10 @@ export default function EditarAgentePage() {
                         )}
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <Label
                           htmlFor="role"
-                          className="text-sm font-semibold text-gray-700"
+                          className="text-base font-semibold text-gray-700"
                         >
                           Tipo de Usuário
                         </Label>
@@ -1518,18 +1499,28 @@ export default function EditarAgentePage() {
                           onValueChange={handleRoleChange}
                           disabled={saving || !isAdmin}
                         >
-                          <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="agent">Agente</SelectItem>
-                            <SelectItem value="admin">Administrador</SelectItem>
+                            <SelectItem
+                              value="agent"
+                              className="text-base py-3"
+                            >
+                              Agente
+                            </SelectItem>
+                            <SelectItem
+                              value="admin"
+                              className="text-base py-3"
+                            >
+                              Administrador
+                            </SelectItem>
                           </SelectContent>
                         </Select>
                         {!isAdmin && (
-                          <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded">
-                            <p className="text-xs text-gray-600">
-                              <RiLockLine className="inline w-3 h-3 mr-1" />
+                          <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                            <p className="text-sm text-gray-600">
+                              <RiLockLine className="inline w-4 h-4 mr-1" />
                               Apenas administradores podem alterar o tipo de
                               usuário
                             </p>
@@ -1539,20 +1530,20 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Botões de Ação */}
-                    <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
+                    <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-200 mt-8">
                       <Button
                         type="submit"
                         disabled={saving || !hasUnsavedChanges}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
                       >
                         {saving ? (
                           <>
-                            <Spinner className="w-4 h-4 mr-2" />
+                            <Spinner className="w-5 h-5 mr-3" />
                             Salvando...
                           </>
                         ) : (
                           <>
-                            <RiSaveLine className="w-4 h-4 mr-2" />
+                            <RiSaveLine className="w-5 h-5 mr-3" />
                             {hasUnsavedChanges
                               ? "Salvar Alterações"
                               : "Nenhuma Alteração"}
@@ -1564,10 +1555,10 @@ export default function EditarAgentePage() {
                         <Button
                           type="button"
                           variant="outline"
-                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
+                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-4 h-14 text-lg transition-all duration-300 rounded-xl"
                           disabled={saving}
                         >
-                          <RiCloseLine className="w-4 h-4 mr-2" />
+                          <RiCloseLine className="w-5 h-5 mr-3" />
                           Cancelar
                         </Button>
                       </Link>
@@ -1575,9 +1566,10 @@ export default function EditarAgentePage() {
 
                     {/* Zona de Perigo (Apenas Admin) */}
                     {isAdmin && !isEditingOwnProfile && (
-                      <div className="pt-4 border-t border-red-200">
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                          <Label className="text-sm font-semibold text-red-700 block mb-2">
+                      <div className="pt-8 border-t border-red-200">
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                          <Label className="text-base font-semibold text-red-700 mb-4 flex items-center">
+                            <RiAlertLine className="w-5 h-5 mr-2" />
                             ⚠️ Zona de Perigo
                           </Label>
 
@@ -1589,44 +1581,45 @@ export default function EditarAgentePage() {
                               <Button
                                 type="button"
                                 variant="outline"
-                                className="w-full border-red-700 text-red-700 hover:bg-red-700 hover:text-white py-2 transition-colors duration-300"
-                                size="sm"
+                                className="w-full border-red-700 text-red-700 hover:bg-red-700 hover:text-white py-3 h-12 transition-colors duration-300"
+                                size="lg"
                                 disabled={isDeleting}
                               >
-                                <RiDeleteBinLine className="w-4 h-4 mr-2" />
+                                <RiDeleteBinLine className="w-5 h-5 mr-2" />
                                 {isDeleting
                                   ? "Excluindo..."
                                   : "Excluir Permanentemente"}
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle className="text-red-600">
+                            <AlertDialogContent className="rounded-xl border-0 shadow-2xl">
+                              <AlertDialogHeader className="pb-4">
+                                <AlertDialogTitle className="text-red-600 text-2xl flex items-center">
+                                  <RiAlertLine className="w-6 h-6 mr-2" />
                                   🚨 EXCLUSÃO PERMANENTE
                                 </AlertDialogTitle>
                                 <AlertDialogDescription asChild>
-                                  <div className="space-y-3">
+                                  <div className="space-y-4 text-base">
                                     <div className="font-semibold text-gray-900">
                                       Tem certeza que deseja excluir
                                       permanentemente este agente?
                                     </div>
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
-                                      <div className="text-sm">
+                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                                      <div>
                                         <strong>Nome:</strong>{" "}
                                         {agent.full_name || "Agente sem nome"}
                                       </div>
-                                      <div className="text-sm">
+                                      <div>
                                         <strong>Matrícula:</strong>{" "}
                                         {agent.matricula}
                                       </div>
-                                      <div className="text-sm">
+                                      <div>
                                         <strong>Email:</strong> {agent.email}
                                       </div>
                                     </div>
-                                    <div className="text-red-600 font-semibold">
+                                    <div className="text-red-600 font-bold text-lg">
                                       ⚠️ ESTA AÇÃO NÃO PODE SER DESFEITA!
                                     </div>
-                                    <div className="text-sm text-gray-600 space-y-1">
+                                    <div className="text-gray-600 space-y-2">
                                       <div className="flex items-start">
                                         <span className="mr-2">•</span>
                                         <span>
@@ -1658,18 +1651,21 @@ export default function EditarAgentePage() {
                                   </div>
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel disabled={isDeleting}>
+                              <AlertDialogFooter className="pt-4">
+                                <AlertDialogCancel
+                                  disabled={isDeleting}
+                                  className="h-11 rounded-lg"
+                                >
                                   Cancelar
                                 </AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={handleHardDelete}
                                   disabled={isDeleting}
-                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                  className="bg-red-600 hover:bg-red-700 text-white h-11 rounded-lg"
                                 >
                                   {isDeleting ? (
                                     <>
-                                      <Spinner className="w-4 h-4 mr-2" />
+                                      <Spinner className="w-5 h-5 mr-2" />
                                       Excluindo...
                                     </>
                                   ) : (
@@ -1680,7 +1676,7 @@ export default function EditarAgentePage() {
                             </AlertDialogContent>
                           </AlertDialog>
 
-                          <p className="text-xs text-red-600 mt-2">
+                          <p className="text-sm text-red-600 mt-3">
                             Esta ação não pode ser desfeita. O agente será
                             removido permanentemente do sistema.
                           </p>
@@ -1694,18 +1690,18 @@ export default function EditarAgentePage() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Status e Permissões */}
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center text-gray-800">
-                  <RiShieldKeyholeLine className="w-4 h-4 mr-2 text-navy-600" />
+            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="pb-6">
+                <CardTitle className="flex items-center text-xl text-gray-800">
+                  <RiShieldKeyholeLine className="w-6 h-6 mr-3 text-navy-600" />
                   Status e Permissões
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-                  <Label className="text-sm font-semibold text-gray-700 cursor-pointer">
+              <CardContent className="space-y-6">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
+                  <Label className="text-base font-semibold text-gray-700 cursor-pointer">
                     Agente Ativo na PAC
                   </Label>
                   <Switch
@@ -1714,21 +1710,22 @@ export default function EditarAgentePage() {
                       handleSwitchChange("status", checked)
                     }
                     disabled={saving || !isAdmin}
+                    className="scale-110"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold">
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">
                     Tipo de Acesso
                   </Label>
                   <div className="space-y-2">
                     {(["agent", "admin"] as const).map((role) => (
                       <label
                         key={role}
-                        className={`flex items-center space-x-2 p-2 rounded-lg transition-colors duration-300 ${
+                        className={`flex items-center space-x-3 p-3 rounded-xl transition-all duration-300 ${
                           formData.role === role
-                            ? "bg-blue-50 border border-blue-200"
-                            : "hover:bg-gray-50"
+                            ? "bg-blue-50 border-2 border-blue-200"
+                            : "hover:bg-gray-50 border border-gray-200"
                         } ${
                           !isAdmin
                             ? "cursor-not-allowed opacity-60"
@@ -1745,14 +1742,14 @@ export default function EditarAgentePage() {
                               e.target.value as "agent" | "admin"
                             )
                           }
-                          className="text-blue-600 focus:ring-blue-600"
+                          className="text-blue-600 focus:ring-blue-600 scale-125"
                           disabled={saving || !isAdmin}
                         />
-                        <span className="text-sm capitalize">
+                        <span className="text-base capitalize">
                           {role === "agent" ? "Agente" : "Administrador"}
                         </span>
                         {role === "admin" && (
-                          <Badge className="bg-purple-100 text-purple-800 text-xs border-purple-200">
+                          <Badge className="bg-purple-100 text-purple-800 text-sm border-purple-200 py-1 px-2 ml-auto">
                             Acesso Total
                           </Badge>
                         )}
@@ -1764,19 +1761,21 @@ export default function EditarAgentePage() {
             </Card>
 
             {/* Status da Certificação */}
-            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center text-gray-800">
-                  <RiCalendarLine className="w-4 h-4 mr-2 text-navy-600" />
+            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+              <CardHeader className="pb-6">
+                <CardTitle className="flex items-center text-xl text-gray-800">
+                  <RiCalendarLine className="w-6 h-6 mr-3 text-navy-600" />
                   Status da Certificação
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center p-4 bg-gray-50 rounded-lg border space-y-3">
+                <div className="text-center p-6 bg-gray-50 rounded-xl border space-y-4">
                   <div className="flex items-center justify-center gap-2">
-                    <Badge className={`${certStatus.color} text-white text-sm`}>
+                    <Badge
+                      className={`${certStatus.color} text-white text-base py-1.5 px-4`}
+                    >
                       {certStatus.icon && (
-                        <span className="mr-1">{certStatus.icon}</span>
+                        <span className="mr-2">{certStatus.icon}</span>
                       )}
                       {certStatus.text}
                     </Badge>
@@ -1784,15 +1783,15 @@ export default function EditarAgentePage() {
 
                   {formData.validade_certificacao && (
                     <>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-base text-gray-600">
                         <strong>Validade:</strong>{" "}
                         {formatDate(formData.validade_certificacao)}
                       </p>
 
                       {certStatus.status === "expirada" && (
-                        <Alert className="bg-red-50 border-red-200">
-                          <RiErrorWarningLine className="h-4 w-4 text-red-600" />
-                          <AlertDescription className="text-red-800 text-sm">
+                        <Alert className="bg-red-50 border-red-200 rounded-lg">
+                          <RiErrorWarningLine className="h-5 w-5 text-red-600" />
+                          <AlertDescription className="text-red-800 text-base">
                             Certificação expirada! Renove para manter o acesso
                             ao sistema.
                           </AlertDescription>
@@ -1800,18 +1799,18 @@ export default function EditarAgentePage() {
                       )}
 
                       {certStatus.status === "proximo-expiracao" && (
-                        <Alert className="bg-yellow-50 border-yellow-200">
-                          <RiAlertLine className="h-4 w-4 text-yellow-600" />
-                          <AlertDescription className="text-yellow-800 text-sm">
+                        <Alert className="bg-yellow-50 border-yellow-200 rounded-lg">
+                          <RiAlertLine className="h-5 w-5 text-yellow-600" />
+                          <AlertDescription className="text-yellow-800 text-base">
                             Certificação próxima do vencimento. Renove em breve.
                           </AlertDescription>
                         </Alert>
                       )}
 
                       {certStatus.status === "valida" && (
-                        <Alert className="bg-green-50 border-green-200">
-                          <RiCheckLine className="h-4 w-4 text-green-600" />
-                          <AlertDescription className="text-green-800 text-sm">
+                        <Alert className="bg-green-50 border-green-200 rounded-lg">
+                          <RiCheckLine className="h-5 w-5 text-green-600" />
+                          <AlertDescription className="text-green-800 text-base">
                             Certificação válida. Tudo em ordem!
                           </AlertDescription>
                         </Alert>
@@ -1820,9 +1819,9 @@ export default function EditarAgentePage() {
                   )}
 
                   {!formData.validade_certificacao && (
-                    <Alert className="bg-gray-50 border-gray-200">
-                      <RiAlertLine className="h-4 w-4 text-gray-600" />
-                      <AlertDescription className="text-gray-800 text-sm">
+                    <Alert className="bg-gray-50 border-gray-200 rounded-lg">
+                      <RiAlertLine className="h-5 w-5 text-gray-600" />
+                      <AlertDescription className="text-gray-800 text-base">
                         Data de validade não informada.
                       </AlertDescription>
                     </Alert>
@@ -1835,9 +1834,4 @@ export default function EditarAgentePage() {
       </div>
     </div>
   );
-}
-
-// Função cn helper (se não tiver importada)
-function cn(...classes: (string | boolean | undefined | null)[]) {
-  return classes.filter(Boolean).join(" ");
 }
