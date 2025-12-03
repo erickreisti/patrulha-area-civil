@@ -21,6 +21,7 @@ const config = {
         "2xl": "6rem",
       },
       screens: {
+        xs: "480px",
         sm: "640px",
         md: "768px",
         lg: "1024px",
@@ -29,23 +30,29 @@ const config = {
       },
     },
     extend: {
+      screens: {
+        xs: "480px",
+        sm: "640px",
+        md: "768px",
+        lg: "1024px",
+        xl: "1280px",
+        "2xl": "1536px",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-
-        // 🎨 CORES PRINCIPAIS DA PATRULHA AÉREA CIVIL - EXPANDIDAS
         navy: {
           50: "#F0F5FF",
           100: "#E6EFFF",
           200: "#D6E4FF",
           300: "#A6C5FF",
           400: "#5A8DEB",
-          DEFAULT: "#1A2873", // Azul marinho principal
-          600: "#1B2C8C", // Azul marinho claro
-          700: "#1E2759", // Azul marinho escuro
+          DEFAULT: "#1A2873",
+          600: "#1B2C8C",
+          700: "#1E2759",
           800: "#1A1F47",
           900: "#131835",
           hover: "#2A3A99",
@@ -57,7 +64,7 @@ const config = {
           200: "#FF9999",
           300: "#FF6666",
           400: "#FF3333",
-          DEFAULT: "#bd0003", // Vermelho para alertas
+          DEFAULT: "#bd0003",
           600: "#990002",
           700: "#660001",
           800: "#330001",
@@ -85,8 +92,6 @@ const config = {
           400: "#F7F7F7",
           500: "#F5F5F5",
         },
-
-        // 🎯 CORES SEMÂNTICAS - EXPANDIDAS
         success: {
           50: "#F0F9F4",
           100: "#E6F7EF",
@@ -129,21 +134,16 @@ const config = {
           hover: "#CC0004",
           focus: "#E60005",
         },
-
-        // 🏠 CORES DE FUNDO PERSONALIZADAS
         bg: {
           primary: "#FCFCFC",
           secondary: "#F0F5FF",
           tertiary: "#E6EFFF",
           highlight: "#1A2873",
           dark: "#1E293B",
-          // Modo escuro
           "dark-primary": "#0F172A",
           "dark-secondary": "#1E293B",
           "dark-tertiary": "#334155",
         },
-
-        // 📐 BORDAS E DIVISORES
         divider: {
           light: "#E9ECEF",
           medium: "#DEE2E6",
@@ -151,8 +151,6 @@ const config = {
           "dark-light": "#334155",
           "dark-medium": "#475569",
         },
-
-        // 🔗 CORES INTERATIVAS
         interactive: {
           link: {
             normal: "#1A2873",
@@ -175,8 +173,6 @@ const config = {
             },
           },
         },
-
-        // ⚡ STATUS
         status: {
           active: "#00A859",
           inactive: "#FF0000",
@@ -189,8 +185,6 @@ const config = {
           published: "#00A859",
           archived: "#8B5CF6",
         },
-
-        // 🔄 MODO ESCURO COMPLETO
         dark: {
           bg: {
             primary: "#0F172A",
@@ -209,8 +203,6 @@ const config = {
             accent: "#6366F1",
           },
         },
-
-        // 🎭 MANTENDO COMPATIBILIDADE COM SHADCN/UI
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

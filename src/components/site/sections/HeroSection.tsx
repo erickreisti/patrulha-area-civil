@@ -71,20 +71,13 @@ const BackgroundImage = () => {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: `url("/images/site/hero-bg.webp")`,
-          backgroundPosition: "center 50px",
+          backgroundPosition: "center",
           backgroundSize: "cover",
-          backgroundAttachment: "fixed",
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-navy-900/70 via-navy-800/40 to-navy-900/60"></div>
         <div className="absolute inset-0 bg-gradient-to-t from-navy-900/60 via-navy-800/30 to-transparent"></div>
         <div className="absolute inset-0 bg-gradient-to-r from-navy-900/20 to-navy-900/20"></div>
-
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-1/4 left-1/4 w-2 h-2 bg-white rounded-full animate-pulse-gentle"></div>
-          <div className="absolute top-1/3 right-1/4 w-1 h-1 bg-white rounded-full animate-float"></div>
-          <div className="absolute bottom-1/3 left-1/3 w-1.5 h-1.5 bg-white rounded-full animate-ping-slow"></div>
-        </div>
       </div>
     </div>
   );
@@ -96,31 +89,13 @@ const MainTitle = () => (
       className={cn(
         "font-bold text-white leading-tight",
         "drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
-        "text-4xl", // Mobile base (320px+) - Quebra em duas linhas
-        "xs:text-5xl", // Mobile pequeno (375px+) - Quebra em duas linhas
-        "sm:text-5xl", // Tablet pequeno (640px+) - Quebra em duas linhas
-        "md:text-5xl", // Tablet (768px+) - Tamanho menor para caber em uma linha
-        "lg:text-6xl", // Desktop (1024px+) - Aumenta gradualmente
-        "xl:text-6xl", // Desktop grande (1280px+)
-        "2xl:text-7xl" // Desktop extra grande (1536px+)
+        "text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl"
       )}
     >
-      {/* 🔸 MOBILE: Quebra em duas linhas (até 767px) */}
       <span className="block md:hidden">
         <span className="block">PATRULHA</span>
-        <span
-          className={cn(
-            "block",
-            "mt-0", // Reduzido do mt-1 original
-            "xs:mt-1", // Reduzido do xs:mt-2 original
-            "sm:mt-1" // Reduzido do sm:mt-2 original
-          )}
-        >
-          AÉREA CIVIL
-        </span>
+        <span className="block mt-1 xs:mt-2">AÉREA CIVIL</span>
       </span>
-
-      {/* 🔸 TABLET/DESKTOP: Uma linha só (768px+) */}
       <span className="hidden md:block whitespace-nowrap">
         PATRULHA AÉREA CIVIL
       </span>
@@ -132,9 +107,9 @@ const Subtitle = () => (
   <motion.div className="mb-2 xs:mb-3 sm:mb-4 md:mb-5" variants={itemVariants}>
     <p
       className={cn(
-        "font-medium text-white mb-0 xs:mb-1 leading-relaxed", // Reduzido mb
+        "font-medium text-white mb-0 xs:mb-1 leading-relaxed",
         "drop-shadow-lg font-roboto text-center",
-        "text-lg xs:text-xl sm:text-2xl md:text-2xl lg:text-3xl xl:text-4xl",
+        "text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl",
         "bg-gradient-to-r from-white via-offwhite-200 to-white bg-clip-text text-transparent"
       )}
     >
@@ -146,7 +121,7 @@ const Subtitle = () => (
 const Description = () => (
   <motion.div
     className={cn(
-      "mb-4 xs:mb-5 sm:mb-6 md:mb-8", // Reduzido margin-bottom
+      "mb-4 xs:mb-5 sm:mb-6 md:mb-8",
       "mx-auto px-3 xs:px-4 sm:px-5",
       "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl"
     )}
@@ -161,7 +136,7 @@ const Description = () => (
         "shadow-xl lg:shadow-2xl",
         "font-roboto font-medium text-center",
         "text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl",
-        "p-3 xs:p-4 sm:p-5 md:p-6 lg:p-7", // Mantido padding interno
+        "p-3 xs:p-4 sm:p-5 md:p-6 lg:p-7",
         "relative overflow-hidden"
       )}
     >
@@ -176,7 +151,7 @@ const Description = () => (
 const ActionButtons = () => (
   <motion.div
     className={cn(
-      "flex flex-col gap-2 xs:gap-3 sm:gap-4 md:gap-5", // Reduzido gap
+      "flex flex-col gap-2 xs:gap-3 sm:gap-4 md:gap-5",
       "justify-center items-center",
       "px-3 xs:px-4 sm:px-5",
       "w-full mx-auto",
@@ -199,22 +174,24 @@ const ActionButtons = () => (
           "relative overflow-hidden shadow-lg hover:shadow-xl",
           "group/button",
           "bg-navy hover:bg-navy-600 text-white",
-          "text-sm xs:text-base sm:text-lg md:text-xl",
-          "px-4 xs:px-5 sm:px-6 md:px-8",
-          "py-2 xs:py-2.5 sm:py-3 md:py-4", // Reduzido padding vertical
-          "min-h-[40px] xs:min-h-[44px] sm:min-h-[48px] md:min-h-[52px]" // Reduzido altura mínima
+          "text-xs xs:text-sm sm:text-base md:text-lg",
+          "px-3 xs:px-4 sm:px-5 md:px-6 lg:px-8",
+          "py-2 xs:py-2.5 sm:py-3 md:py-4",
+          "min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] md:min-h-[48px] lg:min-h-[52px]"
         )}
         asChild
       >
         <Link href="/sobre">
-          <span className="relative z-10 flex items-center justify-center gap-2 xs:gap-3">
-            <span>INICIAR MISSÃO</span>
+          <span className="relative z-10 flex items-center justify-center gap-1.5 xs:gap-2 sm:gap-3">
+            <span className="text-xs xs:text-sm sm:text-base md:text-lg">
+              INICIAR MISSÃO
+            </span>
             <motion.div
               animate={{ x: [0, 4, 0] }}
               transition={{ duration: 1.5, repeat: Infinity }}
               className="flex items-center"
             >
-              <RiArrowRightLine className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6" />
+              <RiArrowRightLine className="w-3 h-3 xs:w-4 xs:h-4 sm:w-5 sm:h-5" />
             </motion.div>
           </span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-700" />
@@ -238,23 +215,25 @@ const ActionButtons = () => (
           "group/outline",
           "border-2 border-white bg-white/10 backdrop-blur-sm",
           "text-white hover:bg-white hover:text-navy-800",
-          "text-sm xs:text-base sm:text-lg md:text-xl",
-          "px-4 xs:px-5 sm:px-6 md:px-8",
-          "py-2 xs:py-2.5 sm:py-3 md:py-4", // Reduzido padding vertical
-          "min-h-[40px] xs:min-h-[44px] sm:min-h-[48px] md:min-h-[52px]" // Reduzido altura mínima
+          "text-xs xs:text-sm sm:text-base md:text-lg",
+          "px-3 xs:px-4 sm:px-5 md:px-6 lg:px-8",
+          "py-2 xs:py-2.5 sm:py-3 md:py-4",
+          "min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] md:min-h-[48px] lg:min-h-[52px]"
         )}
         asChild
       >
         <Link href="/contato">
-          <span className="relative z-10 flex items-center justify-center gap-2 xs:gap-3">
+          <span className="relative z-10 flex items-center justify-center gap-1.5 xs:gap-2 sm:gap-3">
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
               className="flex items-center text-alert-300"
             >
-              <RiAlarmWarningLine className="w-4 h-4 xs:w-5 xs:h-5 sm:w-6 sm:h-6" />
+              <RiAlarmWarningLine className="w-3 h-3 xs:w-4 xs:h-4 sm:w-5 sm:h-5" />
             </motion.div>
-            <span>EMERGÊNCIA</span>
+            <span className="text-xs xs:text-sm sm:text-base md:text-lg">
+              EMERGÊNCIA
+            </span>
           </span>
           <div className="absolute inset-0 bg-white scale-x-0 group-hover/outline:scale-x-100 transition-transform duration-500 origin-left -z-10" />
         </Link>
@@ -277,7 +256,7 @@ const ScrollIndicator = () => {
 
   return (
     <motion.div
-      className="mt-3 xs:mt-4 sm:mt-5 md:mt-6 hidden sm:block cursor-pointer group/scroll" // Reduzido margin-top
+      className="mt-3 xs:mt-4 sm:mt-5 md:mt-6 hidden sm:block cursor-pointer group/scroll"
       variants={itemVariants}
       onClick={scrollToAbout}
       whileHover={{ y: 5 }}
@@ -301,13 +280,13 @@ const ScrollIndicator = () => {
 export function HeroSection() {
   return (
     <section
-      className="relative bg-slate-800 text-white h-screen flex items-center justify-center overflow-hidden"
+      className="relative bg-slate-800 text-white h-screen flex items-center justify-center overflow-hidden min-h-[500px] xs:min-h-[550px] sm:min-h-[600px] md:min-h-[650px] lg:min-h-[700px]"
       id="hero-section"
     >
       <BackgroundImage />
 
       <motion.div
-        className="container mx-auto px-3 xs:px-4 sm:px-5 lg:px-6 xl:px-8 relative z-10"
+        className="container mx-auto px-3 xs:px-4 sm:px-5 md:px-6 lg:px-8 xl:px-10 relative z-10"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
@@ -316,7 +295,7 @@ export function HeroSection() {
           className={cn(
             "mx-auto w-full",
             "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl",
-            "pt-4 xs:pt-6 sm:pt-8 md:pt-12 lg:pt-16" // 🔸 CORREÇÃO: Padding top reduzido
+            "pt-12 xs:pt-16 sm:pt-20 md:pt-24 lg:pt-32"
           )}
         >
           <div className="text-center">
