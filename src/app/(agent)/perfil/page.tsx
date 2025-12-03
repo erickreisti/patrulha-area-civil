@@ -19,7 +19,6 @@ import {
   RiCheckboxCircleLine,
   RiEditLine,
   RiErrorWarningLine,
-  RiRefreshLine,
   RiBarChartLine,
   RiForbidLine,
   RiHomeLine,
@@ -195,53 +194,7 @@ const LoadingState = () => (
   </BaseLayout>
 );
 
-const ErrorState = ({
-  error,
-  onRetry,
-  onSignOut,
-}: {
-  error: string | null;
-  onRetry: () => void;
-  onSignOut: () => void;
-}) => (
-  <BaseLayout>
-    <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
-      >
-        <RiErrorWarningLine className="w-16 h-16 text-alert mx-auto mb-6" />
-        <h2 className="text-2xl font-bold text-slate-800 mb-3 font-bebas">
-          {error ? "Erro ao Carregar" : "Perfil Não Encontrado"}
-        </h2>
-        <p className="text-slate-600 text-lg mb-6 font-roboto">
-          {error || "Não foi possível carregar os dados do perfil."}
-        </p>
-        <div className="flex flex-col gap-4">
-          <Button
-            onClick={onRetry}
-            className="bg-navy hover:bg-navy-700 text-white py-3 text-lg font-semibold font-roboto transition-all duration-300 hover:scale-105 group relative overflow-hidden"
-            size="lg"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-            <RiRefreshLine className="w-5 h-5 mr-3 relative z-10" />
-            <span className="relative z-10">Tentar Novamente</span>
-          </Button>
-          <Button
-            onClick={onSignOut}
-            variant="outline"
-            className="border-slate-300 text-slate-700 hover:bg-slate-50 py-3 text-lg font-roboto transition-all duration-300 hover:scale-105"
-            size="lg"
-          >
-            Fazer Login Novamente
-          </Button>
-        </div>
-      </motion.div>
-    </div>
-  </BaseLayout>
-);
-
+// CORREÇÃO: Remover ErrorState que estava causando confusão
 const formatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return "Não definida";
   try {
@@ -572,6 +525,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
   );
 };
 
+// CORREÇÃO: Separar o botão "Sair" para não chamar ErrorState
 const ActionButtons = ({
   profile,
   isAdmin,
@@ -580,56 +534,84 @@ const ActionButtons = ({
   profile: ProfileData;
   isAdmin: boolean;
   onSignOut: () => void;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5, delay: 0.6 }}
-    className="flex flex-col items-center gap-2 sm:gap-3 mt-4 sm:mt-6"
-  >
-    <div className="flex flex-wrap justify-center gap-1 sm:gap-2 w-full max-w-md px-2">
-      {isAdmin && (
-        <>
-          <ActionButton
-            href={`/admin/agentes/${profile.id}`}
-            icon={RiEditLine}
-            label="Editar"
-          />
-          <ActionButton
-            href="/admin/dashboard"
-            icon={RiBarChartLine}
-            label="Dashboard"
-          />
-        </>
-      )}
-      <ActionButton href="/" icon={RiHomeLine} label="Site" />
-      <ActionButton onClick={onSignOut} icon={RiLogoutBoxLine} label="Sair" />
-    </div>
+}) => {
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await onSignOut();
+      // O hook useAuth deve redirecionar automaticamente
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+      // Fallback: redirecionar manualmente se necessário
+      window.location.href = "/login";
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5, delay: 0.8 }}
-      className="text-center mt-2 sm:mt-4"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.6 }}
+      className="flex flex-col items-center gap-2 sm:gap-3 mt-4 sm:mt-6"
     >
-      <p className="text-white/70 text-xs font-roboto">
-        Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
-      </p>
+      <div className="flex flex-wrap justify-center gap-1 sm:gap-2 w-full max-w-md px-2">
+        {isAdmin && (
+          <>
+            <ActionButton
+              href={`/admin/agentes/${profile.id}`}
+              icon={RiEditLine}
+              label="Editar"
+            />
+            <ActionButton
+              href="/admin/dashboard"
+              icon={RiBarChartLine}
+              label="Dashboard"
+            />
+          </>
+        )}
+        <ActionButton href="/" icon={RiHomeLine} label="Site" />
+
+        {/* Botão Sair corrigido */}
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={handleSignOut}
+          className="flex-1 min-w-[100px] max-w-[140px] flex items-center justify-center space-x-1 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700"
+        >
+          <RiLogoutBoxLine className="w-3 h-3 text-white" />
+          <span className="text-xs font-medium text-white whitespace-nowrap">
+            {isSigningOut ? "Saindo..." : "Sair"}
+          </span>
+        </motion.div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.8 }}
+        className="text-center mt-2 sm:mt-4"
+      >
+        <p className="text-white/70 text-xs font-roboto">
+          Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
+        </p>
+      </motion.div>
     </motion.div>
-  </motion.div>
-);
+  );
+};
 
 // Componente principal
 export default function AgentPerfil() {
   const { profile, loading, signOut, isAdmin } = useAuth();
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
 
-  // Usar um callback para evitar chamada direta no useEffect
   useEffect(() => {
     const shouldShowDialog = profile && !profile.status;
 
     if (shouldShowDialog) {
-      // Usar setTimeout para evitar cascading renders
       const timer = setTimeout(() => {
         setShowInactiveDialog(true);
       }, 100);
@@ -638,19 +620,48 @@ export default function AgentPerfil() {
     }
   }, [profile]);
 
-  const handleRetry = () => {
-    window.location.reload();
-  };
+  // CORREÇÃO: Se não houver perfil e não estiver carregando, redirecionar
+  useEffect(() => {
+    if (!loading && !profile) {
+      // Se não houver perfil, redirecionar para login
+      const timer = setTimeout(() => {
+        window.location.href = "/login";
+      }, 1000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [profile, loading]);
 
   if (loading) return <LoadingState />;
 
+  // CORREÇÃO: Mostrar mensagem de erro direto no perfil, não usar ErrorState
   if (!profile) {
     return (
-      <ErrorState
-        error="Perfil não encontrado"
-        onRetry={handleRetry}
-        onSignOut={signOut}
-      />
+      <BaseLayout>
+        <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
+          >
+            <RiErrorWarningLine className="w-16 h-16 text-alert mx-auto mb-6" />
+            <h2 className="text-2xl font-bold text-slate-800 mb-3 font-bebas">
+              Perfil Não Encontrado
+            </h2>
+            <p className="text-slate-600 text-lg mb-6 font-roboto">
+              Não foi possível carregar seu perfil. Você será redirecionado para
+              o login.
+            </p>
+            <Button
+              onClick={() => (window.location.href = "/login")}
+              className="bg-navy hover:bg-navy-700 text-white py-3 text-lg font-semibold font-roboto transition-all duration-300 hover:scale-105"
+              size="lg"
+            >
+              Ir para Login
+            </Button>
+          </motion.div>
+        </div>
+      </BaseLayout>
     );
   }
 

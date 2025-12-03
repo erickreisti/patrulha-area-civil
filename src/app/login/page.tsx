@@ -187,7 +187,10 @@ export default function LoginPage() {
 
         switch (apiResult.error) {
           case "PROFILE_NOT_FOUND":
-            showAlert("error", "Matrícula não encontrada ou agente inativo");
+            showAlert(
+              "error",
+              "Matrícula não encontrada, você não faz parte da PAC - Patrulha Aérea Civil."
+            );
             break;
           case "PROFILE_INACTIVE":
             showAlert("error", "Conta de agente está inativa");

@@ -121,7 +121,6 @@ interface ProfileUpdateData {
   updated_at: string;
 }
 
-// Hook de permissões otimizado
 const usePermissions = () => {
   const [currentUser, setCurrentUser] = useState<{
     id: string;
@@ -129,7 +128,6 @@ const usePermissions = () => {
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Criar cliente Supabase uma vez
   const supabase = useMemo(() => createClient(), []);
 
   const checkCurrentUser = useCallback(async () => {
@@ -190,7 +188,6 @@ export default function EditarAgentePage() {
     currentUserId,
   } = usePermissions();
 
-  // Criar cliente Supabase uma vez com useMemo
   const supabase = useMemo(() => createClient(), []);
 
   const [formData, setFormData] = useState<FormData>({
@@ -208,8 +205,6 @@ export default function EditarAgentePage() {
 
   const isAdmin = currentUserRole === "admin";
   const isEditingOwnProfile = currentUserId === agentId;
-
-  // ========== FUNÇÕES DE API ==========
 
   const updateUserEmail = async (
     userId: string,
@@ -473,8 +468,6 @@ export default function EditarAgentePage() {
     }
   };
 
-  // ========== FUNÇÕES AUXILIARES ==========
-
   const uploadAvatar = async (file: File): Promise<string> => {
     const toastId = toast.loading("Enviando foto...");
 
@@ -531,7 +524,6 @@ export default function EditarAgentePage() {
         return;
       }
 
-      // Verificar o role do usuário atual
       const { data: currentProfile, error: profileError } = await supabase
         .from("profiles")
         .select("role, status")
@@ -547,14 +539,12 @@ export default function EditarAgentePage() {
 
       const isAdmin = currentProfile.role === "admin";
 
-      // Se não for admin e não for o próprio perfil, bloquear
       if (!isAdmin && session.user.id !== agentId) {
         toast.error("Você só pode visualizar seu próprio perfil");
         router.push("/perfil");
         return;
       }
 
-      // Buscar o agente
       const { data: agent, error: fetchError } = await supabase
         .from("profiles")
         .select("*")
@@ -632,7 +622,6 @@ export default function EditarAgentePage() {
 
   useEffect(() => {
     if (agentId && !permissionsLoading) {
-      // Verificar se usuário tem permissão
       if (!isAdmin && !isEditingOwnProfile) {
         toast.error("Você não tem permissão para editar este agente");
         router.push("/perfil");
@@ -655,8 +644,6 @@ export default function EditarAgentePage() {
       setHasUnsavedChanges(hasChanges);
     }
   }, [formData, originalData, checkForChanges]);
-
-  // ========== HANDLERS DO FORMULÁRIO ==========
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
@@ -832,8 +819,6 @@ export default function EditarAgentePage() {
     };
   };
 
-  // ========== VALIDAÇÕES ==========
-
   const validateForm = (): string[] => {
     const errors: string[] = [];
 
@@ -852,8 +837,6 @@ export default function EditarAgentePage() {
     return errors;
   };
 
-  // ========== HANDLE SUBMIT (SALVAR) ==========
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -866,7 +849,6 @@ export default function EditarAgentePage() {
     const toastId = toast.loading("Salvando alterações...");
 
     try {
-      // 1. Validações básicas
       const validationErrors = validateForm();
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => toast.error(error));
@@ -875,7 +857,6 @@ export default function EditarAgentePage() {
         return;
       }
 
-      // 2. Processar upload do avatar (se houver)
       let finalAvatarUrl = formData.avatar_url;
       if (avatarFile) {
         try {
@@ -894,12 +875,9 @@ export default function EditarAgentePage() {
         }
       }
 
-      // 3. Verificar quais campos foram alterados e usar APIs apropriadas
       const changes: string[] = [];
 
-      // Campos que precisam de APIs específicas (apenas admin pode alterar)
       if (isAdmin) {
-        // Matrícula alterada
         if (formData.matricula !== originalData?.matricula) {
           const success = await updateAgentMatricula(
             agentId,
@@ -912,7 +890,6 @@ export default function EditarAgentePage() {
           changes.push("matrícula");
         }
 
-        // Email alterado
         if (formData.email !== originalData?.email) {
           const success = await updateUserEmail(
             agentId,
@@ -926,7 +903,6 @@ export default function EditarAgentePage() {
           changes.push("email");
         }
 
-        // Status alterado
         if (formData.status !== originalData?.status) {
           const success = await updateAgentStatus(agentId, formData.status);
           if (!success) {
@@ -936,7 +912,6 @@ export default function EditarAgentePage() {
           changes.push("status");
         }
       } else {
-        // Agente comum tentando alterar campos restritos
         const restrictedChanges = {
           matricula: formData.matricula !== originalData?.matricula,
           email: formData.email !== originalData?.email,
@@ -958,8 +933,6 @@ export default function EditarAgentePage() {
         }
       }
 
-      // 4. Atualizar outros campos via cliente (permitido por RLS para alguns campos)
-      // Nota: RLS só permite UPDATE para admin, então agentes comuns NÃO podem atualizar nada via cliente
       if (isAdmin) {
         const updateData: ProfileUpdateData = {
           full_name: formData.full_name.trim(),
@@ -983,7 +956,6 @@ export default function EditarAgentePage() {
         }
       }
 
-      // 5. Sucesso!
       toast.success("Alterações salvas com sucesso!", {
         id: toastId,
         description:
@@ -993,7 +965,6 @@ export default function EditarAgentePage() {
         duration: 6000,
       });
 
-      // 6. Resetar estado
       setFormData((prev) => ({
         ...prev,
         avatar_url: finalAvatarUrl || "",
@@ -1003,7 +974,6 @@ export default function EditarAgentePage() {
       setOriginalData(formData);
       setHasUnsavedChanges(false);
 
-      // 7. Recarregar dados
       setTimeout(() => {
         fetchAgent();
       }, 1000);
@@ -1021,8 +991,6 @@ export default function EditarAgentePage() {
       setSaving(false);
     }
   };
-
-  // ========== HANDLE DELETE ==========
 
   const handleHardDelete = async () => {
     if (!agent) return;
@@ -1046,8 +1014,6 @@ export default function EditarAgentePage() {
       }, 1500);
     }
   };
-
-  // ========== RENDER ==========
 
   if (loading || permissionsLoading) {
     return (
@@ -1107,11 +1073,11 @@ export default function EditarAgentePage() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="mb-8"
+          className="mb-10"
         >
           <div className="mb-8">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
-              <div className="space-y-2">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+              <div className="space-y-3">
                 <h1 className="text-3xl font-bold text-gray-800 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
                   {isEditingOwnProfile ? "EDITAR MEU PERFIL" : "EDITAR AGENTE"}
                 </h1>
@@ -1138,28 +1104,28 @@ export default function EditarAgentePage() {
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 <Badge
                   className={
                     isAdmin
-                      ? "bg-purple-500 text-white text-sm py-1.5 px-3"
-                      : "bg-blue-500 text-white text-sm py-1.5 px-3"
+                      ? "bg-purple-500 text-white text-sm py-2 px-4 rounded-full"
+                      : "bg-blue-500 text-white text-sm py-2 px-4 rounded-full"
                   }
                 >
                   {isAdmin ? (
                     <>
-                      <RiShieldUserLine className="w-4 h-4 mr-1" /> ADMIN
+                      <RiShieldUserLine className="w-4 h-4 mr-2" /> ADMIN
                     </>
                   ) : (
                     <>
-                      <RiUserLine className="w-4 h-4 mr-1" /> AGENTE
+                      <RiUserLine className="w-4 h-4 mr-2" /> AGENTE
                     </>
                   )}
                 </Badge>
 
                 {isEditingOwnProfile && (
-                  <Badge className="bg-green-500 text-white text-sm py-1.5 px-3">
-                    <RiEditLine className="w-4 h-4 mr-1" /> MEU PERFIL
+                  <Badge className="bg-green-500 text-white text-sm py-2 px-4 rounded-full">
+                    <RiEditLine className="w-4 h-4 mr-2" /> MEU PERFIL
                   </Badge>
                 )}
               </div>
@@ -1170,15 +1136,15 @@ export default function EditarAgentePage() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className="mt-4"
+                className="mt-6"
               >
-                <Alert className="bg-yellow-50 border-yellow-200 rounded-xl">
-                  <RiAlertLine className="h-5 w-5 text-yellow-600" />
-                  <AlertDescription className="text-yellow-800 text-base">
-                    Você tem alterações não salvas. Clique em &quot;Salvar
-                    Alterações&quot; para aplicar as mudanças.
+                <Alert className="bg-yellow-50 border-yellow-200 rounded-xl p-5">
+                  <RiAlertLine className="h-6 w-6 text-yellow-600" />
+                  <AlertDescription className="text-yellow-800 text-base ml-3">
+                    <strong>⚠️ Você tem alterações não salvas.</strong> Clique
+                    em &quot;Salvar Alterações&quot; para aplicar as mudanças.
                     {avatarFile && (
-                      <span className="block mt-2 font-semibold">
+                      <span className="block mt-2 font-semibold text-yellow-900">
                         📸 Nova foto será enviada ao salvar
                       </span>
                     )}
@@ -1188,11 +1154,11 @@ export default function EditarAgentePage() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 mb-6">
             <Link href={isAdmin ? "/admin/agentes" : "/perfil"}>
               <Button
                 variant="outline"
-                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-300 h-11 px-4"
+                className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-300 h-12 px-5 rounded-xl"
               >
                 <RiArrowLeftLine className="w-5 h-5 mr-2" />
                 {isAdmin ? "Voltar para Lista" : "Voltar ao Perfil"}
@@ -1201,7 +1167,7 @@ export default function EditarAgentePage() {
             <Link href="/">
               <Button
                 variant="outline"
-                className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white transition-all duration-300 h-11 px-4"
+                className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white transition-all duration-300 h-12 px-5 rounded-xl"
               >
                 <RiHomeLine className="w-5 h-5 mr-2" />
                 Voltar ao Site
@@ -1217,8 +1183,8 @@ export default function EditarAgentePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-                <CardHeader className="border-b border-gray-200 pb-6">
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
+                <CardHeader className="border-b border-gray-200 pb-6 px-8 pt-8">
                   <CardTitle className="flex items-center text-2xl text-gray-800">
                     <RiUserLine className="w-6 h-6 mr-3 text-navy-600" />
                     {isEditingOwnProfile
@@ -1227,7 +1193,7 @@ export default function EditarAgentePage() {
                     {hasUnsavedChanges && (
                       <Badge
                         variant="outline"
-                        className="ml-3 bg-yellow-100 text-yellow-800 border-yellow-300 text-sm py-1 px-3"
+                        className="ml-4 bg-yellow-100 text-yellow-800 border-yellow-300 text-sm py-1.5 px-4"
                       >
                         Alterações Pendentes
                       </Badge>
@@ -1238,11 +1204,11 @@ export default function EditarAgentePage() {
                   <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Avatar Upload */}
                     <div className="space-y-4">
-                      <Label className="text-base font-semibold text-gray-700 flex items-center">
+                      <Label className="text-base font-semibold text-gray-700 flex items-center mb-3">
                         <RiUserLine className="w-5 h-5 mr-2 text-navy-500" />
                         Foto do Agente
                         {avatarFile && (
-                          <Badge className="ml-2 bg-blue-100 text-blue-800 text-sm py-1 px-2">
+                          <Badge className="ml-3 bg-blue-100 text-blue-800 text-sm py-1 px-3">
                             Nova foto selecionada
                           </Badge>
                         )}
@@ -1278,7 +1244,7 @@ export default function EditarAgentePage() {
                       >
                         <RiIdCardLine className="w-5 h-5 mr-2 text-navy-500" />
                         Matrícula *
-                        <Badge className="ml-2 bg-purple-100 text-purple-800 text-sm">
+                        <Badge className="ml-3 bg-purple-100 text-purple-800 text-sm py-1 px-2">
                           Única
                         </Badge>
                       </Label>
@@ -1290,14 +1256,14 @@ export default function EditarAgentePage() {
                           value={formData.matricula}
                           onChange={handleInputChange}
                           placeholder="Número da matrícula"
-                          className="pl-12 text-lg py-3 h-14 font-mono border-2 rounded-xl"
+                          className="pl-12 text-lg py-3 h-14 font-mono border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                           required
                           disabled={saving || !isAdmin}
                           readOnly={!isAdmin}
                         />
                       </div>
                       {!isAdmin && (
-                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                           <p className="text-sm text-yellow-700">
                             <RiAlertLine className="inline w-4 h-4 mr-1" />
                             Apenas administradores podem alterar a matrícula
@@ -1323,7 +1289,7 @@ export default function EditarAgentePage() {
                           value={formData.full_name}
                           onChange={handleInputChange}
                           placeholder="Nome completo do agente"
-                          className="pl-12 text-lg py-3 h-14 border-2 rounded-xl"
+                          className="pl-12 text-lg py-3 h-14 border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                           required
                           disabled={saving}
                         />
@@ -1347,14 +1313,14 @@ export default function EditarAgentePage() {
                           value={formData.email}
                           onChange={handleInputChange}
                           placeholder="email@exemplo.com"
-                          className="pl-12 text-lg py-3 h-14 border-2 rounded-xl"
+                          className="pl-12 text-lg py-3 h-14 border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                           required
                           disabled={saving || !isAdmin}
                           readOnly={!isAdmin}
                         />
                       </div>
                       {!isAdmin && (
-                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                           <p className="text-sm text-yellow-700">
                             <RiAlertLine className="inline w-4 h-4 mr-1" />
                             Para alterar o email, entre em contato com um
@@ -1367,10 +1333,7 @@ export default function EditarAgentePage() {
                     {/* Graduação e Tipo Sanguíneo */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                       <div className="space-y-3">
-                        <Label
-                          htmlFor="graduacao"
-                          className="text-base font-semibold text-gray-700"
-                        >
+                        <Label className="text-base font-semibold text-gray-700">
                           Graduação
                         </Label>
                         <Select
@@ -1378,7 +1341,7 @@ export default function EditarAgentePage() {
                           onValueChange={handleGraduacaoChange}
                           disabled={saving}
                         >
-                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
                             <SelectValue placeholder="Selecione uma graduação" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1386,7 +1349,7 @@ export default function EditarAgentePage() {
                               <SelectItem
                                 key={graduacao}
                                 value={graduacao}
-                                className="text-base py-3"
+                                className="text-base py-3 hover:bg-blue-50"
                               >
                                 {graduacao}
                               </SelectItem>
@@ -1396,10 +1359,7 @@ export default function EditarAgentePage() {
                       </div>
 
                       <div className="space-y-3">
-                        <Label
-                          htmlFor="tipo_sanguineo"
-                          className="text-base font-semibold text-gray-700"
-                        >
+                        <Label className="text-base font-semibold text-gray-700">
                           Tipo Sanguíneo
                         </Label>
                         <Select
@@ -1407,7 +1367,7 @@ export default function EditarAgentePage() {
                           onValueChange={handleTipoSanguineoChange}
                           disabled={saving}
                         >
-                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
                             <SelectValue placeholder="Selecione o tipo sanguíneo" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1415,7 +1375,7 @@ export default function EditarAgentePage() {
                               <SelectItem
                                 key={tipo}
                                 value={tipo}
-                                className="text-base py-3"
+                                className="text-base py-3 hover:bg-blue-50"
                               >
                                 {tipo}
                               </SelectItem>
@@ -1435,7 +1395,7 @@ export default function EditarAgentePage() {
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full h-14 justify-start text-left text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
+                              className="w-full h-14 justify-start text-left text-base border-2 rounded-xl hover:border-blue-500 px-4"
                               disabled={saving}
                             >
                               <RiCalendar2Line className="mr-3 h-5 w-5 text-navy-500" />
@@ -1469,7 +1429,7 @@ export default function EditarAgentePage() {
                           </PopoverContent>
                         </Popover>
                         {formData.validade_certificacao && (
-                          <div className="flex items-center justify-between text-sm mt-2 px-1">
+                          <div className="flex items-center justify-between text-sm mt-3 px-1">
                             <span className="text-gray-600">
                               Selecionado:{" "}
                               {formatDate(formData.validade_certificacao)}
@@ -1479,7 +1439,7 @@ export default function EditarAgentePage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleDateSelect(undefined)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-3 rounded-lg"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 px-3 rounded-lg"
                             >
                               Limpar
                             </Button>
@@ -1488,10 +1448,7 @@ export default function EditarAgentePage() {
                       </div>
 
                       <div className="space-y-3">
-                        <Label
-                          htmlFor="role"
-                          className="text-base font-semibold text-gray-700"
-                        >
+                        <Label className="text-base font-semibold text-gray-700">
                           Tipo de Usuário
                         </Label>
                         <Select
@@ -1499,26 +1456,26 @@ export default function EditarAgentePage() {
                           onValueChange={handleRoleChange}
                           disabled={saving || !isAdmin}
                         >
-                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
                             <SelectValue placeholder="Selecione o tipo" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem
                               value="agent"
-                              className="text-base py-3"
+                              className="text-base py-3 hover:bg-blue-50"
                             >
                               Agente
                             </SelectItem>
                             <SelectItem
                               value="admin"
-                              className="text-base py-3"
+                              className="text-base py-3 hover:bg-blue-50"
                             >
                               Administrador
                             </SelectItem>
                           </SelectContent>
                         </Select>
                         {!isAdmin && (
-                          <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                          <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                             <p className="text-sm text-gray-600">
                               <RiLockLine className="inline w-4 h-4 mr-1" />
                               Apenas administradores podem alterar o tipo de
@@ -1530,11 +1487,11 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Botões de Ação */}
-                    <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-200 mt-8">
+                    <div className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-200 mt-10">
                       <Button
                         type="submit"
                         disabled={saving || !hasUnsavedChanges}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
                       >
                         {saving ? (
                           <>
@@ -1566,7 +1523,7 @@ export default function EditarAgentePage() {
 
                     {/* Zona de Perigo (Apenas Admin) */}
                     {isAdmin && !isEditingOwnProfile && (
-                      <div className="pt-8 border-t border-red-200">
+                      <div className="pt-8 border-t border-red-200 mt-10">
                         <div className="bg-red-50 border border-red-200 rounded-xl p-6">
                           <Label className="text-base font-semibold text-red-700 mb-4 flex items-center">
                             <RiAlertLine className="w-5 h-5 mr-2" />
@@ -1591,7 +1548,7 @@ export default function EditarAgentePage() {
                                   : "Excluir Permanentemente"}
                               </Button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-xl border-0 shadow-2xl">
+                            <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
                               <AlertDialogHeader className="pb-4">
                                 <AlertDialogTitle className="text-red-600 text-2xl flex items-center">
                                   <RiAlertLine className="w-6 h-6 mr-2" />
@@ -1692,14 +1649,14 @@ export default function EditarAgentePage() {
           {/* Sidebar */}
           <div className="space-y-8">
             {/* Status e Permissões */}
-            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-              <CardHeader className="pb-6">
+            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
+              <CardHeader className="pb-6 px-6 pt-6">
                 <CardTitle className="flex items-center text-xl text-gray-800">
                   <RiShieldKeyholeLine className="w-6 h-6 mr-3 text-navy-600" />
                   Status e Permissões
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="space-y-6 px-6 pb-6">
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
                   <Label className="text-base font-semibold text-gray-700 cursor-pointer">
                     Agente Ativo na PAC
@@ -1715,7 +1672,7 @@ export default function EditarAgentePage() {
                 </div>
 
                 <div className="space-y-3">
-                  <Label className="text-base font-semibold">
+                  <Label className="text-base font-semibold text-gray-700">
                     Tipo de Acesso
                   </Label>
                   <div className="space-y-2">
@@ -1761,18 +1718,18 @@ export default function EditarAgentePage() {
             </Card>
 
             {/* Status da Certificação */}
-            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-              <CardHeader className="pb-6">
+            <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
+              <CardHeader className="pb-6 px-6 pt-6">
                 <CardTitle className="flex items-center text-xl text-gray-800">
                   <RiCalendarLine className="w-6 h-6 mr-3 text-navy-600" />
                   Status da Certificação
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-6 pb-6">
                 <div className="text-center p-6 bg-gray-50 rounded-xl border space-y-4">
                   <div className="flex items-center justify-center gap-2">
                     <Badge
-                      className={`${certStatus.color} text-white text-base py-1.5 px-4`}
+                      className={`${certStatus.color} text-white text-base py-2 px-5 rounded-full`}
                     >
                       {certStatus.icon && (
                         <span className="mr-2">{certStatus.icon}</span>
@@ -1789,9 +1746,9 @@ export default function EditarAgentePage() {
                       </p>
 
                       {certStatus.status === "expirada" && (
-                        <Alert className="bg-red-50 border-red-200 rounded-lg">
+                        <Alert className="bg-red-50 border-red-200 rounded-lg p-4">
                           <RiErrorWarningLine className="h-5 w-5 text-red-600" />
-                          <AlertDescription className="text-red-800 text-base">
+                          <AlertDescription className="text-red-800 text-base ml-3">
                             Certificação expirada! Renove para manter o acesso
                             ao sistema.
                           </AlertDescription>
@@ -1799,18 +1756,18 @@ export default function EditarAgentePage() {
                       )}
 
                       {certStatus.status === "proximo-expiracao" && (
-                        <Alert className="bg-yellow-50 border-yellow-200 rounded-lg">
+                        <Alert className="bg-yellow-50 border-yellow-200 rounded-lg p-4">
                           <RiAlertLine className="h-5 w-5 text-yellow-600" />
-                          <AlertDescription className="text-yellow-800 text-base">
+                          <AlertDescription className="text-yellow-800 text-base ml-3">
                             Certificação próxima do vencimento. Renove em breve.
                           </AlertDescription>
                         </Alert>
                       )}
 
                       {certStatus.status === "valida" && (
-                        <Alert className="bg-green-50 border-green-200 rounded-lg">
+                        <Alert className="bg-green-50 border-green-200 rounded-lg p-4">
                           <RiCheckLine className="h-5 w-5 text-green-600" />
-                          <AlertDescription className="text-green-800 text-base">
+                          <AlertDescription className="text-green-800 text-base ml-3">
                             Certificação válida. Tudo em ordem!
                           </AlertDescription>
                         </Alert>
@@ -1819,9 +1776,9 @@ export default function EditarAgentePage() {
                   )}
 
                   {!formData.validade_certificacao && (
-                    <Alert className="bg-gray-50 border-gray-200 rounded-lg">
+                    <Alert className="bg-gray-50 border-gray-200 rounded-lg p-4">
                       <RiAlertLine className="h-5 w-5 text-gray-600" />
-                      <AlertDescription className="text-gray-800 text-base">
+                      <AlertDescription className="text-gray-800 text-base ml-3">
                         Data de validade não informada.
                       </AlertDescription>
                     </Alert>

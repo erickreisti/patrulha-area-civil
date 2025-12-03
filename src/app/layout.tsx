@@ -20,6 +20,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  interactiveWidget: "resizes-visual",
 };
 
 export const metadata: Metadata = {
@@ -90,12 +91,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" className="scroll-smooth">
-      <body
-        className={`${inter.variable} ${roboto.variable} font-sans antialiased bg-bg-primary text-charcoal`}
-        suppressHydrationWarning
-      >
-        {children}
+    <html lang="pt-BR" className={`${inter.variable} ${roboto.variable}`}>
+      <body className="font-sans antialiased bg-background text-foreground min-h-screen">
+        <main className="min-h-screen w-full">{children}</main>
       </body>
     </html>
   );
