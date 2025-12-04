@@ -71,7 +71,7 @@ const BackgroundImage = () => {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: `url("/images/site/hero-bg.webp")`,
-          backgroundPosition: "center",
+          backgroundPosition: "center -30%", // Ajustado 30% para baixo
           backgroundSize: "cover",
         }}
       >
@@ -89,7 +89,8 @@ const MainTitle = () => (
       className={cn(
         "font-bold text-white leading-tight",
         "drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
-        "text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl"
+        "text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl",
+        "transform -translate-y-2 sm:-translate-y-3" // Ajuste para centralizar verticalmente
       )}
     >
       <span className="block md:hidden">
@@ -110,7 +111,8 @@ const Subtitle = () => (
         "font-medium text-white mb-0 xs:mb-1 leading-relaxed",
         "drop-shadow-lg font-roboto text-center",
         "text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl",
-        "bg-gradient-to-r from-white via-offwhite-200 to-white bg-clip-text text-transparent"
+        "bg-gradient-to-r from-white via-offwhite-200 to-white bg-clip-text text-transparent",
+        "transform -translate-y-1 sm:-translate-y-2" // Ajuste para alinhar com título
       )}
     >
       Resgate Aéreo & Proteção Civil
@@ -123,7 +125,8 @@ const Description = () => (
     className={cn(
       "mb-4 xs:mb-5 sm:mb-6 md:mb-8",
       "mx-auto px-3 xs:px-4 sm:px-5",
-      "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl"
+      "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl",
+      "transform -translate-y-2 sm:-translate-y-3" // Ajuste para centralizar
     )}
     variants={scaleInVariants}
   >
@@ -156,7 +159,8 @@ const ActionButtons = () => (
       "px-3 xs:px-4 sm:px-5",
       "w-full mx-auto",
       "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl",
-      "lg:flex-row lg:items-stretch"
+      "lg:flex-row lg:items-stretch",
+      "transform -translate-y-2 sm:-translate-y-3" // Ajuste para centralizar
     )}
     variants={containerVariants}
   >
@@ -295,15 +299,18 @@ export function HeroSection() {
           className={cn(
             "mx-auto w-full",
             "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl",
-            "pt-12 xs:pt-16 sm:pt-20 md:pt-24 lg:pt-32"
+            "pt-0" // Removido padding-top extra para centralizar verticalmente
           )}
         >
-          <div className="text-center">
-            <MainTitle />
-            <Subtitle />
-            <Description />
-            <ActionButtons />
-            <ScrollIndicator />
+          {/* Container para centralizar todo o conteúdo verticalmente */}
+          <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] sm:min-h-[calc(100vh-5rem)]">
+            <div className="text-center w-full">
+              <MainTitle />
+              <Subtitle />
+              <Description />
+              <ActionButtons />
+              <ScrollIndicator />
+            </div>
           </div>
         </div>
       </motion.div>

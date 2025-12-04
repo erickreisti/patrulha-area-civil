@@ -31,6 +31,8 @@ import {
   RiLoginCircleLine,
   RiHomeLine,
   RiMailLine,
+  RiUserSharedLine,
+  RiShieldKeyholeLine,
 } from "react-icons/ri";
 
 // Schema de validação
@@ -52,15 +54,56 @@ const SECURITY_CONFIG = {
   LOCK_TIME_MINUTES: 15,
 };
 
+// Tipos de status do agente
+type AgentStatus = "active" | "inactive" | "suspended" | "not_found";
+
+// Tipos específicos para status
+type ProfileStatus =
+  | boolean
+  | "true"
+  | "false"
+  | "t"
+  | "f"
+  | "1"
+  | "0"
+  | 1
+  | 0
+  | null
+  | undefined;
+
+// 🔐 Função robusta para verificar status - COM TIPOS ESPECÍFICOS
+function isProfileActive(status: ProfileStatus): boolean {
+  if (status === undefined || status === null) {
+    return false;
+  }
+
+  // Boolean true
+  if (status === true) return true;
+
+  // String 'true' ou 't' ou '1'
+  if (typeof status === "string") {
+    const normalized = status.toLowerCase().trim();
+    return normalized === "true" || normalized === "t" || normalized === "1";
+  }
+
+  // Número 1
+  if (typeof status === "number") {
+    return status === 1;
+  }
+
+  return false;
+}
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockTime, setLockTime] = useState<number | null>(null);
   const [alert, setAlert] = useState<{
-    type: "error" | "success" | "warning";
+    type: "error" | "success" | "warning" | "info";
     message: string;
   } | null>(null);
+  const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
 
   const supabase = createClient();
 
@@ -73,7 +116,7 @@ export default function LoginPage() {
   });
 
   const showAlert = useCallback(
-    (type: "error" | "success" | "warning", message: string) => {
+    (type: "error" | "success" | "warning" | "info", message: string) => {
       setAlert({ type, message });
       setTimeout(() => setAlert(null), 5000);
     },
@@ -155,7 +198,7 @@ export default function LoginPage() {
     [failedAttempts]
   );
 
-  // 🎯 FUNÇÃO PRINCIPAL DE LOGIN - CORRIGIDA
+  // 🎯 FUNÇÃO PRINCIPAL DE LOGIN - MODIFICADA
   const handleSubmit = async (data: LoginFormData) => {
     if (isLocked) {
       showAlert("error", "Acesso temporariamente bloqueado por segurança");
@@ -163,6 +206,7 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setAgentStatus(null);
     console.log("🚀 Iniciando processo de login...");
 
     try {
@@ -179,48 +223,92 @@ export default function LoginPage() {
         body: JSON.stringify({ matricula: matriculaLimpa }),
       });
 
+      // Primeiro verifica o status HTTP
+      if (!apiResponse.ok) {
+        if (apiResponse.status === 404) {
+          updateSecurityLock();
+          setAgentStatus("not_found");
+          showAlert(
+            "error",
+            "Matrícula não encontrada, você não faz parte da PAC - Patrulha Aérea Civil."
+          );
+          setLoading(false);
+          return;
+        }
+
+        // Outros erros HTTP
+        updateSecurityLock();
+        showAlert("error", `Erro na API (${apiResponse.status})`);
+        setLoading(false);
+        return;
+      }
+
       const apiResult = await apiResponse.json();
-      console.log("📊 Resposta da API:", apiResult);
+      console.log("📊 Resposta completa da API:", apiResult);
 
       if (!apiResult.success) {
         updateSecurityLock();
 
-        switch (apiResult.error) {
-          case "PROFILE_NOT_FOUND":
-            showAlert(
-              "error",
-              "Matrícula não encontrada, você não faz parte da PAC - Patrulha Aérea Civil."
-            );
-            break;
-          case "PROFILE_INACTIVE":
-            showAlert("error", "Conta de agente está inativa");
-            break;
-          case "IP_BLOCKED":
-            showAlert(
-              "error",
-              apiResult.message || "IP temporariamente bloqueado"
-            );
-            break;
-          default:
-            showAlert(
-              "error",
-              apiResult.message || "Erro ao verificar matrícula"
-            );
+        // A API pode retornar erro mesmo para inativos (se ainda estiver bloqueando)
+        if (apiResult.error === "PROFILE_NOT_FOUND") {
+          setAgentStatus("not_found");
+          showAlert(
+            "error",
+            "Matrícula não encontrada, você não faz parte da PAC - Patrulha Aérea Civil."
+          );
+        } else if (apiResult.error === "IP_BLOCKED") {
+          showAlert(
+            "error",
+            apiResult.message || "IP temporariamente bloqueado"
+          );
+        } else {
+          showAlert(
+            "error",
+            apiResult.message || "Erro ao verificar matrícula"
+          );
         }
+
+        setLoading(false);
         return;
       }
 
-      // ✅ CORREÇÃO AQUI: Pegar email e senha padrão da API
-      const { email, id: profileId } = apiResult.data;
+      // ✅ PERFIL ENCONTRADO (ativo ou inativo)
+      const {
+        email,
+        id: profileId,
+        status: profileStatus,
+        role: profileRole,
+      } = apiResult.data;
+
       const senhaPadrao = apiResult.security.default_password;
-      console.log("✅ Credenciais encontradas:", { email, senhaPadrao });
+      console.log("✅ Credenciais encontradas:", {
+        email,
+        profileId,
+        status: profileStatus,
+        statusType: typeof profileStatus,
+        role: profileRole,
+      });
+
+      // 🔐 Determinar status REAL do agente
+      const isActive = isProfileActive(profileStatus);
+      const isAdmin = profileRole === "admin";
+
+      if (!isActive) {
+        setAgentStatus("inactive");
+        showAlert(
+          "warning",
+          "Sua conta está inativa. Acesso limitado ao perfil."
+        );
+      } else {
+        setAgentStatus("active");
+      }
 
       // 🔐 PASSO 2: Tentar login com Supabase Auth
       console.log("🔑 Autenticando com Supabase...");
       const { data: authData, error: authError } =
         await supabase.auth.signInWithPassword({
           email,
-          password: senhaPadrao, // ✅ Usando senha da API
+          password: senhaPadrao,
         });
 
       if (authError) {
@@ -237,7 +325,7 @@ export default function LoginPage() {
 
       console.log("✅ Autenticação bem-sucedida");
 
-      // 🔒 PASSO 3: Verificar consistência (segurança extra)
+      // 🔒 PASSO 3: Verificar consistência
       if (authData.user.id !== profileId) {
         console.error("❌ Inconsistência nos IDs");
         await supabase.auth.signOut();
@@ -267,7 +355,7 @@ export default function LoginPage() {
       try {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("full_name, role, avatar_url, graduacao")
+          .select("full_name, role, avatar_url, graduacao, status")
           .eq("id", authData.user.id)
           .single();
 
@@ -278,6 +366,8 @@ export default function LoginPage() {
               role: profile.role,
               avatar_url: profile.avatar_url,
               graduacao: profile.graduacao,
+              status: profile.status,
+              isActive: isProfileActive(profile.status),
             },
           });
         }
@@ -285,13 +375,33 @@ export default function LoginPage() {
         console.warn("⚠️ Não foi possível atualizar metadados:", updateError);
       }
 
-      // ✅ Mostrar mensagem de sucesso
-      showAlert("success", "Login realizado com sucesso! Redirecionando...");
+      // ✅ Mostrar mensagem baseada no status
+      if (!isActive) {
+        showAlert(
+          "warning",
+          "Login realizado! Sua conta está inativa. Acesso limitado ao perfil."
+        );
 
-      // 🔄 Redirecionar para perfil
-      setTimeout(() => {
-        window.location.href = "/perfil";
-      }, 1500);
+        // 🔹 AGENTE INATIVO: Vai para perfil
+        setTimeout(() => {
+          window.location.href = "/perfil";
+        }, 2000);
+      } else {
+        showAlert("success", "Login realizado com sucesso! Redirecionando...");
+
+        // 🔹 VERIFICAÇÃO: Administrador tem acesso total?
+        // Se quiser que admin tenha acesso total, mantenha esta lógica:
+        if (isAdmin) {
+          setTimeout(() => {
+            window.location.href = "/admin/dashboard";
+          }, 1500);
+        } else {
+          // 🔹 AGENTE ATIVO (não admin): Também vai apenas para perfil
+          setTimeout(() => {
+            window.location.href = "/perfil";
+          }, 1500);
+        }
+      }
     } catch (error: unknown) {
       updateSecurityLock();
       console.error("💥 Erro geral no login:", error);
@@ -341,13 +451,28 @@ export default function LoginPage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (session) {
-        window.location.href = "/perfil";
+        // Verificar status do usuário
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("status, role")
+          .eq("id", session.user.id)
+          .single();
+
+        if (profile) {
+          // Redirecionar baseado no role
+          if (profile.role === "admin") {
+            window.location.href = "/admin/dashboard";
+          } else {
+            window.location.href = "/perfil";
+          }
+        }
       }
     };
 
     checkSession();
-  }, [supabase.auth]);
+  }, [supabase]);
 
   // Função para mostrar tempo restante do bloqueio
   const getRemainingTime = () => {
@@ -459,6 +584,40 @@ export default function LoginPage() {
                 </p>
               </motion.div>
 
+              {/* Status Indicator */}
+              <AnimatePresence>
+                {agentStatus && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="mb-3 sm:mb-4"
+                  >
+                    {agentStatus === "inactive" && (
+                      <Alert className="bg-amber-50 border-amber-200 text-amber-800 border-l-4 border-l-amber-500">
+                        <div className="flex items-center gap-2">
+                          <RiUserSharedLine className="w-4 h-4 flex-shrink-0" />
+                          <AlertDescription className="text-sm font-medium">
+                            Conta inativa - Acesso limitado ao perfil
+                          </AlertDescription>
+                        </div>
+                      </Alert>
+                    )}
+                    {agentStatus === "active" && (
+                      <Alert className="bg-green-50 border-green-200 text-green-800 border-l-4 border-l-green-500">
+                        <div className="flex items-center gap-2">
+                          <RiCheckLine className="w-4 h-4 flex-shrink-0" />
+                          <AlertDescription className="text-sm font-medium">
+                            Conta ativa - Acesso completo
+                          </AlertDescription>
+                        </div>
+                      </Alert>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Alerts */}
               <AnimatePresence>
                 {alert && (
@@ -475,9 +634,15 @@ export default function LoginPage() {
                           ? "destructive"
                           : alert.type === "warning"
                           ? "warning"
+                          : alert.type === "info"
+                          ? "default"
                           : "default"
                       }
-                      className="border-l-4 rounded-lg text-sm shadow-sm"
+                      className={`border-l-4 rounded-lg text-sm shadow-sm ${
+                        alert.type === "info"
+                          ? "bg-blue-50 border-blue-200 text-blue-800 border-l-blue-500"
+                          : ""
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         {alert.type === "error" && (
@@ -488,6 +653,9 @@ export default function LoginPage() {
                         )}
                         {alert.type === "success" && (
                           <RiCheckLine className="w-4 h-4 flex-shrink-0 text-green-600" />
+                        )}
+                        {alert.type === "info" && (
+                          <RiShieldKeyholeLine className="w-4 h-4 flex-shrink-0 text-blue-600" />
                         )}
                         <AlertDescription className="font-medium font-inter break-words flex-1">
                           {alert.message}
@@ -576,11 +744,49 @@ export default function LoginPage() {
                     </div>
                   </motion.div>
 
+                  {/* Acesso Info */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.2 }}
+                    className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-200"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1">
+                        <RiShieldKeyholeLine className="w-3 h-3" />
+                        <span className="font-medium">Níveis de acesso:</span>
+                      </div>
+                      <ul className="list-disc list-inside pl-2 space-y-0.5">
+                        <li className="flex items-start">
+                          <span className="text-green-600 mr-1">•</span>
+                          <span>
+                            <strong>Agente ativo:</strong> Acesso ao perfil
+                            completo
+                          </span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-amber-600 mr-1">•</span>
+                          <span>
+                            <strong>Agente inativo:</strong> Acesso apenas ao
+                            perfil
+                          </span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="text-blue-600 mr-1">•</span>
+                          <span>
+                            <strong>Administrador:</strong> Acesso total ao
+                            sistema
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                  </motion.div>
+
                   {/* Remember Me */}
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
+                    transition={{ duration: 0.6, delay: 0.3 }}
                   >
                     <FormField
                       control={form.control}
@@ -612,7 +818,7 @@ export default function LoginPage() {
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.3 }}
+                    transition={{ duration: 0.6, delay: 0.4 }}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -662,7 +868,7 @@ export default function LoginPage() {
                 className="relative my-3 sm:my-4"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.4 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
               >
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-200/60"></div>
@@ -678,7 +884,7 @@ export default function LoginPage() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.5 }}
+                transition={{ duration: 0.6, delay: 0.6 }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -696,6 +902,21 @@ export default function LoginPage() {
               </motion.div>
             </CardContent>
           </Card>
+        </motion.div>
+
+        {/* Footer Info */}
+        <motion.div
+          className="mt-4 text-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.8, delay: 0.8 }}
+        >
+          <p className="text-xs text-gray-500 font-inter">
+            Sistema de Gerenciamento da Patrulha Aérea Civil
+          </p>
+          <p className="text-xs text-gray-400 mt-1 font-inter">
+            v2.0 • Acesso seguro e criptografado
+          </p>
         </motion.div>
       </motion.div>
     </div>

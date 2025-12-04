@@ -1,4 +1,3 @@
-// app/api/auth/profile/route.ts - MANTENHA ESTA
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin-client";
 import { SEGURANCA } from "@/lib/security-config";
@@ -8,6 +7,43 @@ const loginAttempts = new Map<
   string,
   { count: number; lastAttempt: number; blockUntil?: number }
 >();
+
+// 🔐 Função robusta para verificar status
+type ProfileStatus =
+  | boolean
+  | "true"
+  | "false"
+  | "t"
+  | "f"
+  | "1"
+  | "0"
+  | 1
+  | 0
+  | null
+  | undefined;
+
+// 🔐 Função robusta para verificar status - COM TIPOS ESPECÍFICOS
+function isProfileActive(status: ProfileStatus): boolean {
+  if (status === undefined || status === null) {
+    return false;
+  }
+
+  // Boolean true
+  if (status === true) return true;
+
+  // String 'true' ou 't'
+  if (typeof status === "string") {
+    const normalized = status.toLowerCase().trim();
+    return normalized === "true" || normalized === "t" || normalized === "1";
+  }
+
+  // Número 1
+  if (typeof status === "number") {
+    return status === 1;
+  }
+
+  return false;
+}
 
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
@@ -179,24 +215,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 8. Validar perfil encontrado
-    if (!profile.status) {
-      console.warn(`⚠️ [${requestId}] Perfil inativo:`, profile.id);
+    // 8. 🔐 Validar perfil encontrado COM VERIFICAÇÃO ROBUSTA
+    const isActive = isProfileActive(profile.status);
 
-      return NextResponse.json(
-        {
-          success: false,
-          error: "PROFILE_INACTIVE",
-          message: "Conta de agente está inativa",
-        },
-        { status: 403 }
-      );
+    console.log(`ℹ️ [${requestId}] Status do perfil:`, {
+      id: profile.id,
+      email: profile.email,
+      status: profile.status,
+      isActive,
+      statusType: typeof profile.status,
+    });
+
+    // NÃO bloqueia mais inativos, apenas registra no log
+    if (!isActive) {
+      console.warn(`⚠️ [${requestId}] PERFIL INATIVO - MAS PERMITINDO LOGIN:`, {
+        id: profile.id,
+        email: profile.email,
+        status: profile.status,
+      });
     }
 
-    console.log(`✅ [${requestId}] Perfil encontrado:`, {
+    console.log(`✅ [${requestId}] Perfil encontrado e ATIVO:`, {
       id: profile.id,
       email: profile.email,
       role: profile.role,
+      status: profile.status,
+      statusType: typeof profile.status,
       duration: `${Date.now() - startTime}ms`,
     });
 
@@ -212,6 +256,8 @@ export async function POST(request: NextRequest) {
           requestId,
           ip,
           matricula: matriculaLimpa,
+          status: profile.status,
+          statusType: typeof profile.status,
           timestamp: new Date().toISOString(),
           responseTime: Date.now() - startTime,
         },
@@ -227,7 +273,7 @@ export async function POST(request: NextRequest) {
     // 10. Resetar contador de tentativas para este IP (sucesso)
     loginAttempts.delete(ip);
 
-    // 11. Retornar dados do perfil (apenas informações necessárias)
+    // 11. Retornar dados do perfil (INCLUINDO STATUS)
     return NextResponse.json({
       success: true,
       data: {
@@ -235,6 +281,7 @@ export async function POST(request: NextRequest) {
         email: profile.email,
         full_name: profile.full_name,
         role: profile.role,
+        status: profile.status, // ← INCLUIR STATUS NA RESPOSTA
         matricula: profile.matricula,
         avatar_url: profile.avatar_url,
         graduacao: profile.graduacao,
