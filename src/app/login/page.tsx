@@ -30,7 +30,6 @@ import {
   RiLockLine,
   RiLoginCircleLine,
   RiHomeLine,
-  RiMailLine,
   RiUserSharedLine,
   RiShieldKeyholeLine,
 } from "react-icons/ri";
@@ -727,59 +726,6 @@ export default function LoginPage() {
                         </FormItem>
                       )}
                     />
-                  </motion.div>
-
-                  {/* Email Helper */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.15 }}
-                    className="text-xs text-gray-500 italic bg-blue-50 p-2 rounded border border-blue-100"
-                  >
-                    <div className="flex items-center gap-1">
-                      <RiMailLine className="w-3 h-3" />
-                      <span>
-                        O sistema usará o e-mail vinculado à sua matrícula
-                      </span>
-                    </div>
-                  </motion.div>
-
-                  {/* Acesso Info */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.2 }}
-                    className="text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-200"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <RiShieldKeyholeLine className="w-3 h-3" />
-                        <span className="font-medium">Níveis de acesso:</span>
-                      </div>
-                      <ul className="list-disc list-inside pl-2 space-y-0.5">
-                        <li className="flex items-start">
-                          <span className="text-green-600 mr-1">•</span>
-                          <span>
-                            <strong>Agente ativo:</strong> Acesso ao perfil
-                            completo
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-amber-600 mr-1">•</span>
-                          <span>
-                            <strong>Agente inativo:</strong> Acesso apenas ao
-                            perfil
-                          </span>
-                        </li>
-                        <li className="flex items-start">
-                          <span className="text-blue-600 mr-1">•</span>
-                          <span>
-                            <strong>Administrador:</strong> Acesso total ao
-                            sistema
-                          </span>
-                        </li>
-                      </ul>
-                    </div>
                   </motion.div>
 
                   {/* Remember Me */}

@@ -523,7 +523,9 @@ export function Header() {
   }, [isMenuOpen]);
 
   return (
-    <header className="bg-white fixed top-0 left-0 right-0 z-50 h-[90px] md:h-[100px] lg:h-[120px] shadow-sm">
+    <header className="bg-white sticky top-0 left-0 right-0 z-50 h-[90px] md:h-[100px] lg:h-[120px] shadow-sm">
+      {/* MUDANÇA PRINCIPAL: fixed → sticky */}
+
       <TopBar />
 
       <div className="bg-white border-b border-slate-200">
