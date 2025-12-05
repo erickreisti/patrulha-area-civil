@@ -1,5 +1,4 @@
-// src/hooks/useAuth.ts
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { UserProfile } from "@/types";
 
@@ -9,39 +8,43 @@ export function useAuth() {
   const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createClient();
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+  const fetchProfile = useCallback(async () => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-        if (!session) {
-          setLoading(false);
-          return;
-        }
+      if (!session) {
+        setProfile(null);
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
 
-        const { data: profileData, error } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
+      const { data: profileData, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", session.user.id)
+        .single();
 
-        if (error) {
-          console.error("Erro ao buscar perfil:", error);
-          setLoading(false);
-          return;
-        }
-
+      if (error) {
+        console.error("Erro ao buscar perfil:", error);
+        setProfile(null);
+        setIsAdmin(false);
+      } else {
         setProfile(profileData);
         setIsAdmin(profileData.role === "admin");
-      } catch (error) {
-        console.error("Erro no useAuth:", error);
-      } finally {
-        setLoading(false);
       }
-    };
+    } catch (error) {
+      console.error("Erro no useAuth:", error);
+      setProfile(null);
+      setIsAdmin(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase]);
 
+  useEffect(() => {
     fetchProfile();
 
     // Escutar mudanças na autenticação
@@ -54,12 +57,16 @@ export function useAuth() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [fetchProfile, supabase]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setProfile(null);
-    setIsAdmin(false);
+    try {
+      await supabase.auth.signOut();
+      setProfile(null);
+      setIsAdmin(false);
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+    }
   };
 
   return {
@@ -68,5 +75,6 @@ export function useAuth() {
     isAdmin,
     signOut,
     supabase,
+    refreshProfile: fetchProfile,
   };
 }

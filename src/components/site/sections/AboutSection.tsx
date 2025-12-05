@@ -18,8 +18,9 @@ import {
 } from "react-icons/ri";
 import Link from "next/link";
 import { useState } from "react";
-import { motion } from "framer-motion";
-import Image from "next/image";
+import { motion, useInView } from "framer-motion";
+import { useRef } from "react";
+import { OptimizedImage } from "@/components/ui/image-optimized";
 import { cn } from "@/lib/utils";
 
 const STATS = [
@@ -101,34 +102,42 @@ const MISSION_VALUES = [
 ];
 
 const SectionHeader = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
   return (
     <motion.div
+      ref={ref}
       className="text-center mb-8 sm:mb-12 lg:mb-16"
       initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.6 }}
-      viewport={{ once: true, margin: "-50px" }}
     >
       <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-        <div className="w-12 sm:w-16 lg:w-20 h-0.5 sm:h-1 bg-navy"></div>
-        <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-navy rounded-full flex items-center justify-center shadow-lg">
+        <div className="w-8 sm:w-12 lg:w-16 h-0.5 sm:h-1 bg-navy"></div>
+        <motion.div
+          className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-navy rounded-full flex items-center justify-center shadow-lg"
+          animate={isInView ? { scale: [0.8, 1.1, 1] } : {}}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
           <RiShieldCheckLine className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
-        </div>
-        <div className="w-12 sm:w-16 lg:w-20 h-0.5 sm:h-1 bg-navy"></div>
+        </motion.div>
+        <div className="w-8 sm:w-12 lg:w-16 h-0.5 sm:h-1 bg-navy"></div>
       </div>
       <h1
         className={cn(
-          "font-bold text-slate-800 mb-4 sm:mb-6 tracking-normal uppercase",
-          "text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl"
+          "font-bold text-slate-800 mb-4 sm:mb-6 tracking-normal uppercase mx-auto px-2",
+          "text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl",
+          "max-w-[90vw]"
         )}
       >
         SOBRE A <span className="text-navy">PATRULHA</span>
       </h1>
       <p
         className={cn(
-          "text-slate-700 max-w-4xl mx-auto leading-relaxed font-medium px-4",
-          "text-sm sm:text-base lg:text-lg",
-          "max-w-xs sm:max-w-md lg:max-w-2xl xl:max-w-4xl"
+          "text-slate-700 mx-auto leading-relaxed font-medium px-2 sm:px-4",
+          "text-sm xs:text-base sm:text-lg lg:text-xl",
+          "max-w-xs xs:max-w-sm sm:max-w-md lg:max-w-2xl xl:max-w-4xl"
         )}
       >
         Organização civil de voluntários comprometida com o serviço humanitário,
@@ -140,6 +149,8 @@ const SectionHeader = () => {
 };
 
 const EmblemSection = () => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
   return (
     <motion.div
       className="relative group flex items-center justify-center"
@@ -152,24 +163,36 @@ const EmblemSection = () => {
         <div
           className={cn(
             "mx-auto mb-4 sm:mb-6 lg:mb-8 flex items-center justify-center",
-            "w-32 h-32 sm:w-40 sm:h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 xl:w-64 xl:h-64"
+            "w-32 h-32 xs:w-36 xs:h-36 sm:w-40 sm:h-40 md:w-48 md:h-48 lg:w-56 lg:h-56 xl:w-64 xl:h-64"
           )}
         >
           <div className="relative w-full h-full">
-            <Image
+            {/* Fallback background */}
+            <div
+              className="absolute inset-0 bg-navy/10 rounded-full"
+              style={{ opacity: isLoaded ? 0 : 1 }}
+            />
+
+            <OptimizedImage
               src="/images/logos/logo.webp"
               alt="Patrulha Aérea Civil"
               width={256}
               height={256}
-              className="object-contain drop-shadow-2xl w-full h-full"
+              className="object-contain drop-shadow-2xl w-full h-full transition-opacity duration-500"
               priority
+              onLoad={() => setIsLoaded(true)}
+              style={{
+                opacity: isLoaded ? 1 : 0,
+              }}
+              sizes="(max-width: 480px) 128px, (max-width: 640px) 144px, (max-width: 768px) 160px, (max-width: 1024px) 192px, (max-width: 1280px) 224px, 256px"
             />
           </div>
         </div>
         <div
           className={cn(
-            "font-bold text-navy uppercase tracking-wider",
-            "text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl"
+            "font-bold text-navy uppercase tracking-wider mx-auto px-2",
+            "text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl",
+            "max-w-[90vw]"
           )}
         >
           Patrulha Aérea Civil
@@ -201,13 +224,15 @@ const Accordion = () => {
         >
           <button
             onClick={() => toggleAccordion(index)}
-            className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between text-left transition-colors duration-200"
+            className="w-full px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between text-left transition-colors duration-200 touch-optimize"
+            aria-expanded={openAccordion === index}
+            aria-controls={`accordion-content-${index}`}
           >
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-navy rounded-full flex-shrink-0"></div>
               <span
                 className={cn(
-                  "font-semibold text-slate-800",
+                  "font-semibold text-slate-800 text-left",
                   "text-sm sm:text-base"
                 )}
               >
@@ -220,7 +245,13 @@ const Accordion = () => {
               <RiArrowDownSLine className="w-3 h-3 sm:w-4 sm:h-4 text-navy flex-shrink-0" />
             )}
           </button>
-          {openAccordion === index && (
+          <div
+            id={`accordion-content-${index}`}
+            className={cn(
+              "overflow-hidden transition-all duration-300 ease-in-out",
+              openAccordion === index ? "max-h-96" : "max-h-0"
+            )}
+          >
             <div className="px-3 sm:px-4 pb-3 sm:pb-4">
               <p
                 className={cn(
@@ -231,164 +262,184 @@ const Accordion = () => {
                 {item.content}
               </p>
             </div>
-          )}
+          </div>
         </div>
       ))}
     </motion.div>
   );
 };
 
-const MissionValuesGrid = () => (
-  <div
-    className={cn(
-      "grid gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto mb-12 sm:mb-16 lg:mb-20",
-      "grid-cols-1 md:grid-cols-3"
-    )}
-  >
-    {MISSION_VALUES.map((item, index) => (
-      <motion.div
-        key={item.title}
-        className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all duration-300 group hover:scale-105"
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: index * 0.1 }}
-        viewport={{ once: true, margin: "-50px" }}
-      >
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-navy rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300">
-            <item.icon className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
-          </div>
-          <span className="text-xs font-bold text-white uppercase tracking-wide px-2 sm:px-3 py-1 rounded-full bg-navy">
-            {item.badge}
-          </span>
-        </div>
+const MissionValuesGrid = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
 
-        <h3
-          className={cn(
-            "font-bold text-slate-800 mb-2 sm:mb-3 uppercase tracking-wide",
-            "text-lg sm:text-xl lg:text-2xl"
-          )}
-        >
-          {item.title}
-        </h3>
-        <p
-          className={cn(
-            "text-slate-700 leading-relaxed",
-            "text-xs sm:text-sm lg:text-base"
-          )}
-        >
-          {item.description}
-        </p>
-      </motion.div>
-    ))}
-  </div>
-);
-
-const StatsGrid = () => (
-  <motion.div
-    className={cn("grid gap-3 sm:gap-4 pt-6", "grid-cols-2")}
-    initial={{ opacity: 0 }}
-    whileInView={{ opacity: 1 }}
-    transition={{ duration: 0.6, delay: 0.3 }}
-    viewport={{ once: true, margin: "-50px" }}
-  >
-    {STATS.map((stat, index) => (
-      <motion.div
-        key={stat.label}
-        className="text-center p-4 sm:p-5 lg:p-6 bg-white border border-slate-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
-        initial={{ opacity: 0, scale: 0.9 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4, delay: index * 0.1 }}
-        viewport={{ once: true, margin: "-50px" }}
-      >
-        <div className="flex justify-center mb-3 sm:mb-4">
-          <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-navy rounded-xl flex items-center justify-center shadow-md">
-            <stat.icon className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
-          </div>
-        </div>
-        <div
-          className={cn(
-            "font-bold text-alert mb-1 sm:mb-2",
-            "text-xl sm:text-2xl lg:text-3xl"
-          )}
-        >
-          {stat.number}
-        </div>
-        <div
-          className={cn(
-            "text-slate-600 uppercase font-bold tracking-wider",
-            "text-xs sm:text-sm"
-          )}
-        >
-          {stat.label}
-        </div>
-      </motion.div>
-    ))}
-  </motion.div>
-);
-
-const AreasAtuacao = () => (
-  <motion.div
-    className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 lg:p-8 shadow-lg"
-    initial={{ opacity: 0, x: 30 }}
-    whileInView={{ opacity: 1, x: 0 }}
-    transition={{ duration: 0.6, delay: 0.2 }}
-    viewport={{ once: true, margin: "-50px" }}
-  >
-    <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 lg:mb-8 pb-3 sm:pb-4 border-b border-slate-200">
-      <RiMapPinLine className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-navy" />
-      <h3
-        className={cn(
-          "font-bold text-slate-800 uppercase tracking-wide",
-          "text-lg sm:text-xl lg:text-2xl"
-        )}
-      >
-        Áreas de Atuação
-      </h3>
-    </div>
-
-    <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-5">
-      {AREAS_ATUACAO.map((area, index) => (
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "grid gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto mb-12 sm:mb-16 lg:mb-20",
+        "grid-cols-1 md:grid-cols-3"
+      )}
+    >
+      {MISSION_VALUES.map((item, index) => (
         <motion.div
-          key={index}
-          className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-navy/50 transition-colors duration-300 group"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: index * 0.1 }}
-          viewport={{ once: true, margin: "-50px" }}
+          key={item.title}
+          className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 lg:p-8 shadow-lg hover:shadow-xl transition-all duration-300 group"
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: index * 0.1 }}
+          whileHover={{ scale: 1.02 }}
         >
-          <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-navy rounded-lg flex items-center justify-center flex-shrink-0 shadow-md group-hover:scale-110 transition-transform duration-300">
-            <area.icon className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-navy rounded-lg flex items-center justify-center shadow-md transition-transform duration-300">
+              <item.icon className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
+            </div>
+            <span className="text-xs font-bold text-white uppercase tracking-wide px-2 sm:px-3 py-1 rounded-full bg-navy">
+              {item.badge}
+            </span>
           </div>
-          <div className="flex-1 min-w-0">
-            <h4
-              className={cn(
-                "font-bold text-slate-800 mb-1 sm:mb-2",
-                "text-base sm:text-lg lg:text-xl"
-              )}
-            >
-              {area.title}
-            </h4>
-            <p
-              className={cn(
-                "text-slate-600 leading-relaxed",
-                "text-xs sm:text-sm lg:text-base"
-              )}
-            >
-              {area.description}
-            </p>
-          </div>
+
+          <h3
+            className={cn(
+              "font-bold text-slate-800 mb-2 sm:mb-3 uppercase tracking-wide",
+              "text-lg sm:text-xl lg:text-2xl"
+            )}
+          >
+            {item.title}
+          </h3>
+          <p
+            className={cn(
+              "text-slate-700 leading-relaxed",
+              "text-xs sm:text-sm lg:text-base"
+            )}
+          >
+            {item.description}
+          </p>
         </motion.div>
       ))}
     </div>
-  </motion.div>
-);
+  );
+};
+
+const StatsGrid = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <motion.div
+      ref={ref}
+      className={cn("grid gap-3 sm:gap-4 pt-6", "grid-cols-2")}
+      initial={{ opacity: 0 }}
+      animate={isInView ? { opacity: 1 } : {}}
+      transition={{ duration: 0.6, delay: 0.3 }}
+    >
+      {STATS.map((stat, index) => (
+        <motion.div
+          key={stat.label}
+          className="text-center p-3 sm:p-4 lg:p-5 bg-white border border-slate-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={isInView ? { opacity: 1, scale: 1 } : {}}
+          transition={{ duration: 0.4, delay: index * 0.1 }}
+          whileHover={{ scale: 1.02 }}
+        >
+          <div className="flex justify-center mb-2 sm:mb-3">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-navy rounded-xl flex items-center justify-center shadow-md">
+              <stat.icon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
+            </div>
+          </div>
+          <div
+            className={cn(
+              "font-bold text-alert mb-1 sm:mb-2",
+              "text-xl sm:text-2xl lg:text-3xl"
+            )}
+          >
+            {stat.number}
+          </div>
+          <div
+            className={cn(
+              "text-slate-600 uppercase font-bold tracking-wider",
+              "text-xs sm:text-sm"
+            )}
+          >
+            {stat.label}
+          </div>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+};
+
+const AreasAtuacao = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <motion.div
+      ref={ref}
+      className="bg-white border border-slate-200 rounded-xl p-4 sm:p-6 lg:p-8 shadow-lg"
+      initial={{ opacity: 0, x: 30 }}
+      animate={isInView ? { opacity: 1, x: 0 } : {}}
+      transition={{ duration: 0.6, delay: 0.2 }}
+    >
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6 lg:mb-8 pb-3 sm:pb-4 border-b border-slate-200">
+        <RiMapPinLine className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7 text-navy flex-shrink-0" />
+        <h3
+          className={cn(
+            "font-bold text-slate-800 uppercase tracking-wide",
+            "text-lg sm:text-xl lg:text-2xl"
+          )}
+        >
+          Áreas de Atuação
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:gap-5">
+        {AREAS_ATUACAO.map((area, index) => (
+          <motion.div
+            key={index}
+            className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-navy/50 transition-colors duration-300 group"
+            initial={{ opacity: 0, y: 20 }}
+            animate={isInView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.4, delay: index * 0.1 }}
+            whileHover={{ x: 5 }}
+          >
+            <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-navy rounded-lg flex items-center justify-center flex-shrink-0 shadow-md transition-transform duration-300">
+              <area.icon className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4
+                className={cn(
+                  "font-bold text-slate-800 mb-1 sm:mb-2",
+                  "text-base sm:text-lg lg:text-xl"
+                )}
+              >
+                {area.title}
+              </h4>
+              <p
+                className={cn(
+                  "text-slate-600 leading-relaxed",
+                  "text-xs sm:text-sm lg:text-base"
+                )}
+              >
+                {area.description}
+              </p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+};
 
 export function AboutSection() {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
   return (
     <section
       id="about-section"
-      className="w-full bg-offwhite py-8 sm:py-12 lg:py-16 xl:py-20"
+      className="w-full bg-offwhite py-8 sm:py-12 lg:py-16 xl:py-20 overflow-hidden"
+      ref={ref}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader />
@@ -399,21 +450,19 @@ export function AboutSection() {
             "grid-cols-1 lg:grid-cols-2"
           )}
           initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
+          animate={isInView ? { opacity: 1 } : {}}
           transition={{ duration: 0.8 }}
-          viewport={{ once: true, margin: "-50px" }}
         >
           <EmblemSection />
 
           <motion.div
             className="space-y-4 sm:space-y-6"
             initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            animate={isInView ? { opacity: 1, x: 0 } : {}}
             transition={{ duration: 0.6, delay: 0.3 }}
-            viewport={{ once: true, margin: "-50px" }}
           >
             <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-navy rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-navy rounded-lg flex items-center justify-center flex-shrink-0">
                 <RiFlagLine className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
               </div>
               <span className="text-navy font-bold tracking-wider uppercase text-xs sm:text-sm lg:text-base">
@@ -453,9 +502,8 @@ export function AboutSection() {
         <motion.div
           className="max-w-6xl mx-auto"
           initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true, margin: "-50px" }}
+          animate={isInView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.8, delay: 0.2 }}
         >
           <div
             className={cn(
@@ -466,14 +514,13 @@ export function AboutSection() {
             <motion.div
               className="space-y-6 sm:space-y-8"
               initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
+              animate={isInView ? { opacity: 1, x: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.2 }}
-              viewport={{ once: true, margin: "-50px" }}
             >
               <div>
                 <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 bg-navy rounded-lg flex items-center justify-center">
-                    <RiTimeLine className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-white" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-navy rounded-lg flex items-center justify-center flex-shrink-0">
+                    <RiTimeLine className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
                   </div>
                   <span className="text-navy font-bold tracking-wider uppercase text-xs sm:text-sm lg:text-base">
                     Nossa História
@@ -520,21 +567,20 @@ export function AboutSection() {
               <motion.div
                 className="pt-4 sm:pt-6"
                 initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.5, delay: 0.5 }}
-                viewport={{ once: true, margin: "-50px" }}
               >
                 <Button
                   asChild
                   className={cn(
                     "bg-navy hover:bg-navy-700 text-white font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl",
                     "px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4",
-                    "text-sm sm:text-base lg:text-lg"
+                    "text-sm sm:text-base lg:text-lg touch-optimize active:scale-95"
                   )}
                 >
                   <Link
                     href="/sobre"
-                    className="flex items-center gap-2 sm:gap-3"
+                    className="flex items-center gap-2 sm:gap-3 justify-center"
                   >
                     Conheça Nossa Organização
                     <RiArrowRightLine className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300 group-hover:translate-x-1" />

@@ -15,10 +15,11 @@ const nextConfig = {
     ],
     formats: ["image/webp", "image/avif"],
     dangerouslyAllowSVG: true,
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    minimumCacheTTL: 60,
   },
-  experimental: {
-    optimizeCss: true,
-  },
+  experimental: {},
   compiler: {
     removeConsole: process.env.NODE_ENV === "production",
   },
@@ -29,6 +30,19 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   poweredByHeader: false,
+  logging: {
+    fetches: {
+      fullUrl: false,
+    },
+  },
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.infrastructureLogging = {
+        level: "error",
+      };
+    }
+    return config;
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

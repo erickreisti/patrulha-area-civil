@@ -5,6 +5,8 @@ import Link from "next/link";
 import { motion, Variants } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { RiArrowRightLine, RiAlarmWarningLine } from "react-icons/ri";
+import { useEffect, useState } from "react";
+import Image from "next/image";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -65,53 +67,95 @@ const buttonVariants: Variants = {
 };
 
 const BackgroundImage = () => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
   return (
     <div className="absolute inset-0 overflow-hidden">
+      {/* Fallback background for loading */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: `url("/images/site/hero-bg.webp")`,
-          backgroundPosition: "center 30%",
-          backgroundSize: "cover",
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-navy-900/80 via-navy-800/50 to-navy-900/70"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-navy-800/40 to-transparent"></div>
-        <div className="absolute inset-0 bg-gradient-to-r from-navy-900/30 to-navy-900/30"></div>
+        className="absolute inset-0 bg-gradient-to-br from-navy-900 to-navy-800"
+        style={{ opacity: isLoaded ? 0 : 1, transition: "opacity 0.5s" }}
+      />
+
+      {/* Background Image with Next.js Image component */}
+      <div className="absolute inset-0">
+        <Image
+          src="/images/site/hero-bg.webp"
+          alt="Patrulha Aérea Civil - Operações Aéreas"
+          fill
+          priority
+          quality={85}
+          className={cn(
+            "object-cover object-center transition-opacity duration-1000",
+            isLoaded ? "opacity-100" : "opacity-0"
+          )}
+          sizes="100vw"
+          style={{
+            objectPosition: "center 30%",
+          }}
+          onLoad={() => setIsLoaded(true)}
+        />
+      </div>
+
+      {/* Overlay gradients */}
+      <div className="absolute inset-0 bg-gradient-to-b from-navy-900/60 via-navy-800/40 to-navy-900/50"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-navy-800/40 to-transparent"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-navy-900/30 via-navy-800/20 to-navy-900/40"></div>
+
+      {/* Subtle pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]"></div>
       </div>
     </div>
   );
 };
 
-const MainTitle = () => (
-  <motion.div className="mb-3 sm:mb-4 md:mb-5 lg:mb-6" variants={itemVariants}>
-    <h1
-      className={cn(
-        "font-bold text-white leading-tight",
-        "drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
-        "text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-8xl",
-        "px-2"
-      )}
+const MainTitle = () => {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  return (
+    <motion.div
+      className="mb-3 sm:mb-4 md:mb-5 lg:mb-6"
+      variants={itemVariants}
     >
-      <span className="block md:hidden leading-[0.9]">
-        <span className="block">PATRULHA</span>
-        <span className="block mt-1 sm:mt-2">AÉREA CIVIL</span>
-      </span>
-      <span className="hidden md:block whitespace-nowrap leading-[0.9]">
-        PATRULHA AÉREA CIVIL
-      </span>
-    </h1>
-  </motion.div>
-);
+      <h1
+        className={cn(
+          "font-bold text-white leading-tight drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
+          isMobile
+            ? "text-4xl xs:text-5xl leading-[0.9] px-2"
+            : "text-5xl sm:text-6xl md:text-7xl lg:text-8xl whitespace-nowrap leading-[0.9] px-4",
+          "mx-auto max-w-[90vw]"
+        )}
+      >
+        {isMobile ? (
+          <>
+            <span className="block">PATRULHA</span>
+            <span className="block mt-1 sm:mt-2">AÉREA CIVIL</span>
+          </>
+        ) : (
+          "PATRULHA AÉREA CIVIL"
+        )}
+      </h1>
+    </motion.div>
+  );
+};
 
 const Subtitle = () => (
   <motion.div className="mb-4 sm:mb-5 md:mb-6 lg:mb-8" variants={itemVariants}>
     <p
       className={cn(
-        "font-medium text-white mb-0 leading-relaxed",
-        "drop-shadow-lg font-roboto text-center",
-        "text-lg sm:text-xl md:text-2xl lg:text-3xl",
-        "px-4 max-w-3xl mx-auto",
+        "font-medium text-white mb-0 leading-relaxed drop-shadow-lg font-roboto text-center",
+        "text-base sm:text-lg md:text-xl lg:text-2xl px-4 mx-auto max-w-3xl",
         "bg-gradient-to-r from-white via-offwhite-200 to-white bg-clip-text text-transparent"
       )}
     >
@@ -123,23 +167,17 @@ const Subtitle = () => (
 const Description = () => (
   <motion.div
     className={cn(
-      "mb-6 sm:mb-8 md:mb-10 lg:mb-12",
-      "mx-auto px-4 sm:px-6",
+      "mb-6 sm:mb-8 md:mb-10 lg:mb-12 mx-auto px-4 sm:px-6",
       "max-w-xl sm:max-w-2xl md:max-w-3xl lg:max-w-4xl"
     )}
     variants={scaleInVariants}
   >
     <div
       className={cn(
-        "text-white leading-relaxed sm:leading-loose",
-        "bg-slate-900/80 backdrop-blur-md",
-        "rounded-xl lg:rounded-2xl",
-        "border border-white/20",
-        "shadow-2xl",
-        "font-roboto font-medium text-center",
-        "text-base sm:text-lg md:text-xl",
-        "p-4 sm:p-6 md:p-8",
-        "relative overflow-hidden"
+        "text-white leading-relaxed sm:leading-loose bg-slate-900/80 backdrop-blur-md",
+        "rounded-xl lg:rounded-2xl border border-white/20 shadow-2xl",
+        "font-roboto font-medium text-center text-sm sm:text-base md:text-lg",
+        "p-4 sm:p-6 md:p-8 relative overflow-hidden"
       )}
     >
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-navy-400/10 to-transparent transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
@@ -155,11 +193,8 @@ const Description = () => (
 const ActionButtons = () => (
   <motion.div
     className={cn(
-      "flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6",
-      "justify-center items-stretch",
-      "px-4 sm:px-6",
-      "w-full mx-auto",
-      "max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl"
+      "flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6 justify-center items-stretch",
+      "px-4 sm:px-6 w-full mx-auto max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl"
     )}
     variants={containerVariants}
   >
@@ -167,20 +202,16 @@ const ActionButtons = () => (
       variants={buttonVariants}
       whileHover="hover"
       whileTap="tap"
-      className="w-full sm:w-auto sm:flex-1"
+      className="w-full sm:w-auto sm:flex-1 touch-optimize"
     >
       <Button
         size="lg"
         className={cn(
-          "w-full font-bold uppercase tracking-wider",
-          "transition-all duration-300 font-roboto border-0",
-          "relative overflow-hidden shadow-lg hover:shadow-xl",
-          "group/button",
-          "bg-navy hover:bg-navy-600 text-white",
-          "text-sm sm:text-base",
-          "px-6 sm:px-8",
-          "py-3 sm:py-4",
-          "h-auto min-h-[48px] sm:min-h-[56px]"
+          "w-full font-bold uppercase tracking-wider transition-all duration-300 font-roboto border-0",
+          "relative overflow-hidden shadow-lg hover:shadow-xl group/button",
+          "bg-navy hover:bg-navy-600 text-white text-sm sm:text-base",
+          "px-4 sm:px-6 md:px-8 py-3 sm:py-4 h-auto min-h-[48px] sm:min-h-[56px]",
+          "active:scale-95"
         )}
         asChild
       >
@@ -206,22 +237,18 @@ const ActionButtons = () => (
       variants={buttonVariants}
       whileHover="hover"
       whileTap="tap"
-      className="w-full sm:w-auto sm:flex-1"
+      className="w-full sm:w-auto sm:flex-1 touch-optimize"
     >
       <Button
         variant="outline"
         size="lg"
         className={cn(
-          "w-full font-bold uppercase tracking-wider",
-          "transition-all duration-300 font-roboto",
-          "relative overflow-hidden shadow-lg hover:shadow-xl",
-          "group/outline",
+          "w-full font-bold uppercase tracking-wider transition-all duration-300 font-roboto",
+          "relative overflow-hidden shadow-lg hover:shadow-xl group/outline",
           "border-2 border-white bg-white/10 backdrop-blur-sm",
-          "text-white hover:bg-white hover:text-navy-800",
-          "text-sm sm:text-base",
-          "px-6 sm:px-8",
-          "py-3 sm:py-4",
-          "h-auto min-h-[48px] sm:min-h-[56px]"
+          "text-white hover:bg-white hover:text-navy-800 text-sm sm:text-base",
+          "px-4 sm:px-6 md:px-8 py-3 sm:py-4 h-auto min-h-[48px] sm:min-h-[56px]",
+          "active:scale-95"
         )}
         asChild
       >
@@ -257,12 +284,13 @@ const ScrollIndicator = () => {
 
   return (
     <motion.div
-      className="hidden sm:block cursor-pointer group/scroll mb-6"
+      className="hidden sm:block cursor-pointer group/scroll mb-4 sm:mb-6"
       variants={itemVariants}
       onClick={scrollToAbout}
       whileHover={{ y: 5 }}
+      aria-label="Role para baixo para saber mais"
     >
-      <div className="flex flex-col items-center mt-10 gap-2 sm:gap-3">
+      <div className="flex flex-col items-center mt-8 sm:mt-10 gap-2 sm:gap-3">
         <span className="text-sm text-white/80 font-roboto uppercase tracking-wider group-hover/scroll:text-white transition-colors duration-300">
           Saiba Mais
         </span>
@@ -270,7 +298,7 @@ const ScrollIndicator = () => {
           <motion.div
             className="w-1 h-3 sm:h-4 bg-white/70 rounded-full mt-2 sm:mt-3"
             animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
           />
         </div>
       </div>
@@ -279,14 +307,33 @@ const ScrollIndicator = () => {
 };
 
 export function HeroSection() {
+  const [height, setHeight] = useState("calc(100vh - 90px)");
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (window.innerWidth < 640) {
+        setHeight("calc(100vh - 90px)");
+      } else if (window.innerWidth < 1024) {
+        setHeight("calc(100vh - 100px)");
+      } else {
+        setHeight("calc(100vh - 120px)");
+      }
+    };
+
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
+
   return (
     <section
-      className="relative bg-slate-800 text-white overflow-hidden"
+      className="relative bg-slate-800 text-white overflow-hidden ios-h-screen"
       style={{
-        height: "calc(100vh - 90px)",
+        height,
         minHeight: "600px",
       }}
       id="hero-section"
+      aria-label="Seção principal da Patrulha Aérea Civil"
     >
       <BackgroundImage />
 
@@ -298,9 +345,8 @@ export function HeroSection() {
       >
         <div
           className={cn(
-            "mx-auto w-full h-full",
-            "flex flex-col justify-end items-center",
-            "pb-8 sm:pb-12 md:pb-16 lg:pb-20"
+            "mx-auto w-full h-full flex flex-col justify-end items-center",
+            "pb-8 sm:pb-12 md:pb-16 lg:pb-20 pt-16 sm:pt-20"
           )}
         >
           <div className="text-center w-full">

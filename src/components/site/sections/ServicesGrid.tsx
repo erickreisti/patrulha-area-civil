@@ -15,9 +15,12 @@ import {
   RiArrowRightLine,
   RiPhoneLine,
   RiSettingsLine,
+  RiArrowLeftLine,
+  RiArrowRightLine as RiArrowRight,
 } from "react-icons/ri";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 type IconType = React.ComponentType<{ className?: string }>;
 
@@ -171,36 +174,64 @@ const useServiceNavigation = (servicesCount: number) => {
   const [activeService, setActiveService] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const detailsRef = useRef<HTMLDivElement>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
 
   const handleServiceSelect = useCallback(
     (index: number) => {
       if (isAnimating) return;
       setIsAnimating(true);
       setActiveService(index);
-      setTimeout(() => setIsAnimating(false), 500);
+      setTimeout(() => setIsAnimating(false), 300);
     },
     [isAnimating]
   );
+
+  // Touch handling for mobile swipe
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart) return;
+
+    const touchEnd = e.changedTouches[0].clientX;
+    const diff = touchStart - touchEnd;
+
+    // Minimum swipe distance
+    if (Math.abs(diff) > 50) {
+      if (diff > 0 && activeService < servicesCount - 1) {
+        handleServiceSelect(activeService + 1);
+      } else if (diff < 0 && activeService > 0) {
+        handleServiceSelect(activeService - 1);
+      }
+    }
+
+    setTouchStart(null);
+  };
 
   useEffect(() => {
     const detailsElement = detailsRef.current;
     if (detailsElement && window.innerWidth >= 1440) {
       const handleWheel = (e: WheelEvent) => {
         if (isAnimating) return;
-        e.preventDefault();
-        setIsAnimating(true);
 
-        const direction = e.deltaY > 0 ? 1 : -1;
-        const newIndex = Math.max(
-          0,
-          Math.min(servicesCount - 1, activeService + direction)
-        );
+        // Prevent default only if we're going to handle it
+        if (Math.abs(e.deltaY) > 50) {
+          e.preventDefault();
+          setIsAnimating(true);
 
-        if (newIndex !== activeService) {
-          setActiveService(newIndex);
+          const direction = e.deltaY > 0 ? 1 : -1;
+          const newIndex = Math.max(
+            0,
+            Math.min(servicesCount - 1, activeService + direction)
+          );
+
+          if (newIndex !== activeService) {
+            setActiveService(newIndex);
+          }
+
+          setTimeout(() => setIsAnimating(false), 300);
         }
-
-        setTimeout(() => setIsAnimating(false), 500);
       };
 
       detailsElement.addEventListener("wheel", handleWheel, { passive: false });
@@ -213,6 +244,8 @@ const useServiceNavigation = (servicesCount: number) => {
     handleServiceSelect,
     detailsRef,
     isAnimating,
+    handleTouchStart,
+    handleTouchEnd,
   };
 };
 
@@ -230,7 +263,7 @@ const ServiceCard = ({
   const IconComponent = service.icon;
 
   return (
-    <motion.div
+    <motion.button
       key={service.title}
       onClick={() => onSelect(index)}
       whileHover={{ scale: 1.02 }}
@@ -239,35 +272,34 @@ const ServiceCard = ({
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.4, delay: index * 0.05 }}
       viewport={{ once: true, margin: "-50px" }}
-      className={`
-        cursor-pointer transition-all duration-300 rounded-xl p-3 sm:p-4 border-2 h-28 sm:h-32
-        ${
-          activeService === index
-            ? "border-navy bg-navy/10 shadow-xl transform scale-105"
-            : "border-slate-200 bg-white shadow-lg hover:shadow-xl"
-        }
-      `}
+      className={cn(
+        "cursor-pointer transition-all duration-300 rounded-xl p-3 sm:p-4 border-2 h-28 sm:h-32 w-full text-left",
+        "focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2",
+        activeService === index
+          ? "border-navy bg-navy/10 shadow-xl transform scale-105"
+          : "border-slate-200 bg-white shadow-lg hover:shadow-xl"
+      )}
+      aria-label={`Selecionar serviço: ${service.title}`}
+      aria-pressed={activeService === index}
     >
       <div className="flex flex-col h-full">
         <div className="flex items-center gap-2 sm:gap-3 mb-2">
           <div
-            className={`
-              w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0
-              ${
-                activeService === index
-                  ? "bg-navy text-white shadow-md"
-                  : "bg-slate-100 text-navy"
-              }
-            `}
+            className={cn(
+              "w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300",
+              activeService === index
+                ? "bg-navy text-white shadow-md"
+                : "bg-slate-100 text-navy"
+            )}
           >
             <IconComponent className="h-3 w-3 sm:h-4 sm:w-4" />
           </div>
           <div className="flex-1 min-w-0">
             <h3
-              className={`
-                font-bold text-xs sm:text-sm leading-tight line-clamp-2
-                ${activeService === index ? "text-navy" : "text-slate-800"}
-              `}
+              className={cn(
+                "font-bold text-xs sm:text-sm leading-tight line-clamp-2",
+                activeService === index ? "text-navy" : "text-slate-800"
+              )}
             >
               {service.title}
             </h3>
@@ -276,17 +308,17 @@ const ServiceCard = ({
 
         <div className="flex justify-between items-center mt-auto">
           <div
-            className={`
-              w-2 h-2 rounded-full transition-all duration-300
-              ${activeService === index ? "bg-navy scale-125" : "bg-slate-300"}
-            `}
+            className={cn(
+              "w-2 h-2 rounded-full transition-all duration-300",
+              activeService === index ? "bg-navy scale-125" : "bg-slate-300"
+            )}
           />
           <span className="text-xs text-slate-500 font-medium">
             {index + 1}/{SERVICES.length}
           </span>
         </div>
       </div>
-    </motion.div>
+    </motion.button>
   );
 };
 
@@ -299,20 +331,21 @@ const ServiceDetails = ({ service }: { service: Service }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      transition={{ duration: 0.4, ease: "easeOut" }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
       className="space-y-4 sm:space-y-6"
     >
       <div className="flex items-center gap-3 sm:gap-4">
         <div
-          className={`
-            w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center
-            ${service.bgColor} shadow-lg flex-shrink-0
-          `}
+          className={cn(
+            "w-10 h-10 sm:w-12 sm:h-12 lg:w-14 lg:h-14 rounded-xl flex items-center justify-center",
+            service.bgColor,
+            "shadow-lg flex-shrink-0"
+          )}
         >
-          <IconComponent className="h-5 w-5 sm:h-7 sm:w-7 text-navy" />
+          <IconComponent className="h-4 w-4 sm:h-5 sm:w-5 lg:h-6 lg:w-6 text-navy" />
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="text-base sm:text-lg font-bold text-slate-800 uppercase tracking-tight leading-tight">
+          <h2 className="text-base sm:text-lg lg:text-xl font-bold text-slate-800 uppercase tracking-tight leading-tight">
             {service.title}
           </h2>
         </div>
@@ -331,11 +364,11 @@ const ServiceDetails = ({ service }: { service: Service }) => {
         <h3 className="text-sm sm:text-base font-bold text-slate-800 mb-2 sm:mb-3">
           Características Principais
         </h3>
-        <div className="grid grid-cols-1 gap-1 sm:gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2">
           {service.features.map((feature, index) => (
             <motion.div
               key={index}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg"
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3, delay: index * 0.1 }}
@@ -354,11 +387,11 @@ const ServiceDetails = ({ service }: { service: Service }) => {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.3 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
             className="w-full"
           >
             <Button
-              className="bg-navy hover:bg-navy-700 text-white font-bold px-3 sm:px-4 py-2 shadow-lg w-full text-xs sm:text-sm min-h-[40px] sm:min-h-[44px] transition-all duration-300 hover:scale-105"
+              className="bg-navy hover:bg-navy-700 text-white font-bold px-3 sm:px-4 py-2 shadow-lg w-full text-xs sm:text-sm min-h-[40px] sm:min-h-[44px] transition-all duration-300 hover:scale-105 touch-optimize active:scale-95"
               asChild
             >
               <Link
@@ -373,12 +406,12 @@ const ServiceDetails = ({ service }: { service: Service }) => {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.4 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
             className="w-full"
           >
             <Button
               variant="outline"
-              className="border-2 border-navy text-navy hover:bg-navy hover:text-white font-bold px-3 sm:px-4 py-2 w-full text-xs sm:text-sm min-h-[40px] sm:min-h-[44px] transition-all duration-300 hover:scale-105"
+              className="border-2 border-navy text-navy hover:bg-navy hover:text-white font-bold px-3 sm:px-4 py-2 w-full text-xs sm:text-sm min-h-[40px] sm:min-h-[44px] transition-all duration-300 hover:scale-105 touch-optimize active:scale-95"
               asChild
             >
               <Link
@@ -401,52 +434,56 @@ const MobileServiceCard = ({
   index,
   activeService,
   onSelect,
+  onTouchStart,
+  onTouchEnd,
 }: {
   service: Service;
   index: number;
   activeService: number;
   onSelect: (index: number) => void;
+  onTouchStart: (e: React.TouchEvent) => void;
+  onTouchEnd: (e: React.TouchEvent) => void;
 }) => {
   const IconComponent = service.icon;
 
   return (
     <motion.div
       key={service.title}
-      onClick={() => onSelect(index)}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
       whileTap={{ scale: 0.98 }}
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
       viewport={{ once: true, margin: "-50px" }}
-      className={`
-        w-full text-left p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all duration-200
-        ${
-          activeService === index
-            ? "border-navy bg-navy/10 shadow-xl"
-            : "border-slate-200 bg-white shadow-lg hover:shadow-xl"
-        }
-      `}
+      className={cn(
+        "w-full text-left p-3 sm:p-4 rounded-xl border-2 cursor-pointer transition-all duration-200",
+        activeService === index
+          ? "border-navy bg-navy/10 shadow-xl"
+          : "border-slate-200 bg-white shadow-lg hover:shadow-xl"
+      )}
     >
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div
+        className="flex items-center gap-2 sm:gap-3"
+        onClick={() => onSelect(index)}
+      >
         <div
-          className={`
-            w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300
-            ${
-              activeService === index
-                ? "bg-navy text-white shadow-md"
-                : "bg-slate-100 text-navy"
-            }
-          `}
+          className={cn(
+            "w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-all duration-300",
+            activeService === index
+              ? "bg-navy text-white shadow-md"
+              : "bg-slate-100 text-navy"
+          )}
         >
-          <IconComponent className="h-4 w-4 sm:h-5 sm:w-5" />
+          <IconComponent className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
         </div>
 
         <div className="flex-1 min-w-0">
           <h3
-            className={`
-              font-bold text-sm sm:text-base mb-1 leading-tight
-              ${activeService === index ? "text-navy" : "text-slate-800"}
-            `}
+            className={cn(
+              "font-bold text-sm sm:text-base mb-1 leading-tight",
+              activeService === index ? "text-navy" : "text-slate-800"
+            )}
           >
             {service.title}
           </h3>
@@ -456,10 +493,10 @@ const MobileServiceCard = ({
         </div>
 
         <div
-          className={`
-            w-2 h-2 rounded-full flex-shrink-0 transition-all duration-300
-            ${activeService === index ? "bg-navy scale-125" : "bg-slate-300"}
-          `}
+          className={cn(
+            "w-2 h-2 rounded-full flex-shrink-0 transition-all duration-300",
+            activeService === index ? "bg-navy scale-125" : "bg-slate-300"
+          )}
         />
       </div>
 
@@ -469,7 +506,7 @@ const MobileServiceCard = ({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-slate-200"
           >
             <div className="mb-3 sm:mb-4">
@@ -489,10 +526,10 @@ const MobileServiceCard = ({
                 {service.features.map((feature, featureIndex) => (
                   <motion.div
                     key={featureIndex}
-                    className="flex items-center gap-1 sm:gap-2"
+                    className="flex items-center gap-1 sm:gap-2 p-1.5 bg-slate-50 rounded"
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: featureIndex * 0.1 }}
+                    transition={{ duration: 0.2, delay: featureIndex * 0.1 }}
                   >
                     <RiCheckboxCircleLine className="h-3 w-3 text-navy flex-shrink-0" />
                     <span className="text-slate-700 text-xs">{feature}</span>
@@ -501,48 +538,46 @@ const MobileServiceCard = ({
               </div>
             </div>
 
-            <div className="flex justify-center pt-2 sm:pt-3">
-              <div className="w-full flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center items-center">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.2 }}
-                  className="w-full sm:w-auto"
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center items-center pt-2 sm:pt-3">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+                className="w-full"
+              >
+                <Button
+                  className="flex-1 w-full bg-navy hover:bg-navy-700 text-white text-xs sm:text-sm h-10 sm:h-12 transition-all duration-300 hover:scale-105 min-h-[40px] sm:min-h-[48px] touch-optimize active:scale-95"
+                  asChild
                 >
-                  <Button
-                    className="flex-1 w-full bg-navy hover:bg-navy-700 text-white text-xs sm:text-sm h-10 sm:h-12 transition-all duration-300 hover:scale-105 min-h-[40px] sm:min-h-[48px]"
-                    asChild
+                  <Link
+                    href="/contato"
+                    className="flex items-center justify-center gap-1 sm:gap-2 py-2"
                   >
-                    <Link
-                      href="/contato"
-                      className="flex items-center justify-center gap-1 sm:gap-2 py-2"
-                    >
-                      <RiPhoneLine className="h-3 w-3 sm:h-4 sm:w-4" />
-                      Contatar
-                    </Link>
-                  </Button>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.3 }}
-                  className="w-full sm:w-auto"
+                    <RiPhoneLine className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Contatar
+                  </Link>
+                </Button>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+                className="w-full"
+              >
+                <Button
+                  variant="outline"
+                  className="flex-1 w-full border-navy text-navy hover:bg-navy hover:text-white text-xs sm:text-sm h-10 sm:h-12 transition-all duration-300 hover:scale-105 min-h-[40px] sm:min-h-[48px] touch-optimize active:scale-95"
+                  asChild
                 >
-                  <Button
-                    variant="outline"
-                    className="flex-1 w-full border-navy text-navy hover:bg-navy hover:text-white text-xs sm:text-sm h-10 sm:h-12 transition-all duration-300 hover:scale-105 min-h-[40px] sm:min-h-[48px]"
-                    asChild
+                  <Link
+                    href="/servicos"
+                    className="flex items-center justify-center gap-1 sm:gap-2 py-2"
                   >
-                    <Link
-                      href="/servicos"
-                      className="flex items-center justify-center gap-1 sm:gap-2 py-2"
-                    >
-                      Detalhes
-                      <RiArrowRightLine className="h-3 w-3 sm:h-4 sm:w-4" />
-                    </Link>
-                  </Button>
-                </motion.div>
-              </div>
+                    Detalhes
+                    <RiArrowRightLine className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </Link>
+                </Button>
+              </motion.div>
             </div>
           </motion.div>
         )}
@@ -559,23 +594,55 @@ const ServiceNavigation = ({
   onSelect: (index: number) => void;
 }) => (
   <motion.div
-    className="flex justify-center gap-1 sm:gap-2 mt-4"
+    className="flex justify-center items-center gap-4 mt-4"
     initial={{ opacity: 0, y: 20 }}
     whileInView={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5, delay: 0.3 }}
     viewport={{ once: true }}
   >
-    {SERVICES.map((_, index) => (
-      <button
-        key={index}
-        onClick={() => onSelect(index)}
-        className={`
-          w-2 h-2 rounded-full transition-all duration-300
-          ${activeService === index ? "bg-navy w-4 sm:w-6" : "bg-slate-300"}
-        `}
-        aria-label={`Ir para serviço ${index + 1}`}
-      />
-    ))}
+    <button
+      onClick={() => onSelect(Math.max(0, activeService - 1))}
+      disabled={activeService === 0}
+      className={cn(
+        "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300",
+        activeService === 0
+          ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+          : "bg-navy text-white hover:bg-navy-700"
+      )}
+      aria-label="Serviço anterior"
+    >
+      <RiArrowLeftLine className="w-4 h-4" />
+    </button>
+
+    <div className="flex gap-1 sm:gap-2">
+      {SERVICES.map((_, index) => (
+        <button
+          key={index}
+          onClick={() => onSelect(index)}
+          className={cn(
+            "w-2 h-2 rounded-full transition-all duration-300",
+            activeService === index
+              ? "bg-navy w-4 sm:w-6"
+              : "bg-slate-300 hover:bg-slate-400"
+          )}
+          aria-label={`Ir para serviço ${index + 1}`}
+        />
+      ))}
+    </div>
+
+    <button
+      onClick={() => onSelect(Math.min(SERVICES.length - 1, activeService + 1))}
+      disabled={activeService === SERVICES.length - 1}
+      className={cn(
+        "w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300",
+        activeService === SERVICES.length - 1
+          ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+          : "bg-navy text-white hover:bg-navy-700"
+      )}
+      aria-label="Próximo serviço"
+    >
+      <RiArrowRight className="w-4 h-4" />
+    </button>
   </motion.div>
 );
 
@@ -595,7 +662,7 @@ const MobileCTASection = () => (
         Entre em contato para uma consultoria especializada
       </p>
       <Button
-        className="bg-navy hover:bg-navy-700 text-white w-full sm:w-auto text-xs h-8 sm:h-9 transition-all duration-300 hover:scale-105"
+        className="bg-navy hover:bg-navy-700 text-white w-full sm:w-auto text-xs h-8 sm:h-9 transition-all duration-300 hover:scale-105 touch-optimize active:scale-95"
         asChild
       >
         <Link
@@ -611,13 +678,18 @@ const MobileCTASection = () => (
 );
 
 export function ServicesGrid() {
-  const { activeService, handleServiceSelect, detailsRef } =
-    useServiceNavigation(SERVICES.length);
+  const {
+    activeService,
+    handleServiceSelect,
+    detailsRef,
+    handleTouchStart,
+    handleTouchEnd,
+  } = useServiceNavigation(SERVICES.length);
 
   return (
     <section
       id="services-section"
-      className="w-full bg-offwhite py-12 sm:py-16 lg:py-20"
+      className="w-full bg-offwhite py-12 sm:py-16 lg:py-20 overflow-hidden"
     >
       <div className="container mx-auto px-3 sm:px-4">
         <motion.div
@@ -628,7 +700,7 @@ export function ServicesGrid() {
           viewport={{ once: true }}
         >
           <div className="flex items-center justify-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <div className="w-12 sm:w-16 h-0.5 sm:h-1 bg-navy"></div>
+            <div className="w-8 sm:w-12 lg:w-16 h-0.5 sm:h-1 bg-navy"></div>
             <motion.div
               className="w-10 h-10 sm:w-12 sm:h-12 bg-navy rounded-full flex items-center justify-center shadow-lg"
               initial={{ scale: 0, rotate: -180 }}
@@ -638,31 +710,31 @@ export function ServicesGrid() {
             >
               <RiSettingsLine className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </motion.div>
-            <div className="w-12 sm:w-16 h-0.5 sm:h-1 bg-navy"></div>
+            <div className="w-8 sm:w-12 lg:w-16 h-0.5 sm:h-1 bg-navy"></div>
           </div>
 
-          <motion.h1
-            className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-slate-800 mb-4 sm:mb-6 tracking-normal uppercase"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            viewport={{ once: true }}
+          <h1
+            className={cn(
+              "text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl",
+              "font-bold text-slate-800 mb-4 sm:mb-6 tracking-normal uppercase mx-auto px-2",
+              "max-w-[90vw]"
+            )}
           >
             NOSSOS <span className="text-navy">SERVIÇOS</span>
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            className="text-base sm:text-lg text-slate-700 max-w-4xl mx-auto leading-relaxed font-medium px-3 sm:px-4"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            viewport={{ once: true }}
+          <p
+            className={cn(
+              "text-sm xs:text-base sm:text-lg text-slate-700 mx-auto leading-relaxed font-medium px-3 sm:px-4",
+              "max-w-xs xs:max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-3xl"
+            )}
           >
             Conheça nossos serviços especializados executados com padrões
             operacionais e compromisso com a excelência
-          </motion.p>
+          </p>
         </motion.div>
 
+        {/* Desktop Layout (2xl and above) */}
         <motion.div
           className="hidden 2xl:flex gap-6 sm:gap-8 max-w-7xl mx-auto"
           initial={{ opacity: 0 }}
@@ -703,14 +775,12 @@ export function ServicesGrid() {
                 <button
                   key={index}
                   onClick={() => handleServiceSelect(index)}
-                  className={`
-                    w-2 h-2 rounded-full transition-all duration-300
-                    ${
-                      activeService === index
-                        ? "bg-navy w-4 sm:w-6"
-                        : "bg-slate-300 hover:bg-slate-400"
-                    }
-                  `}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-all duration-300",
+                    activeService === index
+                      ? "bg-navy w-4 sm:w-6"
+                      : "bg-slate-300 hover:bg-slate-400"
+                  )}
                   aria-label={`Ir para serviço ${index + 1}`}
                 />
               ))}
@@ -729,7 +799,7 @@ export function ServicesGrid() {
                 ref={detailsRef}
                 className="bg-white border-2 border-slate-200 rounded-xl p-4 sm:p-6 shadow-lg h-[500px] sm:h-[600px] overflow-hidden"
               >
-                <div className="overflow-y-auto h-full pr-2">
+                <div className="overflow-y-auto h-full pr-2 scrollbar-thin">
                   <AnimatePresence mode="wait">
                     <ServiceDetails service={SERVICES[activeService]} />
                   </AnimatePresence>
@@ -754,6 +824,7 @@ export function ServicesGrid() {
           </div>
         </motion.div>
 
+        {/* Mobile/Tablet Layout (below 2xl) */}
         <motion.div
           className="2xl:hidden space-y-3 sm:space-y-4 max-w-4xl mx-auto"
           initial={{ opacity: 0 }}
@@ -769,6 +840,8 @@ export function ServicesGrid() {
                 index={index}
                 activeService={activeService}
                 onSelect={handleServiceSelect}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
               />
             ))}
           </div>

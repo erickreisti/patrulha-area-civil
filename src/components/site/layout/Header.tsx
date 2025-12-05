@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { debounce } from "@/lib/debounce";
 import {
   RiFacebookFill,
   RiInstagramLine,
@@ -25,11 +26,12 @@ import {
   RiLogoutBoxRLine,
   RiBarChartLine,
   RiTwitterXLine,
+  RiCloseLine,
+  RiSearchLine,
 } from "react-icons/ri";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/stores/auth-store";
 import { createClient } from "@/lib/supabase/client";
-import { Spinner } from "@/components/ui/spinner";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -68,41 +70,62 @@ const SOCIAL_ICONS = [
 ];
 
 const TopBar = () => {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = debounce(() => {
+      setScrolled(window.scrollY > 10);
+    }, 10);
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
-    <div className="bg-navy py-2">
+    <div
+      className={cn(
+        "bg-navy py-2 transition-all duration-300",
+        scrolled ? "shadow-md" : ""
+      )}
+      role="complementary"
+      aria-label="Barra superior"
+    >
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex justify-between items-center text-white text-sm">
           <div className="flex md:hidden items-center gap-2">
-            <div className="relative w-6 h-4">
-              <Image
-                src="/images/logos/flag-br.webp"
-                alt="Bandeira do Brasil"
-                width={24}
-                height={16}
-                className="object-cover rounded-sm w-full h-full"
-                priority
-              />
-            </div>
-            <span className="text-slate-200 text-xs font-medium">Brasil</span>
-          </div>
-
-          <div className="hidden md:flex items-center gap-3">
-            <div className="relative w-6 h-4">
-              <Image
-                src="/images/logos/flag-br.webp"
-                alt="Bandeira do Brasil"
-                width={24}
-                height={16}
-                className="object-cover rounded-sm w-full h-full"
-                priority
-              />
-            </div>
-            <span className="text-slate-200 font-medium font-roboto">
-              República Federativa do Brasil
+            <Image
+              src="/images/logos/flag-br.webp"
+              alt="Bandeira do Brasil"
+              width={24}
+              height={16}
+              className="rounded-sm"
+              style={{ width: "auto", height: "auto" }}
+              priority
+            />
+            <span className="text-slate-200 text-xs font-medium truncate max-w-[120px] xs:max-w-none">
+              Brasil
             </span>
           </div>
 
-          <div className="flex gap-1 sm:gap-2">
+          <div className="hidden md:flex items-center gap-3">
+            <Image
+              src="/images/logos/flag-br.webp"
+              alt="Bandeira do Brasil"
+              width={24}
+              height={16}
+              className="rounded-sm"
+              style={{ width: "auto", height: "auto" }}
+              priority
+            />
+            <span className="text-slate-200 font-medium font-roboto text-sm lg:text-base">
+              República Federativa do Brasil
+            </span>
+          </div>
+          <div
+            className="flex gap-1 sm:gap-2"
+            role="list"
+            aria-label="Redes sociais"
+          >
             {SOCIAL_ICONS.map((social) => {
               const IconComponent = social.icon;
               return (
@@ -112,13 +135,17 @@ const TopBar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    "w-7 h-7 sm:w-8 sm:h-8 bg-white/10 rounded-full flex items-center justify-center text-white no-underline transition-all duration-300 border border-white/20",
+                    "w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8",
+                    "bg-white/10 rounded-full flex items-center justify-center text-white",
+                    "no-underline transition-all duration-300 border border-white/20",
                     social.hoverColor,
-                    "hover:border-transparent hover:scale-110 hover:shadow-lg"
+                    "hover:border-transparent hover:scale-110 hover:shadow-lg",
+                    "touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
                   )}
                   aria-label={social.label}
+                  role="listitem"
                 >
-                  <IconComponent className="w-3 h-3 sm:w-3 sm:h-3" />
+                  <IconComponent className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                 </a>
               );
             })}
@@ -134,22 +161,25 @@ const Logo = () => {
     <Link
       href="/"
       className="flex items-center group transition-all duration-300 gap-2 md:gap-3 lg:gap-4"
+      aria-label="Página inicial da Patrulha Aérea Civil"
+      role="banner"
     >
-      <div className="relative w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 transition-all duration-300">
+      <div className="relative w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 transition-all duration-300 flex-shrink-0">
         <Image
           src="/images/logos/logo.webp"
           alt="Patrulha Aérea Civil"
           width={56}
           height={56}
-          className="object-contain drop-shadow-md w-full h-full transition-all duration-300"
+          className="object-contain drop-shadow-md transition-all duration-300 group-hover:scale-105"
+          style={{ width: "auto", height: "auto" }}
           priority
         />
       </div>
-      <div className="text-left transition-all duration-300">
-        <h1 className="font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 text-xl sm:text-2xl">
+      <div className="text-left transition-all duration-300 min-w-0">
+        <h1 className="font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 text-lg sm:text-xl md:text-2xl lg:text-3xl truncate">
           PATRULHA AÉREA CIVIL
         </h1>
-        <p className="text-slate-600 leading-tight mt-0.5 font-roboto transition-all duration-300 text-xs">
+        <p className="text-slate-600 leading-tight mt-0.5 font-roboto transition-all duration-300 text-xs md:text-sm truncate">
           COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
         </p>
       </div>
@@ -160,19 +190,26 @@ const Logo = () => {
 const NavigationItem = ({
   item,
   isActive,
+  onClick,
 }: {
   item: (typeof NAVIGATION)[0];
   isActive: boolean;
+  onClick?: () => void;
 }) => (
-  <li className="relative">
+  <li className="relative" role="none">
     <Link
       href={item.href}
+      onClick={onClick}
       className={cn(
-        "no-underline text-slate-700 font-medium py-2 px-1 transition-all duration-300 uppercase tracking-wider font-roboto relative group/navlink text-sm w-fit",
+        "no-underline text-slate-700 font-medium py-2 px-1 transition-all duration-300",
+        "uppercase tracking-wider font-roboto relative group/navlink text-sm w-fit",
         isActive
           ? "text-navy font-semibold"
-          : "text-slate-600 hover:text-navy hover:font-semibold"
+          : "text-slate-600 hover:text-navy hover:font-semibold",
+        "touch-optimize active:scale-95"
       )}
+      aria-current={isActive ? "page" : undefined}
+      role="menuitem"
     >
       <span className="relative z-10 transition-colors duration-300">
         {item.name}
@@ -182,14 +219,22 @@ const NavigationItem = ({
           "absolute -bottom-1 left-0 w-0 h-0.5 bg-navy transition-all duration-300",
           isActive ? "w-full" : "group-hover/navlink:w-full"
         )}
+        aria-hidden="true"
       />
     </Link>
   </li>
 );
 
 const DesktopNavigation = ({ pathname }: { pathname: string }) => (
-  <nav className="flex items-center transition-all duration-300">
-    <ul className="flex list-none gap-4 lg:gap-6 xl:gap-8 m-0 p-0 transition-all duration-300">
+  <nav
+    className="flex items-center transition-all duration-300"
+    aria-label="Navegação principal"
+    role="navigation"
+  >
+    <ul
+      className="flex list-none gap-3 lg:gap-4 xl:gap-6 m-0 p-0 transition-all duration-300"
+      role="menubar"
+    >
       {NAVIGATION.map((item) => (
         <NavigationItem
           key={item.name}
@@ -204,22 +249,16 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
 const LoadingButton = () => {
   return (
     <Button
-      className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md group/loading"
+      className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md"
       disabled
+      aria-label="Carregando..."
+      aria-busy="true"
     >
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-        initial={{ x: "-100%" }}
-        animate={{ x: "100%" }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
       <div className="flex items-center justify-center gap-2 relative z-10">
-        <Spinner className="w-4 h-4 text-white" />
-        <span className="text-white font-medium">Carregando...</span>
+        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+        <span className="text-white font-medium text-xs sm:text-sm">
+          Carregando...
+        </span>
       </div>
     </Button>
   );
@@ -230,7 +269,7 @@ const IdentificationButton = () => {
   const pathname = usePathname();
   const isOnProfilePage = pathname === "/perfil";
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
@@ -240,7 +279,7 @@ const IdentificationButton = () => {
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
     }
-  };
+  }, [clearAuth]);
 
   if (loading) {
     return <LoadingButton />;
@@ -249,11 +288,13 @@ const IdentificationButton = () => {
   if (!user) {
     return (
       <Button
-        className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
+        className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
         asChild
       >
-        <Link href="/login">
-          <span className="relative z-10 text-white">Identificação</span>
+        <Link href="/login" aria-label="Fazer login" role="button">
+          <span className="relative z-10 text-white text-xs sm:text-sm">
+            Identificação
+          </span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
         </Link>
       </Button>
@@ -265,13 +306,23 @@ const IdentificationButton = () => {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px]"
+          className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+          aria-label="Menu do usuário"
+          role="button"
         >
-          <span className="relative z-10 text-white">Identificação</span>
+          <span className="relative z-10 text-white text-xs sm:text-sm">
+            Identificação
+          </span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-64" align="end" sideOffset={8}>
+      <DropdownMenuContent
+        className="w-64 max-w-[90vw]"
+        align="end"
+        sideOffset={8}
+        collisionPadding={16}
+        role="menu"
+      >
         <DropdownMenuLabel className="p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
             <Avatar className="w-10 h-10 border-2 border-navy/20 flex-shrink-0">
@@ -279,6 +330,7 @@ const IdentificationButton = () => {
                 src={profile?.avatar_url || ""}
                 alt={`Avatar de ${profile?.full_name || "Agente"}`}
                 className="object-cover object-center"
+                sizes="40px"
               />
               <AvatarFallback className="bg-navy text-white">
                 <RiUserLine className="w-5 h-5" />
@@ -293,28 +345,34 @@ const IdentificationButton = () => {
                   ? `Matrícula: ${profile.matricula}`
                   : user.email}
               </p>
-              <p className="text-xs text-navy font-medium capitalize">
+              <p className="text-xs text-navy font-medium capitalize truncate">
                 {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
               </p>
             </div>
           </div>
         </DropdownMenuLabel>
 
-        <DropdownMenuGroup className="p-2">
+        <DropdownMenuGroup className="p-2" role="group">
           {!isOnProfilePage && (
-            <DropdownMenuItem asChild>
-              <Link href="/perfil" className="cursor-pointer">
-                <RiUserLine className="w-4 h-4 mr-2 text-blue-600" />
-                <span>Ver Meu Perfil</span>
+            <DropdownMenuItem asChild role="menuitem">
+              <Link
+                href="/perfil"
+                className="cursor-pointer text-sm focus:outline-none focus:bg-slate-100"
+              >
+                <RiUserLine className="w-4 h-4 mr-2 text-blue-600 flex-shrink-0" />
+                <span className="truncate">Ver Meu Perfil</span>
               </Link>
             </DropdownMenuItem>
           )}
 
           {isAdmin && (
-            <DropdownMenuItem asChild>
-              <Link href="/admin/dashboard" className="cursor-pointer">
-                <RiBarChartLine className="w-4 h-4 mr-2 text-purple-600" />
-                <span>Ir ao Dashboard</span>
+            <DropdownMenuItem asChild role="menuitem">
+              <Link
+                href="/admin/dashboard"
+                className="cursor-pointer text-sm focus:outline-none focus:bg-slate-100"
+              >
+                <RiBarChartLine className="w-4 h-4 mr-2 text-purple-600 flex-shrink-0" />
+                <span className="truncate">Ir ao Dashboard</span>
               </Link>
             </DropdownMenuItem>
           )}
@@ -322,13 +380,14 @@ const IdentificationButton = () => {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuGroup className="p-2">
+        <DropdownMenuGroup className="p-2" role="group">
           <DropdownMenuItem
             onClick={handleSignOut}
-            className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+            className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 text-sm focus:outline-none"
+            role="menuitem"
           >
-            <RiLogoutBoxRLine className="w-4 h-4 mr-2" />
-            <span>Sair do Sistema</span>
+            <RiLogoutBoxRLine className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span className="truncate">Sair do Sistema</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
@@ -336,19 +395,23 @@ const IdentificationButton = () => {
   );
 };
 
+interface MobileMenuProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pathname: string;
+  id?: string;
+}
+
 const MobileMenu = ({
   isOpen,
   onClose,
   pathname,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  pathname: string;
-}) => {
+  id = "mobile-menu",
+}: MobileMenuProps) => {
   const { user, profile, isAdmin, clearAuth } = useAuthStore();
   const isOnProfilePage = pathname === "/perfil";
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
@@ -359,207 +422,320 @@ const MobileMenu = ({
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
     }
-  };
+  }, [clearAuth, onClose]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      document.addEventListener("keydown", handleKeyDown);
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   return (
-    <div className="xl:hidden bg-white border-t border-slate-200 shadow-lg animate-slide-down">
-      <div className="container mx-auto px-4 py-4">
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
-            Navegação
-          </h3>
-          <nav className="space-y-1">
-            {NAVIGATION.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-200",
-                  pathname.startsWith(item.href)
-                    ? "bg-navy/10 text-navy border-r-2 border-navy"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                )}
-                onClick={onClose}
-              >
-                {item.name}
-              </Link>
-            ))}
-          </nav>
-        </div>
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            aria-hidden="true"
+            role="presentation"
+          />
 
-        {user ? (
-          <div className="border-t border-slate-200 pt-4">
-            <div className="flex items-center gap-3 px-3 py-3 bg-slate-50 rounded-lg mb-3">
-              <Avatar className="w-10 h-10 border-2 border-navy/20 flex-shrink-0">
-                <AvatarImage
-                  src={profile?.avatar_url || ""}
-                  alt={`Avatar de ${profile?.full_name || "Agente"}`}
-                  className="object-cover object-center"
-                />
-                <AvatarFallback className="bg-navy text-white">
-                  <RiUserLine className="w-5 h-5" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">
-                  {profile?.full_name || "Agente PAC"}
-                </p>
-                <p className="text-xs text-slate-600 truncate">
-                  {profile?.matricula
-                    ? `Matrícula: ${profile.matricula}`
-                    : user.email}
-                </p>
-                <p className="text-xs text-navy font-medium capitalize">
-                  {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
-                </p>
+          {/* Menu Panel */}
+          <motion.div
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
+            className="fixed inset-y-0 right-0 w-full max-w-sm bg-white z-50 lg:hidden overflow-y-auto shadow-xl"
+            style={{ maxHeight: "100vh" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu de navegação"
+            id={id}
+          >
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
+                <Logo />
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg hover:bg-slate-100 transition-colors touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                  aria-label="Fechar menu"
+                  type="button"
+                >
+                  <RiCloseLine className="w-6 h-6 text-slate-700" />
+                </button>
+              </div>
+
+              {/* Navigation */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
+                  Navegação
+                </h3>
+                <nav className="space-y-1" role="navigation">
+                  {NAVIGATION.map((item) => (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={onClose}
+                      className={cn(
+                        "flex items-center px-3 py-3 text-sm font-medium rounded-md transition-colors duration-200",
+                        "focus:outline-none focus:ring-2 focus:ring-navy/50",
+                        pathname.startsWith(item.href)
+                          ? "bg-navy/10 text-navy border-r-2 border-navy"
+                          : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                      )}
+                      role="menuitem"
+                    >
+                      {item.name}
+                    </Link>
+                  ))}
+                </nav>
+
+                {/* Search */}
+                <div className="mt-6 px-2">
+                  <div className="relative">
+                    <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <input
+                      type="search"
+                      placeholder="Buscar..."
+                      className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/50 focus:border-navy"
+                      aria-label="Buscar no site"
+                    />
+                  </div>
+                </div>
+
+                {user ? (
+                  <div className="border-t border-slate-200 pt-6 mt-6">
+                    <div className="flex items-center gap-3 px-3 py-3 bg-slate-50 rounded-lg mb-3">
+                      <Avatar className="w-10 h-10 border-2 border-navy/20 flex-shrink-0">
+                        <AvatarImage
+                          src={profile?.avatar_url || ""}
+                          alt={`Avatar de ${profile?.full_name || "Agente"}`}
+                          className="object-cover object-center"
+                          sizes="40px"
+                        />
+                        <AvatarFallback className="bg-navy text-white">
+                          <RiUserLine className="w-5 h-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">
+                          {profile?.full_name || "Agente PAC"}
+                        </p>
+                        <p className="text-xs text-slate-600 truncate">
+                          {profile?.matricula
+                            ? `Matrícula: ${profile.matricula}`
+                            : user.email}
+                        </p>
+                        <p className="text-xs text-navy font-medium capitalize">
+                          {profile?.graduacao || "Agente"}{" "}
+                          {isAdmin ? "• Admin" : ""}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      {!isOnProfilePage && (
+                        <Link
+                          href="/perfil"
+                          className="flex items-center px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
+                          onClick={onClose}
+                          role="menuitem"
+                        >
+                          <RiUserLine className="w-4 h-4 mr-3 text-blue-600 flex-shrink-0" />
+                          Ver Meu Perfil
+                        </Link>
+                      )}
+
+                      {isAdmin && (
+                        <Link
+                          href="/admin/dashboard"
+                          className="flex items-center px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
+                          onClick={onClose}
+                          role="menuitem"
+                        >
+                          <RiBarChartLine className="w-4 h-4 mr-3 text-purple-600 flex-shrink-0" />
+                          Ir ao Dashboard
+                        </Link>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          handleSignOut();
+                        }}
+                        className="flex items-center w-full px-3 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 text-left focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                        role="menuitem"
+                        type="button"
+                      >
+                        <RiLogoutBoxRLine className="w-4 h-4 mr-3 flex-shrink-0" />
+                        Sair do Sistema
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-t border-slate-200 pt-6 mt-6">
+                    <Button
+                      className="w-full bg-navy hover:bg-navy-700 text-white font-medium py-3 text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300 touch-optimize focus:outline-none focus:ring-2 focus:ring-white/50"
+                      asChild
+                    >
+                      <Link href="/login" onClick={onClose} role="button">
+                        <span className="relative z-10">Identificação</span>
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+
+                {/* Social Links */}
+                <div className="border-t border-slate-200 pt-6 mt-6">
+                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
+                    Redes Sociais
+                  </h3>
+                  <div
+                    className="flex justify-center gap-2 px-2"
+                    role="list"
+                    aria-label="Redes sociais"
+                  >
+                    {SOCIAL_ICONS.map((social) => {
+                      const IconComponent = social.icon;
+                      return (
+                        <a
+                          key={social.label}
+                          href={social.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            "w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 no-underline transition-all duration-300 hover:shadow-lg",
+                            "focus:outline-none focus:ring-2 focus:ring-navy/50",
+                            social.hoverColor,
+                            "hover:text-white hover:scale-110 touch-optimize"
+                          )}
+                          aria-label={social.label}
+                          onClick={onClose}
+                          role="listitem"
+                        >
+                          <IconComponent className="w-4 h-4" />
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-slate-200 p-4 bg-slate-50">
+                <div className="text-center text-xs text-slate-500">
+                  <p>© {new Date().getFullYear()} Patrulha Aérea Civil</p>
+                  <p className="mt-1">Todos os direitos reservados</p>
+                </div>
               </div>
             </div>
-
-            <div className="space-y-1">
-              {!isOnProfilePage && (
-                <Link
-                  href="/perfil"
-                  className="flex items-center px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200"
-                  onClick={onClose}
-                >
-                  <RiUserLine className="w-4 h-4 mr-3 text-blue-600" />
-                  Ver Meu Perfil
-                </Link>
-              )}
-
-              {isAdmin && (
-                <Link
-                  href="/admin/dashboard"
-                  className="flex items-center px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200"
-                  onClick={onClose}
-                >
-                  <RiBarChartLine className="w-4 h-4 mr-3 text-purple-600" />
-                  Ir ao Dashboard
-                </Link>
-              )}
-
-              <button
-                onClick={() => {
-                  handleSignOut();
-                  onClose();
-                }}
-                className="flex items-center w-full px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 text-left"
-              >
-                <RiLogoutBoxRLine className="w-4 h-4 mr-3" />
-                Sair do Sistema
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="border-t border-slate-200 pt-4">
-            <Button
-              className="w-full bg-navy hover:bg-navy-700 text-white font-medium py-2.5 text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300"
-              asChild
-            >
-              <Link href="/login" onClick={onClose}>
-                <span className="relative z-10">Identificação</span>
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
-              </Link>
-            </Button>
-          </div>
-        )}
-
-        <div className="border-t border-slate-200 pt-4 mt-4">
-          <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
-            Redes Sociais
-          </h3>
-          <div className="flex justify-center gap-2">
-            {SOCIAL_ICONS.map((social) => {
-              const IconComponent = social.icon;
-              return (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    "w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 no-underline transition-all duration-300 hover:shadow-lg",
-                    social.hoverColor,
-                    "hover:text-white hover:scale-110"
-                  )}
-                  aria-label={social.label}
-                  onClick={onClose}
-                >
-                  <IconComponent className="w-4 h-4" />
-                </a>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 };
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const { initializeAuth } = useAuthStore();
 
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-  const closeMenu = () => setIsMenuOpen(false);
+  const toggleMenu = useCallback(() => setIsMenuOpen((prev) => !prev), []);
+  const closeMenu = useCallback(() => setIsMenuOpen(false), []);
 
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
 
   useEffect(() => {
-    if (isMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    const handleScroll = debounce(() => {
+      setScrolled(window.scrollY > 20);
+    }, 10);
 
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isMenuOpen]);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <header className="bg-white sticky top-0 left-0 right-0 z-50 h-[90px] md:h-[100px] lg:h-[120px] shadow-sm">
-      {/* MUDANÇA PRINCIPAL: fixed → sticky */}
-
+    <header
+      className={cn(
+        "bg-white sticky top-0 left-0 right-0 z-50 min-h-[90px] md:min-h-[100px] lg:min-h-[120px] transition-all duration-300",
+        scrolled ? "shadow-lg" : "shadow-sm"
+      )}
+      role="banner"
+      aria-label="Cabeçalho principal"
+    >
       <TopBar />
 
       <div className="bg-white border-b border-slate-200">
         <div className="container mx-auto px-4 sm:px-6">
-          <div className="md:hidden flex items-center justify-between w-full py-3">
-            <Logo />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleMenu}
-              className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110"
-              aria-label="Alternar menu"
-            >
-              <RiMenuLine className="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div className="hidden md:flex xl:hidden items-center justify-between w-full py-3">
+          {/* Mobile Header */}
+          <div className="flex md:hidden items-center justify-between w-full py-3">
             <Logo />
             <div className="flex items-center gap-2">
-              <IdentificationButton />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleMenu}
-                className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110"
-                aria-label="Alternar menu"
+                className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
+                aria-expanded={isMenuOpen}
+                aria-controls="mobile-menu"
+                role="button"
               >
                 <RiMenuLine className="h-5 w-5" />
               </Button>
             </div>
           </div>
 
-          <div className="hidden xl:flex items-center justify-between w-full py-4">
+          {/* Tablet Header */}
+          <div className="hidden md:flex lg:hidden items-center justify-between w-full py-3">
+            <Logo />
+            <div className="flex items-center gap-3">
+              <IdentificationButton />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMenu}
+                className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
+                aria-expanded={isMenuOpen}
+                aria-controls="mobile-menu"
+                role="button"
+              >
+                <RiMenuLine className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Desktop Header */}
+          <div className="hidden lg:flex items-center justify-between w-full py-4">
             <Logo />
             <DesktopNavigation pathname={pathname} />
             <IdentificationButton />
@@ -567,7 +743,12 @@ export function Header() {
         </div>
       </div>
 
-      <MobileMenu isOpen={isMenuOpen} onClose={closeMenu} pathname={pathname} />
+      <MobileMenu
+        isOpen={isMenuOpen}
+        onClose={closeMenu}
+        pathname={pathname}
+        id="mobile-menu"
+      />
     </header>
   );
 }

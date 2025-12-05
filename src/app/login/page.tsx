@@ -1,10 +1,14 @@
+// src/app/login/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
+import {
+  createClient,
+  type SupabaseBrowserClient,
+} from "@/lib/supabase/client";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -103,8 +107,7 @@ export default function LoginPage() {
     message: string;
   } | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
-
-  const supabase = createClient();
+  const [supabase, setSupabase] = useState<SupabaseBrowserClient | null>(null);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -114,6 +117,7 @@ export default function LoginPage() {
     },
   });
 
+  // 🚨 CORREÇÃO: showAlert deve ser definido ANTES dos useEffect que a usam
   const showAlert = useCallback(
     (type: "error" | "success" | "warning" | "info", message: string) => {
       setAlert({ type, message });
@@ -121,6 +125,17 @@ export default function LoginPage() {
     },
     []
   );
+
+  // Inicializar Supabase apenas no cliente
+  useEffect(() => {
+    try {
+      const client = createClient();
+      setSupabase(client);
+    } catch (error) {
+      console.error("❌ Erro ao criar cliente Supabase:", error);
+      showAlert("error", "Erro ao inicializar sistema. Recarregue a página.");
+    }
+  }, [showAlert]); // ✅ Adicionado showAlert como dependência
 
   const formatMatricula = useCallback((value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -147,9 +162,9 @@ export default function LoginPage() {
 
   // 🔒 Funções de segurança local
   const checkSecurityLock = useCallback(() => {
-    const lockData = localStorage.getItem("pac_security_lock");
-    if (lockData) {
-      try {
+    try {
+      const lockData = localStorage.getItem("pac_security_lock");
+      if (lockData) {
         const { attempts, lockUntil } = JSON.parse(lockData);
         setFailedAttempts(attempts);
 
@@ -157,10 +172,10 @@ export default function LoginPage() {
           setIsLocked(true);
           setLockTime(lockUntil);
         }
-      } catch (error) {
-        console.error("Erro ao ler bloqueio:", error);
-        localStorage.removeItem("pac_security_lock");
       }
+    } catch (error) {
+      console.error("Erro ao ler bloqueio:", error);
+      localStorage.removeItem("pac_security_lock");
     }
   }, []);
 
@@ -169,36 +184,45 @@ export default function LoginPage() {
       const newAttempts = increment ? failedAttempts + 1 : 0;
       setFailedAttempts(newAttempts);
 
-      if (newAttempts >= SECURITY_CONFIG.MAX_ATTEMPTS) {
-        const lockUntil =
-          Date.now() + SECURITY_CONFIG.LOCK_TIME_MINUTES * 60 * 1000;
-        setIsLocked(true);
-        setLockTime(lockUntil);
+      try {
+        if (newAttempts >= SECURITY_CONFIG.MAX_ATTEMPTS) {
+          const lockUntil =
+            Date.now() + SECURITY_CONFIG.LOCK_TIME_MINUTES * 60 * 1000;
+          setIsLocked(true);
+          setLockTime(lockUntil);
 
-        localStorage.setItem(
-          "pac_security_lock",
-          JSON.stringify({
-            attempts: newAttempts,
-            lockUntil,
-            timestamp: new Date().toISOString(),
-          })
-        );
-      } else {
-        localStorage.setItem(
-          "pac_security_lock",
-          JSON.stringify({
-            attempts: newAttempts,
-            lockUntil: null,
-            timestamp: new Date().toISOString(),
-          })
-        );
+          localStorage.setItem(
+            "pac_security_lock",
+            JSON.stringify({
+              attempts: newAttempts,
+              lockUntil,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        } else {
+          localStorage.setItem(
+            "pac_security_lock",
+            JSON.stringify({
+              attempts: newAttempts,
+              lockUntil: null,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        }
+      } catch (error) {
+        console.error("Erro ao atualizar bloqueio:", error);
       }
     },
     [failedAttempts]
   );
 
-  // 🎯 FUNÇÃO PRINCIPAL DE LOGIN - MODIFICADA
+  // 🎯 FUNÇÃO PRINCIPAL DE LOGIN
   const handleSubmit = async (data: LoginFormData) => {
+    if (!supabase) {
+      showAlert("error", "Sistema não inicializado. Recarregue a página.");
+      return;
+    }
+
     if (isLocked) {
       showAlert("error", "Acesso temporariamente bloqueado por segurança");
       return;
@@ -338,16 +362,24 @@ export default function LoginPage() {
 
       // Salvar matrícula se solicitado
       if (data.rememberMe) {
-        localStorage.setItem(
-          "pac_remember_matricula",
-          JSON.stringify({
-            matricula: data.matricula,
-            rememberMe: true,
-            timestamp: new Date().toISOString(),
-          })
-        );
+        try {
+          localStorage.setItem(
+            "pac_remember_matricula",
+            JSON.stringify({
+              matricula: data.matricula,
+              rememberMe: true,
+              timestamp: new Date().toISOString(),
+            })
+          );
+        } catch (error) {
+          console.error("Erro ao salvar matrícula:", error);
+        }
       } else {
-        localStorage.removeItem("pac_remember_matricula");
+        try {
+          localStorage.removeItem("pac_remember_matricula");
+        } catch (error) {
+          console.error("Erro ao remover matrícula:", error);
+        }
       }
 
       // 📋 PASSO 5: Atualizar metadados do usuário
@@ -421,7 +453,11 @@ export default function LoginPage() {
           setIsLocked(false);
           setLockTime(null);
           setFailedAttempts(0);
-          localStorage.removeItem("pac_security_lock");
+          try {
+            localStorage.removeItem("pac_security_lock");
+          } catch (error) {
+            console.error("Erro ao remover bloqueio:", error);
+          }
           clearInterval(timer);
         }
       }, 1000);
@@ -447,26 +483,32 @@ export default function LoginPage() {
   // 🏠 Verificar sessão existente
   useEffect(() => {
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      if (!supabase) return;
 
-      if (session) {
-        // Verificar status do usuário
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("status, role")
-          .eq("id", session.user.id)
-          .single();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (profile) {
-          // Redirecionar baseado no role
-          if (profile.role === "admin") {
-            window.location.href = "/admin/dashboard";
-          } else {
-            window.location.href = "/perfil";
+        if (session) {
+          // Verificar status do usuário
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("status, role")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profile) {
+            // Redirecionar baseado no role
+            if (profile.role === "admin") {
+              window.location.href = "/admin/dashboard";
+            } else {
+              window.location.href = "/perfil";
+            }
           }
         }
+      } catch (error) {
+        console.error("Erro ao verificar sessão:", error);
       }
     };
 
@@ -479,6 +521,18 @@ export default function LoginPage() {
     const remaining = Math.ceil((lockTime - Date.now()) / 1000 / 60);
     return `${remaining} minuto${remaining !== 1 ? "s" : ""}`;
   };
+
+  // Se Supabase ainda não foi inicializado, mostrar loading
+  if (!supabase) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Inicializando sistema...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Renderização do componente
   return (
@@ -715,7 +769,7 @@ export default function LoginPage() {
                                   handleMatriculaChange(e.target.value)
                                 }
                                 className="text-sm sm:text-base py-2 sm:py-2.5 pl-3 sm:pl-4 pr-10 sm:pr-12 font-medium tracking-wider h-9 sm:h-11 transition-all duration-300 focus:ring-2 focus:ring-navy-500 focus:border-navy-500"
-                                disabled={isLocked || loading}
+                                disabled={isLocked || loading || !supabase}
                               />
                               <div className="absolute right-2.5 sm:right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
                                 <RiUserLine className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-colors duration-300" />
@@ -751,7 +805,7 @@ export default function LoginPage() {
                             <Switch
                               checked={field.value}
                               onCheckedChange={field.onChange}
-                              disabled={loading}
+                              disabled={loading || !supabase}
                               className="scale-90 sm:scale-100 data-[state=checked]:bg-navy-600"
                             />
                           </FormControl>
@@ -770,7 +824,7 @@ export default function LoginPage() {
                   >
                     <Button
                       type="submit"
-                      disabled={isLocked || loading}
+                      disabled={isLocked || loading || !supabase}
                       className="w-full group relative overflow-hidden bg-gradient-to-br from-navy-600 to-navy-700 hover:from-navy-700 hover:to-navy-800 text-white font-semibold py-2 sm:py-3 text-sm sm:text-base rounded-lg sm:rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl font-inter h-10 sm:h-12 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {/* Shine Effect */}

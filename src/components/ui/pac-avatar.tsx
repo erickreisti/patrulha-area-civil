@@ -1,151 +1,51 @@
-// src/components/ui/pac-avatar.tsx - CORRIGIDO
+// src/components/ui/avatar.tsx
 "use client";
 
-import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
-import Image from "next/image";
+import * as React from "react";
+import * as AvatarPrimitive from "@radix-ui/react-avatar";
+
 import { cn } from "@/lib/utils";
 
-interface PacAvatarProps {
-  avatarUrl?: string;
-  nome?: string;
-  className?: string;
-  size?: "sm" | "md" | "lg" | "xl";
-  showFallbackImage?: boolean;
-}
+const Avatar = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Root
+    ref={ref}
+    className={cn(
+      "relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full",
+      className
+    )}
+    {...props}
+  />
+));
+Avatar.displayName = AvatarPrimitive.Root.displayName;
 
-// URL da imagem padrão
-const DEFAULT_AVATAR = "/images/avatars/default/default-agent.webp";
+const AvatarImage = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Image>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Image
+    ref={ref}
+    className={cn("aspect-square h-full w-full", className)}
+    {...props}
+  />
+));
+AvatarImage.displayName = AvatarPrimitive.Image.displayName;
 
-export function PacAvatar({
-  avatarUrl,
-  nome,
-  className,
-  size = "md",
-  showFallbackImage = true,
-}: PacAvatarProps) {
-  const sizeClasses = {
-    sm: "w-8 h-8 text-xs",
-    md: "w-12 h-12 text-sm",
-    lg: "w-16 h-16 text-base",
-    xl: "w-20 h-20 text-lg",
-  };
+const AvatarFallback = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Fallback>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Fallback
+    ref={ref}
+    className={cn(
+      "flex h-full w-full items-center justify-center rounded-full bg-muted",
+      className
+    )}
+    {...props}
+  />
+));
+AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
 
-  const imageSizes = {
-    sm: 32,
-    md: 48,
-    lg: 64,
-    xl: 80,
-  };
-
-  // CORREÇÃO: Definir sizes prop baseado no tamanho
-  const getSizes = (avatarSize: "sm" | "md" | "lg" | "xl") => {
-    switch (avatarSize) {
-      case "sm":
-        return "(max-width: 768px) 32px, 32px";
-      case "md":
-        return "(max-width: 768px) 48px, 48px";
-      case "lg":
-        return "(max-width: 768px) 64px, 64px";
-      case "xl":
-        return "(max-width: 768px) 80px, 80px";
-      default:
-        return "(max-width: 768px) 48px, 48px";
-    }
-  };
-
-  const getIniciais = (nomeCompleto?: string) => {
-    if (!nomeCompleto) return "PAC";
-
-    return nomeCompleto
-      .split(" ")
-      .slice(0, 2)
-      .map((n) => n[0]?.toUpperCase() || "")
-      .join("")
-      .substring(0, 2);
-  };
-
-  const iniciais = getIniciais(nome);
-
-  return (
-    <Avatar
-      className={cn(
-        "border-2 border-gray-200 shadow-sm",
-        sizeClasses[size],
-        className
-      )}
-    >
-      {/* Imagem do usuário ou padrão */}
-      <AvatarImage
-        src={avatarUrl || DEFAULT_AVATAR}
-        alt={nome ? `Avatar de ${nome}` : "Avatar padrão PAC"}
-        className="object-cover"
-      />
-
-      {/* Fallback - mostra imagem padrão OU iniciais */}
-      <AvatarFallback className="bg-gradient-to-br from-navy-600 to-navy-800 text-white font-semibold">
-        {showFallbackImage ? (
-          // Imagem padrão como fallback - CORREÇÃO: Adicionado sizes prop
-          <Image
-            src={DEFAULT_AVATAR}
-            alt="Avatar padrão PAC"
-            width={imageSizes[size]}
-            height={imageSizes[size]}
-            sizes={getSizes(size)} // CORREÇÃO: Adicionado sizes prop
-            className="rounded-full object-cover"
-            onError={(e) => {
-              // Se a imagem padrão falhar, mostra iniciais
-              const target = e.target as HTMLElement;
-              target.style.display = "none";
-            }}
-          />
-        ) : (
-          // Iniciais como fallback
-          <span className="flex items-center justify-center w-full h-full">
-            {iniciais}
-          </span>
-        )}
-      </AvatarFallback>
-    </Avatar>
-  );
-}
-
-// Componente simplificado para uso rápido
-export function AgentAvatar({
-  avatarUrl,
-  nome,
-  size = "md",
-}: {
-  avatarUrl?: string;
-  nome?: string;
-  size?: "sm" | "md" | "lg" | "xl";
-}) {
-  return (
-    <PacAvatar
-      avatarUrl={avatarUrl}
-      nome={nome}
-      size={size}
-      showFallbackImage={true}
-    />
-  );
-}
-
-// Componente para admin
-export function AdminAvatar({
-  avatarUrl,
-  nome,
-  size = "md",
-}: {
-  avatarUrl?: string;
-  nome?: string;
-  size?: "sm" | "md" | "lg" | "xl";
-}) {
-  return (
-    <PacAvatar
-      avatarUrl={avatarUrl}
-      nome={nome}
-      size={size}
-      showFallbackImage={true}
-      className="border-yellow-400"
-    />
-  );
-}
+export { Avatar, AvatarImage, AvatarFallback };
