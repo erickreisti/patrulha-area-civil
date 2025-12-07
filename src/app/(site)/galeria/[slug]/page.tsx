@@ -45,7 +45,7 @@ import {
   RiStarFill,
   RiFilterLine,
 } from "react-icons/ri";
-import { GaleriaCategoria, GaleriaItem } from "@/types";
+import { GaleriaCategoria, GaleriaItem, TipoItem } from "@/types";
 
 interface PageProps {
   params: {
@@ -54,6 +54,35 @@ interface PageProps {
 }
 
 type SortType = "recent" | "oldest" | "name" | "destaque";
+
+// Tipo auxiliar para os dados do Supabase
+interface SupabaseGaleriaCategoria {
+  id: string;
+  nome: string;
+  slug: string;
+  descricao: string | null;
+  tipo: "fotos" | "videos";
+  ordem: number;
+  status: boolean;
+  created_at: string;
+  updated_at: string;
+  arquivada: boolean;
+}
+
+interface SupabaseGaleriaItem {
+  id: string;
+  categoria_id: string | null;
+  titulo: string;
+  descricao: string | null;
+  arquivo_url: string;
+  tipo: TipoItem;
+  thumbnail_url: string | null;
+  ordem: number;
+  autor_id: string | null;
+  status: boolean;
+  created_at: string;
+  destaque: boolean;
+}
 
 export default function CategoriaGaleriaPage({ params }: PageProps) {
   const [categoria, setCategoria] = useState<GaleriaCategoria | null>(null);
@@ -66,11 +95,23 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
   const [filterDestaque, setFilterDestaque] = useState<boolean | null>(null);
   const [sortBy, setSortBy] = useState<SortType>("destaque");
 
+  // 🔥 CORREÇÃO: Inicialização segura do Supabase
+  const [supabase, setSupabase] = useState<ReturnType<
+    typeof createClient
+  > | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSupabase(createClient());
+    }
+  }, []);
+
   const ITEMS_PER_PAGE = 12;
-  const supabase = createClient();
 
   // Buscar dados da categoria
   const fetchData = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       setLoading(true);
 
@@ -80,20 +121,36 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
         .select("*")
         .eq("slug", params.slug)
         .eq("status", true)
-        .single();
+        .maybeSingle();
 
       if (categoriaError || !categoriaData) {
         setError("Categoria não encontrada");
         return;
       }
 
-      setCategoria(categoriaData as GaleriaCategoria);
+      // Converter para o tipo correto
+      const supabaseCategoria =
+        categoriaData as unknown as SupabaseGaleriaCategoria;
+      const typedCategoria: GaleriaCategoria = {
+        id: supabaseCategoria.id,
+        nome: supabaseCategoria.nome,
+        slug: supabaseCategoria.slug,
+        descricao: supabaseCategoria.descricao || undefined,
+        tipo: supabaseCategoria.tipo,
+        ordem: supabaseCategoria.ordem,
+        status: supabaseCategoria.status,
+        arquivada: supabaseCategoria.arquivada,
+        created_at: supabaseCategoria.created_at,
+        updated_at: supabaseCategoria.updated_at,
+      };
+
+      setCategoria(typedCategoria);
 
       // 2. Contar total de itens da categoria
       let countQuery = supabase
         .from("galeria_itens")
         .select("*", { count: "exact", head: true })
-        .eq("categoria_id", categoriaData.id)
+        .eq("categoria_id", typedCategoria.id)
         .eq("status", true);
 
       if (filterDestaque !== null) {
@@ -107,9 +164,9 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
       }
 
       const totalCount = count || 0;
-      const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+      const calculatedTotalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
       setTotalItens(totalCount);
-      setTotalPages(totalPages);
+      setTotalPages(calculatedTotalPages);
 
       // 3. Buscar itens com paginação
       const from = (page - 1) * ITEMS_PER_PAGE;
@@ -118,7 +175,7 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
       let query = supabase
         .from("galeria_itens")
         .select("*")
-        .eq("categoria_id", categoriaData.id)
+        .eq("categoria_id", typedCategoria.id)
         .eq("status", true)
         .range(from, to);
 
@@ -139,7 +196,6 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
           query = query.order("titulo", { ascending: true });
           break;
         case "destaque":
-          // Primeiro os em destaque, depois pelo created_at
           query = query.order("destaque", { ascending: false });
           query = query.order("created_at", { ascending: false });
           break;
@@ -151,7 +207,25 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
         console.error("Erro ao buscar itens:", itensError);
       }
 
-      setItens((itensData as GaleriaItem[]) || []);
+      // Converter para o tipo correto
+      const supabaseItens = (itensData ||
+        []) as unknown as SupabaseGaleriaItem[];
+      const typedItens: GaleriaItem[] = supabaseItens.map((item) => ({
+        id: item.id,
+        titulo: item.titulo,
+        descricao: item.descricao || undefined,
+        categoria_id: item.categoria_id || undefined,
+        tipo: item.tipo,
+        arquivo_url: item.arquivo_url,
+        thumbnail_url: item.thumbnail_url || undefined,
+        ordem: item.ordem,
+        autor_id: item.autor_id || undefined,
+        status: item.status,
+        destaque: item.destaque,
+        created_at: item.created_at,
+      }));
+
+      setItens(typedItens);
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
       setError("Erro ao carregar dados da galeria");
@@ -161,8 +235,10 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
   }, [params.slug, page, filterDestaque, sortBy, supabase]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (supabase) {
+      fetchData();
+    }
+  }, [fetchData, supabase]);
 
   // Resetar página quando mudar filtros
   useEffect(() => {
@@ -195,14 +271,9 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-32 pb-20 overflow-hidden">
-        {/* Background Elements */}
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
         <div className="absolute top-0 left-0 w-48 h-48 sm:w-60 sm:h-60 lg:w-72 lg:h-72 bg-navy-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-navy-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
-
-        {/* Animated Orbs */}
-        <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-navy-500/5 rounded-full blur-2xl animate-pulse" />
-        <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-navy-300/5 rounded-full blur-2xl animate-pulse delay-1000" />
 
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <motion.div
@@ -316,7 +387,7 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
                       </Badge>
                     </div>
 
-                    {/* Ordenação - SELECT CORRIGIDO */}
+                    {/* Ordenação */}
                     <div className="flex items-center gap-2">
                       <RiFilterLine className="w-4 h-4 text-slate-500" />
                       <Select

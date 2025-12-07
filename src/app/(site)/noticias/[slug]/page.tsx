@@ -22,12 +22,41 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { NoticiaWithAutor } from "@/types";
+import { NoticiaWithAutor, NoticiaStatus } from "@/types";
 
 interface PageProps {
   params: {
     slug: string;
   };
+}
+
+interface SupabaseProfile {
+  full_name: string | null;
+  graduacao: string | null;
+  avatar_url: string | null;
+}
+
+interface SupabaseNoticia {
+  id: string;
+  titulo: string;
+  slug: string;
+  conteudo: string;
+  resumo: string | null;
+  imagem: string | null;
+  categoria: string | null;
+  autor_id: string | null;
+  destaque: boolean;
+  data_publicacao: string;
+  status: NoticiaStatus;
+  created_at: string;
+  updated_at: string;
+  autor: SupabaseProfile | null;
+}
+
+// Tipo para o perfil do Supabase com role
+interface SupabaseProfileWithRole {
+  role?: string;
+  [key: string]: unknown;
 }
 
 export default function NoticiaPage({ params }: PageProps) {
@@ -39,7 +68,16 @@ export default function NoticiaPage({ params }: PageProps) {
   const [loading, setLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  const supabase = createClient();
+  // 🔥 CORREÇÃO: Inicialização segura do Supabase
+  const [supabase, setSupabase] = useState<ReturnType<
+    typeof createClient
+  > | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSupabase(createClient());
+    }
+  }, []);
 
   // Função para corrigir URL da imagem
   const getImageUrl = useCallback((url: string | null) => {
@@ -66,6 +104,8 @@ export default function NoticiaPage({ params }: PageProps) {
 
   // Buscar notícia
   const fetchNoticia = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       setLoading(true);
       setImageError(false);
@@ -73,7 +113,7 @@ export default function NoticiaPage({ params }: PageProps) {
       console.log("🔄 Buscando notícia com slug:", params.slug);
 
       // Buscar notícia com autor usando relacionamento
-      const { data: noticiaData, error } = await supabase
+      const { data, error } = await supabase
         .from("noticias")
         .select(
           `
@@ -82,35 +122,51 @@ export default function NoticiaPage({ params }: PageProps) {
         `
         )
         .eq("slug", params.slug)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error("❌ Erro ao buscar notícia:", error);
-
-        // Verificar se é erro de "não encontrado"
-        if (error.code === "PGRST116") {
-          console.log("📭 Notícia não encontrada");
-          notFound();
-          return;
-        }
-
-        // Para outros erros, mostrar 404
-        console.error("💥 Erro específico:", error);
         notFound();
         return;
       }
 
-      if (!noticiaData) {
+      if (!data) {
         console.log("📭 Notícia não encontrada (data vazia)");
         notFound();
         return;
       }
 
+      // Cast para o tipo que sabemos que temos
+      const noticiaData = data as unknown as SupabaseNoticia;
+
       console.log("✅ Notícia encontrada:", noticiaData.titulo);
       console.log("📊 Status da notícia:", noticiaData.status);
 
+      // Converter para o tipo correto
+      const typedNoticia: NoticiaWithAutor = {
+        id: noticiaData.id,
+        titulo: noticiaData.titulo,
+        slug: noticiaData.slug,
+        conteudo: noticiaData.conteudo,
+        resumo: noticiaData.resumo || "",
+        imagem: noticiaData.imagem,
+        categoria: noticiaData.categoria || "",
+        autor_id: noticiaData.autor_id || "",
+        destaque: noticiaData.destaque,
+        data_publicacao: noticiaData.data_publicacao,
+        status: noticiaData.status,
+        created_at: noticiaData.created_at,
+        updated_at: noticiaData.updated_at,
+        autor: noticiaData.autor
+          ? {
+              full_name: noticiaData.autor.full_name || undefined,
+              graduacao: noticiaData.autor.graduacao || undefined,
+              avatar_url: noticiaData.autor.avatar_url || undefined,
+            }
+          : undefined,
+      };
+
       // Verificar se usuário tem permissão para ver a notícia
-      // Se não for admin e a notícia não estiver publicada, mostrar 404
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -122,47 +178,74 @@ export default function NoticiaPage({ params }: PageProps) {
           .select("role")
           .eq("id", user.id)
           .maybeSingle();
-        isAdmin = profile?.role === "admin";
+
+        if (profile) {
+          const typedProfile = profile as SupabaseProfileWithRole;
+          isAdmin = typedProfile.role === "admin";
+        }
       }
 
-      if (!isAdmin && noticiaData.status !== "publicado") {
+      if (!isAdmin && typedNoticia.status !== "publicado") {
         console.log("🚫 Usuário não tem permissão para ver esta notícia");
         notFound();
         return;
       }
 
-      setNoticia(noticiaData as NoticiaWithAutor);
+      setNoticia(typedNoticia);
 
       // Buscar notícias relacionadas
-      try {
-        const { data: relacionadasData, error: relacionadasError } =
-          await supabase
-            .from("noticias")
-            .select(
+      if (typedNoticia.categoria) {
+        try {
+          const { data: relacionadasData, error: relacionadasError } =
+            await supabase
+              .from("noticias")
+              .select(
+                `
+                *,
+                autor:profiles(full_name, graduacao, avatar_url)
               `
-              *,
-              autor:profiles(full_name, graduacao, avatar_url)
-            `
-            )
-            .eq("categoria", noticiaData.categoria)
-            .neq("id", noticiaData.id)
-            .eq("status", "publicado") // Apenas publicadas
-            .limit(3)
-            .order("data_publicacao", { ascending: false });
+              )
+              .eq("categoria", typedNoticia.categoria)
+              .neq("id", typedNoticia.id)
+              .eq("status", "publicado")
+              .limit(3)
+              .order("data_publicacao", { ascending: false });
 
-        if (relacionadasError) {
-          console.error("❌ Erro ao buscar relacionadas:", relacionadasError);
-        } else {
-          console.log(
-            "✅ Notícias relacionadas:",
-            relacionadasData?.length || 0
-          );
-          setNoticiasRelacionadas(
-            (relacionadasData as NoticiaWithAutor[]) || []
-          );
+          if (relacionadasError) {
+            console.error("❌ Erro ao buscar relacionadas:", relacionadasError);
+          } else if (relacionadasData) {
+            const typedRelacionadas = relacionadasData.map((item) => {
+              const data = item as unknown as SupabaseNoticia;
+              return {
+                id: data.id,
+                titulo: data.titulo,
+                slug: data.slug,
+                conteudo: data.conteudo,
+                resumo: data.resumo || "",
+                imagem: data.imagem,
+                categoria: data.categoria || "",
+                autor_id: data.autor_id || "",
+                destaque: data.destaque,
+                data_publicacao: data.data_publicacao,
+                status: data.status,
+                created_at: data.created_at,
+                updated_at: data.updated_at,
+                autor: data.autor
+                  ? {
+                      full_name: data.autor.full_name || undefined,
+                      graduacao: data.autor.graduacao || undefined,
+                      avatar_url: data.autor.avatar_url || undefined,
+                    }
+                  : undefined,
+              } as NoticiaWithAutor;
+            });
+
+            console.log("✅ Notícias relacionadas:", typedRelacionadas.length);
+            setNoticiasRelacionadas(typedRelacionadas);
+          }
+        } catch (relError) {
+          console.error("💥 Erro ao buscar notícias relacionadas:", relError);
         }
-      } catch (relError) {
-        console.error("💥 Erro ao buscar notícias relacionadas:", relError);
       }
     } catch (error) {
       console.error("💥 Erro geral ao carregar notícia:", error);
@@ -173,27 +256,25 @@ export default function NoticiaPage({ params }: PageProps) {
   }, [params.slug, supabase]);
 
   useEffect(() => {
-    if (params.slug) {
+    if (params.slug && supabase) {
       fetchNoticia();
     }
-  }, [params.slug, fetchNoticia]);
+  }, [params.slug, supabase, fetchNoticia]);
 
   const handleShare = async () => {
     if (navigator.share && noticia) {
       try {
         await navigator.share({
           title: noticia.titulo,
-          text: noticia.resumo,
+          text: noticia.resumo || "",
           url: window.location.href,
         });
       } catch (error) {
         console.log("Erro ao compartilhar:", error);
-        // Fallback para copiar link
         navigator.clipboard.writeText(window.location.href);
         alert("Link copiado para a área de transferência!");
       }
     } else {
-      // Fallback para copiar link
       navigator.clipboard.writeText(window.location.href);
       alert("Link copiado para a área de transferência!");
     }
@@ -209,22 +290,13 @@ export default function NoticiaPage({ params }: PageProps) {
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
         <div className="container mx-auto px-4 py-8">
           <div className="animate-pulse space-y-6">
-            {/* Botão voltar skeleton */}
             <div className="h-10 bg-slate-200 rounded w-32"></div>
-
-            {/* Título skeleton */}
             <div className="h-12 bg-slate-200 rounded w-3/4 mb-6"></div>
-
-            {/* Imagem skeleton */}
             <div className="h-96 bg-slate-200 rounded mb-8"></div>
-
-            {/* Conteúdo skeleton */}
             <div className="space-y-3">
               <div className="h-4 bg-slate-200 rounded"></div>
               <div className="h-4 bg-slate-200 rounded"></div>
               <div className="h-4 bg-slate-200 rounded w-5/6"></div>
-              <div className="h-4 bg-slate-200 rounded w-4/6"></div>
-              <div className="h-4 bg-slate-200 rounded w-3/4"></div>
             </div>
           </div>
         </div>
@@ -244,7 +316,6 @@ export default function NoticiaPage({ params }: PageProps) {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-32 pb-20 overflow-hidden">
-        {/* Background Elements */}
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
         <div className="absolute top-0 left-0 w-48 h-48 sm:w-60 sm:h-60 lg:w-72 lg:h-72 bg-navy-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-navy-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
@@ -268,10 +339,9 @@ export default function NoticiaPage({ params }: PageProps) {
             <div className="flex flex-wrap gap-2 mb-6">
               <Badge className="bg-white/20 backdrop-blur-sm border-white/20 text-white hover:bg-white/30 px-4 py-2 text-sm font-medium">
                 <RiNewspaperLine className="w-4 h-4 mr-2" />
-                {noticia.categoria}
+                {noticia.categoria || "Geral"}
               </Badge>
 
-              {/* Status Badge */}
               <Badge
                 variant={isPublished ? "default" : "secondary"}
                 className="backdrop-blur-sm text-sm"
@@ -284,7 +354,6 @@ export default function NoticiaPage({ params }: PageProps) {
                 {isPublished ? "Publicado" : "Rascunho"}
               </Badge>
 
-              {/* Destaque Badge */}
               {noticia.destaque && (
                 <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white backdrop-blur-sm text-sm">
                   <RiStarFill className="w-4 h-4 mr-1" />
@@ -457,7 +526,7 @@ export default function NoticiaPage({ params }: PageProps) {
                               className="bg-slate-100 text-slate-700 border-0"
                             >
                               <RiNewspaperLine className="w-3 h-3 mr-1" />
-                              {noticiaRelacionada.categoria}
+                              {noticiaRelacionada.categoria || "Geral"}
                             </Badge>
 
                             {noticiaRelacionada.destaque && (

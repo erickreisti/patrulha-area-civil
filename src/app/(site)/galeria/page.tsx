@@ -46,15 +46,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
-import { GaleriaCategoria } from "@/types";
+import { GaleriaCategoriaComItens } from "@/types";
+import { Database } from "@/lib/supabase/client";
 
-// ==================== INTERFACES LOCAIS ====================
-interface GaleriaCategoriaComItens extends GaleriaCategoria {
-  item_count: number;
-  ultima_imagem_url?: string;
-  tem_destaque?: boolean;
-}
-
+// ==================== TIPOS LOCAIS ====================
 type SortType = "recent" | "oldest" | "popular" | "destaque";
 
 // ==================== COMPONENTE PRINCIPAL ====================
@@ -68,11 +63,23 @@ export default function GaleriaPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCategorias, setTotalCategorias] = useState(0);
 
-  const supabase = createClient();
+  // 🔥 CLIENTE SUPABASE COM INICIALIZAÇÃO SEGURA
+  const [supabase, setSupabase] = useState<ReturnType<
+    typeof createClient
+  > | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setSupabase(createClient());
+    }
+  }, []);
+
   const ITEMS_PER_PAGE = 10;
 
   // Função para buscar categorias
   const fetchCategorias = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       setLoading(true);
 
@@ -100,9 +107,9 @@ export default function GaleriaPage() {
       }
 
       const totalCount = count || 0;
-      const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+      const calculatedTotalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
       setTotalCategorias(totalCount);
-      setTotalPages(totalPages);
+      setTotalPages(calculatedTotalPages);
 
       // Buscar categorias com paginação
       const from = (page - 1) * ITEMS_PER_PAGE;
@@ -150,49 +157,59 @@ export default function GaleriaPage() {
       }
 
       // Processar cada categoria
+      // Processar cada categoria
       const categoriasComItens = await Promise.all(
-        (categoriasData || []).map(async (categoria) => {
-          // Contar itens da categoria
-          const { count } = await supabase
-            .from("galeria_itens")
-            .select("*", { count: "exact", head: true })
-            .eq("categoria_id", categoria.id)
-            .eq("status", true);
-
-          // Verificar se há itens em destaque
-          const { data: destaqueData } = await supabase
-            .from("galeria_itens")
-            .select("id")
-            .eq("categoria_id", categoria.id)
-            .eq("status", true)
-            .eq("destaque", true)
-            .limit(1);
-
-          // Buscar última imagem para thumbnail
-          let ultimaImagemUrl = undefined;
-          if (count && count > 0) {
-            const { data: ultimoItem } = await supabase
+        (categoriasData || []).map(
+          async (
+            categoria: Database["public"]["Tables"]["galeria_categorias"]["Row"]
+          ) => {
+            // Contar itens da categoria
+            const { count } = await supabase
               .from("galeria_itens")
-              .select("arquivo_url, thumbnail_url, created_at")
+              .select("*", { count: "exact", head: true })
+              .eq("categoria_id", categoria.id)
+              .eq("status", true);
+
+            // Verificar se há itens em destaque
+            const { data: destaqueData } = await supabase
+              .from("galeria_itens")
+              .select("id")
               .eq("categoria_id", categoria.id)
               .eq("status", true)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
+              .eq("destaque", true)
+              .limit(1);
 
-            if (ultimoItem) {
-              ultimaImagemUrl =
-                ultimoItem.thumbnail_url || ultimoItem.arquivo_url;
+            // Buscar última imagem para thumbnail
+            let ultimaImagemUrl = undefined;
+            if (count && count > 0) {
+              const { data: ultimoItem } = await supabase
+                .from("galeria_itens")
+                .select("arquivo_url, thumbnail_url, created_at")
+                .eq("categoria_id", categoria.id)
+                .eq("status", true)
+                .order("created_at", { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+              if (ultimoItem) {
+                // 🔥 CORREÇÃO AQUI
+                const item = ultimoItem as {
+                  arquivo_url: string;
+                  thumbnail_url: string | null;
+                  created_at: string;
+                };
+                ultimaImagemUrl = item.thumbnail_url || item.arquivo_url;
+              }
             }
-          }
 
-          return {
-            ...categoria,
-            item_count: count || 0,
-            tem_destaque: !!destaqueData && destaqueData.length > 0,
-            ultima_imagem_url: ultimaImagemUrl,
-          };
-        })
+            return {
+              ...categoria,
+              item_count: count || 0,
+              tem_destaque: !!destaqueData && destaqueData.length > 0,
+              ultima_imagem_url: ultimaImagemUrl,
+            };
+          }
+        )
       );
 
       // Se for ordenação por popularidade, ordenar após buscar contagem
@@ -207,11 +224,13 @@ export default function GaleriaPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, searchTerm, selectedTipo, sortBy, supabase]);
+  }, [supabase, page, searchTerm, selectedTipo, sortBy]);
 
   useEffect(() => {
-    fetchCategorias();
-  }, [fetchCategorias, page]);
+    if (supabase) {
+      fetchCategorias();
+    }
+  }, [fetchCategorias, supabase]);
 
   // Debounce para busca
   useEffect(() => {
@@ -358,7 +377,7 @@ export default function GaleriaPage() {
         </div>
       </section>
 
-      {/* Filtros e Controles - SELECTS CORRIGIDOS (SEM DESLOCAMENTO) */}
+      {/* Filtros e Controles */}
       <section className="py-6 sm:py-8 bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-40">
         <div className="container mx-auto px-4 sm:px-6">
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start lg:items-center justify-between">
@@ -376,9 +395,9 @@ export default function GaleriaPage() {
               </div>
             </div>
 
-            {/* Controls - SELECTS CORRIGIDOS (SEM DESLOCAMENTO) */}
+            {/* Controls */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
-              {/* Tipo Filter - CORRIGIDO */}
+              {/* Tipo Filter */}
               <Select
                 value={selectedTipo}
                 onValueChange={(value) => setSelectedTipo(value)}
@@ -387,13 +406,7 @@ export default function GaleriaPage() {
                   <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
                   <SelectValue placeholder="Filtrar por tipo" />
                 </SelectTrigger>
-                <SelectContent
-                  className="z-[9999] w-[var(--radix-select-trigger-width)] max-h-[300px] overflow-y-auto"
-                  position="popper"
-                  sideOffset={5}
-                  align="start"
-                  avoidCollisions={false}
-                >
+                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
                   <SelectItem value="all">Todos os Tipos</SelectItem>
                   <SelectItem value="fotos">
                     <div className="flex items-center">
@@ -410,7 +423,7 @@ export default function GaleriaPage() {
                 </SelectContent>
               </Select>
 
-              {/* Sort - CORRIGIDO */}
+              {/* Sort */}
               <Select
                 value={sortBy}
                 onValueChange={(value: SortType) => setSortBy(value)}
@@ -419,13 +432,7 @@ export default function GaleriaPage() {
                   <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
                   <SelectValue placeholder="Ordenar por" />
                 </SelectTrigger>
-                <SelectContent
-                  className="z-[9999] w-[var(--radix-select-trigger-width)]"
-                  position="popper"
-                  sideOffset={5}
-                  align="start"
-                  avoidCollisions={false}
-                >
+                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
                   <SelectItem value="recent">Mais Recentes</SelectItem>
                   <SelectItem value="oldest">Mais Antigas</SelectItem>
                   <SelectItem value="popular">Mais Itens</SelectItem>

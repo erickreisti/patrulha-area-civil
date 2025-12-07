@@ -50,6 +50,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { NoticiaWithAutor } from "@/types";
+import { Database } from "@/lib/supabase/client";
 
 // ==================== CONFIGURAÇÕES ====================
 const ITEMS_PER_PAGE_OPTIONS = [6, 10, 20, 30, 50];
@@ -71,8 +72,11 @@ export default function NoticiasPage() {
     Array<{ value: string; label: string; icon: IconType }>
   >([{ value: "all", label: "Todas as Categorias", icon: RiStackLine }]);
 
-  // Otimização: useMemo para criar o cliente Supabase apenas uma vez
-  const supabase = useMemo(() => createClient(), []);
+  // 🔥 CLIENTE SUPABASE COM INICIALIZAÇÃO SEGURA
+  const supabase = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    return createClient();
+  }, []);
 
   // 🔥 HOOK PARA PREVENIR LOCK DE SCROLL DO RADIX UI
   useEffect(() => {
@@ -105,8 +109,8 @@ export default function NoticiasPage() {
 
       return () => {
         observer.disconnect();
-        document.body.style.overflow = "auto";
-        document.body.style.paddingRight = "0";
+        document.body.style.overflow = "";
+        document.body.style.paddingRight = "";
       };
     };
 
@@ -116,6 +120,8 @@ export default function NoticiasPage() {
 
   // Buscar categorias únicas
   const fetchCategories = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       const { data, error } = await supabase
         .from("noticias")
@@ -125,7 +131,14 @@ export default function NoticiasPage() {
       if (error) throw error;
 
       const uniqueCategories = Array.from(
-        new Set(data?.map((n) => n.categoria).filter(Boolean) as string[])
+        new Set(
+          data
+            ?.map(
+              (n: Database["public"]["Tables"]["noticias"]["Row"]) =>
+                n.categoria
+            )
+            .filter(Boolean) as string[]
+        )
       ).map((cat) => ({
         value: cat,
         label: cat,
@@ -143,6 +156,8 @@ export default function NoticiasPage() {
 
   // Buscar notícias com paginação
   const fetchNoticias = useCallback(async () => {
+    if (!supabase) return;
+
     try {
       setLoading(true);
 
@@ -169,6 +184,9 @@ export default function NoticiasPage() {
           `titulo.ilike.%${searchTerm}%,resumo.ilike.%${searchTerm}%,conteudo.ilike.%${searchTerm}%`
         );
       }
+
+      // Apenas notícias publicadas para usuários públicos
+      query = query.eq("status", "publicado");
 
       switch (sortBy) {
         case "recent":
@@ -201,29 +219,31 @@ export default function NoticiasPage() {
       setLoading(false);
     }
   }, [
+    supabase,
     currentPage,
     itemsPerPage,
     selectedCategory,
     searchTerm,
     sortBy,
-    supabase,
   ]);
 
+  // Inicialização
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
-
-  useEffect(() => {
-    fetchNoticias();
-  }, [fetchNoticias]);
+    if (supabase) {
+      fetchCategories();
+      fetchNoticias();
+    }
+  }, [supabase, fetchCategories, fetchNoticias]);
 
   // Debounce para busca
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (currentPage !== 1) {
-        setCurrentPage(1);
-      } else {
-        fetchNoticias();
+      if (supabase) {
+        if (currentPage !== 1) {
+          setCurrentPage(1);
+        } else {
+          fetchNoticias();
+        }
       }
     }, 500);
 
@@ -234,14 +254,15 @@ export default function NoticiasPage() {
     sortBy,
     itemsPerPage,
     currentPage,
+    supabase,
     fetchNoticias,
   ]);
 
   // Calcular total de páginas
-  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
 
   // Função para formatar nome do autor
-  const formatAuthorName = (name: string) => {
+  const formatAuthorName = (name?: string) => {
     if (!name) return "Autor";
     const firstName = name.split(" ")[0];
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
@@ -365,7 +386,7 @@ export default function NoticiasPage() {
         </div>
       </section>
 
-      {/* 🔥 SEÇÃO DE FILTROS CORRIGIDA - SEM DESLOCAMENTO */}
+      {/* Seção de Filtros */}
       <div className="bg-white/95 backdrop-blur-sm border-b border-slate-200/60 relative z-50">
         <div className="container mx-auto px-4 sm:px-6 py-6">
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start lg:items-center justify-between">
@@ -386,116 +407,76 @@ export default function NoticiasPage() {
               </div>
             </div>
 
-            {/* Controls - COM WRAPPER PARA PREVENIR DESLOCAMENTO */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto relative radix-portal-fix">
+            {/* Controls */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
               {/* Category Filter */}
-              <div className="relative">
-                <Select
-                  value={selectedCategory}
-                  onValueChange={(value) => {
-                    setSelectedCategory(value);
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                    <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
-                    <SelectValue placeholder="Filtrar por categoria" />
-                  </SelectTrigger>
-                  <SelectContent
-                    className="z-[9999] bg-white shadow-xl border-slate-200"
-                    position="popper"
-                    align="start"
-                    sideOffset={5}
-                  >
-                    {categories.map((category) => {
-                      const Icon = category.icon;
-                      return (
-                        <SelectItem
-                          key={category.value}
-                          value={category.value}
-                          className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
-                        >
-                          <div className="flex items-center">
-                            <Icon className="w-4 h-4 mr-2" />
-                            {category.label}
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Sort */}
-              <div className="relative">
-                <Select
-                  value={sortBy}
-                  onValueChange={(value: "recent" | "oldest" | "destaque") =>
-                    setSortBy(value)
-                  }
-                >
-                  <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                    <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
-                    <SelectValue placeholder="Ordenar por" />
-                  </SelectTrigger>
-                  <SelectContent
-                    className="z-[9999] bg-white shadow-xl border-slate-200"
-                    position="popper"
-                    align="start"
-                    sideOffset={5}
-                  >
-                    <SelectItem
-                      value="recent"
-                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
-                    >
-                      Mais Recentes
-                    </SelectItem>
-                    <SelectItem
-                      value="oldest"
-                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
-                    >
-                      Mais Antigas
-                    </SelectItem>
-                    <SelectItem
-                      value="destaque"
-                      className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
-                    >
-                      Em Destaque
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Items per Page */}
-              <div className="relative">
-                <Select
-                  value={itemsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setItemsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent
-                    className="z-[9999] bg-white shadow-xl border-slate-200"
-                    position="popper"
-                    align="start"
-                    sideOffset={5}
-                  >
-                    {ITEMS_PER_PAGE_OPTIONS.map((num) => (
+              <Select
+                value={selectedCategory}
+                onValueChange={(value) => {
+                  setSelectedCategory(value);
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                  <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
+                  <SelectValue placeholder="Filtrar por categoria" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
+                  {categories.map((category) => {
+                    const Icon = category.icon;
+                    return (
                       <SelectItem
-                        key={num}
-                        value={num.toString()}
+                        key={category.value}
+                        value={category.value}
                         className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
                       >
-                        {num} por página
+                        <div className="flex items-center">
+                          <Icon className="w-4 h-4 mr-2" />
+                          {category.label}
+                        </div>
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+
+              {/* Sort */}
+              <Select
+                value={sortBy}
+                onValueChange={(value: "recent" | "oldest" | "destaque") =>
+                  setSortBy(value)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                  <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
+                  <SelectItem value="recent">Mais Recentes</SelectItem>
+                  <SelectItem value="oldest">Mais Antigas</SelectItem>
+                  <SelectItem value="destaque">Em Destaque</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Items per Page */}
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setItemsPerPage(Number(value));
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
+                  {ITEMS_PER_PAGE_OPTIONS.map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num} por página
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -725,7 +706,7 @@ function NewsCard({
   isFirst = false,
 }: {
   noticia: NoticiaWithAutor;
-  formatAuthorName: (name: string) => string;
+  formatAuthorName: (name?: string) => string;
   getImageUrl: (url: string | null) => string | null;
   isFirst?: boolean;
 }) {
@@ -794,7 +775,7 @@ function NewsCard({
         {/* Category Badge */}
         <Badge className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 bg-white/90 backdrop-blur-sm text-slate-700 border-0 text-xs">
           <RiStackLine className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
-          {noticia.categoria}
+          {noticia.categoria || "Geral"}
         </Badge>
       </div>
 
@@ -815,9 +796,7 @@ function NewsCard({
             <div className="flex items-center">
               <RiUserLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
               <span className="text-xs font-medium">
-                {noticia.autor?.full_name
-                  ? formatAuthorName(noticia.autor.full_name)
-                  : "Autor"}
+                {formatAuthorName(noticia.autor?.full_name)}
               </span>
             </div>
             <div className="flex items-center">

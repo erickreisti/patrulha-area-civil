@@ -9,7 +9,7 @@ export interface UserProfile {
   validade_certificacao?: string;
   tipo_sanguineo?: string;
   status: boolean;
-  role: "admin" | "agent"; // Especificando os valores possíveis
+  role: "admin" | "agent";
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +37,12 @@ export interface GaleriaCategoria {
   itens_count?: number;
 }
 
+export interface GaleriaCategoriaComItens extends GaleriaCategoria {
+  item_count: number;
+  ultima_imagem_url?: string;
+  tem_destaque?: boolean;
+}
+
 export interface GaleriaItem {
   id: string;
   titulo: string;
@@ -54,7 +60,6 @@ export interface GaleriaItem {
   updated_at?: string;
 }
 
-// Interfaces para listagem
 export interface GaleriaItemListagem {
   id: string;
   titulo: string;
@@ -76,7 +81,6 @@ export interface CategoriaListagem {
   itens_count: number;
 }
 
-// Formulários
 export interface CreateCategoriaData {
   nome: string;
   descricao?: string;
@@ -117,7 +121,6 @@ export interface Noticia {
   updated_at: string;
 }
 
-// Interface para notícia com informações do autor
 export interface NoticiaWithAutor extends Noticia {
   autor?: {
     full_name?: string;
@@ -126,7 +129,6 @@ export interface NoticiaWithAutor extends Noticia {
   };
 }
 
-// Interface para dados do formulário de notícia
 export interface NoticiaFormData {
   titulo: string;
   slug: string;
@@ -183,4 +185,35 @@ export interface UploadResult {
   error: string | null;
   path: string | null;
   success: boolean;
+}
+
+// ==================== PAGINAÇÃO ====================
+export interface PaginatedResult<T> {
+  data: T[];
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+}
+
+// ==================== FILTROS ====================
+export interface FilterOptions {
+  search?: string;
+  tipo?: string;
+  status?: boolean;
+  categoria_id?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+}
+
+// ==================== FORMULÁRIOS ====================
+export interface FormState {
+  loading: boolean;
+  error: string | null;
+  success: boolean;
+}
+
+export interface SelectOption {
+  value: string;
+  label: string;
 }
