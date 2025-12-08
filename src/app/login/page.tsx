@@ -5,13 +5,11 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  createClient,
-  type SupabaseBrowserClient,
-} from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -107,7 +105,7 @@ export default function LoginPage() {
     message: string;
   } | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
-  const [supabase, setSupabase] = useState<SupabaseBrowserClient | null>(null);
+  const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -135,7 +133,7 @@ export default function LoginPage() {
       console.error("❌ Erro ao criar cliente Supabase:", error);
       showAlert("error", "Erro ao inicializar sistema. Recarregue a página.");
     }
-  }, [showAlert]); // ✅ Adicionado showAlert como dependência
+  }, [showAlert]);
 
   const formatMatricula = useCallback((value: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -314,7 +312,6 @@ export default function LoginPage() {
 
       // 🔐 Determinar status REAL do agente
       const isActive = isProfileActive(profileStatus);
-      const isAdmin = profileRole === "admin";
 
       if (!isActive) {
         setAgentStatus("inactive");
@@ -412,27 +409,14 @@ export default function LoginPage() {
           "warning",
           "Login realizado! Sua conta está inativa. Acesso limitado ao perfil."
         );
-
-        // 🔹 AGENTE INATIVO: Vai para perfil
-        setTimeout(() => {
-          window.location.href = "/perfil";
-        }, 2000);
       } else {
-        showAlert("success", "Login realizado com sucesso! Redirecionando...");
-
-        // 🔹 VERIFICAÇÃO: Administrador tem acesso total?
-        // Se quiser que admin tenha acesso total, mantenha esta lógica:
-        if (isAdmin) {
-          setTimeout(() => {
-            window.location.href = "/admin/dashboard";
-          }, 1500);
-        } else {
-          // 🔹 AGENTE ATIVO (não admin): Também vai apenas para perfil
-          setTimeout(() => {
-            window.location.href = "/perfil";
-          }, 1500);
-        }
+        showAlert("success", "Login realizado com sucesso!");
       }
+
+      // 🔹 ✅ **TODOS redirecionam para /perfil** - agentes ativos/inativos e admins
+      setTimeout(() => {
+        window.location.href = "/perfil";
+      }, 1500);
     } catch (error: unknown) {
       updateSecurityLock();
       console.error("💥 Erro geral no login:", error);
@@ -491,21 +475,8 @@ export default function LoginPage() {
         } = await supabase.auth.getSession();
 
         if (session) {
-          // Verificar status do usuário
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("status, role")
-            .eq("id", session.user.id)
-            .single();
-
-          if (profile) {
-            // Redirecionar baseado no role
-            if (profile.role === "admin") {
-              window.location.href = "/admin/dashboard";
-            } else {
-              window.location.href = "/perfil";
-            }
-          }
+          // ✅ **TODOS redirecionam para /perfil** - independente do role
+          window.location.href = "/perfil";
         }
       } catch (error) {
         console.error("Erro ao verificar sessão:", error);

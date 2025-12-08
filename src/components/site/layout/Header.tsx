@@ -84,45 +84,47 @@ const TopBar = () => {
   return (
     <div
       className={cn(
-        "bg-navy py-2 transition-all duration-300",
+        "bg-navy py-1.5 xs:py-2 transition-all duration-300",
         scrolled ? "shadow-md" : ""
       )}
       role="complementary"
       aria-label="Barra superior"
     >
-      <div className="container mx-auto px-4 sm:px-6">
-        <div className="flex justify-between items-center text-white text-sm">
-          <div className="flex md:hidden items-center gap-2">
+      <div className="container mx-auto px-3 xs:px-4 sm:px-6">
+        <div className="flex justify-between items-center text-white text-xs xs:text-sm">
+          {/* Mobile: Bandeira e texto reduzido */}
+          <div className="flex md:hidden items-center gap-1.5 xs:gap-2">
             <Image
               src="/images/logos/flag-br.webp"
               alt="Bandeira do Brasil"
-              width={24}
-              height={16}
-              className="rounded-sm"
-              style={{ width: "auto", height: "auto" }}
+              width={20}
+              height={14}
+              className="rounded-sm w-auto h-auto min-w-[20px]"
               priority
             />
-            <span className="text-slate-200 text-xs font-medium truncate max-w-[120px] xs:max-w-none">
+            <span className="text-slate-200 font-medium truncate text-[10px] xs:text-xs">
               Brasil
             </span>
           </div>
 
-          <div className="hidden md:flex items-center gap-3">
+          {/* Desktop: Texto completo */}
+          <div className="hidden md:flex items-center gap-2 lg:gap-3">
             <Image
               src="/images/logos/flag-br.webp"
               alt="Bandeira do Brasil"
-              width={24}
-              height={16}
-              className="rounded-sm"
-              style={{ width: "auto", height: "auto" }}
+              width={22}
+              height={15}
+              className="rounded-sm w-auto h-auto"
               priority
             />
-            <span className="text-slate-200 font-medium font-roboto text-sm lg:text-base">
+            <span className="text-slate-200 font-medium font-roboto text-xs lg:text-sm xl:text-base">
               República Federativa do Brasil
             </span>
           </div>
+
+          {/* Redes sociais - tamanhos responsivos */}
           <div
-            className="flex gap-1 sm:gap-2"
+            className="flex gap-1 xs:gap-1.5 sm:gap-2"
             role="list"
             aria-label="Redes sociais"
           >
@@ -135,7 +137,7 @@ const TopBar = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn(
-                    "w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8",
+                    "w-5 h-5 xs:w-6 xs:h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8",
                     "bg-white/10 rounded-full flex items-center justify-center text-white",
                     "no-underline transition-all duration-300 border border-white/20",
                     social.hoverColor,
@@ -145,7 +147,7 @@ const TopBar = () => {
                   aria-label={social.label}
                   role="listitem"
                 >
-                  <IconComponent className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                  <IconComponent className="w-2 h-2 xs:w-2.5 xs:h-2.5 sm:w-3 sm:h-3" />
                 </a>
               );
             })}
@@ -160,26 +162,28 @@ const Logo = () => {
   return (
     <Link
       href="/"
-      className="flex items-center group transition-all duration-300 gap-2 md:gap-3 lg:gap-4"
+      className="flex items-center group transition-all duration-300 gap-1.5 xs:gap-2 md:gap-3 lg:gap-4"
       aria-label="Página inicial da Patrulha Aérea Civil"
       role="banner"
     >
-      <div className="relative w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 transition-all duration-300 flex-shrink-0">
+      {/* Logo responsiva */}
+      <div className="relative w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 transition-all duration-300 flex-shrink-0">
         <Image
           src="/images/logos/logo.webp"
           alt="Patrulha Aérea Civil"
-          width={56}
-          height={56}
-          className="object-contain drop-shadow-md transition-all duration-300 group-hover:scale-105"
-          style={{ width: "auto", height: "auto" }}
+          width={48}
+          height={48}
+          className="object-contain drop-shadow-md transition-all duration-300 group-hover:scale-105 w-full h-full"
           priority
         />
       </div>
-      <div className="text-left transition-all duration-300 min-w-0">
-        <h1 className="font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 text-lg sm:text-xl md:text-2xl lg:text-3xl truncate">
+
+      {/* Textos responsivos mantendo por extenso */}
+      <div className="text-left transition-all duration-300 min-w-0 flex-1">
+        <h1 className="font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl truncate">
           PATRULHA AÉREA CIVIL
         </h1>
-        <p className="text-slate-600 leading-tight mt-0.5 font-roboto transition-all duration-300 text-xs md:text-sm truncate">
+        <p className="text-slate-600 leading-tight mt-0.5 font-roboto transition-all duration-300 text-[9px] xs:text-[10px] sm:text-xs md:text-sm truncate">
           COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
         </p>
       </div>
@@ -201,12 +205,13 @@ const NavigationItem = ({
       href={item.href}
       onClick={onClick}
       className={cn(
-        "no-underline text-slate-700 font-medium py-2 px-1 transition-all duration-300",
-        "uppercase tracking-wider font-roboto relative group/navlink text-sm w-fit",
+        "no-underline text-slate-700 font-medium py-1.5 xs:py-2 px-1 transition-all duration-300",
+        "uppercase tracking-wider font-roboto relative group/navlink w-fit",
         isActive
           ? "text-navy font-semibold"
           : "text-slate-600 hover:text-navy hover:font-semibold",
-        "touch-optimize active:scale-95"
+        "touch-optimize active:scale-95",
+        "text-xs xs:text-sm sm:text-base" // Tamanhos responsivos
       )}
       aria-current={isActive ? "page" : undefined}
       role="menuitem"
@@ -232,7 +237,7 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
     role="navigation"
   >
     <ul
-      className="flex list-none gap-3 lg:gap-4 xl:gap-6 m-0 p-0 transition-all duration-300"
+      className="flex list-none gap-1.5 xs:gap-2 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 m-0 p-0 transition-all duration-300 flex-wrap justify-center"
       role="menubar"
     >
       {NAVIGATION.map((item) => (
@@ -249,14 +254,14 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
 const LoadingButton = () => {
   return (
     <Button
-      className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md"
+      className="bg-navy hover:bg-navy-700 text-white font-medium px-3 xs:px-4 py-2 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md"
       disabled
       aria-label="Carregando..."
       aria-busy="true"
     >
-      <div className="flex items-center justify-center gap-2 relative z-10">
-        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-        <span className="text-white font-medium text-xs sm:text-sm">
+      <div className="flex items-center justify-center gap-1.5 xs:gap-2 relative z-10">
+        <div className="animate-spin rounded-full h-3 xs:h-4 w-3 xs:w-4 border-2 border-white border-t-transparent" />
+        <span className="text-white font-medium text-[10px] xs:text-xs sm:text-sm">
           Carregando...
         </span>
       </div>
@@ -288,11 +293,11 @@ const IdentificationButton = () => {
   if (!user) {
     return (
       <Button
-        className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+        className="bg-navy hover:bg-navy-700 text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
         asChild
       >
         <Link href="/login" aria-label="Fazer login" role="button">
-          <span className="relative z-10 text-white text-xs sm:text-sm">
+          <span className="relative z-10 text-white text-[10px] xs:text-xs sm:text-sm truncate">
             Identificação
           </span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
@@ -306,60 +311,60 @@ const IdentificationButton = () => {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className="bg-navy hover:bg-navy-700 text-white font-medium px-4 py-2.5 text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+          className="bg-navy hover:bg-navy-700 text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
           aria-label="Menu do usuário"
           role="button"
         >
-          <span className="relative z-10 text-white text-xs sm:text-sm">
+          <span className="relative z-10 text-white text-[10px] xs:text-xs sm:text-sm truncate">
             Identificação
           </span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-64 max-w-[90vw]"
+        className="w-56 xs:w-60 sm:w-64 max-w-[90vw]"
         align="end"
-        sideOffset={8}
-        collisionPadding={16}
+        sideOffset={6}
+        collisionPadding={12}
         role="menu"
       >
-        <DropdownMenuLabel className="p-4 border-b border-slate-200">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-10 h-10 border-2 border-navy/20 flex-shrink-0">
+        <DropdownMenuLabel className="p-3 xs:p-4 border-b border-slate-200">
+          <div className="flex items-center gap-2 xs:gap-3">
+            <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-navy/20 flex-shrink-0">
               <AvatarImage
                 src={profile?.avatar_url || ""}
                 alt={`Avatar de ${profile?.full_name || "Agente"}`}
                 className="object-cover object-center"
                 sizes="40px"
               />
-              <AvatarFallback className="bg-navy text-white">
-                <RiUserLine className="w-5 h-5" />
+              <AvatarFallback className="bg-navy text-white text-xs">
+                <RiUserLine className="w-4 h-4 xs:w-5 xs:h-5" />
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-800 truncate">
+              <p className="text-xs xs:text-sm font-semibold text-slate-800 truncate">
                 {profile?.full_name || "Agente PAC"}
               </p>
-              <p className="text-xs text-slate-600 truncate">
+              <p className="text-[10px] xs:text-xs text-slate-600 truncate">
                 {profile?.matricula
                   ? `Matrícula: ${profile.matricula}`
                   : user.email}
               </p>
-              <p className="text-xs text-navy font-medium capitalize truncate">
+              <p className="text-[10px] xs:text-xs text-navy font-medium capitalize truncate">
                 {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
               </p>
             </div>
           </div>
         </DropdownMenuLabel>
 
-        <DropdownMenuGroup className="p-2" role="group">
+        <DropdownMenuGroup className="p-1.5 xs:p-2" role="group">
           {!isOnProfilePage && (
             <DropdownMenuItem asChild role="menuitem">
               <Link
                 href="/perfil"
-                className="cursor-pointer text-sm focus:outline-none focus:bg-slate-100"
+                className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-slate-100 py-2"
               >
-                <RiUserLine className="w-4 h-4 mr-2 text-blue-600 flex-shrink-0" />
+                <RiUserLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 text-blue-600 flex-shrink-0" />
                 <span className="truncate">Ver Meu Perfil</span>
               </Link>
             </DropdownMenuItem>
@@ -369,9 +374,9 @@ const IdentificationButton = () => {
             <DropdownMenuItem asChild role="menuitem">
               <Link
                 href="/admin/dashboard"
-                className="cursor-pointer text-sm focus:outline-none focus:bg-slate-100"
+                className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-slate-100 py-2"
               >
-                <RiBarChartLine className="w-4 h-4 mr-2 text-purple-600 flex-shrink-0" />
+                <RiBarChartLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 text-purple-600 flex-shrink-0" />
                 <span className="truncate">Ir ao Dashboard</span>
               </Link>
             </DropdownMenuItem>
@@ -380,13 +385,13 @@ const IdentificationButton = () => {
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuGroup className="p-2" role="group">
+        <DropdownMenuGroup className="p-1.5 xs:p-2" role="group">
           <DropdownMenuItem
             onClick={handleSignOut}
-            className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 text-sm focus:outline-none"
+            className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 text-xs xs:text-sm focus:outline-none py-2"
             role="menuitem"
           >
-            <RiLogoutBoxRLine className="w-4 h-4 mr-2 flex-shrink-0" />
+            <RiLogoutBoxRLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 flex-shrink-0" />
             <span className="truncate">Sair do Sistema</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -457,7 +462,7 @@ const MobileMenu = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            className="fixed inset-0 bg-black/50 z-40 xl:hidden"
             aria-hidden="true"
             role="presentation"
           />
@@ -468,7 +473,7 @@ const MobileMenu = ({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-y-0 right-0 w-full max-w-sm bg-white z-50 lg:hidden overflow-y-auto shadow-xl"
+            className="fixed inset-y-0 right-0 w-full max-w-xs xs:max-w-sm bg-white z-50 xl:hidden overflow-y-auto shadow-xl"
             style={{ maxHeight: "100vh" }}
             role="dialog"
             aria-modal="true"
@@ -477,21 +482,21 @@ const MobileMenu = ({
           >
             <div className="flex flex-col h-full">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
+              <div className="flex items-center justify-between p-3 xs:p-4 border-b border-slate-200 bg-white">
                 <Logo />
                 <button
                   onClick={onClose}
-                  className="p-2 rounded-lg hover:bg-slate-100 transition-colors touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                  className="p-1.5 xs:p-2 rounded-lg hover:bg-slate-100 transition-colors touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
                   aria-label="Fechar menu"
                   type="button"
                 >
-                  <RiCloseLine className="w-6 h-6 text-slate-700" />
+                  <RiCloseLine className="w-5 h-5 xs:w-6 xs:h-6 text-slate-700" />
                 </button>
               </div>
 
               {/* Navigation */}
-              <div className="flex-1 overflow-y-auto p-4">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
+              <div className="flex-1 overflow-y-auto p-3 xs:p-4">
+                <h3 className="text-xs xs:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
                   Navegação
                 </h3>
                 <nav className="space-y-1" role="navigation">
@@ -501,7 +506,7 @@ const MobileMenu = ({
                       href={item.href}
                       onClick={onClose}
                       className={cn(
-                        "flex items-center px-3 py-3 text-sm font-medium rounded-md transition-colors duration-200",
+                        "flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium rounded-md transition-colors duration-200",
                         "focus:outline-none focus:ring-2 focus:ring-navy/50",
                         pathname.startsWith(item.href)
                           ? "bg-navy/10 text-navy border-r-2 border-navy"
@@ -515,42 +520,42 @@ const MobileMenu = ({
                 </nav>
 
                 {/* Search */}
-                <div className="mt-6 px-2">
+                <div className="mt-4 xs:mt-6 px-2">
                   <div className="relative">
-                    <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                    <RiSearchLine className="absolute left-2.5 xs:left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 xs:w-4 xs:h-4 text-slate-400 pointer-events-none" />
                     <input
                       type="search"
                       placeholder="Buscar..."
-                      className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/50 focus:border-navy"
+                      className="w-full pl-8 xs:pl-10 pr-3 xs:pr-4 py-1.5 xs:py-2 text-xs xs:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/50 focus:border-navy"
                       aria-label="Buscar no site"
                     />
                   </div>
                 </div>
 
                 {user ? (
-                  <div className="border-t border-slate-200 pt-6 mt-6">
-                    <div className="flex items-center gap-3 px-3 py-3 bg-slate-50 rounded-lg mb-3">
-                      <Avatar className="w-10 h-10 border-2 border-navy/20 flex-shrink-0">
+                  <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
+                    <div className="flex items-center gap-2 xs:gap-3 px-2 xs:px-3 py-2 xs:py-3 bg-slate-50 rounded-lg mb-2 xs:mb-3">
+                      <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-navy/20 flex-shrink-0">
                         <AvatarImage
                           src={profile?.avatar_url || ""}
                           alt={`Avatar de ${profile?.full_name || "Agente"}`}
                           className="object-cover object-center"
                           sizes="40px"
                         />
-                        <AvatarFallback className="bg-navy text-white">
-                          <RiUserLine className="w-5 h-5" />
+                        <AvatarFallback className="bg-navy text-white text-xs">
+                          <RiUserLine className="w-4 h-4 xs:w-5 xs:h-5" />
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 truncate">
+                        <p className="text-xs xs:text-sm font-semibold text-slate-800 truncate">
                           {profile?.full_name || "Agente PAC"}
                         </p>
-                        <p className="text-xs text-slate-600 truncate">
+                        <p className="text-[10px] xs:text-xs text-slate-600 truncate">
                           {profile?.matricula
                             ? `Matrícula: ${profile.matricula}`
                             : user.email}
                         </p>
-                        <p className="text-xs text-navy font-medium capitalize">
+                        <p className="text-[10px] xs:text-xs text-navy font-medium capitalize">
                           {profile?.graduacao || "Agente"}{" "}
                           {isAdmin ? "• Admin" : ""}
                         </p>
@@ -561,11 +566,11 @@ const MobileMenu = ({
                       {!isOnProfilePage && (
                         <Link
                           href="/perfil"
-                          className="flex items-center px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
+                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
                           onClick={onClose}
                           role="menuitem"
                         >
-                          <RiUserLine className="w-4 h-4 mr-3 text-blue-600 flex-shrink-0" />
+                          <RiUserLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 xs:mr-3 text-blue-600 flex-shrink-0" />
                           Ver Meu Perfil
                         </Link>
                       )}
@@ -573,11 +578,11 @@ const MobileMenu = ({
                       {isAdmin && (
                         <Link
                           href="/admin/dashboard"
-                          className="flex items-center px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
+                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
                           onClick={onClose}
                           role="menuitem"
                         >
-                          <RiBarChartLine className="w-4 h-4 mr-3 text-purple-600 flex-shrink-0" />
+                          <RiBarChartLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 xs:mr-3 text-purple-600 flex-shrink-0" />
                           Ir ao Dashboard
                         </Link>
                       )}
@@ -586,23 +591,25 @@ const MobileMenu = ({
                         onClick={() => {
                           handleSignOut();
                         }}
-                        className="flex items-center w-full px-3 py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 text-left focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                        className="flex items-center w-full px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 text-left focus:outline-none focus:ring-2 focus:ring-red-500/50"
                         role="menuitem"
                         type="button"
                       >
-                        <RiLogoutBoxRLine className="w-4 h-4 mr-3 flex-shrink-0" />
+                        <RiLogoutBoxRLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 xs:mr-3 flex-shrink-0" />
                         Sair do Sistema
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="border-t border-slate-200 pt-6 mt-6">
+                  <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
                     <Button
-                      className="w-full bg-navy hover:bg-navy-700 text-white font-medium py-3 text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300 touch-optimize focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className="w-full bg-navy hover:bg-navy-700 text-white font-medium py-2 xs:py-3 text-xs xs:text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300 touch-optimize focus:outline-none focus:ring-2 focus:ring-white/50"
                       asChild
                     >
                       <Link href="/login" onClick={onClose} role="button">
-                        <span className="relative z-10">Identificação</span>
+                        <span className="relative z-10 text-xs xs:text-sm">
+                          Identificação
+                        </span>
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
                       </Link>
                     </Button>
@@ -610,12 +617,12 @@ const MobileMenu = ({
                 )}
 
                 {/* Social Links */}
-                <div className="border-t border-slate-200 pt-6 mt-6">
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-2">
+                <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
+                  <h3 className="text-xs xs:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
                     Redes Sociais
                   </h3>
                   <div
-                    className="flex justify-center gap-2 px-2"
+                    className="flex justify-center gap-1.5 xs:gap-2 px-2"
                     role="list"
                     aria-label="Redes sociais"
                   >
@@ -628,7 +635,7 @@ const MobileMenu = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
-                            "w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 no-underline transition-all duration-300 hover:shadow-lg",
+                            "w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 no-underline transition-all duration-300 hover:shadow-lg",
                             "focus:outline-none focus:ring-2 focus:ring-navy/50",
                             social.hoverColor,
                             "hover:text-white hover:scale-110 touch-optimize"
@@ -637,7 +644,7 @@ const MobileMenu = ({
                           onClick={onClose}
                           role="listitem"
                         >
-                          <IconComponent className="w-4 h-4" />
+                          <IconComponent className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
                         </a>
                       );
                     })}
@@ -646,10 +653,10 @@ const MobileMenu = ({
               </div>
 
               {/* Footer */}
-              <div className="border-t border-slate-200 p-4 bg-slate-50">
-                <div className="text-center text-xs text-slate-500">
+              <div className="border-t border-slate-200 p-3 xs:p-4 bg-slate-50">
+                <div className="text-center text-[10px] xs:text-xs text-slate-500">
                   <p>© {new Date().getFullYear()} Patrulha Aérea Civil</p>
-                  <p className="mt-1">Todos os direitos reservados</p>
+                  <p className="mt-0.5 xs:mt-1">Todos os direitos reservados</p>
                 </div>
               </div>
             </div>
@@ -685,7 +692,7 @@ export function Header() {
   return (
     <header
       className={cn(
-        "bg-white sticky top-0 left-0 right-0 z-50 min-h-[90px] md:min-h-[100px] lg:min-h-[120px] transition-all duration-300",
+        "bg-white sticky top-0 left-0 right-0 z-50 min-h-[80px] xs:min-h-[85px] md:min-h-[90px] lg:min-h-[100px] xl:min-h-[120px] transition-all duration-300",
         scrolled ? "shadow-lg" : "shadow-sm"
       )}
       role="banner"
@@ -694,48 +701,48 @@ export function Header() {
       <TopBar />
 
       <div className="bg-white border-b border-slate-200">
-        <div className="container mx-auto px-4 sm:px-6">
-          {/* Mobile Header */}
-          <div className="flex md:hidden items-center justify-between w-full py-3">
+        <div className="container mx-auto px-3 xs:px-4 sm:px-6">
+          {/* Mobile Header (< 768px): Logo + Menu Hamburguer */}
+          <div className="flex md:hidden items-center justify-between w-full py-2 xs:py-3">
             <Logo />
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 xs:gap-2">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleMenu}
-                className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                className="text-slate-700 hover:bg-slate-100 w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
                 aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
                 aria-expanded={isMenuOpen}
                 aria-controls="mobile-menu"
                 role="button"
               >
-                <RiMenuLine className="h-5 w-5" />
+                <RiMenuLine className="h-4 w-4 xs:h-5 xs:w-5" />
               </Button>
             </div>
           </div>
 
-          {/* Tablet Header */}
-          <div className="hidden md:flex lg:hidden items-center justify-between w-full py-3">
+          {/* Tablet/Desktop Médio (768px - 1280px): Logo + Botão + Menu Hamburguer */}
+          <div className="hidden md:flex xl:hidden items-center justify-between w-full py-2.5 xs:py-3">
             <Logo />
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 xs:gap-3">
               <IdentificationButton />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={toggleMenu}
-                className="text-slate-700 hover:bg-slate-100 w-10 h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                className="text-slate-700 hover:bg-slate-100 w-9 h-9 xs:w-10 xs:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
                 aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
                 aria-expanded={isMenuOpen}
                 aria-controls="mobile-menu"
                 role="button"
               >
-                <RiMenuLine className="h-5 w-5" />
+                <RiMenuLine className="h-4 w-4 xs:h-5 xs:w-5" />
               </Button>
             </div>
           </div>
 
-          {/* Desktop Header */}
-          <div className="hidden lg:flex items-center justify-between w-full py-4">
+          {/* Desktop Grande (> 1280px): Logo + Links + Botão */}
+          <div className="hidden xl:flex items-center justify-between w-full py-3 xs:py-4">
             <Logo />
             <DesktopNavigation pathname={pathname} />
             <IdentificationButton />
