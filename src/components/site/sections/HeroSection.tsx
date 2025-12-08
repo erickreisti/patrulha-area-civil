@@ -137,14 +137,7 @@ const MainTitle = () => {
           "mx-auto max-w-[90vw]"
         )}
       >
-        {isMobile ? (
-          <>
-            <span className="block">PATRULHA</span>
-            <span className="block mt-1 sm:mt-2">AÉREA CIVIL</span>
-          </>
-        ) : (
-          "PATRULHA AÉREA CIVIL"
-        )}
+        PATRULHA AÉREA CIVIL
       </h1>
     </motion.div>
   );
@@ -194,7 +187,8 @@ const ActionButtons = () => (
   <motion.div
     className={cn(
       "flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6 justify-center items-stretch",
-      "px-4 sm:px-6 w-full mx-auto max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl"
+      "px-4 sm:px-6 w-full mx-auto max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl",
+      "mb-4 sm:mb-6" // Adicionado espaçamento na parte inferior
     )}
     variants={containerVariants}
   >
@@ -346,7 +340,10 @@ export function HeroSection() {
         <div
           className={cn(
             "mx-auto w-full h-full flex flex-col justify-end items-center",
-            "pb-8 sm:pb-12 md:pb-16 lg:pb-20 pt-16 sm:pt-20"
+            // Aumentado o padding bottom para mobile e ajustado para outros dispositivos
+            "pb-12 sm:pb-16 md:pb-20 lg:pb-24 pt-16 sm:pt-20",
+            // Garantir que o conteúdo não fique muito colado na parte inferior
+            "min-h-[600px]"
           )}
         >
           <div className="text-center w-full">
@@ -359,7 +356,7 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-16 sm:h-20 md:h-24 lg:h-28 bg-gradient-to-t from-navy-900/80 via-navy-900/40 to-transparent pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-28 lg:h-32 bg-gradient-to-t from-navy-900/80 via-navy-900/40 to-transparent pointer-events-none"></div>
     </section>
   );
 }
