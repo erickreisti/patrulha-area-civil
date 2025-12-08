@@ -1,0 +1,59 @@
+{
+  "name": "Patrulha Aérea Civil - Sistema",
+  "short_name": "PAC Sistema",
+  "description": "Sistema de Gerenciamento da Patrulha Aérea Civil - Comando Operacional RJ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "pt-BR",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+
+    {
+      "src": "/apple-icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Acesso Agente",
+      "short_name": "Login",
+      "description": "Acesso ao sistema para agentes",
+      "url": "/login",
+      "icons": [{ "src": "/icons/login-icon.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Perfil",
+      "short_name": "Perfil",
+      "description": "Acessar perfil do agente",
+      "url": "/perfil",
+      "icons": [{ "src": "/icons/profile-icon.png", "sizes": "96x96" }]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard do Sistema PAC"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Sistema PAC no mobile"
+    }
+  ]
+}
