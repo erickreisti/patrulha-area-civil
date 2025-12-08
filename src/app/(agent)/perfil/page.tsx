@@ -496,7 +496,7 @@ export default function AgentPerfil() {
 
                   {/* Bandeira centralizada */}
                   <div className="text-center">
-                    <h2 className="text-[8px] min-[375px]:text-[9px] sm:text-[10px] font-bold text-slate-700 tracking-wide uppercase font-bebas mb-1">
+                    <h2 className="text-[8px] min-[375px]:text-[9px] sm:text-[10px] font-bold text-slate-700 tracking-wide uppercase font-roboto mb-1">
                       Identificação
                     </h2>
                     <div className="flex justify-center">
@@ -516,7 +516,7 @@ export default function AgentPerfil() {
 
                 {/* NOME COMPLETO */}
                 <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
-                  <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
+                  <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                     Nome
                   </label>
                   <p className="text-sm min-[375px]:text-base sm:text-lg font-bold text-slate-800 leading-tight font-bebas text-center break-words px-1">
@@ -529,7 +529,7 @@ export default function AgentPerfil() {
                   <div className="flex flex-col space-y-2">
                     {/* Graduação - 1/3 da altura total */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
-                      <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
+                      <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                         Graduação
                       </label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
@@ -543,7 +543,7 @@ export default function AgentPerfil() {
 
                     {/* Tipo Sanguíneo - 1/3 da altura total */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
-                      <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
+                      <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                         Tipo Sanguíneo
                       </label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
@@ -555,7 +555,7 @@ export default function AgentPerfil() {
 
                     {/* Validade - 1/3 da altura total */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
-                      <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
+                      <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                         Validade
                       </label>
                       <div className="h-[calc(100%-1.25rem)] flex flex-col justify-center items-center">
@@ -603,7 +603,7 @@ export default function AgentPerfil() {
 
                 {/* MATRÍCULA */}
                 <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
-                  <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
+                  <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                     Matrícula
                   </label>
                   <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1">
