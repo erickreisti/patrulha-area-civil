@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,9 +27,8 @@ import {
   RiAlertLine,
 } from "react-icons/ri";
 import { useAuth } from "@/hooks/useAuth";
-import { UserProfile } from "@/types"; // Importar do types
+import { UserProfile } from "@/types";
 
-// Usar UserProfile do types em vez de criar nova interface
 type ProfileData = UserProfile;
 
 interface CertificationInfo {
@@ -40,7 +38,6 @@ interface CertificationInfo {
   badgeVariant: "default" | "secondary" | "destructive";
 }
 
-// Componente Dialog para agente inativo
 const InactiveAgentDialog = ({
   isOpen,
   onClose,
@@ -194,7 +191,6 @@ const LoadingState = () => (
   </BaseLayout>
 );
 
-// CORREÇÃO: Remover ErrorState que estava causando confusão
 const formatDate = (dateString: string | null | undefined): string => {
   if (!dateString) return "Não definida";
   try {
@@ -281,229 +277,19 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
   };
 };
 
-interface InfoSectionProps {
-  label: string;
-  value: string;
-  isTitle?: boolean;
-  isAlert?: boolean;
-  isMono?: boolean;
-  center?: boolean;
-}
-
-const InfoSection: React.FC<InfoSectionProps> = ({
-  label,
-  value,
-  isTitle = false,
-  isAlert = false,
-  isMono = false,
-  center = false,
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="space-y-1 sm:space-y-2"
-  >
-    <label
-      className={`text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block ${
-        center ? "text-center" : "text-left"
-      } font-roboto`}
-    >
-      {label}
-    </label>
-    <div
-      className={`flex items-center ${
-        center ? "justify-center" : "justify-start"
-      }`}
-    >
-      <p
-        className={`
-          ${
-            isTitle
-              ? "text-lg sm:text-xl lg:text-2xl"
-              : "text-base sm:text-lg lg:text-xl"
-          }
-          font-bold leading-tight break-words min-h-[1.2em] font-bebas
-          ${isAlert ? "text-alert uppercase" : "text-slate-800"}
-          ${isMono ? "font-mono" : ""}
-          max-w-full overflow-hidden
-        `}
-      >
-        {value}
-      </p>
-    </div>
-  </motion.div>
-);
-
-const CertificationSection = ({
-  certificationInfo,
-  profile,
-}: {
-  certificationInfo: CertificationInfo;
-  profile: ProfileData;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 10 }}
-    animate={{ opacity: 1, y: 0 }}
-    className="space-y-1 sm:space-y-2"
-  >
-    <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto">
-      Validade
-    </label>
-    <div className="flex items-center justify-center lg:justify-start">
-      <p className="text-base sm:text-lg lg:text-xl font-bold leading-tight break-words min-h-[1.2em] font-bebas text-slate-800 max-w-full overflow-hidden">
-        {certificationInfo.text}
-      </p>
-    </div>
-    {!profile.status && (
-      <p className="text-xs text-alert mt-1 text-center lg:text-left font-roboto">
-        ⚠️ Agente inativo - certificação cancelada
-      </p>
-    )}
-  </motion.div>
-);
-
-interface AvatarSectionProps {
-  profile: ProfileData;
-}
-
-const AvatarSection: React.FC<AvatarSectionProps> = ({ profile }) => (
-  <motion.div
-    initial={{ opacity: 0, scale: 0.8 }}
-    animate={{ opacity: 1, scale: 1 }}
-    className="space-y-2 sm:space-y-3 w-full max-w-[280px] mx-auto"
-  >
-    <div className="flex justify-center">
-      <motion.div
-        className="relative"
-        whileHover={{ scale: 1.02 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className="w-40 h-52 sm:w-48 sm:h-60 lg:w-56 lg:h-72 xl:w-64 xl:h-80 bg-slate-100 rounded-lg border-4 border-navy shadow-xl flex items-center justify-center overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-200/30 to-slate-100/50" />
-
-          {profile.avatar_url ? (
-            <Image
-              src={profile.avatar_url}
-              alt="Foto de perfil"
-              fill
-              className="object-cover relative z-10"
-              sizes="(max-width: 640px) 160px, (max-width: 768px) 192px, 224px"
-              priority={true}
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-              }}
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center text-slate-400 relative z-10">
-              <RiUserLine className="w-16 h-16 sm:w-20 sm:h-20 mb-2" />
-              <span className="text-sm text-center px-2 font-roboto">
-                Sem foto
-              </span>
-            </div>
-          )}
-        </div>
-      </motion.div>
-    </div>
-  </motion.div>
-);
-
-const StatusSection = ({ profile }: { profile: ProfileData }) => (
-  <div className="flex flex-col items-center">
-    <div className="text-center w-full">
-      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block mb-3 sm:mb-4 font-roboto">
-        Situação do Patrulheiro
-      </label>
-      <div className="flex justify-center">
-        <motion.div
-          whileHover={{ scale: 1.08 }}
-          whileTap={{ scale: 0.98 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Badge
-            className={`
-              text-lg sm:text-xl lg:text-2xl 
-              px-8 sm:px-12 lg:px-16 
-              py-4 sm:py-5 lg:py-6 
-              font-extrabold rounded-xl
-              min-w-[280px] sm:min-w-[340px] lg:min-w-[400px]
-              max-w-[480px] w-full
-              transition-all duration-300 cursor-default
-              shadow-2xl text-center font-bebas
-              border-4
-              ${
-                profile.status
-                  ? "bg-gradient-to-r from-success to-success-600 text-white hover:from-success-600 hover:to-success-700 border-success-700/50 shadow-success/30"
-                  : "bg-gradient-to-r from-alert to-alert-600 text-white hover:from-alert-600 hover:to-alert-700 border-alert-700/50 shadow-alert/30"
-              }
-            `}
-          >
-            <div className="flex items-center justify-center space-x-3 sm:space-x-4">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={profile.status ? "active" : "inactive"}
-                  initial={{ scale: 0.8, rotate: -180 }}
-                  animate={{ scale: 1.2, rotate: 0 }}
-                  transition={{ duration: 0.5, type: "spring" }}
-                >
-                  {profile.status ? (
-                    <RiCheckboxCircleLine className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10" />
-                  ) : (
-                    <RiForbidLine className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10" />
-                  )}
-                </motion.div>
-              </AnimatePresence>
-              <span className="text-xl sm:text-2xl lg:text-3xl font-black tracking-wider drop-shadow-lg">
-                {profile.status ? "ATIVO" : "INATIVO"}
-              </span>
-            </div>
-          </Badge>
-        </motion.div>
-      </div>
-      {!profile.status && (
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="text-sm sm:text-base text-alert mt-3 max-w-md mx-auto font-roboto px-2 font-semibold bg-alert/10 py-2 rounded-lg border border-alert/20"
-        >
-          AGENTE INATIVO - ACESSO LIMITADO AO SISTEMA
-        </motion.p>
-      )}
-      {profile.status && (
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="text-sm sm:text-base text-success mt-3 max-w-md mx-auto font-roboto px-2 font-semibold bg-success/10 py-2 rounded-lg border border-success/20"
-        >
-          AGENTE ATIVO - ACESSO COMPLETO AO SISTEMA
-        </motion.p>
-      )}
-    </div>
-  </div>
-);
-
-interface ActionButtonProps {
+const ActionButton: React.FC<{
   href?: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick?: () => void;
-}
-
-const ActionButton: React.FC<ActionButtonProps> = ({
-  href,
-  icon: Icon,
-  label,
-  onClick,
-}) => {
+}> = ({ href, icon: Icon, label, onClick }) => {
   const buttonContent = (
     <motion.div
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
-      className="flex items-center justify-center space-x-1 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy"
+      className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
     >
-      {Icon && <Icon className="w-3 h-3 text-white" />}
+      {Icon && <Icon className="w-3.5 h-3.5 text-white flex-shrink-0" />}
       <span className="text-xs font-medium text-white whitespace-nowrap">
         {label}
       </span>
@@ -512,20 +298,19 @@ const ActionButton: React.FC<ActionButtonProps> = ({
 
   if (href) {
     return (
-      <Link href={href} className="flex-1 min-w-[100px] max-w-[140px]">
+      <Link href={href} className="w-full">
         {buttonContent}
       </Link>
     );
   }
 
   return (
-    <div onClick={onClick} className="flex-1 min-w-[100px] max-w-[140px]">
+    <div onClick={onClick} className="w-full">
       {buttonContent}
     </div>
   );
 };
 
-// CORREÇÃO: Separar o botão "Sair" para não chamar ErrorState
 const ActionButtons = ({
   profile,
   isAdmin,
@@ -541,10 +326,8 @@ const ActionButtons = ({
     setIsSigningOut(true);
     try {
       await onSignOut();
-      // O hook useAuth deve redirecionar automaticamente
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
-      // Fallback: redirecionar manualmente se necessário
       window.location.href = "/login";
     } finally {
       setIsSigningOut(false);
@@ -556,9 +339,9 @@ const ActionButtons = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.6 }}
-      className="flex flex-col items-center gap-2 sm:gap-3 mt-4 sm:mt-6"
+      className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
     >
-      <div className="flex flex-wrap justify-center gap-1 sm:gap-2 w-full max-w-md px-2">
+      <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2 w-full">
         {isAdmin && (
           <>
             <ActionButton
@@ -575,14 +358,13 @@ const ActionButtons = ({
         )}
         <ActionButton href="/" icon={RiHomeLine} label="Site" />
 
-        {/* Botão Sair corrigido */}
         <motion.div
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleSignOut}
-          className="flex-1 min-w-[100px] max-w-[140px] flex items-center justify-center space-x-1 px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700"
+          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
         >
-          <RiLogoutBoxLine className="w-3 h-3 text-white" />
+          <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
           <span className="text-xs font-medium text-white whitespace-nowrap">
             {isSigningOut ? "Saindo..." : "Sair"}
           </span>
@@ -593,9 +375,9 @@ const ActionButtons = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.8 }}
-        className="text-center mt-2 sm:mt-4"
+        className="text-center mt-3 w-full"
       >
-        <p className="text-white/70 text-xs font-roboto">
+        <p className="text-white/70 text-[10px] font-roboto">
           Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
         </p>
       </motion.div>
@@ -603,7 +385,7 @@ const ActionButtons = ({
   );
 };
 
-// Componente principal
+// Componente principal com layout de duas colunas a partir de 375px
 export default function AgentPerfil() {
   const { profile, loading, signOut, isAdmin } = useAuth();
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
@@ -620,10 +402,8 @@ export default function AgentPerfil() {
     }
   }, [profile]);
 
-  // CORREÇÃO: Se não houver perfil e não estiver carregando, redirecionar
   useEffect(() => {
     if (!loading && !profile) {
-      // Se não houver perfil, redirecionar para login
       const timer = setTimeout(() => {
         window.location.href = "/login";
       }, 1000);
@@ -634,7 +414,6 @@ export default function AgentPerfil() {
 
   if (loading) return <LoadingState />;
 
-  // CORREÇÃO: Mostrar mensagem de erro direto no perfil, não usar ErrorState
   if (!profile) {
     return (
       <BaseLayout>
@@ -642,19 +421,18 @@ export default function AgentPerfil() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
+            className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center border border-white/20"
           >
-            <RiErrorWarningLine className="w-16 h-16 text-alert mx-auto mb-6" />
-            <h2 className="text-2xl font-bold text-slate-800 mb-3 font-bebas">
+            <RiErrorWarningLine className="w-14 h-14 text-alert mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-slate-800 mb-3 font-bebas">
               Perfil Não Encontrado
             </h2>
-            <p className="text-slate-600 text-lg mb-6 font-roboto">
-              Não foi possível carregar seu perfil. Você será redirecionado para
-              o login.
+            <p className="text-slate-600 text-base mb-6 font-roboto">
+              Não foi possível carregar seu perfil.
             </p>
             <Button
               onClick={() => (window.location.href = "/login")}
-              className="bg-navy hover:bg-navy-700 text-white py-3 text-lg font-semibold font-roboto transition-all duration-300 hover:scale-105"
+              className="bg-navy hover:bg-navy-700 text-white py-3 text-base font-semibold font-roboto transition-all duration-300 hover:scale-105 w-full"
               size="lg"
             >
               Ir para Login
@@ -674,137 +452,225 @@ export default function AgentPerfil() {
         onClose={() => setShowInactiveDialog(false)}
       />
 
-      <div className="min-h-screen flex items-center justify-center p-2 sm:p-4 relative z-20">
-        <div className="w-full max-w-6xl">
+      <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 relative z-20">
+        <div className="w-full max-w-xs min-[375px]:max-w-sm sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.2 }}
             className="flex justify-center"
           >
-            <Card className="relative bg-gradient-to-br from-slate-50 to-white rounded-xl shadow-xl overflow-hidden w-full max-w-sm sm:max-w-md lg:max-w-3xl border border-slate-200/60 mx-2">
-              <div className="absolute inset-0 opacity-[0.05] flex items-center justify-center pointer-events-none z-0">
-                <div className="w-full h-full max-w-[800px] max-h-[800px] sm:max-w-[800px] sm:max-h-[800px] relative">
-                  <Image
-                    src="/images/logos/logo-pattern.svg"
-                    alt="Marca d'água Patrulha Aérea Civil"
-                    fill
-                    sizes="300px"
-                    className="object-contain"
-                    priority
-                  />
-                </div>
-              </div>
-
-              <div className="absolute inset-1 border border-slate-300/30 rounded-lg pointer-events-none z-0" />
-
-              <CardContent className="p-3 sm:p-4 lg:p-6 relative z-10">
-                {/* HEADER */}
+            <Card className="relative bg-white rounded-xl shadow-sm overflow-hidden w-full border border-slate-200 mx-auto">
+              <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6 relative z-10">
+                {/* HEADER - Compacto, logo mais próxima do topo */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6 }}
-                  className="flex flex-col items-center pb-4 border-b border-slate-200/30 mb-4 space-y-4"
+                  className="flex flex-col items-center pb-2 border-b border-slate-200 mb-3 space-y-1.5"
                 >
-                  {/* LOGO */}
-                  <motion.div whileHover={{ scale: 1.05 }}>
-                    <div className="w-24 h-24 sm:w-32 sm:h-32 lg:w-36 lg:h-36 xl:w-40 xl:h-40 flex items-center justify-center">
+                  {/* Logo menor e mais próxima do topo */}
+                  <motion.div whileHover={{ scale: 1.05 }} className="mt-1">
+                    <div className="w-12 h-12 min-[375px]:w-14 min-[375px]:h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 flex items-center justify-center">
                       <div className="relative w-full h-full">
                         <Image
                           src="/images/logos/logo.webp"
                           alt="Patrulha Aérea Civil"
-                          width={160}
-                          height={160}
+                          width={80}
+                          height={80}
                           className="w-full h-full object-contain"
                           priority={true}
-                          sizes="(max-width: 640px) 96px, (max-width: 768px) 128px, 144px"
                         />
                       </div>
                     </div>
                   </motion.div>
 
-                  {/* TÍTULO */}
-                  <div className="text-center">
-                    <h1 className="text-navy text-xl sm:text-2xl lg:text-3xl font-bold tracking-wide uppercase leading-tight font-bebas">
+                  <div className="text-center -mt-1">
+                    <h1 className="text-navy text-sm min-[375px]:text-base sm:text-lg md:text-xl font-bold tracking-wide uppercase leading-tight font-bebas">
                       Patrulha Aérea Civil
                     </h1>
-                    <p className="text-slate-600 text-[8px] sm:text-sm mt-1 leading-snug font-roboto">
+                    <p className="text-slate-600 text-[8px] min-[375px]:text-[9px] sm:text-[10px] md:text-xs leading-snug font-roboto">
                       COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
                     </p>
                   </div>
 
-                  {/* IDENTIFICAÇÃO E BANDEIRA */}
-                  <div className="text-center space-y-2">
-                    <h2 className="text-xs sm:text-sm font-bold text-slate-700 tracking-wide uppercase font-bebas">
+                  {/* Bandeira centralizada */}
+                  <div className="text-center">
+                    <h2 className="text-[8px] min-[375px]:text-[9px] sm:text-[10px] font-bold text-slate-700 tracking-wide uppercase font-bebas mb-1">
                       Identificação
                     </h2>
-                    <div className="w-12 h-8 sm:w-14 sm:h-10 border border-slate-300 rounded flex items-center justify-center justify-self-center overflow-hidden">
-                      <Image
-                        src="/images/logos/flag-br.webp"
-                        alt="Bandeira do Brasil"
-                        width={56}
-                        height={40}
-                        className="w-full h-full object-cover rounded"
-                        priority
-                      />
+                    <div className="flex justify-center">
+                      <div className="w-6 h-4 min-[375px]:w-7 min-[375px]:h-5 sm:w-8 sm:h-6 border border-slate-300 rounded overflow-hidden">
+                        <Image
+                          src="/images/logos/flag-br.webp"
+                          alt="Bandeira do Brasil"
+                          width={32}
+                          height={24}
+                          className="w-full h-full object-cover"
+                          priority
+                        />
+                      </div>
                     </div>
                   </div>
                 </motion.div>
 
-                <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-center lg:items-start">
-                  {/* LADO ESQUERDO - INFORMAÇÕES */}
-                  <div className="flex-1 w-full space-y-3 sm:space-y-4 text-center lg:text-left">
-                    <InfoSection
-                      label="Nome"
-                      value={profile.full_name || "NÃO DEFINIDO"}
-                      isTitle
-                    />
-                    <InfoSection
-                      label="Graduação"
-                      value={
-                        profile.graduacao
+                {/* NOME COMPLETO */}
+                <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
+                  <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
+                    Nome
+                  </label>
+                  <p className="text-sm min-[375px]:text-base sm:text-lg font-bold text-slate-800 leading-tight font-bebas text-center break-words px-1">
+                    {profile.full_name || "NÃO DEFINIDO"}
+                  </p>
+                </div>
+
+                {/* DUAS COLUNAS A PARTIR DE 375px */}
+                <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3 mb-3">
+                  {/* Coluna da Esquerda - Informações */}
+                  <div className="space-y-2">
+                    {/* Graduação */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white">
+                      <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
+                        Graduação
+                      </label>
+                      <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas break-words">
+                        {profile.graduacao
                           ? `${profile.graduacao.toUpperCase()}`
-                          : "GRADUAÇÃO NÃO DEFINIDA - PAC"
-                      }
-                      isAlert
-                    />
-                    <InfoSection
-                      label="Matrícula"
-                      value={`${formatMatricula(profile.matricula)} RJ`}
-                      isMono
-                    />
-                    <CertificationSection
-                      certificationInfo={certificationInfo}
-                      profile={profile}
-                    />
-                  </div>
+                          : "GRADUAÇÃO NÃO DEFINIDA - PAC"}
+                      </p>
+                    </div>
 
-                  <div className="w-full lg:w-px lg:h-40 bg-slate-300/10 my-3 lg:my-0" />
-
-                  {/* LADO DIREITO - AVATAR E TIPO SANGUÍNEO */}
-                  <div className="flex-1 w-full space-y-3 sm:space-y-4 flex flex-col items-center">
-                    <AvatarSection profile={profile} />
-
-                    <div className="w-full text-center">
-                      <label className="text-xs sm:text-sm font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
+                    {/* Tipo Sanguíneo */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white">
+                      <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
                         Tipo Sanguíneo
                       </label>
-                      <p className="text-lg sm:text-xl lg:text-2xl font-bold text-alert uppercase font-bebas leading-tight">
+                      <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas">
                         {profile.tipo_sanguineo || "NÃO DEFINIDO"}
                       </p>
+                    </div>
+
+                    {/* Validade */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white">
+                      <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
+                        Validade
+                      </label>
+                      <p
+                        className={`text-xs min-[375px]:text-sm sm:text-base font-bold font-bebas ${certificationInfo.className}`}
+                      >
+                        {certificationInfo.text}
+                      </p>
+                      {!profile.status && (
+                        <p className="text-[8px] min-[375px]:text-[9px] text-alert mt-0.5 font-roboto">
+                          ⚠️ Agente inativo - certificação cancelada
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Coluna da Direita - Foto (lado a lado a partir de 375px) */}
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="border-2 border-navy/20 rounded-lg p-1 min-[375px]:p-2 bg-slate-50/50 w-full h-full">
+                      <div className="w-full h-40 min-[375px]:h-44 sm:h-48 md:h-52 lg:h-56 bg-slate-100 rounded border border-slate-300 flex items-center justify-center overflow-hidden relative">
+                        {profile.avatar_url ? (
+                          <Image
+                            src={profile.avatar_url}
+                            alt="Foto de perfil"
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 374px) 280px, (max-width: 375px) 150px, (max-width: 640px) 180px, (max-width: 768px) 200px, 240px"
+                            priority={true}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-slate-400">
+                            <RiUserLine className="w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-12 sm:h-12" />
+                            <span className="text-xs font-roboto mt-0.5">
+                              Sem foto
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="my-4 border-t border-slate-300/30 relative">
-                  <div className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-4 h-0.5 bg-navy/20 rounded-full" />
+                {/* MATRÍCULA */}
+                <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
+                  <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
+                    Matrícula
+                  </label>
+                  <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1">
+                    {formatMatricula(profile.matricula)} RJ
+                  </p>
                 </div>
 
-                <StatusSection profile={profile} />
+                {/* SITUAÇÃO DO PATRULHEIRO */}
+                <div className="mb-3">
+                  <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1.5 text-center">
+                    Situação do Patrulheiro
+                  </label>
+                  <div className="flex justify-center">
+                    <motion.div
+                      whileHover={{ scale: 1.02 }}
+                      transition={{ duration: 0.3 }}
+                      className="w-full max-w-xs"
+                    >
+                      <div
+                        className={`
+                          text-xs min-[375px]:text-sm
+                          py-2 min-[375px]:py-2.5
+                          font-bold rounded-lg
+                          w-full
+                          transition-all duration-300 cursor-default
+                          text-center font-bebas
+                          ${
+                            profile.status
+                              ? "bg-gradient-to-r from-success to-success-600 text-white"
+                              : "bg-gradient-to-r from-alert to-alert-600 text-white"
+                          }
+                        `}
+                      >
+                        <div className="flex items-center justify-center space-x-1 min-[375px]:space-x-1.5">
+                          <AnimatePresence mode="wait">
+                            <motion.div
+                              key={profile.status ? "active" : "inactive"}
+                              initial={{ scale: 0.8 }}
+                              animate={{ scale: 1 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              {profile.status ? (
+                                <RiCheckboxCircleLine className="w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4" />
+                              ) : (
+                                <RiForbidLine className="w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4" />
+                              )}
+                            </motion.div>
+                          </AnimatePresence>
+                          <span className="text-xs min-[375px]:text-sm sm:text-base font-black tracking-wider">
+                            {profile.status ? "ATIVO" : "INATIVO"}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                  {!profile.status ? (
+                    <p className="text-[10px] min-[375px]:text-xs text-alert mt-1.5 text-center font-roboto font-semibold px-1">
+                      AGENTE INATIVO - ACESSO LIMITADO AO SISTEMA
+                    </p>
+                  ) : (
+                    <p className="text-[10px] min-[375px]:text-xs text-success mt-1.5 text-center font-roboto font-semibold px-1">
+                      AGENTE ATIVO - ACESSO COMPLETO AO SISTEMA
+                    </p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </motion.div>
 
+          {/* BOTÕES DE AÇÃO */}
           <ActionButtons
             profile={profile}
             isAdmin={isAdmin}
