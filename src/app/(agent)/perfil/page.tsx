@@ -469,15 +469,15 @@ export default function AgentPerfil() {
                   transition={{ duration: 0.6 }}
                   className="flex flex-col items-center pb-2 border-b border-slate-200 mb-3 space-y-1.5"
                 >
-                  {/* Logo menor e mais próxima do topo */}
+                  {/* Logo ainda maior */}
                   <motion.div whileHover={{ scale: 1.05 }} className="mt-1">
-                    <div className="w-12 h-12 min-[375px]:w-14 min-[375px]:h-14 sm:w-16 sm:h-16 md:w-18 md:h-18 lg:w-20 lg:h-20 flex items-center justify-center">
+                    <div className="w-16 h-16 min-[375px]:w-20 min-[375px]:h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 flex items-center justify-center">
                       <div className="relative w-full h-full">
                         <Image
                           src="/images/logos/logo.webp"
                           alt="Patrulha Aérea Civil"
-                          width={80}
-                          height={80}
+                          width={128}
+                          height={128}
                           className="w-full h-full object-contain"
                           priority={true}
                         />
@@ -519,81 +519,84 @@ export default function AgentPerfil() {
                   <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                     Nome
                   </label>
-                  <p className="text-sm min-[375px]:text-base sm:text-lg font-bold text-slate-800 leading-tight font-bebas text-center break-words px-1">
+                  <p className="text-sm min-[375px]:text-base sm:text-lg font-bold text-slate-900 leading-tight font-bebas text-center break-words px-1">
                     {profile.full_name || "NÃO DEFINIDO"}
                   </p>
                 </div>
-
-                {/* DUAS COLUNAS A PARTIR DE 375px */}
-                <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3 mb-3">
-                  {/* Coluna da Esquerda - Informações */}
-                  <div className="space-y-2">
-                    {/* Graduação */}
-                    <div className="border border-slate-200 rounded-lg p-2 bg-white">
+                {/* DUAS COLUNAS A PARTIR DE 375px - AMBAS COM MESMA ALTURA */}
+                <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3 mb-3 items-stretch">
+                  {/* Coluna da Esquerda - OCUPA MESMA ALTURA DA FOTO */}
+                  <div className="flex flex-col space-y-2">
+                    {/* Graduação - 1/3 da altura total */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
                         Graduação
                       </label>
-                      <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas break-words">
-                        {profile.graduacao
-                          ? `${profile.graduacao.toUpperCase()}`
-                          : "GRADUAÇÃO NÃO DEFINIDA - PAC"}
-                      </p>
+                      <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
+                        <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas break-words text-center leading-tight">
+                          {profile.graduacao
+                            ? `${profile.graduacao.toUpperCase()}`
+                            : "GRADUAÇÃO NÃO DEFINIDA - PAC"}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Tipo Sanguíneo */}
-                    <div className="border border-slate-200 rounded-lg p-2 bg-white">
+                    {/* Tipo Sanguíneo - 1/3 da altura total */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
                         Tipo Sanguíneo
                       </label>
-                      <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas">
-                        {profile.tipo_sanguineo || "NÃO DEFINIDO"}
-                      </p>
+                      <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
+                        <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas text-center leading-tight">
+                          {profile.tipo_sanguineo || "NÃO DEFINIDO"}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Validade */}
-                    <div className="border border-slate-200 rounded-lg p-2 bg-white">
+                    {/* Validade - 1/3 da altura total */}
+                    <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
                         Validade
                       </label>
-                      <p
-                        className={`text-xs min-[375px]:text-sm sm:text-base font-bold font-bebas ${certificationInfo.className}`}
-                      >
-                        {certificationInfo.text}
-                      </p>
-                      {!profile.status && (
-                        <p className="text-[8px] min-[375px]:text-[9px] text-alert mt-0.5 font-roboto">
-                          ⚠️ Agente inativo - certificação cancelada
+                      <div className="h-[calc(100%-1.25rem)] flex flex-col justify-center items-center">
+                        <p
+                          className={`text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-900 font-roboto ${certificationInfo.className} text-center leading-tight`}
+                        >
+                          {certificationInfo.text}
                         </p>
-                      )}
+                        {!profile.status && (
+                          <p className="text-[8px] min-[375px]:text-[9px] text-alert mt-0.5 font-roboto text-center">
+                            ⚠️ Agente inativo - certificação cancelada
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Coluna da Direita - Foto (lado a lado a partir de 375px) */}
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="border-2 border-navy/20 rounded-lg p-1 min-[375px]:p-2 bg-slate-50/50 w-full h-full">
-                      <div className="w-full h-40 min-[375px]:h-44 sm:h-48 md:h-52 lg:h-56 bg-slate-100 rounded border border-slate-300 flex items-center justify-center overflow-hidden relative">
-                        {profile.avatar_url ? (
-                          <Image
-                            src={profile.avatar_url}
-                            alt="Foto de perfil"
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 374px) 280px, (max-width: 375px) 150px, (max-width: 640px) 180px, (max-width: 768px) 200px, 240px"
-                            priority={true}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div className="flex flex-col items-center justify-center text-slate-400">
-                            <RiUserLine className="w-8 h-8 min-[375px]:w-10 min-[375px]:h-10 sm:w-12 sm:h-12" />
-                            <span className="text-xs font-roboto mt-0.5">
-                              Sem foto
-                            </span>
-                          </div>
-                        )}
-                      </div>
+                  {/* Coluna da Direita - Foto (com aspect-ratio) */}
+                  <div className="flex flex-col items-center justify-center w-full">
+                    <div className="w-full aspect-[3/4] rounded-md overflow-hidden relative border border-slate-300">
+                      {profile.avatar_url ? (
+                        <Image
+                          src={profile.avatar_url}
+                          alt="Foto de perfil"
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 374px) 280px, (max-width: 375px) 150px, (max-width: 640px) 200px, (max-width: 768px) 250px, 300px"
+                          priority={true}
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                          <RiUserLine className="w-14 h-14 min-[375px]:w-16 min-[375px]:h-16 sm:w-18 sm:h-18 md:w-22 md:h-22" />
+                          <span className="text-sm font-roboto mt-2">
+                            Sem foto
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -603,7 +606,7 @@ export default function AgentPerfil() {
                   <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
                     Matrícula
                   </label>
-                  <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1">
+                  <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-900 font-mono text-center tracking-wide break-all px-1">
                     {formatMatricula(profile.matricula)} RJ
                   </p>
                 </div>
