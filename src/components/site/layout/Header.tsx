@@ -467,13 +467,13 @@ const MobileMenu = ({
             role="presentation"
           />
 
-          {/* Menu Panel */}
+          {/* Menu Panel - Agora desce de cima para baixo */}
           <motion.div
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
+            initial={{ y: "-100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "-100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-y-0 right-0 w-full max-w-xs xs:max-w-sm bg-white z-50 xl:hidden overflow-y-auto shadow-xl"
+            className="fixed top-0 left-0 right-0 w-full bg-white z-50 xl:hidden overflow-y-auto shadow-xl"
             style={{ maxHeight: "100vh" }}
             role="dialog"
             aria-modal="true"
@@ -481,9 +481,11 @@ const MobileMenu = ({
             id={id}
           >
             <div className="flex flex-col h-full">
-              {/* Header */}
+              {/* Header - Agora com botão de fechar à direita */}
               <div className="flex items-center justify-between p-3 xs:p-4 border-b border-slate-200 bg-white">
-                <Logo />
+                <h2 className="text-lg xs:text-xl font-semibold text-navy">
+                  Menu
+                </h2>
                 <button
                   onClick={onClose}
                   className="p-1.5 xs:p-2 rounded-lg hover:bg-slate-100 transition-colors touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"

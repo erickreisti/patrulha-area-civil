@@ -106,6 +106,7 @@ export default function LoginPage() {
   } | null>(null);
   const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -559,16 +560,31 @@ export default function LoginPage() {
             href="/"
             className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 mb-4 sm:mb-5 group"
           >
-            {/* Logo */}
+            {/* Logo - Com preload controlado */}
             <div className="relative w-20 h-20 sm:w-28 sm:h-28 flex justify-center">
               <Image
                 src="/images/logos/logo.webp"
                 alt="Patrulha Aérea Civil"
-                fill
-                className="object-contain drop-shadow-lg"
-                priority
+                width={112}
+                height={112}
+                className={`object-contain drop-shadow-lg w-full h-full transition-opacity duration-500 ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                }`}
                 sizes="(max-width: 640px) 80px, 112px"
+                quality={85}
+                priority={true} // ✅ VOLTAMOS com priority porque é o LCP
+                onLoad={() => setImageLoaded(true)}
+                // Adicionamos um placeholder de fundo para melhor UX
+                style={{
+                  backgroundColor: imageLoaded ? "transparent" : "#f3f4f6",
+                }}
               />
+              {/* Placeholder enquanto carrega */}
+              {!imageLoaded && (
+                <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse rounded-lg flex items-center justify-center">
+                  <span className="text-gray-500 text-xs">Carregando...</span>
+                </div>
+              )}
             </div>
 
             {/* Textos */}
