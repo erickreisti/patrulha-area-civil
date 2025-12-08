@@ -271,7 +271,7 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
 
   return {
     text: formatDate(profile.validade_certificacao),
-    className: "text-success font-semibold",
+    className: "text-slate-800 font-semibold",
     iconColor: "text-success",
     badgeVariant: "default",
   };
@@ -519,7 +519,7 @@ export default function AgentPerfil() {
                   <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
                     Nome
                   </label>
-                  <p className="text-sm min-[375px]:text-base sm:text-lg font-bold text-slate-900 leading-tight font-bebas text-center break-words px-1">
+                  <p className="text-sm min-[375px]:text-base sm:text-lg font-bold text-slate-800 leading-tight font-bebas text-center break-words px-1">
                     {profile.full_name || "NÃO DEFINIDO"}
                   </p>
                 </div>
@@ -560,7 +560,7 @@ export default function AgentPerfil() {
                       </label>
                       <div className="h-[calc(100%-1.25rem)] flex flex-col justify-center items-center">
                         <p
-                          className={`text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-900 font-roboto ${certificationInfo.className} text-center leading-tight`}
+                          className={`text-xs min-[375px]:text-sm sm:text-base font-bold  font-roboto ${certificationInfo.className} text-center leading-tight`}
                         >
                           {certificationInfo.text}
                         </p>
@@ -606,7 +606,7 @@ export default function AgentPerfil() {
                   <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-0.5">
                     Matrícula
                   </label>
-                  <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-900 font-mono text-center tracking-wide break-all px-1">
+                  <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1">
                     {formatMatricula(profile.matricula)} RJ
                   </p>
                 </div>
