@@ -38,6 +38,51 @@ interface CertificationInfo {
   badgeVariant: "default" | "secondary" | "destructive";
 }
 
+// Sistema de escalabilidade para labels (6px em 375px)
+const getLabelFontSize = () => {
+  if (typeof window === "undefined") return "text-[6px]";
+
+  const width = window.innerWidth;
+
+  if (width < 375) return "text-[6px]"; // Base: 6px
+  if (width < 400) return "text-[7px]"; // +1px: 7px
+  if (width < 480) return "text-[8px]"; // +2px: 8px
+  if (width < 640) return "text-[9px]"; // +3px: 9px
+  if (width < 768) return "text-[10px]"; // +4px: 10px
+  if (width < 1024) return "text-[11px] sm:text-[12px]"; // +6px: 12px
+  return "text-[11px] sm:text-[12px] md:text-[14px]"; // +8px: 14px
+};
+
+// Sistema de escalabilidade para conteúdo PRINCIPAL (um pouco maior que labels)
+const getContentFontSize = () => {
+  if (typeof window === "undefined") return "text-xs";
+
+  const width = window.innerWidth;
+
+  if (width < 375) return "text-xs"; // Base: 12px (6px maior que labels)
+  if (width < 400) return "text-sm"; // +2px: 14px
+  if (width < 480) return "text-base"; // +4px: 16px
+  if (width < 640) return "text-lg"; // +6px: 18px
+  if (width < 768) return "text-lg sm:text-xl"; // +8px: 20px
+  if (width < 1024) return "text-lg sm:text-xl md:text-2xl"; // +12px: 24px
+  return "text-lg sm:text-xl md:text-2xl lg:text-3xl"; // +16px: 28px
+};
+
+// Sistema de escalabilidade para conteúdo SECUNDÁRIO (matrícula, datas)
+const getSecondaryContentFontSize = () => {
+  if (typeof window === "undefined") return "text-[10px]";
+
+  const width = window.innerWidth;
+
+  if (width < 375) return "text-[10px]"; // Base: 10px (4px maior que labels)
+  if (width < 400) return "text-[11px]"; // +1px: 11px
+  if (width < 480) return "text-[12px]"; // +2px: 12px
+  if (width < 640) return "text-[13px]"; // +3px: 13px
+  if (width < 768) return "text-[14px] sm:text-[15px]"; // +5px: 15px
+  if (width < 1024) return "text-[14px] sm:text-[15px] md:text-[16px]"; // +6px: 16px
+  return "text-[14px] sm:text-[15px] md:text-[16px] lg:text-[18px]"; // +8px: 18px
+};
+
 const InactiveAgentDialog = ({
   isOpen,
   onClose,
@@ -57,7 +102,7 @@ const InactiveAgentDialog = ({
             <RiAlertLine className="w-6 h-6 text-alert" />
           </div>
         </div>
-        <DialogTitle className="text-center text-lg font-bold text-alert font-bebas leading-tight">
+        <DialogTitle className="text-center text-lg font-bold text-alert font-roboto leading-tight">
           AGENTE NÃO VINCULADO À PAC
         </DialogTitle>
         <DialogDescription className="text-center text-slate-700 mt-1 text-sm font-roboto">
@@ -156,7 +201,9 @@ const LoadingSpinner = () => (
         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
       />
     </div>
-    <span className="text-slate-700 font-medium">Carregando...</span>
+    <span className="text-slate-700 font-medium font-roboto">
+      Carregando...
+    </span>
   </div>
 );
 
@@ -180,7 +227,7 @@ const LoadingState = () => (
         <div className="flex justify-center mb-6">
           <LoadingSpinner />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3 font-bebas">
+        <h2 className="text-2xl font-bold text-slate-800 mb-3 font-roboto">
           Carregando Perfil
         </h2>
         <p className="text-slate-600 text-lg font-roboto">
@@ -290,7 +337,7 @@ const ActionButton: React.FC<{
       className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
     >
       {Icon && <Icon className="w-3.5 h-3.5 text-white flex-shrink-0" />}
-      <span className="text-xs font-medium text-white whitespace-nowrap">
+      <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
         {label}
       </span>
     </motion.div>
@@ -365,7 +412,7 @@ const ActionButtons = ({
           className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
         >
           <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-          <span className="text-xs font-medium text-white whitespace-nowrap">
+          <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
             {isSigningOut ? "Saindo..." : "Sair"}
           </span>
         </motion.div>
@@ -385,10 +432,14 @@ const ActionButtons = ({
   );
 };
 
-// Componente principal com layout de duas colunas a partir de 375px
+// Componente principal
 export default function AgentPerfil() {
   const { profile, loading, signOut, isAdmin } = useAuth();
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
+  const [labelFontSize, setLabelFontSize] = useState("text-[6px]");
+  const [contentFontSize, setContentFontSize] = useState("text-xs");
+  const [secondaryContentFontSize, setSecondaryContentFontSize] =
+    useState("text-[10px]");
 
   useEffect(() => {
     const shouldShowDialog = profile && !profile.status;
@@ -412,6 +463,19 @@ export default function AgentPerfil() {
     }
   }, [profile, loading]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setLabelFontSize(getLabelFontSize());
+      setContentFontSize(getContentFontSize());
+      setSecondaryContentFontSize(getSecondaryContentFontSize());
+    };
+
+    handleResize(); // Set initial values
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   if (loading) return <LoadingState />;
 
   if (!profile) {
@@ -424,7 +488,7 @@ export default function AgentPerfil() {
             className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center border border-white/20"
           >
             <RiErrorWarningLine className="w-14 h-14 text-alert mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-slate-800 mb-3 font-bebas">
+            <h2 className="text-xl font-bold text-slate-800 mb-3 font-roboto">
               Perfil Não Encontrado
             </h2>
             <p className="text-slate-600 text-base mb-6 font-roboto">
@@ -444,6 +508,12 @@ export default function AgentPerfil() {
   }
 
   const certificationInfo = getCertificationInfo(profile);
+  const labelClass = `${labelFontSize} font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1`;
+  const mainContentClass = `${contentFontSize} font-bold text-slate-800 leading-tight font-roboto text-center break-words px-1 uppercase`;
+  const secondaryContentClass = `${secondaryContentFontSize} font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1`;
+  const graduationClass = `${contentFontSize} font-bold text-alert font-roboto break-words text-center leading-tight uppercase`;
+  const bloodTypeClass = `${contentFontSize} font-bold text-alert font-roboto text-center leading-tight uppercase`;
+  const certificationClass = `${secondaryContentFontSize} font-bold font-roboto ${certificationInfo.className} text-center leading-tight`;
 
   return (
     <BaseLayout>
@@ -462,14 +532,13 @@ export default function AgentPerfil() {
           >
             <Card className="relative bg-white rounded-xl shadow-sm overflow-hidden w-full border border-slate-200 mx-auto">
               <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6 relative z-10">
-                {/* HEADER - Compacto, logo mais próxima do topo */}
+                {/* HEADER */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6 }}
                   className="flex flex-col items-center pb-2 border-b border-slate-200 mb-3 space-y-1.5"
                 >
-                  {/* Logo ainda maior */}
                   <motion.div whileHover={{ scale: 1.05 }} className="mt-1">
                     <div className="w-16 h-16 min-[375px]:w-20 min-[375px]:h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 lg:w-32 lg:h-32 flex items-center justify-center">
                       <div className="relative w-full h-full">
@@ -486,17 +555,18 @@ export default function AgentPerfil() {
                   </motion.div>
 
                   <div className="text-center -mt-1">
-                    <h1 className="text-navy text-sm min-[375px]:text-base sm:text-lg md:text-xl font-bold tracking-wide uppercase leading-tight font-bebas">
+                    <h1 className="text-navy text-sm min-[375px]:text-base sm:text-lg md:text-xl font-bold tracking-wide uppercase leading-tight font-roboto">
                       Patrulha Aérea Civil
                     </h1>
-                    <p className="text-slate-600 text-[8px] min-[375px]:text-[9px] sm:text-[10px] md:text-xs leading-snug font-roboto">
+                    <p className="text-slate-600 text-[6px] min-[375px]:text-[7px] sm:text-[8px] md:text-[10px] leading-snug font-roboto">
                       COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
                     </p>
                   </div>
 
-                  {/* Bandeira centralizada */}
                   <div className="text-center">
-                    <h2 className="text-[8px] min-[375px]:text-[9px] sm:text-[10px] font-bold text-slate-700 tracking-wide uppercase font-roboto mb-1">
+                    <h2
+                      className={`${labelFontSize} font-bold text-slate-700 tracking-wide uppercase font-roboto mb-1`}
+                    >
                       Identificação
                     </h2>
                     <div className="flex justify-center">
@@ -516,24 +586,21 @@ export default function AgentPerfil() {
 
                 {/* NOME COMPLETO */}
                 <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
-                  <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
-                    Nome
-                  </label>
-                  <p className="text-sm min-[375px]:text-base sm:text-lg font-bold text-slate-800 leading-tight font-bebas text-center break-words px-1">
+                  <label className={labelClass}>Nome</label>
+                  <p className={mainContentClass}>
                     {profile.full_name || "NÃO DEFINIDO"}
                   </p>
                 </div>
-                {/* DUAS COLUNAS A PARTIR DE 375px - AMBAS COM MESMA ALTURA */}
+
+                {/* DUAS COLUNAS */}
                 <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3 mb-3 items-stretch">
-                  {/* Coluna da Esquerda - OCUPA MESMA ALTURA DA FOTO */}
+                  {/* Coluna da Esquerda */}
                   <div className="flex flex-col space-y-2">
-                    {/* Graduação - 1/3 da altura total */}
+                    {/* Graduação */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
-                      <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
-                        Graduação
-                      </label>
+                      <label className={labelClass}>Graduação</label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
-                        <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas break-words text-center leading-tight">
+                        <p className={graduationClass}>
                           {profile.graduacao
                             ? `${profile.graduacao.toUpperCase()}`
                             : "GRADUAÇÃO NÃO DEFINIDA - PAC"}
@@ -541,31 +608,27 @@ export default function AgentPerfil() {
                       </div>
                     </div>
 
-                    {/* Tipo Sanguíneo - 1/3 da altura total */}
+                    {/* Tipo Sanguíneo */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
-                      <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
-                        Tipo Sanguíneo
-                      </label>
+                      <label className={labelClass}>Tipo Sanguíneo</label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
-                        <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-alert font-bebas text-center leading-tight">
+                        <p className={bloodTypeClass}>
                           {profile.tipo_sanguineo || "NÃO DEFINIDO"}
                         </p>
                       </div>
                     </div>
 
-                    {/* Validade - 1/3 da altura total */}
+                    {/* Validade */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
-                      <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
-                        Validade
-                      </label>
+                      <label className={labelClass}>Validade</label>
                       <div className="h-[calc(100%-1.25rem)] flex flex-col justify-center items-center">
-                        <p
-                          className={`text-xs min-[375px]:text-sm sm:text-base font-bold  font-roboto ${certificationInfo.className} text-center leading-tight`}
-                        >
+                        <p className={certificationClass}>
                           {certificationInfo.text}
                         </p>
                         {!profile.status && (
-                          <p className="text-[8px] min-[375px]:text-[9px] text-alert mt-0.5 font-roboto text-center">
+                          <p
+                            className={`${labelFontSize} text-alert mt-0.5 font-roboto text-center`}
+                          >
                             ⚠️ Agente inativo - certificação cancelada
                           </p>
                         )}
@@ -573,7 +636,7 @@ export default function AgentPerfil() {
                     </div>
                   </div>
 
-                  {/* Coluna da Direita - Foto (com aspect-ratio) */}
+                  {/* Coluna da Direita - Foto */}
                   <div className="flex flex-col items-center justify-center w-full">
                     <div className="w-full aspect-[3/4] rounded-md overflow-hidden relative border border-slate-300">
                       {profile.avatar_url ? (
@@ -592,7 +655,7 @@ export default function AgentPerfil() {
                       ) : (
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400">
                           <RiUserLine className="w-14 h-14 min-[375px]:w-16 min-[375px]:h-16 sm:w-18 sm:h-18 md:w-22 md:h-22" />
-                          <span className="text-sm font-roboto mt-2">
+                          <span className="text-sm min-[375px]:text-base sm:text-lg font-roboto mt-2">
                             Sem foto
                           </span>
                         </div>
@@ -603,17 +666,17 @@ export default function AgentPerfil() {
 
                 {/* MATRÍCULA */}
                 <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
-                  <label className="text-[8px] min-[375px]:text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1">
-                    Matrícula
-                  </label>
-                  <p className="text-xs min-[375px]:text-sm sm:text-base font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1">
+                  <label className={labelClass}>Matrícula</label>
+                  <p className={secondaryContentClass}>
                     {formatMatricula(profile.matricula)} RJ
                   </p>
                 </div>
 
                 {/* SITUAÇÃO DO PATRULHEIRO */}
                 <div className="mb-3">
-                  <label className="text-[10px] min-[375px]:text-xs font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1.5 text-center">
+                  <label
+                    className={`${labelFontSize} font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1.5 text-center`}
+                  >
                     Situação do Patrulheiro
                   </label>
                   <div className="flex justify-center">
@@ -624,12 +687,12 @@ export default function AgentPerfil() {
                     >
                       <div
                         className={`
-                          text-xs min-[375px]:text-sm
-                          py-2 min-[375px]:py-2.5
+                          ${secondaryContentFontSize}
+                          py-2 min-[375px]:py-2.5 sm:py-3 md:py-4
                           font-bold rounded-lg
                           w-full
                           transition-all duration-300 cursor-default
-                          text-center font-bebas
+                          text-center font-roboto
                           ${
                             profile.status
                               ? "bg-gradient-to-r from-success to-success-600 text-white"
@@ -637,7 +700,7 @@ export default function AgentPerfil() {
                           }
                         `}
                       >
-                        <div className="flex items-center justify-center space-x-1 min-[375px]:space-x-1.5">
+                        <div className="flex items-center justify-center space-x-1 min-[375px]:space-x-1.5 sm:space-x-2">
                           <AnimatePresence mode="wait">
                             <motion.div
                               key={profile.status ? "active" : "inactive"}
@@ -646,13 +709,15 @@ export default function AgentPerfil() {
                               transition={{ duration: 0.3 }}
                             >
                               {profile.status ? (
-                                <RiCheckboxCircleLine className="w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4" />
+                                <RiCheckboxCircleLine className="w-4 h-4 min-[375px]:w-5 min-[375px]:h-5 sm:w-6 sm:h-6" />
                               ) : (
-                                <RiForbidLine className="w-3.5 h-3.5 min-[375px]:w-4 min-[375px]:h-4" />
+                                <RiForbidLine className="w-4 h-4 min-[375px]:w-5 min-[375px]:h-5 sm:w-6 sm:h-6" />
                               )}
                             </motion.div>
                           </AnimatePresence>
-                          <span className="text-xs min-[375px]:text-sm sm:text-base font-black tracking-wider">
+                          <span
+                            className={`${contentFontSize} font-black tracking-wider uppercase font-roboto`}
+                          >
                             {profile.status ? "ATIVO" : "INATIVO"}
                           </span>
                         </div>
@@ -660,11 +725,15 @@ export default function AgentPerfil() {
                     </motion.div>
                   </div>
                   {!profile.status ? (
-                    <p className="text-[10px] min-[375px]:text-xs text-alert mt-1.5 text-center font-roboto font-semibold px-1">
+                    <p
+                      className={`${labelFontSize} text-alert mt-1.5 text-center font-roboto font-semibold px-1`}
+                    >
                       AGENTE INATIVO - ACESSO LIMITADO AO SISTEMA
                     </p>
                   ) : (
-                    <p className="text-[10px] min-[375px]:text-xs text-success mt-1.5 text-center font-roboto font-semibold px-1">
+                    <p
+                      className={`${labelFontSize} text-success mt-1.5 text-center font-roboto font-semibold px-1`}
+                    >
                       AGENTE ATIVO - ACESSO COMPLETO AO SISTEMA
                     </p>
                   )}

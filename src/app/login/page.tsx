@@ -902,7 +902,7 @@ export default function LoginPage() {
             Sistema de Gerenciamento da Patrulha Aérea Civil
           </p>
           <p className="text-xs text-gray-400 mt-1 font-inter">
-            v2.0 • Acesso seguro e criptografado
+            Acesso seguro e criptografado
           </p>
         </motion.div>
       </motion.div>
