@@ -1,5 +1,5 @@
 // app/api/upload/general/route.ts
-import { createAdminClient } from "@/lib/supabase/admin-client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 // Interface para as configurações de upload

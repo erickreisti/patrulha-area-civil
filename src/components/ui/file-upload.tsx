@@ -6,7 +6,7 @@ import { Card, CardContent } from "./card";
 import { Progress } from "./progress";
 import { Badge } from "./badge";
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 import { toast } from "sonner";
 import {
   FaUpload,

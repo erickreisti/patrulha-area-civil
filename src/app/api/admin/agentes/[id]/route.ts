@@ -1,6 +1,6 @@
-// app/api/admin/agentes/[id]/route.ts - VERSÃO COM VERIFICAÇÃO DE ADMIN
+// app/api/admin/agentes/[id]/route.ts - VERSÃO FINAL
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin-client";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function DELETE(
   request: NextRequest,
@@ -109,30 +109,81 @@ export async function DELETE(
       "system_activities",
       "galeria_itens",
       "noticias",
-    ];
+    ] as const;
 
     for (const table of relatedTables) {
       try {
-        await supabaseAdmin
-          .from(table)
-          .delete()
-          .eq(
-            table === "galeria_itens" || table === "noticias"
-              ? "autor_id"
-              : "user_id",
-            agentId
-          );
+        let deleteQuery;
+
+        // Use type assertion para cada tabela
+        switch (table) {
+          case "notifications":
+          case "system_activities":
+            deleteQuery = supabaseAdmin
+              .from(table)
+              .delete()
+              .eq("user_id", agentId);
+            break;
+          case "galeria_itens":
+          case "noticias":
+            deleteQuery = supabaseAdmin
+              .from(table)
+              .delete()
+              .eq("autor_id", agentId);
+            break;
+          default:
+            continue;
+        }
+
+        await deleteQuery;
+        console.log(`✅ Dados deletados da tabela ${table}`);
       } catch (error) {
         console.warn(`⚠️ Erro ao limpar ${table}:`, error);
       }
     }
 
     // Deletar das tabelas profiles
-    await supabaseAdmin.from("profiles_simple").delete().eq("id", agentId);
-    await supabaseAdmin.from("profiles").delete().eq("id", agentId);
+    try {
+      await supabaseAdmin.from("profiles_simple").delete().eq("id", agentId);
+      console.log("✅ Deletado de profiles_simple");
+    } catch (error) {
+      console.warn("⚠️ Erro ao deletar de profiles_simple:", error);
+    }
+
+    try {
+      await supabaseAdmin.from("profiles").delete().eq("id", agentId);
+      console.log("✅ Deletado de profiles");
+    } catch (error) {
+      console.warn("⚠️ Erro ao deletar de profiles:", error);
+    }
+
+    // Fazer backup em profiles_backup
+    try {
+      await supabaseAdmin.from("profiles_backup").insert({
+        id: agentId,
+        matricula: agent.matricula,
+        email: agent.email,
+        full_name: agent.full_name,
+        avatar_url: agent.avatar_url,
+        deleted_at: new Date().toISOString(),
+        deleted_by: user.id,
+      });
+      console.log("✅ Backup realizado em profiles_backup");
+    } catch (backupError) {
+      console.warn("⚠️ Erro ao fazer backup:", backupError);
+    }
 
     // Deletar do Auth
-    await supabaseAdmin.auth.admin.deleteUser(agentId);
+    try {
+      await supabaseAdmin.auth.admin.deleteUser(agentId);
+      console.log("✅ Usuário deletado do Auth");
+    } catch (authDeleteError) {
+      console.error("❌ Erro ao deletar do Auth:", authDeleteError);
+      return NextResponse.json(
+        { error: "Erro ao remover usuário do sistema de autenticação" },
+        { status: 500 }
+      );
+    }
 
     // Registrar a atividade
     await supabaseAdmin.from("system_activities").insert({
@@ -150,6 +201,8 @@ export async function DELETE(
         timestamp: new Date().toISOString(),
       },
     });
+
+    console.log("✅ Atividade registrada no sistema");
 
     return NextResponse.json({
       success: true,

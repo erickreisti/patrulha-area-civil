@@ -1,101 +1,101 @@
-// src/components/admin/AdminSidebar.tsx - APENAS LINKS "CRIAR"
+// src/components/admin/AdminSidebar.tsx - USANDO REMIX ICONS
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Users,
-  Images,
-  Folder,
-  LogOut,
-  BarChart3,
-  User,
-  Plus,
-  UserPlus,
-  List,
-  Newspaper,
-  LucideIcon,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-// Definindo tipos para a navegação
+// Ícones Remix - Padronizado com AdminHeader
+import {
+  RiDashboardLine,
+  RiGroupLine,
+  RiArticleLine,
+  RiImageLine,
+  RiFolderLine,
+  RiLogoutBoxLine,
+  RiUserLine,
+  RiAddLine,
+  RiUserAddLine,
+  RiListUnordered,
+} from "react-icons/ri";
+
+// Tipos para navegação hierárquica
 interface NavigationChild {
   name: string;
   href: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   children?: NavigationChild[];
 }
 
 interface NavigationItem {
   name: string;
   href: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<{ className?: string }>;
   children?: NavigationChild[];
 }
 
+// Estrutura de navegação com submenus
 const navigation: NavigationItem[] = [
   {
     name: "Dashboard",
     href: "/admin/dashboard",
-    icon: BarChart3,
+    icon: RiDashboardLine,
   },
   {
     name: "Agentes",
     href: "/admin/agentes",
-    icon: Users,
+    icon: RiGroupLine,
     children: [
       {
         name: "Criar Agente",
         href: "/admin/agentes/criar",
-        icon: UserPlus,
+        icon: RiUserAddLine,
       },
     ],
   },
   {
     name: "Notícias",
     href: "/admin/noticias",
-    icon: Newspaper,
+    icon: RiArticleLine,
     children: [
       {
         name: "Criar Notícia",
         href: "/admin/noticias/criar",
-        icon: Plus,
+        icon: RiAddLine,
       },
     ],
   },
   {
     name: "Galeria",
     href: "/admin/galeria",
-    icon: Images,
+    icon: RiImageLine,
     children: [
-      // TODOS OS ITENS
       {
         name: "Todos os Itens",
         href: "/admin/galeria/itens",
-        icon: List,
+        icon: RiListUnordered,
         children: [
           {
             name: "Criar Item",
             href: "/admin/galeria/itens/criar",
-            icon: Plus,
+            icon: RiAddLine,
           },
         ],
       },
-      // TODAS AS CATEGORIAS
       {
         name: "Todas as Categorias",
         href: "/admin/galeria/categorias",
-        icon: Folder,
+        icon: RiFolderLine,
         children: [
           {
             name: "Criar Categoria",
             href: "/admin/galeria/categorias/criar",
-            icon: Plus,
+            icon: RiAddLine,
           },
         ],
       },
@@ -108,27 +108,25 @@ export function AdminSidebar() {
   const router = useRouter();
   const supabase = createClient();
 
+  // Logout do sistema
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  // Função para verificar se um link está ativo
+  // Verifica se um link está ativo
   const isLinkActive = (href: string) => {
-    if (href === "/admin/dashboard") {
-      return pathname === href;
-    }
-
-    // Para outros links, verifica se o pathname começa com o href
+    if (href === "/admin/dashboard") return pathname === href;
     return pathname.startsWith(href);
   };
 
-  // Função para renderizar os itens de navegação
+  // Renderiza itens de navegação recursivamente
   const renderNavigationItem = (
     item: NavigationItem | NavigationChild,
     level = 0
   ) => {
     const isActive = isLinkActive(item.href);
+    const Icon = item.icon;
 
     return (
       <div key={item.name}>
@@ -143,7 +141,7 @@ export function AdminSidebar() {
             level === 2 && "ml-8 text-xs py-1"
           )}
         >
-          <item.icon
+          <Icon
             className={cn(
               "mr-3 flex-shrink-0 transition-colors",
               level === 0 ? "h-5 w-5" : "h-4 w-4",
@@ -155,7 +153,7 @@ export function AdminSidebar() {
           {item.name}
         </Link>
 
-        {/* Subitens - Mostrar sempre que houver children */}
+        {/* Subitens - mostrados quando o pai está ativo */}
         {item.children && (
           <div
             className={cn(
@@ -164,7 +162,7 @@ export function AdminSidebar() {
               isActive ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
             )}
           >
-            {item.children.map((child: NavigationChild) =>
+            {item.children.map((child) =>
               renderNavigationItem(child, level + 1)
             )}
           </div>
@@ -175,18 +173,16 @@ export function AdminSidebar() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-white border-r border-gray-200 shadow-lg">
-      {/* Logo - ESTILO IDÊNTICO AO PERFIL */}
+      {/* Logo - Estilo passaporte */}
       <div className="flex items-center justify-center h-24 flex-shrink-0 px-4 border-b border-gray-200 bg-gradient-to-r from-navy-700 to-navy-900">
         <Link href="/" className="flex items-center gap-4 group">
-          {/* Logo estilo passaporte - IDÊNTICO AO PERFIL */}
           <motion.div
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.3 }}
             className="relative"
           >
-            {/* Container estilo passaporte */}
-            <div className="bg-white rounded-full shadow-xl overflow-hidden flex items-center justify-center">
-              {/* Imagem da logo */}
+            {/* Container redondo estilo passaporte */}
+            <div className="bg-white rounded-full shadow-xl overflow-hidden flex items-center justify-center w-14 h-14">
               <div className="w-full h-full flex items-center justify-center p-1">
                 <Image
                   src="/images/logos/logo.webp"
@@ -200,8 +196,9 @@ export function AdminSidebar() {
             </div>
           </motion.div>
 
+          {/* Texto da organização */}
           <div className="text-left">
-            <h1 className="font-bebas text-xl text-white tracking-wider uppercase leading-tight drop-shadow-md">
+            <h1 className="font-roboto text-[12px] text-white tracking-wider uppercase leading-tight drop-shadow-md">
               PATRULHA AÉREA CIVIL
             </h1>
             <p className="text-blue-300 text-xs leading-tight mt-1 font-roboto font-medium">
@@ -211,14 +208,14 @@ export function AdminSidebar() {
         </Link>
       </div>
 
-      {/* Navegação */}
+      {/* Navegação principal */}
       <div className="flex-1 flex flex-col pt-4 pb-4 overflow-y-auto">
         <nav className="flex-1 px-3 space-y-1">
           {navigation.map((item) => renderNavigationItem(item))}
         </nav>
       </div>
 
-      {/* Footer do Sidebar */}
+      {/* Footer com ações do usuário */}
       <div className="flex-shrink-0 border-t border-gray-200 p-3 bg-white">
         <div className="flex items-center space-x-3">
           <div className="flex-1 min-w-0">
@@ -228,6 +225,7 @@ export function AdminSidebar() {
             <p className="text-xs text-gray-500 truncate">Sistema PAC</p>
           </div>
 
+          {/* Botões de ação */}
           <div className="flex space-x-1">
             <Button
               variant="ghost"
@@ -236,7 +234,7 @@ export function AdminSidebar() {
               className="text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors p-2"
               title="Meu Perfil"
             >
-              <User className="h-4 w-4" />
+              <RiUserLine className="h-4 w-4" />
             </Button>
 
             <Button
@@ -246,7 +244,7 @@ export function AdminSidebar() {
               className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors p-2"
               title="Sair do sistema"
             >
-              <LogOut className="h-4 w-4" />
+              <RiLogoutBoxLine className="h-4 w-4" />
             </Button>
           </div>
         </div>

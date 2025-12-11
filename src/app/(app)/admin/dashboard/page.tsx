@@ -52,25 +52,20 @@ interface SystemStatus {
   message: string;
 }
 
-interface ActivityMetadata {
-  version?: string;
-  details?: string;
-  [key: string]: unknown;
-}
-
+// ✅ CORRIGIDO: Interface compatível com Supabase
 interface Activity {
   id: string;
-  user_id: string;
+  user_id: string | null;
   action_type: string;
   description: string;
   resource_type: string | null;
   resource_id: string | null;
-  metadata: ActivityMetadata;
+  metadata: Record<string, unknown> | null;
   created_at: string;
   user_profile?: {
-    full_name: string;
-    matricula: string;
-  };
+    full_name: string | null;
+    matricula: string | null;
+  } | null;
 }
 
 type IconType = React.ComponentType<{ className?: string }>;
@@ -309,7 +304,8 @@ export default function AdminDashboard() {
 
         if (error) throw error;
 
-        setRecentActivities(activities || []);
+        // ✅ Convertendo para o tipo Activity que aceita null
+        setRecentActivities((activities || []) as Activity[]);
       } catch (error) {
         console.error("Erro ao buscar atividades:", error);
       } finally {
@@ -322,32 +318,24 @@ export default function AdminDashboard() {
         // 🔥 USANDO RLS CORRETAMENTE:
         // Admin pode ver TUDO através das políticas
 
-        // 1. Buscar perfis - admin vê todos
-        const { data: agentsData, error: agentsError } = await supabase
-          .from("profiles")
-          .select("id, status, role");
+        // Usar Promise.all para buscar tudo de uma vez
+        const [
+          { data: agentsData, error: agentsError },
+          { data: newsData, error: newsError },
+          { data: galleryData, error: galleryError },
+          { data: categoriesData, error: categoriesError },
+        ] = await Promise.all([
+          supabase.from("profiles").select("id, status, role"),
+          supabase.from("noticias").select("id, destaque, status"),
+          supabase.from("galeria_itens").select("id, tipo, status"),
+          supabase
+            .from("galeria_categorias")
+            .select("id, tipo, status, arquivada"),
+        ]);
 
         if (agentsError) throw agentsError;
-
-        // 2. Buscar notícias - admin vê todas
-        const { data: newsData, error: newsError } = await supabase
-          .from("noticias")
-          .select("id, destaque, status");
-
         if (newsError) throw newsError;
-
-        // 3. Buscar itens da galeria - admin vê todos
-        const { data: galleryData, error: galleryError } = await supabase
-          .from("galeria_itens")
-          .select("id, tipo, status");
-
         if (galleryError) throw galleryError;
-
-        // 4. Buscar categorias - admin vê todas
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from("galeria_categorias")
-          .select("id, tipo, status, arquivada");
-
         if (categoriesError) throw categoriesError;
 
         // Processar dados
@@ -519,7 +507,6 @@ export default function AdminDashboard() {
     }
   }, [mounted, isAdmin, fetchData]);
 
-  // Restante do código permanece igual...
   const getActivityIcon = (actionType: string) => {
     const iconClass = "w-4 h-4 flex-shrink-0";
     switch (actionType) {
@@ -591,13 +578,8 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Buscar dados atualizados
-      const [
-        agentsResponse,
-        newsResponse,
-        galleryResponse,
-        categoriesResponse,
-      ] = await Promise.all([
+      // Buscar dados atualizados (não precisa armazenar em variáveis)
+      await Promise.all([
         supabase.from("profiles").select("id, status, role"),
         supabase.from("noticias").select("id, destaque, status"),
         supabase.from("galeria_itens").select("id, tipo, status"),
@@ -606,13 +588,8 @@ export default function AdminDashboard() {
           .select("id, tipo, status, arquivada"),
       ]);
 
-      // Processar dados (mesma lógica de antes)
-      const agentsData = agentsResponse.data || [];
-      const newsData = newsResponse.data || [];
-      const galleryData = galleryResponse.data || [];
-      const categoriesData = categoriesResponse.data || [];
-
-      // ... (cálculos de estatísticas)
+      // Recarregar todos os dados
+      await fetchData();
 
       setLastUpdate(new Date());
     } catch (error) {
@@ -620,9 +597,9 @@ export default function AdminDashboard() {
     } finally {
       setRefreshing(false);
     }
-  }, [supabase]);
+  }, [supabase, fetchData]);
 
-  // Componente de Atividades Recentes (manter igual)
+  // Componente de Atividades Recentes
   const RecentActivity = () => (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -692,7 +669,9 @@ export default function AdminDashboard() {
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <p className="text-xs text-gray-600 transition-colors duration-300">
-                          {activity.user_profile?.full_name || "Sistema"}
+                          {activity.user_profile?.full_name ||
+                            activity.user_id ||
+                            "Sistema"}
                         </p>
                         <span className="text-gray-400">•</span>
                         <p className="text-xs text-gray-500 transition-colors duration-300 group-hover:text-gray-600">

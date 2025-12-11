@@ -45,7 +45,37 @@ import {
   RiStarFill,
   RiFilterLine,
 } from "react-icons/ri";
-import { GaleriaCategoria, GaleriaItem, TipoItem } from "@/types";
+
+// Tipos locais (substituindo a importação de @/types)
+type TipoItem = "foto" | "video";
+
+interface GaleriaCategoria {
+  id: string;
+  nome: string;
+  slug: string;
+  descricao?: string;
+  tipo: "fotos" | "videos";
+  ordem: number;
+  status: boolean;
+  created_at: string;
+  updated_at?: string;
+  arquivada?: boolean;
+}
+
+interface GaleriaItem {
+  id: string;
+  titulo: string;
+  descricao?: string;
+  categoria_id?: string;
+  tipo: TipoItem;
+  arquivo_url: string;
+  thumbnail_url?: string;
+  ordem: number;
+  autor_id?: string;
+  status: boolean;
+  destaque: boolean;
+  created_at: string;
+}
 
 interface PageProps {
   params: {
@@ -65,8 +95,8 @@ interface SupabaseGaleriaCategoria {
   ordem: number;
   status: boolean;
   created_at: string;
-  updated_at: string;
-  arquivada: boolean;
+  updated_at: string | null;
+  arquivada: boolean | null;
 }
 
 interface SupabaseGaleriaItem {
@@ -139,9 +169,9 @@ export default function CategoriaGaleriaPage({ params }: PageProps) {
         tipo: supabaseCategoria.tipo,
         ordem: supabaseCategoria.ordem,
         status: supabaseCategoria.status,
-        arquivada: supabaseCategoria.arquivada,
+        arquivada: supabaseCategoria.arquivada || undefined,
         created_at: supabaseCategoria.created_at,
-        updated_at: supabaseCategoria.updated_at,
+        updated_at: supabaseCategoria.updated_at || undefined,
       };
 
       setCategoria(typedCategoria);

@@ -1,4 +1,3 @@
-// src/lib/constants.ts
 export const AVATAR_CONFIG = {
   DEFAULT: {
     AGENT: "/images/avatars/default/default_agent.webp",

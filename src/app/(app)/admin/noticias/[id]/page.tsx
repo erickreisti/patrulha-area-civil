@@ -1,9 +1,9 @@
-// src/app/(app)/admin/noticias/[id]/page.tsx - VERSÃO CORRIGIDA E MELHORADA
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +39,32 @@ import {
   RiUserLine,
   RiExternalLinkLine,
 } from "react-icons/ri";
-import { NoticiaFormData, NoticiaStatus, NoticiaWithAutor } from "@/types";
+
+// Tipos do Supabase
+import type { Database } from "@/lib/supabase/types";
+type NoticiaRow = Database["public"]["Tables"]["noticias"]["Row"];
+type NoticiaStatus = NoticiaRow["status"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+interface NoticiaWithAutor extends Omit<NoticiaRow, "autor_id"> {
+  autor?: {
+    full_name: ProfileRow["full_name"];
+    graduacao: ProfileRow["graduacao"];
+    avatar_url: ProfileRow["avatar_url"];
+  } | null;
+}
+
+interface NoticiaFormData {
+  titulo: string;
+  slug: string;
+  conteudo: string;
+  resumo: string;
+  imagem: string | null;
+  categoria: string;
+  destaque: boolean;
+  data_publicacao: string;
+  status: NoticiaStatus;
+}
 
 const CATEGORIAS = [
   "Operações",
@@ -68,9 +93,50 @@ const fadeInUp = {
   },
 };
 
+// Componente de placeholder para imagem
+const ImageWithFallback = ({
+  src,
+  alt,
+  className = "w-16 h-16",
+}: {
+  src: string | null;
+  alt: string;
+  className?: string;
+}) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (!src || imageError) {
+    return (
+      <div
+        className={`${className} rounded flex items-center justify-center bg-gray-200`}
+      >
+        <RiImageLine className="w-8 h-8 text-gray-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${className} rounded overflow-hidden relative bg-gray-200`}
+    >
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        className="object-cover"
+        onError={() => setImageError(true)}
+        priority={false}
+        loading="lazy"
+      />
+    </div>
+  );
+};
+
 export default function EditarNoticiaPage({ params }: PageProps) {
   const router = useRouter();
   const supabase = createClient();
+  const adminClient = createAdminClient();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,70 +155,33 @@ export default function EditarNoticiaPage({ params }: PageProps) {
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Componente de placeholder para imagem
-  const ImageWithFallback = ({
-    src,
-    alt,
-    className = "w-16 h-16",
-  }: {
-    src: string | null;
-    alt: string;
-    className?: string;
-  }) => {
-    const [imageError, setImageError] = useState(false);
-
-    if (!src || imageError) {
-      return (
-        <div
-          className={`${className} rounded flex items-center justify-center bg-gray-200`}
-        >
-          <RiImageLine className="w-8 h-8 text-gray-400" />
-        </div>
-      );
-    }
-
-    return (
-      <div
-        className={`${className} rounded overflow-hidden relative bg-gray-200`}
-      >
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          className="object-cover"
-          onError={() => setImageError(true)}
-          priority={false}
-          loading="lazy"
-        />
-      </div>
-    );
-  };
-
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       console.log(`🔄 Buscando notícia ID: ${params.id}...`);
 
-      const { data: noticiaData, error } = await supabase
+      const client = adminClient || supabase;
+      const { data: noticiaData, error } = await client
         .from("noticias")
         .select(
           `
           *,
-          profiles!autor_id (
-            full_name,
-            graduacao,
-            avatar_url
-          )
+          profiles!noticias_autor_id_fkey(full_name, graduacao, avatar_url)
         `
         )
         .eq("id", params.id)
         .single();
 
-      if (error) throw error;
-      if (!noticiaData) throw new Error("Notícia não encontrada");
+      if (error) {
+        console.error("❌ Erro detalhado:", error);
+        throw error;
+      }
 
-      // Transformar os dados para a interface NoticiaWithAutor
+      if (!noticiaData) {
+        throw new Error("Notícia não encontrada");
+      }
+
+      // Transformar os dados
       const noticiaTransformada: NoticiaWithAutor = {
         ...noticiaData,
         autor: noticiaData.profiles
@@ -161,7 +190,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
               graduacao: noticiaData.profiles.graduacao,
               avatar_url: noticiaData.profiles.avatar_url,
             }
-          : undefined,
+          : null,
       };
 
       setNoticia(noticiaTransformada);
@@ -169,9 +198,9 @@ export default function EditarNoticiaPage({ params }: PageProps) {
         titulo: noticiaData.titulo,
         slug: noticiaData.slug,
         conteudo: noticiaData.conteudo,
-        resumo: noticiaData.resumo,
+        resumo: noticiaData.resumo || "",
         imagem: noticiaData.imagem,
-        categoria: noticiaData.categoria,
+        categoria: noticiaData.categoria || "Operações",
         destaque: noticiaData.destaque,
         data_publicacao: noticiaData.data_publicacao,
         status: noticiaData.status,
@@ -185,7 +214,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     } finally {
       setLoading(false);
     }
-  }, [params.id, supabase, router]);
+  }, [params.id, supabase, adminClient, router]);
 
   useEffect(() => {
     fetchData();
@@ -203,7 +232,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
   const handleTituloChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const titulo = e.target.value;
-    setFormData((prev: NoticiaFormData) => ({
+    setFormData((prev) => ({
       ...prev,
       titulo,
       slug: generateSlug(titulo),
@@ -214,15 +243,14 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev: NoticiaFormData) => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  // ✅ CORREÇÃO: Função para lidar com upload de imagem
   const handleImageUpload = (imageUrl: string) => {
-    setFormData((prev: NoticiaFormData) => ({
+    setFormData((prev) => ({
       ...prev,
       imagem: imageUrl,
     }));
@@ -262,8 +290,10 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     }
 
     try {
-      // ✅ CORREÇÃO: Verificação de slug com tratamento de erro
-      const { data: existingSlug, error: slugError } = await supabase
+      const client = adminClient || supabase;
+
+      // Verificar slug único
+      const { data: existingSlug, error: slugError } = await client
         .from("noticias")
         .select("id")
         .eq("slug", formData.slug)
@@ -271,7 +301,6 @@ export default function EditarNoticiaPage({ params }: PageProps) {
         .maybeSingle();
 
       if (slugError && slugError.code !== "PGRST116") {
-        // PGRST116 é "Não encontrado" - isso é normal
         console.error("Erro ao verificar slug:", slugError);
       }
 
@@ -284,10 +313,10 @@ export default function EditarNoticiaPage({ params }: PageProps) {
       }
 
       const updateData = {
-        titulo: formData.titulo,
-        slug: formData.slug,
-        conteudo: formData.conteudo,
-        resumo: formData.resumo,
+        titulo: formData.titulo.trim(),
+        slug: formData.slug.trim(),
+        conteudo: formData.conteudo.trim(),
+        resumo: formData.resumo.trim(),
         imagem: formData.imagem,
         categoria: formData.categoria,
         destaque: formData.destaque,
@@ -298,7 +327,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
 
       console.log("📤 Enviando dados para atualização:", updateData);
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await client
         .from("noticias")
         .update(updateData)
         .eq("id", params.id);
@@ -336,7 +365,8 @@ export default function EditarNoticiaPage({ params }: PageProps) {
     }
 
     try {
-      const { error } = await supabase
+      const client = adminClient || supabase;
+      const { error } = await client
         .from("noticias")
         .delete()
         .eq("id", params.id);
@@ -412,7 +442,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header - TÍTULO E DESCRIÇÃO */}
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -425,7 +455,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
           <p className="text-gray-600">Editando: {noticia.titulo}</p>
         </motion.div>
 
-        {/* ✅ BOTÕES ABAIXO DO HEADER */}
+        {/* Botões */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -622,7 +652,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setFormData((prev: NoticiaFormData) => ({
+                                setFormData((prev) => ({
                                   ...prev,
                                   imagem: null,
                                 }));
@@ -869,7 +899,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                     <Select
                       value={formData.status}
                       onValueChange={(value: NoticiaStatus) =>
-                        setFormData((prev: NoticiaFormData) => ({
+                        setFormData((prev) => ({
                           ...prev,
                           status: value,
                         }))
@@ -898,7 +928,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                       id="destaque"
                       checked={formData.destaque}
                       onCheckedChange={(checked) =>
-                        setFormData((prev: NoticiaFormData) => ({
+                        setFormData((prev) => ({
                           ...prev,
                           destaque: checked,
                         }))
@@ -926,7 +956,7 @@ export default function EditarNoticiaPage({ params }: PageProps) {
                   <Select
                     value={formData.categoria}
                     onValueChange={(value) =>
-                      setFormData((prev: NoticiaFormData) => ({
+                      setFormData((prev) => ({
                         ...prev,
                         categoria: value,
                       }))

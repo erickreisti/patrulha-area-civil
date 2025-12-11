@@ -1,9 +1,9 @@
-// src/app/(app)/admin/noticias/criar/page.tsx - VERSÃO MELHORADA
 "use client";
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,10 @@ import {
   RiDeleteBinFill,
   RiEyeLine,
 } from "react-icons/ri";
+
+// Tipos do Supabase
+import type { Database } from "@/lib/supabase/types";
+type NoticiaStatus = Database["public"]["Tables"]["noticias"]["Row"]["status"];
 
 const CATEGORIAS = [
   "Operações",
@@ -243,6 +247,7 @@ function ImageUploadSection({
 export default function CriarNoticiaPage() {
   const router = useRouter();
   const supabase = createClient();
+  const adminClient = createAdminClient();
 
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -254,7 +259,7 @@ export default function CriarNoticiaPage() {
     categoria: "Operações",
     destaque: false,
     data_publicacao: new Date().toISOString().split("T")[0],
-    status: "rascunho" as "rascunho" | "publicado" | "arquivado",
+    status: "rascunho" as NoticiaStatus,
   });
   const [errors, setErrors] = useState<string[]>([]);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -359,7 +364,10 @@ export default function CriarNoticiaPage() {
     }
 
     try {
-      const { data: existingSlug, error: slugError } = await supabase
+      const client = adminClient || supabase;
+
+      // Verificar slug único
+      const { data: existingSlug, error: slugError } = await client
         .from("noticias")
         .select("id")
         .eq("slug", formData.slug)
@@ -394,7 +402,7 @@ export default function CriarNoticiaPage() {
 
       console.log("🔄 Criando nova notícia...", formData);
 
-      const { error } = await supabase.from("noticias").insert([
+      const { error } = await client.from("noticias").insert([
         {
           titulo: formData.titulo.trim(),
           slug: formData.slug.trim(),
@@ -461,7 +469,7 @@ export default function CriarNoticiaPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header - TÍTULO E DESCRIÇÃO */}
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -476,7 +484,7 @@ export default function CriarNoticiaPage() {
           </p>
         </motion.div>
 
-        {/* ✅ BOTÕES ABAIXO DO HEADER - Mesmo layout do outro arquivo */}
+        {/* Botões */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -814,9 +822,9 @@ export default function CriarNoticiaPage() {
                     </Label>
                     <Select
                       value={formData.status}
-                      onValueChange={(
-                        value: "rascunho" | "publicado" | "arquivado"
-                      ) => setFormData((prev) => ({ ...prev, status: value }))}
+                      onValueChange={(value: NoticiaStatus) =>
+                        setFormData((prev) => ({ ...prev, status: value }))
+                      }
                     >
                       <SelectTrigger className="transition-all duration-300 hover:border-blue-500 focus:ring-blue-500">
                         <SelectValue />

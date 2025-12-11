@@ -1,18 +1,41 @@
+"use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { UserProfile } from "@/types";
+import type { Database } from "@/lib/supabase/types";
 
-export function useAuth() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+
+interface UseAuthReturn {
+  profile: Profile | null;
+  loading: boolean;
+  error: string | null;
+  isAdmin: boolean;
+  signOut: () => Promise<void>;
+  supabase: ReturnType<typeof createClient>;
+  refreshProfile: () => Promise<void>;
+}
+
+export function useAuth(): UseAuthReturn {
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+
   const supabase = createClient();
 
   const fetchProfile = useCallback(async () => {
     try {
+      setError(null);
+
       const {
         data: { session },
+        error: sessionError,
       } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error(`Erro de sessão: ${sessionError.message}`);
+      }
 
       if (!session) {
         setProfile(null);
@@ -21,22 +44,31 @@ export function useAuth() {
         return;
       }
 
-      const { data: profileData, error } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", session.user.id)
         .single();
 
-      if (error) {
-        console.error("Erro ao buscar perfil:", error);
-        setProfile(null);
-        setIsAdmin(false);
-      } else {
+      if (profileError) {
+        console.error("Erro ao buscar perfil:", profileError);
+        throw new Error(`Erro ao carregar perfil: ${profileError.message}`);
+      }
+
+      if (profileData) {
         setProfile(profileData);
         setIsAdmin(profileData.role === "admin");
+      } else {
+        setProfile(null);
+        setIsAdmin(false);
       }
-    } catch (error) {
-      console.error("Erro no useAuth:", error);
+    } catch (err: unknown) {
+      console.error("Erro no useAuth:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro desconhecido ao carregar dados do usuário"
+      );
       setProfile(null);
       setIsAdmin(false);
     } finally {
@@ -45,17 +77,38 @@ export function useAuth() {
   }, [supabase]);
 
   useEffect(() => {
-    fetchProfile();
+    let isSubscribed = true;
+    let unsubscribe: (() => void) | undefined;
 
-    // Escutar mudanças na autenticação
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      fetchProfile();
-    });
+    const initAuth = async () => {
+      try {
+        await fetchProfile();
+
+        if (isSubscribed) {
+          const {
+            data: { subscription },
+          } = supabase.auth.onAuthStateChange(() => {
+            if (isSubscribed) {
+              fetchProfile();
+            }
+          });
+
+          unsubscribe = () => subscription.unsubscribe();
+        }
+      } catch (err) {
+        if (isSubscribed) {
+          console.error("Erro na inicialização do auth:", err);
+        }
+      }
+    };
+
+    initAuth();
 
     return () => {
-      subscription.unsubscribe();
+      isSubscribed = false;
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
   }, [fetchProfile, supabase]);
 
@@ -64,14 +117,19 @@ export function useAuth() {
       await supabase.auth.signOut();
       setProfile(null);
       setIsAdmin(false);
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
+      setError(null);
+    } catch (err: unknown) {
+      console.error("Erro ao fazer logout:", err);
+      setError(
+        err instanceof Error ? err.message : "Erro desconhecido ao fazer logout"
+      );
     }
   };
 
   return {
     profile,
     loading,
+    error,
     isAdmin,
     signOut,
     supabase,

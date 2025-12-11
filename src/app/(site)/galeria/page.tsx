@@ -1,6 +1,7 @@
+// app/(site)/galeria/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -45,205 +46,41 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
-import { GaleriaCategoriaComItens } from "@/types";
-import { Database } from "@/lib/supabase/client";
+import {
+  useGaleriaStore,
+  type GaleriaCategoriaComItens,
+} from "@/stores/useGaleriaStore";
 
-// ==================== TIPOS LOCAIS ====================
-type SortType = "recent" | "oldest" | "popular" | "destaque";
+// ==================== CONFIGURAÇÕES ====================
+const ITEMS_PER_PAGE_OPTIONS = [6, 10, 20, 30, 50];
 
 // ==================== COMPONENTE PRINCIPAL ====================
 export default function GaleriaPage() {
-  const [categorias, setCategorias] = useState<GaleriaCategoriaComItens[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTipo, setSelectedTipo] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<SortType>("recent");
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCategorias, setTotalCategorias] = useState(0);
+  const {
+    categorias,
+    loadingCategorias: loading,
+    filtrosCategorias: filtros,
+    totalCategorias,
+    fetchCategorias,
+    setSearchTerm,
+    setTipo,
+    setSortByCategorias,
+    setItemsPerPageCategorias,
+    setCurrentPageCategorias,
+  } = useGaleriaStore();
 
-  // 🔥 CLIENTE SUPABASE COM INICIALIZAÇÃO SEGURA
-  const [supabase, setSupabase] = useState<ReturnType<
-    typeof createClient
-  > | null>(null);
-
+  // Carregar categorias
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      setSupabase(createClient());
-    }
-  }, []);
+    fetchCategorias();
+  }, [filtros, fetchCategorias]);
 
-  const ITEMS_PER_PAGE = 10;
+  // Calcular total de páginas
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalCategorias / filtros.itemsPerPage)
+  );
 
-  // Função para buscar categorias
-  const fetchCategorias = useCallback(async () => {
-    if (!supabase) return;
-
-    try {
-      setLoading(true);
-
-      // Construir query base para contar total
-      let countQuery = supabase
-        .from("galeria_categorias")
-        .select("*", { count: "exact", head: true })
-        .eq("status", true)
-        .eq("arquivada", false);
-
-      if (searchTerm) {
-        countQuery = countQuery.or(
-          `nome.ilike.%${searchTerm}%,descricao.ilike.%${searchTerm}%`
-        );
-      }
-
-      if (selectedTipo !== "all") {
-        countQuery = countQuery.eq("tipo", selectedTipo);
-      }
-
-      const { count, error: countError } = await countQuery;
-
-      if (countError) {
-        console.error("Erro ao contar categorias:", countError);
-      }
-
-      const totalCount = count || 0;
-      const calculatedTotalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
-      setTotalCategorias(totalCount);
-      setTotalPages(calculatedTotalPages);
-
-      // Buscar categorias com paginação
-      const from = (page - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
-
-      let query = supabase
-        .from("galeria_categorias")
-        .select("*")
-        .eq("status", true)
-        .eq("arquivada", false)
-        .range(from, to);
-
-      if (searchTerm) {
-        query = query.or(
-          `nome.ilike.%${searchTerm}%,descricao.ilike.%${searchTerm}%`
-        );
-      }
-
-      if (selectedTipo !== "all") {
-        query = query.eq("tipo", selectedTipo);
-      }
-
-      // Aplicar ordenação
-      switch (sortBy) {
-        case "recent":
-          query = query.order("created_at", { ascending: false });
-          break;
-        case "oldest":
-          query = query.order("created_at", { ascending: true });
-          break;
-        case "destaque":
-          query = query.order("ordem", { ascending: true });
-          break;
-        default:
-          query = query
-            .order("ordem", { ascending: true })
-            .order("nome", { ascending: true });
-      }
-
-      const { data: categoriasData, error: categoriasError } = await query;
-
-      if (categoriasError) {
-        console.error("Erro ao buscar categorias:", categoriasError);
-        throw categoriasError;
-      }
-
-      // Processar cada categoria
-      // Processar cada categoria
-      const categoriasComItens = await Promise.all(
-        (categoriasData || []).map(
-          async (
-            categoria: Database["public"]["Tables"]["galeria_categorias"]["Row"]
-          ) => {
-            // Contar itens da categoria
-            const { count } = await supabase
-              .from("galeria_itens")
-              .select("*", { count: "exact", head: true })
-              .eq("categoria_id", categoria.id)
-              .eq("status", true);
-
-            // Verificar se há itens em destaque
-            const { data: destaqueData } = await supabase
-              .from("galeria_itens")
-              .select("id")
-              .eq("categoria_id", categoria.id)
-              .eq("status", true)
-              .eq("destaque", true)
-              .limit(1);
-
-            // Buscar última imagem para thumbnail
-            let ultimaImagemUrl = undefined;
-            if (count && count > 0) {
-              const { data: ultimoItem } = await supabase
-                .from("galeria_itens")
-                .select("arquivo_url, thumbnail_url, created_at")
-                .eq("categoria_id", categoria.id)
-                .eq("status", true)
-                .order("created_at", { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-              if (ultimoItem) {
-                // 🔥 CORREÇÃO AQUI
-                const item = ultimoItem as {
-                  arquivo_url: string;
-                  thumbnail_url: string | null;
-                  created_at: string;
-                };
-                ultimaImagemUrl = item.thumbnail_url || item.arquivo_url;
-              }
-            }
-
-            return {
-              ...categoria,
-              item_count: count || 0,
-              tem_destaque: !!destaqueData && destaqueData.length > 0,
-              ultima_imagem_url: ultimaImagemUrl,
-            };
-          }
-        )
-      );
-
-      // Se for ordenação por popularidade, ordenar após buscar contagem
-      if (sortBy === "popular") {
-        categoriasComItens.sort((a, b) => b.item_count - a.item_count);
-      }
-
-      setCategorias(categoriasComItens as GaleriaCategoriaComItens[]);
-    } catch (error) {
-      console.error("Erro ao carregar galeria:", error);
-      setCategorias([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, page, searchTerm, selectedTipo, sortBy]);
-
-  useEffect(() => {
-    if (supabase) {
-      fetchCategorias();
-    }
-  }, [fetchCategorias, supabase]);
-
-  // Debounce para busca
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (page !== 1) {
-        setPage(1);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [searchTerm, selectedTipo, sortBy, page]);
-
-  // ✅ CALCULAR ESTATÍSTICAS
+  // Estatísticas
   const totalFotos = categorias
     .filter((cat) => cat.tipo === "fotos")
     .reduce((sum, cat) => sum + cat.item_count, 0);
@@ -388,7 +225,7 @@ export default function GaleriaPage() {
                 <Input
                   type="text"
                   placeholder="Buscar categorias..."
-                  value={searchTerm}
+                  value={filtros.searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-9 sm:pl-12 pr-4 py-2.5 sm:py-3 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl transition-all duration-300 bg-white/50 backdrop-blur-sm text-sm sm:text-base"
                 />
@@ -399,8 +236,8 @@ export default function GaleriaPage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
               {/* Tipo Filter */}
               <Select
-                value={selectedTipo}
-                onValueChange={(value) => setSelectedTipo(value)}
+                value={filtros.tipo}
+                onValueChange={(value) => setTipo(value)}
               >
                 <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                   <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
@@ -425,8 +262,10 @@ export default function GaleriaPage() {
 
               {/* Sort */}
               <Select
-                value={sortBy}
-                onValueChange={(value: SortType) => setSortBy(value)}
+                value={filtros.sortBy}
+                onValueChange={(
+                  value: "recent" | "oldest" | "popular" | "destaque"
+                ) => setSortByCategorias(value)}
               >
                 <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                   <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
@@ -437,6 +276,25 @@ export default function GaleriaPage() {
                   <SelectItem value="oldest">Mais Antigas</SelectItem>
                   <SelectItem value="popular">Mais Itens</SelectItem>
                   <SelectItem value="destaque">Em Destaque</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Items per Page */}
+              <Select
+                value={filtros.itemsPerPage.toString()}
+                onValueChange={(value) => {
+                  setItemsPerPageCategorias(Number(value));
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
+                  {ITEMS_PER_PAGE_OPTIONS.map((num) => (
+                    <SelectItem key={num} value={num.toString()}>
+                      {num} por página
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -454,27 +312,42 @@ export default function GaleriaPage() {
                 {totalCategorias} CATEGORIAS ENCONTRADAS
               </h2>
               <p className="text-slate-600 mt-1 text-sm sm:text-base">
-                {searchTerm && `Buscando por: "${searchTerm}"`}
-                {selectedTipo !== "all" &&
-                  ` • Tipo: ${selectedTipo === "fotos" ? "Fotos" : "Vídeos"}`}
-                {sortBy && ` • Ordenado por: ${sortBy}`}
+                {filtros.searchTerm && `Buscando por: "${filtros.searchTerm}"`}
+                {filtros.tipo !== "all" &&
+                  ` • Tipo: ${filtros.tipo === "fotos" ? "Fotos" : "Vídeos"}`}
+                {filtros.sortBy && ` • Ordenado por: ${filtros.sortBy}`}
               </p>
             </div>
 
             {categorias.length > 0 && (
               <div className="text-xs sm:text-sm text-slate-500">
-                Página {page} de {totalPages} • {totalCategorias} categorias no
-                total
+                Página {filtros.currentPage} de {totalPages} • {totalCategorias}{" "}
+                categorias no total
               </div>
             )}
           </div>
 
           {/* Grid de Categorias */}
           <AnimatePresence mode="wait">
-            {categorias.length > 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                {Array.from({ length: filtros.itemsPerPage }).map((_, i) => (
+                  <Card key={i} className="border-0 shadow-lg">
+                    <CardHeader className="pb-3 sm:pb-4">
+                      <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
+                      <Skeleton className="h-4 w-full mb-1" />
+                      <Skeleton className="h-4 w-2/3" />
+                    </CardHeader>
+                    <CardContent>
+                      <Skeleton className="h-4 w-1/2" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : categorias.length > 0 ? (
               <>
                 <motion.div
-                  key={`grid-${sortBy}-${selectedTipo}-${page}`}
+                  key={`grid-${filtros.sortBy}-${filtros.tipo}-${filtros.currentPage}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -506,10 +379,14 @@ export default function GaleriaPage() {
                         <PaginationItem>
                           <PaginationPrevious
                             onClick={() =>
-                              setPage((prev) => Math.max(1, prev - 1))
+                              setCurrentPageCategorias(
+                                Math.max(filtros.currentPage - 1, 1)
+                              )
                             }
                             className={
-                              page === 1 ? "pointer-events-none opacity-50" : ""
+                              filtros.currentPage === 1
+                                ? "pointer-events-none opacity-50"
+                                : ""
                             }
                           />
                         </PaginationItem>
@@ -519,20 +396,25 @@ export default function GaleriaPage() {
                           (_, i) => {
                             let pageNum = i + 1;
                             if (totalPages > 5) {
-                              if (page <= 3) {
+                              if (filtros.currentPage <= 3) {
                                 pageNum = i + 1;
-                              } else if (page >= totalPages - 2) {
+                              } else if (
+                                filtros.currentPage >=
+                                totalPages - 2
+                              ) {
                                 pageNum = totalPages - 4 + i;
                               } else {
-                                pageNum = page - 2 + i;
+                                pageNum = filtros.currentPage - 2 + i;
                               }
                             }
 
                             return (
                               <PaginationItem key={pageNum}>
                                 <PaginationLink
-                                  isActive={page === pageNum}
-                                  onClick={() => setPage(pageNum)}
+                                  isActive={filtros.currentPage === pageNum}
+                                  onClick={() =>
+                                    setCurrentPageCategorias(pageNum)
+                                  }
                                 >
                                   {pageNum}
                                 </PaginationLink>
@@ -544,10 +426,12 @@ export default function GaleriaPage() {
                         <PaginationItem>
                           <PaginationNext
                             onClick={() =>
-                              setPage((prev) => Math.min(totalPages, prev + 1))
+                              setCurrentPageCategorias(
+                                Math.min(totalPages, filtros.currentPage + 1)
+                              )
                             }
                             className={
-                              page === totalPages
+                              filtros.currentPage === totalPages
                                 ? "pointer-events-none opacity-50"
                                 : ""
                             }
@@ -569,17 +453,17 @@ export default function GaleriaPage() {
                   Nenhuma categoria encontrada
                 </h3>
                 <p className="text-slate-500 max-w-md mx-auto text-sm sm:text-base px-4">
-                  {searchTerm || selectedTipo !== "all"
+                  {filtros.searchTerm || filtros.tipo !== "all"
                     ? "Tente ajustar os filtros ou termos de busca."
                     : "Ainda não há categorias cadastradas na galeria."}
                 </p>
-                {(searchTerm || selectedTipo !== "all") && (
+                {(filtros.searchTerm || filtros.tipo !== "all") && (
                   <Button
                     variant="outline"
                     onClick={() => {
                       setSearchTerm("");
-                      setSelectedTipo("all");
-                      setPage(1);
+                      setTipo("all");
+                      setCurrentPageCategorias(1);
                     }}
                     className="mt-4"
                   >

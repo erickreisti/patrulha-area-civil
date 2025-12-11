@@ -34,24 +34,21 @@ import {
   RiDeleteBinLine,
 } from "react-icons/ri";
 
+// ✅ CORRIGIDO: Interface compatível com o Supabase
 interface Activity {
   id: string;
-  user_id: string;
+  user_id: string | null; // ✅ Pode ser null
   action_type: string;
   description: string;
   resource_type: string | null;
   resource_id: string | null;
-  metadata: {
-    version?: string;
-    details?: string;
-    [key: string]: unknown;
-  };
+  metadata: Record<string, unknown> | null; // ✅ Pode ser null
   created_at: string;
   user_profile?: {
-    full_name: string;
-    matricula: string;
-    graduacao?: string;
-  };
+    full_name: string | null;
+    matricula: string | null;
+    graduacao?: string | null;
+  } | null; // ✅ Pode ser null
 }
 
 interface ActivityFilters {
@@ -156,7 +153,8 @@ export default function AllActivitiesPage() {
         throw error;
       }
 
-      setActivities(data || []);
+      // ✅ Converter para o tipo Activity que aceita null
+      setActivities((data || []) as Activity[]);
       setTotalCount(count || 0);
     } catch (error) {
       console.error("Erro ao buscar atividades:", error);
@@ -582,6 +580,7 @@ export default function AllActivitiesPage() {
                                   <RiUserLine className="w-3 h-3" />
                                   <span>
                                     {activity.user_profile?.full_name ||
+                                      activity.user_id ||
                                       "Sistema"}
                                   </span>
                                   {activity.user_profile?.matricula && (

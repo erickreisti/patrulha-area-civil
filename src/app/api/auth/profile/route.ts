@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin-client";
-import { SEGURANCA } from "@/lib/security-config";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { SEGURANCA } from "@/utils/security-config";
 
 // Cache em memória para rate limiting
 const loginAttempts = new Map<

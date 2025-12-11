@@ -1,7 +1,6 @@
-// src/components/admin/AdminHeader.tsx - CORRIGIDO
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,33 +10,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-// Icons
+// Ícones Remix
 import {
   RiMenuLine,
   RiNotificationLine,
   RiUserLine,
-  RiSearchLine,
   RiLogoutBoxLine,
   RiGlobalLine,
   RiGroupLine,
@@ -58,19 +42,27 @@ import {
   RiSettingsLine,
 } from "react-icons/ri";
 
-// =============================================
-// TIPOS E INTERFACES
-// =============================================
+// Importar o SearchComponent
+import { SearchComponent } from "./SearchComponent";
+
+// Tipos corrigidos - usando Json do Supabase
+type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 interface UserProfile {
-  full_name: string;
+  full_name: string | null;
   avatar_url: string | null;
-  role: string;
+  role: "admin" | "agent";
 }
 
 interface Notification {
   id: string;
-  user_id: string;
+  user_id: string | null;
   type:
     | "system"
     | "user_created"
@@ -80,22 +72,15 @@ interface Notification {
     | "info";
   title: string;
   message: string;
-  action_url?: string;
+  action_url: string | null;
   is_read: boolean;
+  metadata: Json | null;
+  expires_at: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-interface NavigationItem {
-  name: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  children?: NavigationItem[];
-}
-
-// =============================================
-// HOOK DE NOTIFICAÇÕES
-// =============================================
-
+// Hook de notificações otimizado
 const useNotifications = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -221,10 +206,7 @@ const useNotifications = () => {
   };
 };
 
-// =============================================
-// COMPONENTE DE NOTIFICAÇÃO
-// =============================================
-
+// Componente individual de notificação
 const NotificationItem = ({
   notification,
   onMarkAsRead,
@@ -278,15 +260,6 @@ const NotificationItem = ({
     }
   };
 
-  const handleClick = () => {
-    if (!notification.is_read) {
-      onMarkAsRead(notification.id);
-    }
-    if (notification.action_url) {
-      router.push(notification.action_url);
-    }
-  };
-
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -305,7 +278,10 @@ const NotificationItem = ({
         {getNotificationIcon()}
         <div className="flex-1 min-w-0">
           <button
-            onClick={handleClick}
+            onClick={() => {
+              if (!notification.is_read) onMarkAsRead(notification.id);
+              if (notification.action_url) router.push(notification.action_url);
+            }}
             className="w-full text-left hover:opacity-80 transition-opacity"
           >
             <p
@@ -348,36 +324,27 @@ const NotificationItem = ({
   );
 };
 
-// =============================================
-// HEADER DA PATRULHA AÉREA CIVIL - IDÊNTICO À SIDEBAR
-// =============================================
-
+// Header da logo (igual ao sidebar)
 const PatrulhaAereaCivilHeader = () => {
   return (
     <div className="flex items-center justify-center h-24 flex-shrink-0 px-4 border-b border-gray-200 bg-gradient-to-r from-navy-700 to-navy-900">
       <Link href="/" className="flex items-center gap-4 group">
-        {/* Logo estilo passaporte - IDÊNTICO À SIDEBAR */}
         <motion.div
           whileHover={{ scale: 1.05 }}
           transition={{ duration: 0.3 }}
           className="relative"
         >
-          {/* Container estilo passaporte */}
-          <div className=" bg-white rounded-full shadow-xl overflow-hidden flex items-center justify-center">
-            {/* Imagem da logo */}
-            <div className="w-full h-full flex items-center justify-center p-1">
-              <Image
-                src="/images/logos/logo.webp"
-                alt="Patrulha Aérea Civil"
-                width={56}
-                height={56}
-                className="object-cover w-full h-full"
-                priority
-              />
-            </div>
+          <div className="bg-white rounded-full shadow-xl overflow-hidden w-14 h-14 flex items-center justify-center">
+            <Image
+              src="/images/logos/logo.webp"
+              alt="Patrulha Aérea Civil"
+              width={56}
+              height={56}
+              className="object-contain w-full h-full p-1"
+              priority
+            />
           </div>
         </motion.div>
-
         <div className="text-left">
           <h1 className="font-roboto text-[12px] text-white tracking-wider uppercase leading-tight drop-shadow-md">
             PATRULHA AÉREA CIVIL
@@ -391,21 +358,22 @@ const PatrulhaAereaCivilHeader = () => {
   );
 };
 
-// =============================================
-// SIDEBAR MOBILE - ESTRUTURA IDÊNTICA À SIDEBAR PRINCIPAL
-// =============================================
+// Tipos para navegação mobile
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children?: NavItem[];
+}
 
+// Sidebar mobile para menu hambúrguer
 const MobileSidebar = () => {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
 
-  const navigation: NavigationItem[] = [
-    {
-      name: "Dashboard",
-      href: "/admin/dashboard",
-      icon: RiDashboardLine,
-    },
+  const navigation: NavItem[] = [
+    { name: "Dashboard", href: "/admin/dashboard", icon: RiDashboardLine },
     {
       name: "Agentes",
       href: "/admin/agentes",
@@ -473,12 +441,12 @@ const MobileSidebar = () => {
     router.push("/login");
   };
 
-  const renderNavigationItem = (item: NavigationItem, level = 0) => {
+  const renderNavigationItem = (item: NavItem, level = 0) => {
     const isActive = isLinkActive(item.href);
     const IconComponent = item.icon;
 
     return (
-      <div key={item.name}>
+      <div key={`${item.name}-${level}`}>
         <Link
           href={item.href}
           className={`flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-all duration-200 border ${
@@ -518,14 +486,11 @@ const MobileSidebar = () => {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Navegação */}
       <div className="flex-1 flex flex-col pt-4 pb-4 overflow-y-auto">
         <nav className="flex-1 px-3 space-y-1">
           {navigation.map((item) => renderNavigationItem(item))}
         </nav>
       </div>
-
-      {/* Footer do Mobile Sidebar */}
       <div className="flex-shrink-0 border-t border-gray-200 p-3 bg-white">
         <div className="flex items-center space-x-3">
           <div className="flex-1 min-w-0">
@@ -534,7 +499,6 @@ const MobileSidebar = () => {
             </p>
             <p className="text-xs text-gray-500 truncate">Sistema PAC</p>
           </div>
-
           <div className="flex space-x-1">
             <Button
               variant="ghost"
@@ -545,7 +509,6 @@ const MobileSidebar = () => {
             >
               <RiUserLine className="h-4 w-4" />
             </Button>
-
             <Button
               variant="ghost"
               size="sm"
@@ -562,21 +525,13 @@ const MobileSidebar = () => {
   );
 };
 
-// =============================================
-// COMPONENTE PRINCIPAL ADMIN HEADER
-// =============================================
-
+// Componente principal AdminHeader
 export function AdminHeader() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const searchAreaRef = useRef<HTMLDivElement>(null);
 
   // Hook de notificações
   const {
@@ -589,10 +544,7 @@ export function AdminHeader() {
     refreshNotifications,
   } = useNotifications();
 
-  // =============================================
-  // EFFECTS E CARREGAMENTO DE DADOS
-  // =============================================
-
+  // Carrega perfil do usuário
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
@@ -618,196 +570,54 @@ export function AdminHeader() {
     loadUserProfile();
   }, [supabase]);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        searchAreaRef.current &&
-        !searchAreaRef.current.contains(event.target as Node)
-      ) {
-        setIsSearchOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    if (isSearchOpen && searchInputRef.current) {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
-  }, [isSearchOpen]);
-
-  // =============================================
-  // SISTEMA DE BUSCA
-  // =============================================
-
-  const performSearch = useCallback(
-    async (query: string) => {
-      const searchTerm = `%${query}%`;
-
-      try {
-        const [
-          { data: agents },
-          { data: news },
-          { data: galleryItems },
-          { data: galleryCategories },
-        ] = await Promise.all([
-          supabase
-            .from("profiles")
-            .select("*")
-            .eq("status", true)
-            .or(`full_name.ilike.${searchTerm},matricula.ilike.${searchTerm}`)
-            .limit(5),
-          supabase
-            .from("noticias")
-            .select("*")
-            .neq("status", "arquivado")
-            .or(`titulo.ilike.${searchTerm},resumo.ilike.${searchTerm}`)
-            .limit(5),
-          supabase
-            .from("galeria_itens")
-            .select("*")
-            .eq("status", true)
-            .or(`titulo.ilike.${searchTerm},descricao.ilike.${searchTerm}`)
-            .limit(5),
-          supabase
-            .from("galeria_categorias")
-            .select("*")
-            .eq("status", true)
-            .or(`nome.ilike.${searchTerm},descricao.ilike.${searchTerm}`)
-            .limit(5),
-        ]);
-
-        // Os resultados da busca podem ser usados aqui se necessário
-        console.log("Resultados da busca:", {
-          agents: agents?.length || 0,
-          news: news?.length || 0,
-          galleryItems: galleryItems?.length || 0,
-          galleryCategories: galleryCategories?.length || 0,
-        });
-      } catch (error) {
-        console.error("Erro na busca:", error);
-      }
-    },
-    [supabase]
-  );
-
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.trim().length >= 2) {
-        setIsSearching(true);
-        try {
-          await performSearch(searchQuery);
-        } catch (error) {
-          console.error("Erro na busca:", error);
-        } finally {
-          setIsSearching(false);
-        }
-      }
-    }, 300);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, performSearch]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) {
-      setIsSearchOpen(false);
-      return;
-    }
-    setIsSearchOpen(true);
-  };
-
-  const clearSearch = () => {
-    setSearchQuery("");
-    setIsSearchOpen(false);
-  };
-
+  // Logout do sistema
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/login");
   };
 
-  // =============================================
-  // RENDER PRINCIPAL
-  // =============================================
-
   return (
     <>
       <header className="flex-shrink-0 border-b border-gray-200 bg-white shadow-sm">
         <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
-          {/* Lado Esquerdo - Menu Mobile e Busca */}
-          <div className="flex items-center space-x-4" ref={searchAreaRef}>
-            {/* Menu Mobile */}
+          {/* Menu Mobile e Busca */}
+          <div className="flex items-center space-x-4">
+            {/* Menu Mobile (Hambúrguer) */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="lg:hidden text-gray-500 hover:text-gray-700"
+                  aria-label="Abrir menu"
                 >
                   <RiMenuLine className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-80 p-0 bg-white">
-                <SheetHeader className="sr-only">
-                  <SheetTitle>Menu de Navegação</SheetTitle>
-                </SheetHeader>
-
                 <button
                   type="button"
                   className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary z-50 bg-white/80 backdrop-blur-sm p-1.5"
-                  onClick={() =>
-                    document
-                      .querySelector('[data-state="open"]')
-                      ?.dispatchEvent(
-                        new KeyboardEvent("keydown", { key: "Escape" })
-                      )
-                  }
+                  onClick={() => {
+                    const openSheet = document.querySelector(
+                      '[data-state="open"]'
+                    ) as HTMLElement;
+                    openSheet?.click();
+                  }}
+                  aria-label="Fechar menu"
                 >
                   <RiCloseLine className="h-2 w-2 text-gray-600" />
-                  <span className="sr-only">Fechar menu</span>
                 </button>
-
                 <PatrulhaAereaCivilHeader />
                 <MobileSidebar />
               </SheetContent>
             </Sheet>
 
-            {/* Sistema de Busca */}
-            <form onSubmit={handleSearch} className="relative">
-              <div className="relative">
-                <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <input
-                  ref={searchInputRef}
-                  type="search"
-                  placeholder="Buscar agentes, notícias, galeria..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    if (e.target.value.trim().length >= 2)
-                      setIsSearchOpen(true);
-                  }}
-                  onFocus={() =>
-                    searchQuery.trim().length >= 2 && setIsSearchOpen(true)
-                  }
-                  className="pl-10 pr-10 w-64 lg:w-80 border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg h-10 px-3 py-2 text-sm"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={clearSearch}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <RiCloseLine className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </form>
+            {/* Sistema de Busca - NOVO COMPONENTE */}
+            <SearchComponent />
           </div>
 
-          {/* Lado Direito - Ações e Perfil */}
+          {/* Ações e Perfil */}
           <div className="flex items-center space-x-3">
             {/* Link para Site Público */}
             <Button
@@ -816,7 +626,7 @@ export function AdminHeader() {
               asChild
               className="text-gray-600 hover:text-blue-600 border-gray-300 hover:border-blue-600 hidden sm:flex"
             >
-              <Link href="/" target="_blank">
+              <Link href="/" target="_blank" rel="noopener noreferrer">
                 <RiGlobalLine className="h-4 w-4 mr-2" />
                 Ver Site
               </Link>
@@ -829,6 +639,9 @@ export function AdminHeader() {
                   variant="ghost"
                   size="sm"
                   className="relative text-gray-500 hover:text-gray-700"
+                  aria-label={`Notificações ${
+                    unreadCount > 0 ? `(${unreadCount} não lidas)` : ""
+                  }`}
                 >
                   <RiNotificationLine className="h-5 w-5" />
                   {unreadCount > 0 && (
@@ -910,6 +723,7 @@ export function AdminHeader() {
                   variant="ghost"
                   size="sm"
                   className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 p-2"
+                  aria-label="Menu do usuário"
                 >
                   {loading ? (
                     <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
@@ -917,7 +731,7 @@ export function AdminHeader() {
                     <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-gray-200">
                       <Image
                         src={userProfile.avatar_url}
-                        alt={userProfile.full_name}
+                        alt={userProfile.full_name || "Usuário"}
                         width={32}
                         height={32}
                         className="w-full h-full object-cover"
@@ -925,14 +739,12 @@ export function AdminHeader() {
                     </div>
                   ) : (
                     <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm">
-                      {userProfile
-                        ? userProfile.full_name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .toUpperCase()
-                            .substring(0, 2)
-                        : "A"}
+                      {userProfile?.full_name
+                        ?.split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                        .substring(0, 2) || "A"}
                     </div>
                   )}
                 </Button>
@@ -941,7 +753,7 @@ export function AdminHeader() {
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium">
-                      {userProfile?.full_name}
+                      {userProfile?.full_name || "Usuário"}
                     </p>
                     <p className="text-xs text-gray-500 capitalize">
                       {userProfile?.role}
@@ -969,49 +781,6 @@ export function AdminHeader() {
           </div>
         </div>
       </header>
-
-      {/* Modal de Busca */}
-      <Dialog open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden p-0 bg-white">
-          <DialogHeader className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-navy-700 to-navy-900">
-            <DialogTitle className="flex items-center gap-2 text-white">
-              <RiSearchLine className="w-5 h-5 text-white" />
-              Resultados da Busca
-              {isSearching && (
-                <RiLoaderLine className="w-4 h-4 animate-spin ml-2 text-white" />
-              )}
-            </DialogTitle>
-            <DialogDescription className="text-blue-200 mt-1">
-              Resultados da busca por &quot;{searchQuery}&quot;
-            </DialogDescription>
-            <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-              <RiCloseLine className="h-5 w-5 text-white hover:text-gray-200" />
-              <span className="sr-only">Fechar</span>
-            </DialogClose>
-          </DialogHeader>
-          <div className="px-6 py-4 bg-white">
-            <div className="relative mb-4">
-              <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="search"
-                placeholder="Continue buscando..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg h-10 px-3 py-2 text-sm bg-white"
-                autoFocus
-              />
-            </div>
-            {/* Área para exibir resultados da busca quando implementado */}
-            <div className="text-center py-8 text-gray-500">
-              <RiSearchLine className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>Digite pelo menos 2 caracteres para buscar</p>
-              <p className="text-sm text-gray-400 mt-2">
-                A funcionalidade de busca está em desenvolvimento
-              </p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

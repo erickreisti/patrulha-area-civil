@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin-client";
-import { SEGURANCA } from "@/lib/security-config";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { SEGURANCA } from "@/utils/security-config";
 
 export async function POST(request: NextRequest) {
   try {

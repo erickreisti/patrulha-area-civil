@@ -19,15 +19,15 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 
-// Interface para notícias
+// Interface para notícias - ACEITAR null
 interface Noticia {
   id: string;
   titulo: string;
   slug: string;
-  resumo?: string;
-  categoria?: string;
+  resumo: string | null;
+  categoria: string | null;
   data_publicacao: string;
   status: string;
 }

@@ -1,8 +1,8 @@
-// src/app/(app)/admin/noticias/page.tsx - VERSÃO MELHORADA
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,17 +39,20 @@ import {
   RiImageLine,
   RiExternalLinkLine,
 } from "react-icons/ri";
-import { NoticiaWithAutor, NoticiaStatus } from "@/types";
 
-const CATEGORIAS = [
-  "Operações",
-  "Treinamento",
-  "Cooperação",
-  "Projetos Sociais",
-  "Equipamentos",
-  "Eventos",
-  "Comunicação",
-];
+// Tipos do Supabase
+import type { Database } from "@/lib/supabase/types";
+type NoticiaRow = Database["public"]["Tables"]["noticias"]["Row"];
+type NoticiaStatus = NoticiaRow["status"];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+
+interface NoticiaWithAutor extends Omit<NoticiaRow, "autor_id"> {
+  autor?: {
+    full_name: ProfileRow["full_name"];
+    graduacao: ProfileRow["graduacao"];
+    avatar_url: ProfileRow["avatar_url"];
+  } | null;
+}
 
 interface StatCardProps {
   title: string;
@@ -126,7 +129,6 @@ const StatCard = ({
   );
 };
 
-// Componente de placeholder para imagem
 const ImageWithFallback = ({
   src,
   alt,
@@ -166,6 +168,16 @@ const ImageWithFallback = ({
   );
 };
 
+const CATEGORIAS = [
+  "Operações",
+  "Treinamento",
+  "Cooperação",
+  "Projetos Sociais",
+  "Equipamentos",
+  "Eventos",
+  "Comunicação",
+];
+
 export default function NoticiasPage() {
   const [noticias, setNoticias] = useState<NoticiaWithAutor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -180,6 +192,7 @@ export default function NoticiasPage() {
   >("all");
 
   const supabase = createClient();
+  const adminClient = createAdminClient();
 
   const fetchNoticias = useCallback(async () => {
     try {
@@ -187,12 +200,15 @@ export default function NoticiasPage() {
       setRefreshing(true);
       console.log("🔄 Buscando notícias do banco...");
 
-      const { data, error } = await supabase
+      // Usar adminClient para bypass RLS se necessário
+      const client = adminClient || supabase;
+
+      const { data, error } = await client
         .from("noticias")
         .select(
           `
           *,
-          autor:profiles(full_name, graduacao)
+          autor:profiles!noticias_autor_id_fkey(full_name, graduacao, avatar_url)
         `
         )
         .order("created_at", { ascending: false });
@@ -211,7 +227,7 @@ export default function NoticiasPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [supabase]);
+  }, [supabase, adminClient]);
 
   useEffect(() => {
     fetchNoticias();
@@ -220,8 +236,10 @@ export default function NoticiasPage() {
   const filteredNoticias = noticias.filter((noticia) => {
     const matchesSearch =
       noticia.titulo.toLowerCase().includes(search.toLowerCase()) ||
-      noticia.resumo?.toLowerCase().includes(search.toLowerCase()) ||
-      noticia.conteudo?.toLowerCase().includes(search.toLowerCase());
+      (noticia.resumo &&
+        noticia.resumo.toLowerCase().includes(search.toLowerCase())) ||
+      (noticia.conteudo &&
+        noticia.conteudo.toLowerCase().includes(search.toLowerCase()));
 
     const matchesStatus =
       filterStatus === "all" || noticia.status === filterStatus;
@@ -251,7 +269,8 @@ export default function NoticiasPage() {
         newStatus = "publicado";
       }
 
-      const { error } = await supabase
+      const client = adminClient || supabase;
+      const { error } = await client
         .from("noticias")
         .update({
           status: newStatus,
@@ -285,7 +304,8 @@ export default function NoticiasPage() {
     currentDestaque: boolean
   ) => {
     try {
-      const { error } = await supabase
+      const client = adminClient || supabase;
+      const { error } = await client
         .from("noticias")
         .update({
           destaque: !currentDestaque,
@@ -326,7 +346,8 @@ export default function NoticiasPage() {
     }
 
     try {
-      const { error } = await supabase
+      const client = adminClient || supabase;
+      const { error } = await client
         .from("noticias")
         .delete()
         .eq("id", noticiaId);
@@ -395,7 +416,7 @@ export default function NoticiasPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
       <div className="container mx-auto px-4">
-        {/* Header - TÍTULO E DESCRIÇÃO */}
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -410,7 +431,7 @@ export default function NoticiasPage() {
           </p>
         </motion.div>
 
-        {/* ✅ BOTÕES ABAIXO DO HEADER */}
+        {/* Botões */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

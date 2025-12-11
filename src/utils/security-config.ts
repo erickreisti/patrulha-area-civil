@@ -1,4 +1,3 @@
-// src/lib/security-config.ts
 export const SEGURANCA = {
   SENHA_PADRAO: "PAC@2025!Secure",
   TENTATIVAS_MAXIMAS: 5,
@@ -9,7 +8,6 @@ export const SEGURANCA = {
   REQUIRE_EMAIL_CONFIRMATION: true,
 } as const;
 
-// Funções de segurança
 export const validarSenha = (
   password: string
 ): { isValid: boolean; message?: string } => {
@@ -31,22 +29,14 @@ export const validarSenha = (
   return { isValid: true };
 };
 
-// Para uso futuro em rotinas de admin
 export const rotacionarSenhaPadrao = async (
   novaSenha: string
 ): Promise<boolean> => {
-  // Validação rigorosa da nova senha
   const validacao = validarSenha(novaSenha);
   if (!validacao.isValid) {
     throw new Error(validacao.message || "Senha inválida");
   }
 
-  // Aqui você implementaria a lógica para atualizar
-  // todas as senhas no Supabase Auth
   console.log(`[ADMIN] Senha padrão rotacionada para: ${novaSenha}`);
-
-  // Implementação futura:
-  // return await atualizarSenhasEmMassa(novaSenha);
-
   return true;
 };

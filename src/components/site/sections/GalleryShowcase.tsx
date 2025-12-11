@@ -14,14 +14,14 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 
-// Interface para categorias da galeria
+// Interface para categorias da galeria - ACEITAR null
 interface CategoriaGaleria {
   id: string;
   nome: string;
   slug: string;
-  descricao?: string;
+  descricao: string | null;
   tipo: "fotos" | "videos";
   ordem: number;
   status: boolean;

@@ -1,11 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
-import type { Database } from "@/lib/supabase/types";
-
-type NotificationInsert =
-  Database["public"]["Tables"]["notifications"]["Insert"];
-type NotificationType =
-  Database["public"]["Tables"]["notifications"]["Row"]["type"];
-type Json = Database["public"]["Tables"]["notifications"]["Row"]["metadata"];
+import type {
+  NotificationInsert,
+  NotificationType,
+  NotificationRow,
+} from "@/lib/supabase/types-helpers";
+import { toJsonValue } from "@/lib/supabase/types-helpers";
 
 export interface CreateNotificationParams {
   user_id: string;
@@ -20,7 +19,9 @@ export interface CreateNotificationParams {
 export class NotificationService {
   private static supabase = createClient();
 
-  static async createNotification(params: CreateNotificationParams) {
+  static async createNotification(
+    params: CreateNotificationParams
+  ): Promise<NotificationRow | null> {
     try {
       const notificationData: NotificationInsert = {
         user_id: params.user_id,
@@ -29,7 +30,7 @@ export class NotificationService {
         message: params.message,
         action_url: params.action_url || null,
         is_read: false,
-        metadata: params.metadata as Json,
+        metadata: toJsonValue(params.metadata),
         expires_at: params.expires_at?.toISOString() || null,
       };
 
@@ -43,11 +44,13 @@ export class NotificationService {
       return data;
     } catch (error) {
       console.error("Erro ao criar notificação:", error);
-      throw error;
+      return null;
     }
   }
 
-  static async notifyAdmins(params: Omit<CreateNotificationParams, "user_id">) {
+  static async notifyAdmins(
+    params: Omit<CreateNotificationParams, "user_id">
+  ): Promise<NotificationRow[] | null> {
     try {
       const { data: admins, error: adminsError } = await this.supabase
         .from("profiles")
@@ -57,12 +60,19 @@ export class NotificationService {
 
       if (adminsError) throw adminsError;
 
+      if (!admins || admins.length === 0) {
+        return [];
+      }
+
       const notifications = admins.map((admin) => ({
-        ...params,
         user_id: admin.id,
+        type: params.type,
+        title: params.title,
+        message: params.message,
         action_url: params.action_url || null,
+        metadata: toJsonValue(params.metadata),
+        is_read: false,
         expires_at: params.expires_at?.toISOString() || null,
-        metadata: params.metadata as Json,
       }));
 
       const { data, error } = await this.supabase
@@ -74,14 +84,14 @@ export class NotificationService {
       return data;
     } catch (error) {
       console.error("Erro ao notificar administradores:", error);
-      throw error;
+      return null;
     }
   }
 
   static async notifyUser(
     userId: string,
     params: Omit<CreateNotificationParams, "user_id">
-  ) {
+  ): Promise<NotificationRow | null> {
     return this.createNotification({
       ...params,
       user_id: userId,
@@ -91,7 +101,7 @@ export class NotificationService {
   static async systemNotification(
     message: string,
     metadata?: Record<string, unknown>
-  ) {
+  ): Promise<NotificationRow | null> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -107,7 +117,10 @@ export class NotificationService {
     });
   }
 
-  static async getUserNotifications(userId: string, limit: number = 20) {
+  static async getUserNotifications(
+    userId: string,
+    limit: number = 20
+  ): Promise<NotificationRow[]> {
     try {
       const { data, error } = await this.supabase
         .from("notifications")
@@ -117,14 +130,14 @@ export class NotificationService {
         .limit(limit);
 
       if (error) throw error;
-      return data;
+      return data || [];
     } catch (error) {
       console.error("Erro ao buscar notificações do usuário:", error);
-      throw error;
+      return [];
     }
   }
 
-  static async markAsRead(notificationId: string) {
+  static async markAsRead(notificationId: string): Promise<boolean> {
     try {
       const { error } = await this.supabase
         .from("notifications")
@@ -138,11 +151,11 @@ export class NotificationService {
       return true;
     } catch (error) {
       console.error("Erro ao marcar notificação como lida:", error);
-      throw error;
+      return false;
     }
   }
 
-  static async markAllAsRead(userId: string) {
+  static async markAllAsRead(userId: string): Promise<boolean> {
     try {
       const { error } = await this.supabase
         .from("notifications")
@@ -157,11 +170,11 @@ export class NotificationService {
       return true;
     } catch (error) {
       console.error("Erro ao marcar todas as notificações como lidas:", error);
-      throw error;
+      return false;
     }
   }
 
-  static async deleteNotification(notificationId: string) {
+  static async deleteNotification(notificationId: string): Promise<boolean> {
     try {
       const { error } = await this.supabase
         .from("notifications")
@@ -172,11 +185,11 @@ export class NotificationService {
       return true;
     } catch (error) {
       console.error("Erro ao excluir notificação:", error);
-      throw error;
+      return false;
     }
   }
 
-  static async getUnreadCount(userId: string) {
+  static async getUnreadCount(userId: string): Promise<number> {
     try {
       const { count, error } = await this.supabase
         .from("notifications")
@@ -188,11 +201,11 @@ export class NotificationService {
       return count || 0;
     } catch (error) {
       console.error("Erro ao contar notificações não lidas:", error);
-      throw error;
+      return 0;
     }
   }
 
-  static async cleanupExpiredNotifications() {
+  static async cleanupExpiredNotifications(): Promise<boolean> {
     try {
       const { error } = await this.supabase
         .from("notifications")
@@ -203,7 +216,7 @@ export class NotificationService {
       return true;
     } catch (error) {
       console.error("Erro ao limpar notificações expiradas:", error);
-      throw error;
+      return false;
     }
   }
 }

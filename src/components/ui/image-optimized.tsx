@@ -1,6 +1,6 @@
 // src/components/ui/optimized-image.tsx
 import Image, { ImageProps } from "next/image";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 
 interface OptimizedImageProps extends Omit<ImageProps, "src" | "alt"> {
   src: string;

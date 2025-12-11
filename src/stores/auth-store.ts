@@ -1,17 +1,17 @@
 import { create } from "zustand";
 import { createClient } from "@/lib/supabase/client";
 import { persist } from "zustand/middleware";
-import { AuthUser, UserProfile } from "@/types";
+import type { ProfileRow, AuthUser } from "@/lib/supabase/types-helpers";
 
 interface AuthState {
   user: AuthUser | null;
-  profile: UserProfile | null;
+  profile: ProfileRow | null;
   isAdmin: boolean;
   loading: boolean;
   initialized: boolean;
 
   initializeAuth: () => Promise<void>;
-  setAuth: (user: AuthUser, profile: UserProfile) => void;
+  setAuth: (user: AuthUser, profile: ProfileRow) => void;
   clearAuth: () => void;
   setLoading: (loading: boolean) => void;
   refreshProfile: () => Promise<void>;
@@ -62,7 +62,7 @@ export const useAuthStore = create<AuthState>()(
               set({
                 user: { id: user.id, email: user.email },
                 profile,
-                isAdmin: profile.role?.toLowerCase().trim() === "admin",
+                isAdmin: profile.role === "admin",
                 loading: false,
                 initialized: true,
               });
@@ -89,11 +89,11 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      setAuth: (user: AuthUser, profile: UserProfile) => {
+      setAuth: (user: AuthUser, profile: ProfileRow) => {
         set({
           user,
           profile,
-          isAdmin: profile.role?.toLowerCase().trim() === "admin",
+          isAdmin: profile.role === "admin",
           loading: false,
         });
       },
@@ -126,7 +126,7 @@ export const useAuthStore = create<AuthState>()(
           if (profile) {
             set({
               profile,
-              isAdmin: profile.role?.toLowerCase().trim() === "admin",
+              isAdmin: profile.role === "admin",
             });
           }
         } catch (error) {

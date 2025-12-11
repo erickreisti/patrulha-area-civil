@@ -20,7 +20,7 @@ import {
 } from "react-icons/ri";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/utils";
 
 type IconType = React.ComponentType<{ className?: string }>;
 

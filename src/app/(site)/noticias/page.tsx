@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -48,35 +48,31 @@ import type { IconType } from "react-icons";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
-import { NoticiaWithAutor } from "@/types";
-import { Database } from "@/lib/supabase/client";
+import { useNoticiasStore, NoticiaWithAutor } from "@/stores/useNoticiasStore";
 
 // ==================== CONFIGURAÇÕES ====================
 const ITEMS_PER_PAGE_OPTIONS = [6, 10, 20, 30, 50];
-const DEFAULT_ITEMS_PER_PAGE = 10;
 
 // ==================== COMPONENTE PRINCIPAL ====================
 export default function NoticiasPage() {
-  const [noticias, setNoticias] = useState<NoticiaWithAutor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(DEFAULT_ITEMS_PER_PAGE);
-  const [sortBy, setSortBy] = useState<"recent" | "oldest" | "destaque">(
-    "recent"
-  );
-  const [totalCount, setTotalCount] = useState(0);
-  const [categories, setCategories] = useState<
+  const {
+    noticias,
+    loadingLista: loading,
+    filtros,
+    totalCount,
+    categoriasDisponiveis,
+    fetchNoticias,
+    fetchCategorias,
+    setSearchTerm,
+    setCategoria,
+    setSortBy,
+    setItemsPerPage,
+    setCurrentPage,
+  } = useNoticiasStore();
+
+  const [localCategories, setLocalCategories] = useState<
     Array<{ value: string; label: string; icon: IconType }>
   >([{ value: "all", label: "Todas as Categorias", icon: RiStackLine }]);
-
-  // 🔥 CLIENTE SUPABASE COM INICIALIZAÇÃO SEGURA
-  const supabase = useMemo(() => {
-    if (typeof window === "undefined") return null;
-    return createClient();
-  }, []);
 
   // 🔥 HOOK PARA PREVENIR LOCK DE SCROLL DO RADIX UI
   useEffect(() => {
@@ -118,148 +114,41 @@ export default function NoticiasPage() {
     return cleanup;
   }, []);
 
-  // Buscar categorias únicas
-  const fetchCategories = useCallback(async () => {
-    if (!supabase) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("noticias")
-        .select("categoria")
-        .not("categoria", "is", null);
-
-      if (error) throw error;
-
-      const uniqueCategories = Array.from(
-        new Set(
-          data
-            ?.map(
-              (n: Database["public"]["Tables"]["noticias"]["Row"]) =>
-                n.categoria
-            )
-            .filter(Boolean) as string[]
-        )
-      ).map((cat) => ({
-        value: cat,
-        label: cat,
-        icon: RiNewspaperLine,
-      }));
-
-      setCategories([
-        { value: "all", label: "Todas as Categorias", icon: RiStackLine },
-        ...uniqueCategories,
-      ]);
-    } catch (error) {
-      console.error("Erro ao buscar categorias:", error);
-    }
-  }, [supabase]);
-
-  // Buscar notícias com paginação
-  const fetchNoticias = useCallback(async () => {
-    if (!supabase) return;
-
-    try {
-      setLoading(true);
-
-      const from = (currentPage - 1) * itemsPerPage;
-      const to = from + itemsPerPage - 1;
-
-      let query = supabase
-        .from("noticias")
-        .select(
-          `
-          *,
-          autor:profiles(full_name, graduacao, avatar_url)
-        `,
-          { count: "exact" }
-        )
-        .range(from, to);
-
-      if (selectedCategory !== "all") {
-        query = query.eq("categoria", selectedCategory);
-      }
-
-      if (searchTerm.trim()) {
-        query = query.or(
-          `titulo.ilike.%${searchTerm}%,resumo.ilike.%${searchTerm}%,conteudo.ilike.%${searchTerm}%`
-        );
-      }
-
-      // Apenas notícias publicadas para usuários públicos
-      query = query.eq("status", "publicado");
-
-      switch (sortBy) {
-        case "recent":
-          query = query.order("data_publicacao", { ascending: false });
-          break;
-        case "oldest":
-          query = query.order("data_publicacao", { ascending: true });
-          break;
-        case "destaque":
-          query = query
-            .order("destaque", { ascending: false })
-            .order("data_publicacao", { ascending: false });
-          break;
-      }
-
-      const { data: noticiasData, error, count } = await query;
-
-      if (error) {
-        console.error("Erro ao buscar notícias:", error);
-        throw error;
-      }
-
-      setNoticias((noticiasData as NoticiaWithAutor[]) || []);
-      setTotalCount(count || 0);
-    } catch (error) {
-      console.error("Erro ao buscar notícias:", error);
-      setNoticias([]);
-      setTotalCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [
-    supabase,
-    currentPage,
-    itemsPerPage,
-    selectedCategory,
-    searchTerm,
-    sortBy,
-  ]);
-
   // Inicialização
   useEffect(() => {
-    if (supabase) {
-      fetchCategories();
-      fetchNoticias();
+    fetchCategorias();
+    fetchNoticias();
+  }, [fetchCategorias, fetchNoticias]);
+
+  // Atualizar categorias locais - CORRIGIDO: Move para dentro de um useEffect separado
+  useEffect(() => {
+    if (categoriasDisponiveis.length > 0) {
+      const mappedCategories = categoriasDisponiveis.map((cat) => ({
+        value: cat.value,
+        label: cat.label,
+        icon: RiNewspaperLine,
+      }));
+      // Use requestAnimationFrame para evitar setState síncrono
+      requestAnimationFrame(() => {
+        setLocalCategories([
+          { value: "all", label: "Todas as Categorias", icon: RiStackLine },
+          ...mappedCategories,
+        ]);
+      });
     }
-  }, [supabase, fetchCategories, fetchNoticias]);
+  }, [categoriasDisponiveis]);
 
   // Debounce para busca
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (supabase) {
-        if (currentPage !== 1) {
-          setCurrentPage(1);
-        } else {
-          fetchNoticias();
-        }
-      }
+      fetchNoticias();
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [
-    searchTerm,
-    selectedCategory,
-    sortBy,
-    itemsPerPage,
-    currentPage,
-    supabase,
-    fetchNoticias,
-  ]);
+  }, [filtros, fetchNoticias]);
 
   // Calcular total de páginas
-  const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
+  const totalPages = Math.max(1, Math.ceil(totalCount / filtros.itemsPerPage));
 
   // Função para formatar nome do autor
   const formatAuthorName = (name?: string) => {
@@ -298,7 +187,7 @@ export default function NoticiasPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {Array.from({ length: DEFAULT_ITEMS_PER_PAGE }).map((_, i) => (
+            {Array.from({ length: filtros.itemsPerPage }).map((_, i) => (
               <Card key={i} className="border-0 shadow-lg">
                 <CardHeader className="pb-3 sm:pb-4">
                   <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
@@ -397,10 +286,9 @@ export default function NoticiasPage() {
                 <Input
                   type="text"
                   placeholder="Buscar em notícias..."
-                  value={searchTerm}
+                  value={filtros.searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
-                    setCurrentPage(1);
                   }}
                   className="pl-9 sm:pl-12 pr-4 py-2.5 sm:py-3 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl transition-all duration-300 bg-white/50 backdrop-blur-sm text-sm sm:text-base"
                 />
@@ -411,10 +299,9 @@ export default function NoticiasPage() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
               {/* Category Filter */}
               <Select
-                value={selectedCategory}
+                value={filtros.categoria}
                 onValueChange={(value) => {
-                  setSelectedCategory(value);
-                  setCurrentPage(1);
+                  setCategoria(value);
                 }}
               >
                 <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
@@ -422,7 +309,7 @@ export default function NoticiasPage() {
                   <SelectValue placeholder="Filtrar por categoria" />
                 </SelectTrigger>
                 <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
-                  {categories.map((category) => {
+                  {localCategories.map((category) => {
                     const Icon = category.icon;
                     return (
                       <SelectItem
@@ -442,7 +329,7 @@ export default function NoticiasPage() {
 
               {/* Sort */}
               <Select
-                value={sortBy}
+                value={filtros.sortBy}
                 onValueChange={(value: "recent" | "oldest" | "destaque") =>
                   setSortBy(value)
                 }
@@ -460,10 +347,9 @@ export default function NoticiasPage() {
 
               {/* Items per Page */}
               <Select
-                value={itemsPerPage.toString()}
+                value={filtros.itemsPerPage.toString()}
                 onValueChange={(value) => {
                   setItemsPerPage(Number(value));
-                  setCurrentPage(1);
                 }}
               >
                 <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
@@ -492,19 +378,21 @@ export default function NoticiasPage() {
                 {totalCount} NOTÍCIAS ENCONTRADAS
               </h2>
               <p className="text-slate-600 mt-1 text-sm sm:text-base">
-                {searchTerm && `Buscando por: "${searchTerm}"`}
-                {selectedCategory !== "all" &&
+                {filtros.searchTerm && `Buscando por: "${filtros.searchTerm}"`}
+                {filtros.categoria !== "all" &&
                   ` • Categoria: ${
-                    categories.find((c) => c.value === selectedCategory)?.label
+                    localCategories.find((c) => c.value === filtros.categoria)
+                      ?.label
                   }`}
               </p>
             </div>
 
             {noticias.length > 0 && (
               <div className="text-xs sm:text-sm text-slate-500">
-                Página {currentPage} de {totalPages} • {totalCount} resultados
+                Página {filtros.currentPage} de {totalPages} • {totalCount}{" "}
+                resultados
                 <span className="ml-2 font-medium">
-                  • {itemsPerPage} por página
+                  • {filtros.itemsPerPage} por página
                 </span>
               </div>
             )}
@@ -514,7 +402,7 @@ export default function NoticiasPage() {
           <AnimatePresence mode="wait">
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                {Array.from({ length: itemsPerPage }).map((_, i) => (
+                {Array.from({ length: filtros.itemsPerPage }).map((_, i) => (
                   <Card key={i} className="border-0 shadow-lg">
                     <CardHeader className="pb-3 sm:pb-4">
                       <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
@@ -529,7 +417,7 @@ export default function NoticiasPage() {
               </div>
             ) : noticias.length > 0 ? (
               <motion.div
-                key={`grid-${currentPage}-${selectedCategory}-${searchTerm}-${itemsPerPage}`}
+                key={`grid-${filtros.currentPage}-${filtros.categoria}-${filtros.searchTerm}-${filtros.itemsPerPage}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -563,7 +451,7 @@ export default function NoticiasPage() {
                   Nenhuma notícia encontrada
                 </h3>
                 <p className="text-slate-500 max-w-md mx-auto text-sm sm:text-base px-4">
-                  {searchTerm || selectedCategory !== "all"
+                  {filtros.searchTerm || filtros.categoria !== "all"
                     ? "Tente ajustar os filtros ou termos de busca."
                     : "Ainda não há notícias publicadas. Volte em breve!"}
                 </p>
@@ -578,10 +466,12 @@ export default function NoticiasPage() {
                 <PaginationItem>
                   <PaginationPrevious
                     onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
+                      setCurrentPage(Math.max(filtros.currentPage - 1, 1))
                     }
                     className={
-                      currentPage === 1 ? "pointer-events-none opacity-50" : ""
+                      filtros.currentPage === 1
+                        ? "pointer-events-none opacity-50"
+                        : ""
                     }
                   />
                 </PaginationItem>
@@ -590,14 +480,14 @@ export default function NoticiasPage() {
                 <PaginationItem>
                   <PaginationLink
                     onClick={() => setCurrentPage(1)}
-                    isActive={currentPage === 1}
+                    isActive={filtros.currentPage === 1}
                   >
                     1
                   </PaginationLink>
                 </PaginationItem>
 
                 {/* Elipsis após primeira página */}
-                {currentPage > 3 && (
+                {filtros.currentPage > 3 && (
                   <PaginationItem>
                     <PaginationEllipsis />
                   </PaginationItem>
@@ -606,12 +496,12 @@ export default function NoticiasPage() {
                 {/* Páginas do meio */}
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .filter((page) => page > 1 && page < totalPages)
-                  .filter((page) => Math.abs(page - currentPage) <= 1)
+                  .filter((page) => Math.abs(page - filtros.currentPage) <= 1)
                   .map((page) => (
                     <PaginationItem key={page}>
                       <PaginationLink
                         onClick={() => setCurrentPage(page)}
-                        isActive={currentPage === page}
+                        isActive={filtros.currentPage === page}
                       >
                         {page}
                       </PaginationLink>
@@ -619,7 +509,7 @@ export default function NoticiasPage() {
                   ))}
 
                 {/* Elipsis antes da última página */}
-                {currentPage < totalPages - 2 && (
+                {filtros.currentPage < totalPages - 2 && (
                   <PaginationItem>
                     <PaginationEllipsis />
                   </PaginationItem>
@@ -630,7 +520,7 @@ export default function NoticiasPage() {
                   <PaginationItem>
                     <PaginationLink
                       onClick={() => setCurrentPage(totalPages)}
-                      isActive={currentPage === totalPages}
+                      isActive={filtros.currentPage === totalPages}
                     >
                       {totalPages}
                     </PaginationLink>
@@ -640,10 +530,12 @@ export default function NoticiasPage() {
                 <PaginationItem>
                   <PaginationNext
                     onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      setCurrentPage(
+                        Math.min(filtros.currentPage + 1, totalPages)
+                      )
                     }
                     className={
-                      currentPage === totalPages
+                      filtros.currentPage === totalPages
                         ? "pointer-events-none opacity-50"
                         : ""
                     }

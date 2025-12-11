@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin-client";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { toJsonValue } from "@/lib/supabase/types-helpers"; // Importar a função já existente
 
 interface UpdateUserBody {
   userId: string;
@@ -20,6 +21,7 @@ interface AuthUpdateData {
   [key: string]: unknown;
 }
 
+// Interface corrigida - remova a propriedade 'status' ou ajuste para boolean | null
 interface ProfileUpdateData {
   email?: string;
   full_name?: string;
@@ -27,8 +29,6 @@ interface ProfileUpdateData {
   tipo_sanguineo?: string | null;
   validade_certificacao?: string | null;
   avatar_url?: string | null;
-  status?: boolean | null;
-  role?: string | null;
   updated_at: string;
   [key: string]: unknown;
 }
@@ -190,34 +190,20 @@ export async function POST(request: NextRequest) {
 
     // Adicionar outros campos do metadata que correspondem ao schema do profile
     if (metadata) {
-      // Campos permitidos no profile (baseado no schema)
+      // Campos permitidos no profile (baseado no schema) - removido 'status' e 'role'
       const allowedProfileFields = [
         "graduacao",
         "tipo_sanguineo",
         "validade_certificacao",
         "avatar_url",
-        "status",
-        "role",
       ] as const;
 
       allowedProfileFields.forEach((field) => {
         const value = metadata[field];
         if (value !== undefined) {
           // Type-safe assignment - agora aceita null
-          if (
-            (field === "graduacao" ||
-              field === "tipo_sanguineo" ||
-              field === "validade_certificacao" ||
-              field === "avatar_url" ||
-              field === "role") &&
-            (typeof value === "string" || value === null)
-          ) {
+          if (typeof value === "string" || value === null) {
             profileUpdateData[field] = value as string | null;
-          } else if (
-            field === "status" &&
-            (typeof value === "boolean" || value === null)
-          ) {
-            profileUpdateData[field] = value as boolean | null;
           }
         }
       });
@@ -290,6 +276,19 @@ export async function POST(request: NextRequest) {
         activityDescription.push(`metadados atualizados`);
       }
 
+      // Criar metadata para a atividade usando a função já existente
+      const activityMetadata = {
+        updated_by: currentUser.id,
+        updated_by_email: currentUser.email,
+        target_user_id: userId,
+        old_email: oldEmail,
+        new_email: newEmail,
+        full_name: fullName,
+        metadata_changes: metadata,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Usar toJsonValue que já existe no seu projeto
       await supabaseAdmin.from("system_activities").insert({
         user_id: currentUser.id,
         action_type: "user_update",
@@ -298,16 +297,8 @@ export async function POST(request: NextRequest) {
         )}`,
         resource_type: "profile",
         resource_id: userId,
-        metadata: {
-          updated_by: currentUser.id,
-          updated_by_email: currentUser.email,
-          target_user_id: userId,
-          old_email: oldEmail,
-          new_email: newEmail,
-          full_name: fullName,
-          metadata_changes: metadata,
-          timestamp: new Date().toISOString(),
-        },
+        metadata: toJsonValue(activityMetadata),
+        created_at: new Date().toISOString(),
       });
 
       console.log("📝 Atividade registrada no sistema");
@@ -487,28 +478,15 @@ export async function PATCH(request: NextRequest) {
         "tipo_sanguineo",
         "validade_certificacao",
         "avatar_url",
-        "status",
-        "role",
       ] as const;
 
       allowedProfileFields.forEach((field) => {
         const value = metadata[field];
-        if (value !== undefined) {
-          if (
-            (field === "graduacao" ||
-              field === "tipo_sanguineo" ||
-              field === "validade_certificacao" ||
-              field === "avatar_url" ||
-              field === "role") &&
-            (typeof value === "string" || value === null)
-          ) {
-            profileUpdateData[field] = value as string | null;
-          } else if (
-            field === "status" &&
-            (typeof value === "boolean" || value === null)
-          ) {
-            profileUpdateData[field] = value as boolean | null;
-          }
+        if (
+          value !== undefined &&
+          (typeof value === "string" || value === null)
+        ) {
+          profileUpdateData[field] = value as string | null;
         }
       });
     }
@@ -529,6 +507,30 @@ export async function PATCH(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    // Registrar atividade no sistema
+    try {
+      const activityMetadata = {
+        updated_by: user.id,
+        updated_by_email: user.email,
+        target_user_id: userId,
+        new_email: newEmail,
+        full_name: fullName,
+        timestamp: new Date().toISOString(),
+      };
+
+      await supabaseAdmin.from("system_activities").insert({
+        user_id: user.id,
+        action_type: "user_update",
+        description: `Usuário ${userId} atualizado via PATCH`,
+        resource_type: "profile",
+        resource_id: userId,
+        metadata: toJsonValue(activityMetadata),
+        created_at: new Date().toISOString(),
+      });
+    } catch (activityError) {
+      console.warn("⚠️ Não foi possível registrar atividade:", activityError);
     }
 
     return NextResponse.json({

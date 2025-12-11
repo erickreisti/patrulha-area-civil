@@ -1,4 +1,3 @@
-// src/lib/supabase/storage.ts - VERSÃO CORRIGIDA
 export const STORAGE_BUCKETS = {
   AVATARES: "avatares-agentes",
   NOTICIAS: "imagens-noticias",
@@ -9,7 +8,6 @@ export const STORAGE_BUCKETS = {
 
 export type StorageBucket = keyof typeof STORAGE_BUCKETS;
 
-// Usar tipos readonly com as const
 export const STORAGE_CONFIG = {
   MAX_FILE_SIZES: {
     AVATARES: 2 * 1024 * 1024, // 2MB
@@ -34,7 +32,6 @@ export const STORAGE_CONFIG = {
   },
 } as const;
 
-// Tipos para as configurações
 export type AllowedImageType =
   (typeof STORAGE_CONFIG.ALLOWED_TYPES.IMAGES)[number];
 export type AllowedVideoType =
@@ -42,7 +39,6 @@ export type AllowedVideoType =
 export type AllowedDocumentType =
   (typeof STORAGE_CONFIG.ALLOWED_TYPES.DOCUMENTS)[number];
 
-// Função auxiliar para validar uploads - CORRIGIDA
 export const validateUpload = (
   file: File,
   bucket: StorageBucket
@@ -56,7 +52,6 @@ export const validateUpload = (
     };
   }
 
-  // Validação de tipo baseada no bucket - CORRIGIDO
   let allowedTypes: readonly string[] = [];
   switch (bucket) {
     case "AVATARES":
