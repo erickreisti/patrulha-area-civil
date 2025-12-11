@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Roboto } from "next/font/google";
 import "./globals.css";
+import { ServiceWorkerInitializer } from "@/components/service-worker/ServiceWorkerInitializer";
+import { AuthInitializer } from "@/components/auth/AuthInitializer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -92,40 +94,7 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  verification: {
-    google: "verification_token",
-    yandex: "verification_token",
-    yahoo: "verification_token",
-  },
 };
-
-// Client component para gerenciar Service Worker
-function ServiceWorkerManager() {
-  const scriptContent = `
-    (function() {
-      // Remover qualquer Service Worker existente
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          console.log('Removendo', registrations.length, 'Service Workers...');
-          for (let registration of registrations) {
-            registration.unregister().then(function(success) {
-              if (success) {
-                console.log('Service Worker removido com sucesso');
-              }
-            });
-          }
-        });
-      }
-    })();
-  `;
-
-  return (
-    <script
-      dangerouslySetInnerHTML={{ __html: scriptContent }}
-      suppressHydrationWarning
-    />
-  );
-}
 
 export default function RootLayout({
   children,
@@ -139,22 +108,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        {/* Preconnect para melhor performance */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
           href="https://fonts.gstatic.com"
           crossOrigin="anonymous"
         />
-
-        {/* Remova todos os preloads para evitar warnings */}
-        {/* <link
-          rel="preload"
-          href="/images/site/hero-bg.webp"
-          as="image"
-          type="image/webp"
-          media="(min-width: 768px)"
-        /> */}
 
         {/* PWA meta tags */}
         <meta name="application-name" content="Patrulha Aérea Civil" />
@@ -177,6 +136,10 @@ export default function RootLayout({
           Pular para conteúdo principal
         </a>
 
+        {/* Inicializadores */}
+        <ServiceWorkerInitializer />
+        <AuthInitializer />
+
         <div className="flex flex-col min-h-screen">
           <main
             id="main-content"
@@ -186,9 +149,6 @@ export default function RootLayout({
             {children}
           </main>
         </div>
-
-        {/* Service Worker Manager - remove todos os service workers */}
-        <ServiceWorkerManager />
 
         {/* Feedback para JavaScript desabilitado */}
         <noscript>

@@ -19,7 +19,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/utils/utils";
+import { cn } from "@/lib/utils/utils";
 
 // Interface para notícias - ACEITAR null
 interface Noticia {

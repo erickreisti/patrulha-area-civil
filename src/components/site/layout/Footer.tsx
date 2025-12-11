@@ -18,7 +18,7 @@ import {
 import { motion } from "framer-motion";
 import { IconType } from "react-icons";
 import { useRef } from "react";
-import { cn } from "@/utils/utils";
+import { cn } from "@/lib/utils/utils";
 
 const SOCIAL_LINKS = [
   {

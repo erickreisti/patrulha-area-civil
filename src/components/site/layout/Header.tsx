@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/utils/utils";
+import { cn } from "@/lib/utils/utils";
 import { debounce } from "@/lib/debounce";
 import {
   RiFacebookFill,

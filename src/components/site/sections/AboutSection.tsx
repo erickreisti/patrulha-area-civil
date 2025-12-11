@@ -21,7 +21,7 @@ import { useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { useRef } from "react";
 import { OptimizedImage } from "@/components/ui/image-optimized";
-import { cn } from "@/utils/utils";
+import { cn } from "@/lib/utils/utils";
 
 const STATS = [
   { number: "500+", label: "jovens impactados", icon: RiUserLine },

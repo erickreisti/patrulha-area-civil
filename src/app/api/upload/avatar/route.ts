@@ -1,114 +1,131 @@
-// app/api/upload/avatar/route.ts
-import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api/middleware/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  handleApiError,
+  createSuccessResponse,
+  createValidationError,
+} from "@/lib/utils/error-handler";
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    const { user } = authResult;
+
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const userId = formData.get("userId") as string;
+    const userId = (formData.get("userId") as string) || user.id;
 
+    // Validações
     if (!file) {
+      return createValidationError("Nenhum arquivo enviado");
+    }
+
+    // Verificar se usuário tem permissão
+    if (user.role !== "admin" && userId !== user.id) {
       return NextResponse.json(
-        { error: "Nenhum arquivo enviado" },
-        { status: 400 }
+        { error: "Você só pode fazer upload do seu próprio avatar" },
+        { status: 403 }
       );
     }
 
-    // 🔒 Validações de segurança
+    // Validações do arquivo
     if (file.size > 2 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: "Arquivo muito grande. Máximo: 2MB" },
-        { status: 400 }
-      );
-    }
-
-    if (!file.type.startsWith("image/")) {
-      return NextResponse.json(
-        { error: "Apenas imagens são permitidas" },
-        { status: 400 }
-      );
+      // 2MB
+      return createValidationError("Arquivo muito grande. Máximo: 2MB");
     }
 
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Tipo de arquivo não permitido. Use JPEG, PNG, WEBP ou GIF" },
-        { status: 400 }
-      );
+      return createValidationError("Tipo de arquivo não permitido");
     }
 
-    const supabase = createAdminClient();
-    const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const fileName = `avatar_${userId || "user"}_${Date.now()}.${fileExt}`;
+    const supabaseAdmin = createAdminClient();
 
-    // Converter File para Buffer
+    // Gerar nome do arquivo
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const fileName = `${userId}/${Date.now()}.${fileExt}`;
+
+    // Converter para buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    console.log("🔄 Fazendo upload do avatar...", {
-      fileName,
-      size: file.size,
-      type: file.type,
-    });
-
-    // 🔒 Upload seguro com admin client
-    const { data, error } = await supabase.storage
+    // Upload para o storage
+    const { data, error } = await supabaseAdmin.storage
       .from("avatares-agentes")
       .upload(fileName, buffer, {
         upsert: true,
-        cacheControl: "3600",
         contentType: file.type,
+        cacheControl: "3600",
       });
 
     if (error) {
-      console.error("❌ Erro no upload:", error);
-      throw error;
+      throw new Error(`Erro no upload: ${error.message}`);
     }
 
     // Obter URL pública
     const {
       data: { publicUrl },
-    } = supabase.storage.from("avatares-agentes").getPublicUrl(data.path);
+    } = supabaseAdmin.storage.from("avatares-agentes").getPublicUrl(data.path);
 
-    console.log("✅ Upload realizado com sucesso:", publicUrl);
+    // Atualizar perfil do usuário com a nova URL
+    await supabaseAdmin
+      .from("profiles")
+      .update({
+        avatar_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
 
-    return NextResponse.json({
-      success: true,
-      url: publicUrl,
-      path: data.path,
-      fileName: fileName,
-    });
-  } catch (error: unknown) {
-    console.error("💥 Erro no upload de avatar:", error);
+    // Registrar atividade se for admin
+    if (user.role === "admin" && userId !== user.id) {
+      const { data: targetUser } = await supabaseAdmin
+        .from("profiles")
+        .select("email, full_name")
+        .eq("id", userId)
+        .single();
 
-    // Tratamento de erros específicos do Supabase
-    if (
-      error instanceof Error &&
-      error.message?.includes("The resource already exists")
-    ) {
-      return NextResponse.json(
-        { error: "Já existe um arquivo com este nome" },
-        { status: 409 }
-      );
+      await supabaseAdmin.from("system_activities").insert({
+        user_id: user.id,
+        action_type: "avatar_upload",
+        description: `Avatar do agente ${
+          targetUser?.full_name || targetUser?.email
+        } atualizado`,
+        resource_type: "profile",
+        resource_id: userId,
+        metadata: {
+          uploaded_by: user.id,
+          uploaded_by_email: user.email,
+          target_user_id: userId,
+          file_name: fileName,
+          file_size: file.size,
+        },
+      });
     }
 
-    if (
-      error instanceof Error &&
-      error.message?.includes("Payload too large")
-    ) {
-      return NextResponse.json(
-        { error: "Arquivo muito grande" },
-        { status: 413 }
-      );
-    }
-
-    return NextResponse.json(
+    return createSuccessResponse(
       {
-        error:
-          error instanceof Error ? error.message : "Erro interno no servidor",
+        url: publicUrl,
+        path: data.path,
+        file_name: fileName,
+        file_size: file.size,
       },
-      { status: 500 }
+      "Avatar atualizado com sucesso"
     );
+  } catch (error) {
+    return handleApiError(error);
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }

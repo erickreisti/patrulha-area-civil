@@ -1,159 +1,160 @@
-// app/api/upload/general/route.ts
-import { createAdminClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api/middleware/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  handleApiError,
+  createSuccessResponse,
+  createValidationError,
+} from "@/lib/utils/error-handler";
 
-// Interface para as configurações de upload
-interface UploadConfig {
-  bucket: string;
-  maxSize: number;
-  allowedTypes: string[];
-}
-
-// Configurações por tipo de upload
-const UPLOAD_CONFIGS: Record<string, UploadConfig> = {
-  image: {
+// Configurações por tipo de arquivo
+const UPLOAD_CONFIGS = {
+  news: {
     bucket: "imagens-noticias",
     maxSize: 5 * 1024 * 1024, // 5MB
-    allowedTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    allowedTypes: ["image/jpeg", "image/png", "image/webp"],
+  },
+  gallery: {
+    bucket: "galeria-fotos",
+    maxSize: 10 * 1024 * 1024, // 10MB
+    allowedTypes: ["image/jpeg", "image/png", "image/webp"],
   },
   video: {
     bucket: "galeria-videos",
     maxSize: 50 * 1024 * 1024, // 50MB
-    allowedTypes: [
-      "video/mp4",
-      "video/mpeg",
-      "video/quicktime",
-      "video/x-msvideo",
-    ],
+    allowedTypes: ["video/mp4", "video/mpeg", "video/quicktime"],
   },
-  file: {
+  document: {
     bucket: "documentos-oficiais",
     maxSize: 10 * 1024 * 1024, // 10MB
-    allowedTypes: ["*"], // Qualquer tipo, mas validar extensões
-  },
-  media: {
-    bucket: "galeria-fotos",
-    maxSize: 5 * 1024 * 1024, // 5MB
-    allowedTypes: ["image/jpeg", "image/png", "image/webp"],
+    allowedTypes: [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ],
   },
 };
 
 export async function POST(request: NextRequest) {
   try {
+    const authResult = await requireAuth(request);
+    if (authResult instanceof NextResponse) return authResult;
+
+    const { user } = authResult;
+
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const type = formData.get("type") as string;
-    const bucket = formData.get("bucket") as string;
 
     if (!file || !type) {
-      return NextResponse.json(
-        { error: "Arquivo e tipo são obrigatórios" },
-        { status: 400 }
-      );
+      return createValidationError("Arquivo e tipo são obrigatórios");
     }
 
-    // 🔒 SOLUÇÃO: Acessar config de forma segura sem any
-    const config = UPLOAD_CONFIGS[type];
+    // Verificar configuração do tipo
+    const config = UPLOAD_CONFIGS[type as keyof typeof UPLOAD_CONFIGS];
     if (!config) {
+      return createValidationError("Tipo de upload inválido");
+    }
+
+    // Verificar permissões
+    if (user.role !== "admin") {
       return NextResponse.json(
-        { error: "Tipo de upload inválido. Use: image, video, file ou media" },
-        { status: 400 }
+        { error: "Apenas administradores podem fazer upload geral" },
+        { status: 403 }
       );
     }
 
-    const targetBucket = bucket || config.bucket;
-
-    // 🔒 Validações de segurança
+    // Validações do arquivo
     if (file.size > config.maxSize) {
-      return NextResponse.json(
-        {
-          error: `Arquivo muito grande. Máximo: ${
-            config.maxSize / 1024 / 1024
-          }MB`,
-        },
-        { status: 400 }
+      return createValidationError(
+        `Arquivo muito grande. Máximo: ${config.maxSize / 1024 / 1024}MB`
       );
     }
 
-    if (
-      config.allowedTypes[0] !== "*" &&
-      !config.allowedTypes.includes(file.type)
-    ) {
-      return NextResponse.json(
-        {
-          error: `Tipo de arquivo não permitido. Tipos permitidos: ${config.allowedTypes.join(
-            ", "
-          )}`,
-        },
-        { status: 400 }
+    if (!config.allowedTypes.includes(file.type)) {
+      return createValidationError(
+        `Tipo de arquivo não permitido. Permitidos: ${config.allowedTypes.join(
+          ", "
+        )}`
       );
     }
 
-    // 🔒 Validação adicional para documentos
-    if (type === "file") {
-      const fileExt = file.name.split(".").pop()?.toLowerCase();
-      const dangerousExtensions = ["exe", "bat", "cmd", "sh", "js", "vbs"];
-      if (fileExt && dangerousExtensions.includes(fileExt)) {
-        return NextResponse.json(
-          { error: "Tipo de arquivo potencialmente perigoso não permitido" },
-          { status: 400 }
-        );
-      }
+    // Validar extensões perigosas
+    const dangerousExtensions = [".exe", ".bat", ".cmd", ".sh", ".js", ".vbs"];
+    const fileExt = file.name.split(".").pop()?.toLowerCase();
+    if (fileExt && dangerousExtensions.includes(`.${fileExt}`)) {
+      return createValidationError("Tipo de arquivo potencialmente perigoso");
     }
 
-    const supabase = createAdminClient();
-    const fileExt = file.name.split(".").pop()?.toLowerCase() || "bin";
-    const fileName = `${type}_${Date.now()}_${Math.random()
+    const supabaseAdmin = createAdminClient();
+
+    // Gerar nome do arquivo
+    const fileName = `${type}/${Date.now()}_${Math.random()
       .toString(36)
       .substring(2)}.${fileExt}`;
 
-    // Converter File para Buffer
+    // Converter para buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    console.log("🔄 Fazendo upload geral...", {
-      fileName,
-      type,
-      bucket: targetBucket,
-      size: file.size,
-    });
-
-    // 🔒 Upload seguro
-    const { data, error } = await supabase.storage
-      .from(targetBucket)
+    // Upload
+    const { data, error } = await supabaseAdmin.storage
+      .from(config.bucket)
       .upload(fileName, buffer, {
-        cacheControl: "3600",
         contentType: file.type,
+        cacheControl: "3600",
       });
 
     if (error) {
-      console.error("❌ Erro no upload geral:", error);
-      throw error;
+      throw new Error(`Erro no upload: ${error.message}`);
     }
 
     // Obter URL pública
     const {
       data: { publicUrl },
-    } = supabase.storage.from(targetBucket).getPublicUrl(data.path);
+    } = supabaseAdmin.storage.from(config.bucket).getPublicUrl(data.path);
 
-    console.log("✅ Upload geral realizado:", publicUrl);
-
-    return NextResponse.json({
-      success: true,
-      url: publicUrl,
-      path: data.path,
-      fileName: fileName,
-      bucket: targetBucket,
-    });
-  } catch (error: unknown) {
-    console.error("💥 Erro no upload geral:", error);
-
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Erro interno no servidor",
+    // Registrar atividade
+    await supabaseAdmin.from("system_activities").insert({
+      user_id: user.id,
+      action_type: `${type}_upload`,
+      description: `Arquivo ${file.name} enviado para ${config.bucket}`,
+      resource_type: "storage",
+      resource_id: fileName,
+      metadata: {
+        uploaded_by: user.id,
+        uploaded_by_email: user.email,
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        bucket: config.bucket,
       },
-      { status: 500 }
+    });
+
+    return createSuccessResponse(
+      {
+        url: publicUrl,
+        path: data.path,
+        bucket: config.bucket,
+        file_name: fileName,
+        original_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+      },
+      "Arquivo enviado com sucesso"
     );
+  } catch (error) {
+    return handleApiError(error);
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
 }
