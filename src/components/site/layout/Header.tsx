@@ -28,7 +28,7 @@ import {
   RiCloseLine,
 } from "react-icons/ri";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuthStore } from "@/lib/stores/auth";
+import { useAuthStore } from "@/lib/stores/useAuthStore";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },

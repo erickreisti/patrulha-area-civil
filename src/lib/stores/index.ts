@@ -1,3 +1,3 @@
 // lib/stores/index.ts
-export { useAuthStore } from "./auth";
-export { useConfigStore } from "./config";
+export { useAuthStore } from "./useAuthStore";
+export { useConfigStore } from "./useConfigStore";
