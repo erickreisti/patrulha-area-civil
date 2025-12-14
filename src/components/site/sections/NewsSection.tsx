@@ -1,3 +1,4 @@
+// components/site/sections/NewsSection.tsx - VERSÃO SEM HOOK
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -14,70 +15,19 @@ import {
   RiArrowRightLine,
   RiTimeLine,
   RiNewspaperLine,
+  RiErrorWarningLine,
+  RiEyeLine,
 } from "react-icons/ri";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { cn } from "@/lib/utils/utils";
-
-// Interface para notícias - ACEITAR null
-interface Noticia {
-  id: string;
-  titulo: string;
-  slug: string;
-  resumo: string | null;
-  categoria: string | null;
-  data_publicacao: string;
-  status: string;
-}
-
-// Hook otimizado para notícias
-function useNoticias() {
-  const [noticias, setNoticias] = useState<Noticia[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchNoticias() {
-      try {
-        setLoading(true);
-        const supabase = createClient();
-
-        const { data, error } = await supabase
-          .from("noticias")
-          .select(
-            "id, titulo, slug, resumo, categoria, data_publicacao, status"
-          )
-          .eq("status", "publicado")
-          .order("data_publicacao", { ascending: false })
-          .limit(6);
-
-        if (error) throw error;
-
-        setNoticias(data || []);
-      } catch (err: unknown) {
-        console.error("Erro ao carregar notícias:", err);
-        const errorMessage =
-          err instanceof Error ? err.message : "Erro desconhecido";
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchNoticias();
-  }, []);
-
-  return { noticias, loading, error };
-}
+import { cn } from "@/lib/utils/cn";
+import { useState, useEffect } from "react"; // ← IMPORTE useState e useEffect
+import { getLatestNews } from "@/app/actions/news"; // ← IMPORTE a server action
+import type { NoticiaLista } from "@/lib/stores/useNoticiasStore";
 
 const SectionHeader = () => {
-  const ref = useRef(null);
-
   return (
     <motion.div
-      ref={ref}
       className="text-center mb-8 sm:mb-12 lg:mb-16"
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -121,29 +71,76 @@ const SectionHeader = () => {
   );
 };
 
+// Interface atualizada para usar NoticiaLista
 interface NewsCardProps {
-  noticia: Noticia;
+  noticia: NoticiaLista;
   index: number;
 }
 
 const NewsCard = ({ noticia, index }: NewsCardProps) => {
+  const hasImage = noticia.imagem && noticia.imagem !== "";
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
       viewport={{ once: true, margin: "-100px" }}
+      className="h-full"
     >
-      <Card className="border-slate-200 bg-white hover:shadow-xl transition-all duration-300 group h-full flex flex-col hover:scale-[1.02]">
-        <CardHeader className="pb-3 sm:pb-4 flex-1">
-          <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-2">
-            <Badge
-              variant="secondary"
-              className="bg-navy/10 text-navy hover:bg-navy/20 border-0 font-roboto text-xs sm:text-sm"
-            >
-              {noticia.categoria || "Geral"}
-            </Badge>
-            <div className="flex items-center text-slate-500 text-xs sm:text-sm font-roboto">
+      <Card className="border-slate-200 bg-white hover:shadow-xl transition-all duration-300 group h-full flex flex-col hover:scale-[1.02] overflow-hidden">
+        {hasImage && (
+          <div className="relative h-40 sm:h-48 lg:h-56 overflow-hidden">
+            <div
+              className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+              style={{ backgroundImage: `url('${noticia.imagem}')` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            <div className="absolute top-3 left-3">
+              <Badge
+                variant="secondary"
+                className="bg-navy/90 text-white hover:bg-navy border-0 font-roboto text-xs sm:text-sm backdrop-blur-sm"
+              >
+                {noticia.categoria || "Geral"}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        <CardHeader
+          className={`pb-3 sm:pb-4 flex-1 ${!hasImage ? "pt-6" : ""}`}
+        >
+          {!hasImage && (
+            <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-2">
+              <Badge
+                variant="secondary"
+                className="bg-navy/10 text-navy hover:bg-navy/20 border-0 font-roboto text-xs sm:text-sm"
+              >
+                {noticia.categoria || "Geral"}
+              </Badge>
+              <div className="flex items-center text-slate-500 text-xs sm:text-sm font-roboto">
+                <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
+                {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </div>
+            </div>
+          )}
+
+          <CardTitle
+            className={cn(
+              "text-slate-800 font-bold leading-tight line-clamp-2",
+              "text-base sm:text-lg lg:text-xl",
+              hasImage ? "text-white relative z-10" : ""
+            )}
+          >
+            {noticia.titulo}
+          </CardTitle>
+
+          {hasImage && (
+            <div className="flex items-center text-slate-200 text-xs sm:text-sm font-roboto mt-2">
               <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
               {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR", {
                 day: "2-digit",
@@ -151,18 +148,10 @@ const NewsCard = ({ noticia, index }: NewsCardProps) => {
                 year: "numeric",
               })}
             </div>
-          </div>
-          <CardTitle
-            className={cn(
-              "text-slate-800 font-bold leading-tight line-clamp-2",
-              "text-base sm:text-lg lg:text-xl"
-            )}
-          >
-            {noticia.titulo}
-          </CardTitle>
+          )}
         </CardHeader>
 
-        <CardContent className="space-y-3 sm:space-y-4">
+        <CardContent className="space-y-3 sm:space-y-4 flex-1">
           <CardDescription
             className={cn(
               "text-slate-600 font-roboto leading-relaxed line-clamp-3",
@@ -171,14 +160,33 @@ const NewsCard = ({ noticia, index }: NewsCardProps) => {
           >
             {noticia.resumo || "Leia mais sobre esta notícia..."}
           </CardDescription>
+
+          {noticia.autor && (
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-navy/10 flex items-center justify-center">
+                <RiEyeLine className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-navy" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-slate-700 font-medium truncate">
+                  Por: {noticia.autor.full_name || "Autor"}
+                </p>
+                {noticia.autor.graduacao && (
+                  <p className="text-[10px] text-slate-500 truncate">
+                    {noticia.autor.graduacao}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mt-auto pt-3 sm:pt-4">
             <Button
               variant="link"
-              className="p-0 h-auto text-navy hover:text-navy-700 font-roboto flex items-center gap-1 group text-xs sm:text-sm touch-optimize"
+              className="p-0 h-auto text-navy hover:text-navy-700 font-roboto flex items-center gap-1 group text-xs sm:text-sm touch-optimize w-full justify-start"
               asChild
             >
               <Link href={`/noticias/${noticia.slug}`}>
-                <span>Ler Mais</span>
+                <span>Ler Notícia Completa</span>
                 <RiArrowRightLine className="w-3 h-3 sm:w-4 sm:h-4 group-hover:translate-x-1 transition-transform duration-200" />
               </Link>
             </Button>
@@ -190,10 +198,18 @@ const NewsCard = ({ noticia, index }: NewsCardProps) => {
 };
 
 interface NewsGridProps {
-  noticias: Noticia[];
+  noticias: NoticiaLista[];
 }
 
 const NewsGrid = ({ noticias }: NewsGridProps) => {
+  if (noticias.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-slate-500">Nenhuma notícia para exibir</p>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -201,7 +217,7 @@ const NewsGrid = ({ noticias }: NewsGridProps) => {
         "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
       )}
     >
-      {noticias.slice(0, 3).map((noticia, index) => (
+      {noticias.map((noticia, index) => (
         <NewsCard key={noticia.id} noticia={noticia} index={index} />
       ))}
     </div>
@@ -223,7 +239,8 @@ const CTAButton = () => {
         className={cn(
           "bg-navy hover:bg-navy-700 text-white font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl",
           "px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4",
-          "text-sm sm:text-base lg:text-lg touch-optimize active:scale-95"
+          "text-sm sm:text-base lg:text-lg touch-optimize active:scale-95",
+          "group"
         )}
       >
         <Link
@@ -249,8 +266,9 @@ const SkeletonLoader = () => (
     {[1, 2, 3].map((i) => (
       <Card
         key={i}
-        className="border-slate-200 bg-white animate-pulse h-48 sm:h-56 lg:h-64"
+        className="border-slate-200 bg-white animate-pulse h-64 sm:h-72 lg:h-80"
       >
+        <div className="h-40 sm:h-48 bg-slate-200" />
         <CardHeader className="pb-3 sm:pb-4">
           <div className="flex justify-between items-center mb-2 sm:mb-3">
             <div className="h-4 sm:h-5 bg-slate-200 rounded w-1/4"></div>
@@ -269,8 +287,89 @@ const SkeletonLoader = () => (
   </div>
 );
 
+const ErrorState = ({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry?: () => void;
+}) => (
+  <motion.div
+    className="text-center py-8 sm:py-12"
+    initial={{ opacity: 0 }}
+    whileInView={{ opacity: 1 }}
+    transition={{ duration: 0.5 }}
+    viewport={{ once: true, margin: "-100px" }}
+  >
+    <div className="bg-red-50 border border-red-200 rounded-xl p-6 sm:p-8 max-w-md mx-auto">
+      <RiErrorWarningLine className="w-12 h-12 sm:w-16 sm:h-16 text-red-500 mx-auto mb-4" />
+      <h3 className="text-red-800 font-bold text-lg sm:text-xl mb-2">
+        Erro ao carregar notícias
+      </h3>
+      <p className="text-red-600 text-sm sm:text-base mb-4">{error}</p>
+      {onRetry && (
+        <Button
+          variant="outline"
+          className="border-red-300 text-red-700 hover:bg-red-50"
+          onClick={onRetry}
+        >
+          Tentar novamente
+        </Button>
+      )}
+    </div>
+  </motion.div>
+);
+
+const EmptyState = () => (
+  <motion.div
+    className="text-center py-8 sm:py-12"
+    initial={{ opacity: 0 }}
+    whileInView={{ opacity: 1 }}
+    transition={{ duration: 0.5 }}
+    viewport={{ once: true, margin: "-100px" }}
+  >
+    <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 sm:p-8 max-w-md mx-auto">
+      <RiNewspaperLine className="w-12 h-12 sm:w-16 sm:h-16 text-slate-400 mx-auto mb-4" />
+      <h3 className="text-slate-800 font-bold text-lg sm:text-xl mb-2">
+        Nenhuma notícia disponível
+      </h3>
+      <p className="text-slate-600 text-sm sm:text-base mb-4">
+        Em breve teremos novidades para compartilhar.
+      </p>
+      <Button variant="outline" asChild>
+        <Link href="/noticias">Ver todas as notícias</Link>
+      </Button>
+    </div>
+  </motion.div>
+);
+
 export function NewsSection() {
-  const { noticias, loading, error } = useNoticias();
+  // Substitua o hook por estado local + useEffect
+  const [noticias, setNoticias] = useState<NoticiaLista[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchNoticias = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const result = await getLatestNews(3);
+
+      if (result.success) {
+        setNoticias(result.data);
+      } else {
+        setError(result.error || "Erro ao carregar notícias");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNoticias();
+  }, []);
 
   return (
     <section className="w-full bg-white py-8 sm:py-12 lg:py-16 xl:py-20 overflow-hidden">
@@ -280,43 +379,14 @@ export function NewsSection() {
         {loading ? (
           <SkeletonLoader />
         ) : error ? (
-          <motion.div
-            className="text-center py-8 sm:py-12"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            viewport={{ once: true, margin: "-100px" }}
-          >
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 sm:p-6 max-w-md mx-auto">
-              <h3 className="text-red-800 font-bold text-lg sm:text-xl mb-2">
-                Erro ao carregar notícias
-              </h3>
-              <p className="text-red-600 text-sm sm:text-base">{error}</p>
-            </div>
-          </motion.div>
+          <ErrorState error={error} onRetry={fetchNoticias} />
         ) : noticias.length > 0 ? (
           <>
             <NewsGrid noticias={noticias} />
             <CTAButton />
           </>
         ) : (
-          <motion.div
-            className="text-center py-8 sm:py-12"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            viewport={{ once: true, margin: "-100px" }}
-          >
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 sm:p-8 max-w-md mx-auto">
-              <RiNewspaperLine className="w-12 h-12 sm:w-16 sm:h-16 text-slate-400 mx-auto mb-4" />
-              <h3 className="text-slate-800 font-bold text-lg sm:text-xl mb-2">
-                Nenhuma notícia disponível
-              </h3>
-              <p className="text-slate-600 text-sm sm:text-base">
-                Em breve teremos novidades para compartilhar.
-              </p>
-            </div>
-          </motion.div>
+          <EmptyState />
         )}
       </div>
     </section>

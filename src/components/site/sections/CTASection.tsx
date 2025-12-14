@@ -6,7 +6,7 @@ import { RiArrowRightLine, RiTeamLine, RiPhoneLine } from "react-icons/ri";
 import { motion } from "framer-motion";
 import { useRef } from "react";
 import { useInView } from "framer-motion";
-import { cn } from "@/lib/utils/utils";
+import { cn } from "@/lib/utils/cn";
 
 export function CTASection() {
   const ref = useRef(null);

@@ -1,13 +1,9 @@
-// lib/supabase/types.ts
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+import { UserRole, Json } from "@/lib/types/shared";
 
-export interface Database {
+/**
+ * Tipos do banco de dados Supabase
+ */
+export type Database = {
   public: {
     Tables: {
       profiles: {
@@ -21,12 +17,15 @@ export interface Database {
           validade_certificacao: string | null;
           tipo_sanguineo: string | null;
           status: boolean;
-          role: "admin" | "agent";
+          role: UserRole; // ← Usando tipo compartilhado
           created_at: string;
           updated_at: string;
+          uf: string | null;
+          data_nascimento: string | null;
+          telefone: string | null;
         };
         Insert: {
-          id: string;
+          id?: string;
           matricula: string;
           email: string;
           full_name?: string | null;
@@ -35,9 +34,12 @@ export interface Database {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
-          role?: "admin" | "agent";
+          role?: UserRole; // ← Usando tipo compartilhado
           created_at?: string;
           updated_at?: string;
+          uf?: string | null;
+          data_nascimento?: string | null;
+          telefone?: string | null;
         };
         Update: {
           id?: string;
@@ -49,117 +51,22 @@ export interface Database {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
-          role?: "admin" | "agent";
+          role?: UserRole; // ← Usando tipo compartilhado
           created_at?: string;
           updated_at?: string;
+          uf?: string | null;
+          data_nascimento?: string | null;
+          telefone?: string | null;
         };
         Relationships: [
           {
             foreignKeyName: "profiles_id_fkey";
             columns: ["id"];
+            isOneToOne: true;
             referencedRelation: "users";
             referencedColumns: ["id"];
           }
         ];
-      };
-
-      profiles_simple: {
-        Row: {
-          id: string;
-          matricula: string;
-          email: string;
-          full_name: string | null;
-          avatar_url: string | null;
-          graduacao: string | null;
-          validade_certificacao: string | null;
-          tipo_sanguineo: string | null;
-          status: boolean;
-          role: "admin" | "agent";
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id: string;
-          matricula: string;
-          email: string;
-          full_name?: string | null;
-          avatar_url?: string | null;
-          graduacao?: string | null;
-          validade_certificacao?: string | null;
-          tipo_sanguineo?: string | null;
-          status?: boolean;
-          role?: "admin" | "agent";
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: {
-          id?: string;
-          matricula?: string;
-          email?: string;
-          full_name?: string | null;
-          avatar_url?: string | null;
-          graduacao?: string | null;
-          validade_certificacao?: string | null;
-          tipo_sanguineo?: string | null;
-          status?: boolean;
-          role?: "admin" | "agent";
-          created_at?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "profiles_simple_id_fkey";
-            columns: ["id"];
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
-
-      profiles_backup: {
-        Row: {
-          id: string | null;
-          matricula: string | null;
-          email: string | null;
-          full_name: string | null;
-          avatar_url: string | null;
-          graduacao: string | null;
-          validade_certificacao: string | null;
-          tipo_sanguineo: string | null;
-          status: boolean | null;
-          role: string | null;
-          created_at: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          id?: string | null;
-          matricula?: string | null;
-          email?: string | null;
-          full_name?: string | null;
-          avatar_url?: string | null;
-          graduacao?: string | null;
-          validade_certificacao?: string | null;
-          tipo_sanguineo?: string | null;
-          status?: boolean | null;
-          role?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          id?: string | null;
-          matricula?: string | null;
-          email?: string | null;
-          full_name?: string | null;
-          avatar_url?: string | null;
-          graduacao?: string | null;
-          validade_certificacao?: string | null;
-          tipo_sanguineo?: string | null;
-          status?: boolean | null;
-          role?: string | null;
-          created_at?: string | null;
-          updated_at?: string | null;
-        };
-        Relationships: [];
       };
 
       notifications: {
@@ -224,6 +131,49 @@ export interface Database {
           {
             foreignKeyName: "notifications_user_id_fkey";
             columns: ["user_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+
+      system_activities: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          action_type: string;
+          description: string;
+          resource_type: string | null;
+          resource_id: string | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string | null;
+          action_type: string;
+          description: string;
+          resource_type?: string | null;
+          resource_id?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string | null;
+          action_type?: string;
+          description?: string;
+          resource_type?: string | null;
+          resource_id?: string | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "system_activities_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           }
@@ -245,6 +195,7 @@ export interface Database {
           status: "rascunho" | "publicado" | "arquivado";
           created_at: string;
           updated_at: string;
+          views: number;
         };
         Insert: {
           id?: string;
@@ -260,6 +211,7 @@ export interface Database {
           status?: "rascunho" | "publicado" | "arquivado";
           created_at?: string;
           updated_at?: string;
+          views?: number;
         };
         Update: {
           id?: string;
@@ -275,11 +227,13 @@ export interface Database {
           status?: "rascunho" | "publicado" | "arquivado";
           created_at?: string;
           updated_at?: string;
+          views?: number;
         };
         Relationships: [
           {
             foreignKeyName: "noticias_autor_id_fkey";
             columns: ["autor_id"];
+            isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           }
@@ -340,6 +294,7 @@ export interface Database {
           status: boolean;
           created_at: string;
           destaque: boolean;
+          views: number;
         };
         Insert: {
           id?: string;
@@ -354,6 +309,7 @@ export interface Database {
           status?: boolean;
           created_at?: string;
           destaque?: boolean;
+          views?: number;
         };
         Update: {
           id?: string;
@@ -368,79 +324,164 @@ export interface Database {
           status?: boolean;
           created_at?: string;
           destaque?: boolean;
+          views?: number;
         };
         Relationships: [
           {
             foreignKeyName: "galeria_itens_categoria_id_fkey";
             columns: ["categoria_id"];
+            isOneToOne: false;
             referencedRelation: "galeria_categorias";
             referencedColumns: ["id"];
           },
           {
             foreignKeyName: "galeria_itens_autor_id_fkey";
             columns: ["autor_id"];
+            isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           }
         ];
       };
 
-      system_activities: {
+      profiles_history: {
         Row: {
-          id: string;
-          user_id: string | null;
+          history_id: string;
+          profile_id: string;
+          matricula: string;
+          email: string;
+          full_name: string | null;
+          uf: string | null;
+          avatar_url: string | null;
+          graduacao: string | null;
+          validade_certificacao: string | null;
+          tipo_sanguineo: string | null;
+          data_nascimento: string | null;
+          telefone: string | null;
+          status: boolean | null;
+          role: string | null;
           action_type: string;
-          description: string;
-          resource_type: string | null;
-          resource_id: string | null;
-          metadata: Json | null;
-          created_at: string;
+          changed_at: string;
+          changed_by: string | null;
+          old_data: Json | null;
+          new_data: Json | null;
         };
         Insert: {
-          id?: string;
-          user_id?: string | null;
+          history_id?: string;
+          profile_id: string;
+          matricula: string;
+          email: string;
+          full_name?: string | null;
+          uf?: string | null;
+          avatar_url?: string | null;
+          graduacao?: string | null;
+          validade_certificacao?: string | null;
+          tipo_sanguineo?: string | null;
+          data_nascimento?: string | null;
+          telefone?: string | null;
+          status?: boolean | null;
+          role?: string | null;
           action_type: string;
-          description: string;
-          resource_type?: string | null;
-          resource_id?: string | null;
-          metadata?: Json | null;
-          created_at?: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          old_data?: Json | null;
+          new_data?: Json | null;
         };
         Update: {
-          id?: string;
-          user_id?: string | null;
+          history_id?: string;
+          profile_id?: string;
+          matricula?: string;
+          email?: string;
+          full_name?: string | null;
+          uf?: string | null;
+          avatar_url?: string | null;
+          graduacao?: string | null;
+          validade_certificacao?: string | null;
+          tipo_sanguineo?: string | null;
+          data_nascimento?: string | null;
+          telefone?: string | null;
+          status?: boolean | null;
+          role?: string | null;
           action_type?: string;
-          description?: string;
-          resource_type?: string | null;
-          resource_id?: string | null;
-          metadata?: Json | null;
-          created_at?: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          old_data?: Json | null;
+          new_data?: Json | null;
         };
         Relationships: [
           {
-            foreignKeyName: "system_activities_user_id_fkey";
-            columns: ["user_id"];
+            foreignKeyName: "profiles_history_changed_by_fkey";
+            columns: ["changed_by"];
+            isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           }
         ];
       };
     };
-
     Views: {
       [_ in never]: never;
     };
-
     Functions: {
       [_ in never]: never;
     };
-
     Enums: {
       [_ in never]: never;
     };
-
     CompositeTypes: {
       [_ in never]: never;
     };
   };
+};
+
+// Tipos de uso comum
+export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
+export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
+
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type NotificationInsert =
+  Database["public"]["Tables"]["notifications"]["Insert"];
+export type NotificationUpdate =
+  Database["public"]["Tables"]["notifications"]["Update"];
+
+export type SystemActivity =
+  Database["public"]["Tables"]["system_activities"]["Row"];
+export type SystemActivityInsert =
+  Database["public"]["Tables"]["system_activities"]["Insert"];
+export type SystemActivityUpdate =
+  Database["public"]["Tables"]["system_activities"]["Update"];
+
+export type Noticia = Database["public"]["Tables"]["noticias"]["Row"];
+export type NoticiaInsert = Database["public"]["Tables"]["noticias"]["Insert"];
+export type NoticiaUpdate = Database["public"]["Tables"]["noticias"]["Update"];
+
+export type GaleriaCategoria =
+  Database["public"]["Tables"]["galeria_categorias"]["Row"];
+export type GaleriaCategoriaInsert =
+  Database["public"]["Tables"]["galeria_categorias"]["Insert"];
+export type GaleriaCategoriaUpdate =
+  Database["public"]["Tables"]["galeria_categorias"]["Update"];
+
+export type GaleriaItem = Database["public"]["Tables"]["galeria_itens"]["Row"];
+export type GaleriaItemInsert =
+  Database["public"]["Tables"]["galeria_itens"]["Insert"];
+export type GaleriaItemUpdate =
+  Database["public"]["Tables"]["galeria_itens"]["Update"];
+
+export type ProfilesHistory =
+  Database["public"]["Tables"]["profiles_history"]["Row"];
+export type ProfilesHistoryInsert =
+  Database["public"]["Tables"]["profiles_history"]["Insert"];
+export type ProfilesHistoryUpdate =
+  Database["public"]["Tables"]["profiles_history"]["Update"];
+
+// Helper para converter Record<string, unknown> para Json
+export function toJson(data?: Record<string, unknown>): Json | null {
+  if (!data) return null;
+  try {
+    return JSON.parse(JSON.stringify(data)) as Json;
+  } catch {
+    return data as Json;
+  }
 }

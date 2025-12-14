@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+
 import {
   Card,
   CardContent,
@@ -43,141 +45,229 @@ import {
   RiMailLine,
   RiNotificationLine,
   RiStackLine,
+  RiSortDesc,
+  RiFireLine,
 } from "react-icons/ri";
-import type { IconType } from "react-icons";
-import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNoticiasStore, NoticiaWithAutor } from "@/stores/useNoticiasStore";
+import { useNoticiasStore, NoticiaLista } from "@/lib/stores/useNoticiasStore";
+import { getNews, getNewsStats } from "@/app/actions/news";
 
 // ==================== CONFIGURAÇÕES ====================
-const ITEMS_PER_PAGE_OPTIONS = [6, 10, 20, 30, 50];
+const ITEMS_PER_PAGE_OPTIONS = [
+  { value: "6", label: "6 por página" },
+  { value: "10", label: "10 por página" },
+  { value: "20", label: "20 por página" },
+  { value: "30", label: "30 por página" },
+  { value: "50", label: "50 por página" },
+];
+
+const SORT_OPTIONS = [
+  { value: "recent", label: "Mais Recentes", icon: RiSortDesc },
+  { value: "oldest", label: "Mais Antigas", icon: RiSortAsc },
+  { value: "destaque", label: "Em Destaque", icon: RiStarFill },
+  { value: "popular", label: "Mais Populares", icon: RiFireLine },
+];
 
 // ==================== COMPONENTE PRINCIPAL ====================
 export default function NoticiasPage() {
+  const router = useRouter();
+
+  // Usar o store de notícias
   const {
     noticias,
-    loadingLista: loading,
+    loadingLista,
     filtros,
     totalCount,
     categoriasDisponiveis,
-    fetchNoticias,
-    fetchCategorias,
+    stats,
     setSearchTerm,
     setCategoria,
     setSortBy,
     setItemsPerPage,
     setCurrentPage,
+    clearFilters,
+    setNoticias,
+    setCategoriasDisponiveis,
+    setStats,
+    setTotalCount,
+    setLoadingLista,
   } = useNoticiasStore();
 
-  const [localCategories, setLocalCategories] = useState<
-    Array<{ value: string; label: string; icon: IconType }>
-  >([{ value: "all", label: "Todas as Categorias", icon: RiStackLine }]);
+  // Estado local para busca com debounce
+  const [localSearch, setLocalSearch] = useState(filtros.searchTerm);
+  const debounceTimer = useRef<NodeJS.Timeout>();
 
-  // 🔥 HOOK PARA PREVENIR LOCK DE SCROLL DO RADIX UI
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  // Função para ordenar notícias
+  const sortNoticias = useCallback(
+    (noticiasList: NoticiaLista[], sortBy: string) => {
+      if (sortBy === "recent") {
+        return [...noticiasList].sort(
+          (a, b) =>
+            new Date(b.data_publicacao).getTime() -
+            new Date(a.data_publicacao).getTime()
+        );
+      } else if (sortBy === "oldest") {
+        return [...noticiasList].sort(
+          (a, b) =>
+            new Date(a.data_publicacao).getTime() -
+            new Date(b.data_publicacao).getTime()
+        );
+      } else if (sortBy === "destaque") {
+        return [...noticiasList].sort(
+          (a, b) =>
+            (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0) ||
+            new Date(b.data_publicacao).getTime() -
+              new Date(a.data_publicacao).getTime()
+        );
+      } else if (sortBy === "popular") {
+        return [...noticiasList].sort(
+          (a, b) =>
+            (b.views || 0) - (a.views || 0) ||
+            new Date(b.data_publicacao).getTime() -
+              new Date(a.data_publicacao).getTime()
+        );
+      }
+      return noticiasList;
+    },
+    []
+  );
 
-    const preventScrollLock = () => {
-      // Observar mudanças no estilo do body
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.attributeName === "style") {
-            const target = mutation.target as HTMLElement;
-            // Se o Radix tentar esconder o scroll, impedir
-            if (target.style.overflow === "hidden") {
-              target.style.overflow = "auto";
-              target.style.paddingRight = "0";
-              target.style.marginRight = "0";
-            }
-          }
-        });
-      });
-
-      observer.observe(document.body, {
-        attributes: true,
-        attributeFilter: ["style"],
-      });
-
-      // Forçar scroll visível no início
-      document.body.style.overflow = "auto";
-      document.body.style.paddingRight = "0";
-
-      return () => {
-        observer.disconnect();
-        document.body.style.overflow = "";
-        document.body.style.paddingRight = "";
+  // Função para buscar notícias
+  const fetchNoticias = useCallback(async () => {
+    setLoadingLista(true);
+    try {
+      const options = {
+        limit: filtros.itemsPerPage,
+        page: filtros.currentPage,
+        search: filtros.searchTerm || undefined,
+        category: filtros.categoria !== "all" ? filtros.categoria : undefined,
+        featured: filtros.sortBy === "destaque" ? true : undefined,
       };
-    };
 
-    const cleanup = preventScrollLock();
-    return cleanup;
-  }, []);
+      const result = await getNews(options);
 
-  // Inicialização
-  useEffect(() => {
-    fetchCategorias();
-    fetchNoticias();
-  }, [fetchCategorias, fetchNoticias]);
+      if (result.success) {
+        let sortedNoticias = result.data;
 
-  // Atualizar categorias locais - CORRIGIDO: Move para dentro de um useEffect separado
-  useEffect(() => {
-    if (categoriasDisponiveis.length > 0) {
-      const mappedCategories = categoriasDisponiveis.map((cat) => ({
-        value: cat.value,
-        label: cat.label,
-        icon: RiNewspaperLine,
-      }));
-      // Use requestAnimationFrame para evitar setState síncrono
-      requestAnimationFrame(() => {
-        setLocalCategories([
-          { value: "all", label: "Todas as Categorias", icon: RiStackLine },
-          ...mappedCategories,
-        ]);
-      });
+        // Ordenar localmente se necessário
+        if (filtros.sortBy === "popular" || filtros.sortBy === "oldest") {
+          sortedNoticias = sortNoticias(result.data, filtros.sortBy);
+        }
+
+        setNoticias(sortedNoticias);
+        setTotalCount(result.pagination.total);
+
+        // Extrair categorias únicas das notícias
+        const categoriasUnicas = Array.from(
+          new Set(
+            result.data
+              .map((n) => n.categoria)
+              .filter(
+                (cat): cat is string =>
+                  cat !== null && cat !== undefined && cat.trim() !== ""
+              )
+          )
+        );
+
+        const categoriasOptions = [
+          { value: "all", label: "Todas categorias" },
+          ...categoriasUnicas.map((cat) => ({
+            value: cat,
+            label: cat,
+          })),
+        ];
+
+        setCategoriasDisponiveis(categoriasOptions);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar notícias:", error);
+      setNoticias([]);
+      setTotalCount(0);
+      setCategoriasDisponiveis([{ value: "all", label: "Todas categorias" }]);
+    } finally {
+      setLoadingLista(false);
     }
-  }, [categoriasDisponiveis]);
+  }, [
+    filtros,
+    setNoticias,
+    setCategoriasDisponiveis,
+    setTotalCount,
+    setLoadingLista,
+    sortNoticias,
+  ]);
+
+  // Função para buscar estatísticas
+  const fetchStats = useCallback(async () => {
+    try {
+      const result = await getNewsStats();
+      if (result.success && result.data) {
+        setStats(result.data);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar estatísticas:", error);
+    }
+  }, [setStats]);
 
   // Debounce para busca
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchNoticias();
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+
+    debounceTimer.current = setTimeout(() => {
+      setSearchTerm(localSearch);
+      setCurrentPage(1);
     }, 500);
 
-    return () => clearTimeout(timer);
-  }, [filtros, fetchNoticias]);
+    return () => {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+    };
+  }, [localSearch, setSearchTerm, setCurrentPage]);
+
+  // Buscar notícias quando filtros mudam
+  useEffect(() => {
+    fetchNoticias();
+  }, [fetchNoticias]);
+
+  // Buscar estatísticas no início
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
 
   // Calcular total de páginas
   const totalPages = Math.max(1, Math.ceil(totalCount / filtros.itemsPerPage));
 
   // Função para formatar nome do autor
-  const formatAuthorName = (name?: string) => {
+  const formatAuthorName = (name?: string | null) => {
     if (!name) return "Autor";
     const firstName = name.split(" ")[0];
     return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase();
   };
 
   // Função para corrigir URL da imagem
-  const getImageUrl = (url: string | null) => {
+  const getImageUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
-
-    // Se já é uma URL completa
     if (url.startsWith("http")) return url;
 
-    // Corrigir barras duplicadas
-    const cleanUrl = url.startsWith("/") ? url.substring(1) : url;
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const bucket = "imagens-noticias";
 
-    if (cleanUrl.includes(bucket)) {
-      return `${supabaseUrl}/storage/v1/object/public/${cleanUrl}`;
-    } else {
-      return `${supabaseUrl}/storage/v1/object/public/${bucket}/${cleanUrl}`;
+    if (url.includes("/") && !url.startsWith("http")) {
+      if (url.includes(bucket)) {
+        return `${supabaseUrl}/storage/v1/object/public/${url}`;
+      } else {
+        return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
+      }
     }
+
+    return url;
   };
 
   // Loading Skeleton
-  if (loading && noticias.length === 0) {
+  if (loadingLista && noticias.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -246,30 +336,20 @@ export default function NoticiasPage() {
               transition={{ delay: 0.3, duration: 0.6 }}
               className="grid grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-2xl mx-auto mt-8 sm:mt-10 lg:mt-12"
             >
-              <div className="text-center">
-                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                  {totalCount}
+              {[
+                { value: stats.total, label: "Total" },
+                { value: stats.published, label: "Publicadas" },
+                { value: stats.featured, label: "Em Destaque" },
+              ].map((stat, index) => (
+                <div key={index} className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+                    {stat.value}
+                  </div>
+                  <div className="text-blue-200 text-xs sm:text-sm font-medium">
+                    {stat.label}
+                  </div>
                 </div>
-                <div className="text-blue-200 text-xs sm:text-sm font-medium">
-                  Total
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                  {noticias.filter((n) => n.status === "publicado").length}
-                </div>
-                <div className="text-blue-200 text-xs sm:text-sm font-medium">
-                  Publicadas
-                </div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                  {noticias.filter((n) => n.destaque).length}
-                </div>
-                <div className="text-blue-200 text-xs sm:text-sm font-medium">
-                  Em Destaque
-                </div>
-              </div>
+              ))}
             </motion.div>
           </motion.div>
         </div>
@@ -286,85 +366,189 @@ export default function NoticiasPage() {
                 <Input
                   type="text"
                   placeholder="Buscar em notícias..."
-                  value={filtros.searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                  }}
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
                   className="pl-9 sm:pl-12 pr-4 py-2.5 sm:py-3 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl transition-all duration-300 bg-white/50 backdrop-blur-sm text-sm sm:text-base"
                 />
+                {localSearch && (
+                  <button
+                    onClick={() => {
+                      setLocalSearch("");
+                      setSearchTerm("");
+                    }}
+                    className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors w-4 h-4 flex items-center justify-center"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Controls */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
               {/* Category Filter */}
-              <Select
-                value={filtros.categoria}
-                onValueChange={(value) => {
-                  setCategoria(value);
-                }}
-              >
-                <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                  <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
-                  <SelectValue placeholder="Filtrar por categoria" />
-                </SelectTrigger>
-                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
-                  {localCategories.map((category) => {
-                    const Icon = category.icon;
-                    return (
+              <div className="min-w-[200px]">
+                <Select
+                  value={filtros.categoria}
+                  onValueChange={(value) => {
+                    setCategoria(value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                    <div className="flex items-center">
+                      <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
+                      <SelectValue placeholder="Filtrar por categoria" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
+                    {categoriasDisponiveis.map((category) => (
                       <SelectItem
                         key={category.value}
                         value={category.value}
                         className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
                       >
-                        <div className="flex items-center">
-                          <Icon className="w-4 h-4 mr-2" />
-                          {category.label}
-                        </div>
+                        {category.label}
                       </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Sort */}
-              <Select
-                value={filtros.sortBy}
-                onValueChange={(value: "recent" | "oldest" | "destaque") =>
-                  setSortBy(value)
-                }
-              >
-                <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                  <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
-                  <SelectItem value="recent">Mais Recentes</SelectItem>
-                  <SelectItem value="oldest">Mais Antigas</SelectItem>
-                  <SelectItem value="destaque">Em Destaque</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="min-w-[180px]">
+                <Select
+                  value={filtros.sortBy}
+                  onValueChange={(
+                    value: "recent" | "oldest" | "destaque" | "popular"
+                  ) => {
+                    setSortBy(value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                    <div className="flex items-center">
+                      <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
+                      <SelectValue placeholder="Ordenar por" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
+                    {SORT_OPTIONS.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                      >
+                        <div className="flex items-center">
+                          <option.icon className="w-4 h-4 mr-2" />
+                          {option.label}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {/* Items per Page */}
-              <Select
-                value={filtros.itemsPerPage.toString()}
-                onValueChange={(value) => {
-                  setItemsPerPage(Number(value));
-                }}
-              >
-                <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
-                  {ITEMS_PER_PAGE_OPTIONS.map((num) => (
-                    <SelectItem key={num} value={num.toString()}>
-                      {num} por página
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="min-w-[160px]">
+                <Select
+                  value={filtros.itemsPerPage.toString()}
+                  onValueChange={(value) => {
+                    setItemsPerPage(Number(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
+                    <SelectValue
+                      placeholder={`${filtros.itemsPerPage} por página`}
+                    >
+                      {filtros.itemsPerPage} por página
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
+                    {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
+
+          {/* Indicadores de filtros ativos */}
+          {(filtros.searchTerm ||
+            filtros.categoria !== "all" ||
+            filtros.sortBy !== "recent") && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {filtros.searchTerm && (
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 bg-blue-50 border-blue-200 text-blue-700"
+                >
+                  Busca: &quot;{filtros.searchTerm}&quot;
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="ml-1 hover:text-blue-900 w-3 h-3 flex items-center justify-center"
+                  >
+                    ✕
+                  </button>
+                </Badge>
+              )}
+              {filtros.categoria !== "all" && (
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 bg-green-50 border-green-200 text-green-700"
+                >
+                  <RiFilterLine className="w-3 h-3" />
+                  {
+                    categoriasDisponiveis.find(
+                      (c) => c.value === filtros.categoria
+                    )?.label
+                  }
+                  <button
+                    onClick={() => setCategoria("all")}
+                    className="ml-1 hover:text-green-900 w-3 h-3 flex items-center justify-center"
+                  >
+                    ✕
+                  </button>
+                </Badge>
+              )}
+              {filtros.sortBy !== "recent" && (
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 bg-purple-50 border-purple-200 text-purple-700"
+                >
+                  <RiSortAsc className="w-3 h-3" />
+                  {SORT_OPTIONS.find(
+                    (option) => option.value === filtros.sortBy
+                  )?.label || filtros.sortBy}
+                  <button
+                    onClick={() => setSortBy("recent")}
+                    className="ml-1 hover:text-purple-900 w-3 h-3 flex items-center justify-center"
+                  >
+                    ✕
+                  </button>
+                </Badge>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  clearFilters();
+                  setLocalSearch("");
+                }}
+                className="h-6 text-xs"
+              >
+                Limpar todos
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -381,8 +565,9 @@ export default function NoticiasPage() {
                 {filtros.searchTerm && `Buscando por: "${filtros.searchTerm}"`}
                 {filtros.categoria !== "all" &&
                   ` • Categoria: ${
-                    localCategories.find((c) => c.value === filtros.categoria)
-                      ?.label
+                    categoriasDisponiveis.find(
+                      (c) => c.value === filtros.categoria
+                    )?.label
                   }`}
               </p>
             </div>
@@ -400,7 +585,7 @@ export default function NoticiasPage() {
 
           {/* Grid de Notícias */}
           <AnimatePresence mode="wait">
-            {loading ? (
+            {loadingLista ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                 {Array.from({ length: filtros.itemsPerPage }).map((_, i) => (
                   <Card key={i} className="border-0 shadow-lg">
@@ -429,13 +614,14 @@ export default function NoticiasPage() {
                     key={noticia.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
+                    transition={{ delay: index * 0.05 }}
                   >
                     <NewsCard
                       noticia={noticia}
                       formatAuthorName={formatAuthorName}
                       getImageUrl={getImageUrl}
                       isFirst={index === 0}
+                      router={router}
                     />
                   </motion.div>
                 ))}
@@ -455,6 +641,20 @@ export default function NoticiasPage() {
                     ? "Tente ajustar os filtros ou termos de busca."
                     : "Ainda não há notícias publicadas. Volte em breve!"}
                 </p>
+                {(filtros.searchTerm ||
+                  filtros.categoria !== "all" ||
+                  filtros.sortBy !== "recent") && (
+                  <Button
+                    onClick={() => {
+                      clearFilters();
+                      setLocalSearch("");
+                    }}
+                    variant="outline"
+                    className="mt-4"
+                  >
+                    Limpar todos os filtros
+                  </Button>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -471,7 +671,7 @@ export default function NoticiasPage() {
                     className={
                       filtros.currentPage === 1
                         ? "pointer-events-none opacity-50"
-                        : ""
+                        : "cursor-pointer"
                     }
                   />
                 </PaginationItem>
@@ -481,6 +681,7 @@ export default function NoticiasPage() {
                   <PaginationLink
                     onClick={() => setCurrentPage(1)}
                     isActive={filtros.currentPage === 1}
+                    className="cursor-pointer"
                   >
                     1
                   </PaginationLink>
@@ -502,6 +703,7 @@ export default function NoticiasPage() {
                       <PaginationLink
                         onClick={() => setCurrentPage(page)}
                         isActive={filtros.currentPage === page}
+                        className="cursor-pointer"
                       >
                         {page}
                       </PaginationLink>
@@ -521,6 +723,7 @@ export default function NoticiasPage() {
                     <PaginationLink
                       onClick={() => setCurrentPage(totalPages)}
                       isActive={filtros.currentPage === totalPages}
+                      className="cursor-pointer"
                     >
                       {totalPages}
                     </PaginationLink>
@@ -537,7 +740,7 @@ export default function NoticiasPage() {
                     className={
                       filtros.currentPage === totalPages
                         ? "pointer-events-none opacity-50"
-                        : ""
+                        : "cursor-pointer"
                     }
                   />
                 </PaginationItem>
@@ -591,26 +794,52 @@ export default function NoticiasPage() {
 }
 
 // ==================== COMPONENTE DE CARD DE NOTÍCIA ====================
+interface NewsCardProps {
+  noticia: NoticiaLista;
+  formatAuthorName: (name?: string | null) => string;
+  getImageUrl: (url: string | null | undefined) => string | null;
+  isFirst?: boolean;
+  router: ReturnType<typeof useRouter>;
+}
+
 function NewsCard({
   noticia,
   formatAuthorName,
   getImageUrl,
   isFirst = false,
-}: {
-  noticia: NoticiaWithAutor;
-  formatAuthorName: (name?: string) => string;
-  getImageUrl: (url: string | null) => string | null;
-  isFirst?: boolean;
-}) {
+  router,
+}: NewsCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
-  const readingTime = Math.ceil(noticia.conteudo.length / 1000);
+  const readingTime = Math.ceil((noticia.resumo?.length || 0) / 1000);
   const isPublished = noticia.status === "publicado";
   const imageUrl = getImageUrl(noticia.imagem);
 
+  // Helper para obter nome do autor
+  const getAuthorName = () => {
+    const name = noticia.autor?.full_name;
+    return name ? formatAuthorName(name) : "Autor";
+  };
+
+  // Função para lidar com clique no card
+  const handleCardClick = () => {
+    if (isPublished && noticia.slug) {
+      router.push(`/noticias/${noticia.slug}`);
+    }
+  };
+
+  // Função para lidar com clique no botão
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    handleCardClick();
+  };
+
   return (
-    <Card className="group border-2 border-slate-200/60 hover:border-navy-300/50 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden h-full flex flex-col">
+    <Card
+      className="group border-2 border-slate-200/60 hover:border-navy-300/50 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden h-full flex flex-col cursor-pointer"
+      onClick={handleCardClick}
+    >
       {/* Image Container */}
       <div className="relative h-40 sm:h-44 lg:h-48 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
         {imageUrl && !imageError ? (
@@ -677,7 +906,7 @@ function NewsCard({
         </CardTitle>
 
         <CardDescription className="text-slate-600 leading-relaxed line-clamp-3 text-xs sm:text-sm mt-2">
-          {noticia.resumo || noticia.conteudo.slice(0, 120) + "..."}
+          {noticia.resumo || "Leia mais sobre esta notícia..."}
         </CardDescription>
       </CardHeader>
 
@@ -687,9 +916,7 @@ function NewsCard({
           <div className="flex items-center space-x-3 sm:space-x-4">
             <div className="flex items-center">
               <RiUserLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-              <span className="text-xs font-medium">
-                {formatAuthorName(noticia.autor?.full_name)}
-              </span>
+              <span className="text-xs font-medium">{getAuthorName()}</span>
             </div>
             <div className="flex items-center">
               <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
@@ -707,15 +934,13 @@ function NewsCard({
 
         {/* Action Button */}
         <Button
-          asChild
+          onClick={handleButtonClick}
           variant="outline"
           size="sm"
           className="w-full border-navy-200 text-navy-700 hover:bg-navy-600 hover:text-white hover:border-navy-600 transition-all duration-300 group/btn text-xs sm:text-sm"
         >
-          <Link href={`/noticias/${noticia.slug}`}>
-            Ler Notícia
-            <RiArrowRightLine className="w-3 h-3 sm:w-4 sm:h-4 ml-1.5 sm:ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
-          </Link>
+          Ler Notícia
+          <RiArrowRightLine className="w-3 h-3 sm:w-4 sm:h-4 ml-1.5 sm:ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
         </Button>
       </CardContent>
     </Card>

@@ -39,170 +39,104 @@ const config = {
         "2xl": "1536px",
       },
       colors: {
+        // Paleta Principal PAC (Navy)
+        pac: {
+          primary: {
+            DEFAULT: "#1A2873", // Navy principal
+            dark: "#131835", // Navy mais escuro
+            light: "#1B2C8C", // Navy mais claro
+            soft: "#2A3A99", // Navy suave para hover
+            muted: "#5A8DEB", // Navy suavizado
+            pale: "#D6E4FF", // Navy muito claro
+            faint: "#F0F5FF", // Navy background
+          },
+          secondary: {
+            DEFAULT: "#00A859", // Verde sucesso
+            dark: "#006633", // Verde escuro
+            light: "#6DCFA1", // Verde claro
+            pale: "#E6F7EF", // Verde muito claro
+          },
+          alert: {
+            DEFAULT: "#bd0003", // Vermelho alerta
+            dark: "#660001", // Vermelho escuro
+            light: "#FF6666", // Vermelho claro
+            pale: "#FFE6E6", // Vermelho muito claro
+          },
+          warning: {
+            DEFAULT: "#FF6B00", // Laranja warning
+            dark: "#CC4D00", // Laranja escuro
+            light: "#FFCC33", // Laranja claro
+            pale: "#FFF8E6", // Laranja muito claro
+          },
+          accent: {
+            DEFAULT: "#8B5CF6", // Roxo para destaques
+            purple: "#8B5CF6",
+            teal: "#14B8A6",
+            amber: "#F59E0B",
+          },
+        },
+
+        // Cores de estado
+        status: {
+          active: "#00A859", // Ativo (verde)
+          inactive: "#BD0003", // Inativo (vermelho)
+          warning: "#FF6B00", // Atenção (laranja)
+          pending: "#F59E0B", // Pendente (âmbar)
+          completed: "#00A859", // Concluído (verde)
+          draft: "#6B7280", // Rascunho (cinza)
+          published: "#10B981", // Publicado (verde claro)
+          archived: "#8B5CF6", // Arquivado (roxo)
+          expired: "#6B7280", // Expirado (cinza)
+        },
+
+        // Cores de fundo
+        background: {
+          primary: "#FCFCFC", // Branco principal
+          secondary: "#F0F5FF", // Azul muito claro
+          tertiary: "#E6EFFF", // Azul mais claro
+          dark: {
+            primary: "#0F172A", // Preto azulado escuro
+            secondary: "#1E293B", // Preto azulado médio
+            tertiary: "#334155", // Preto azulado claro
+          },
+          highlight: "#1A2873", // Destaque navy
+        },
+
+        // Cores de texto
+        text: {
+          primary: "#1E293B", // Cinza escuro principal
+          secondary: "#475569", // Cinza médio
+          tertiary: "#64748B", // Cinza claro
+          muted: "#94A3B8", // Cinza muito claro
+          inverted: "#F8FAFC", // Branco para fundos escuros
+          dark: {
+            primary: "#F8FAFC", // Branco principal dark
+            secondary: "#E2E8F0", // Cinza muito claro dark
+            tertiary: "#CBD5E1", // Cinza claro dark
+          },
+        },
+
+        // Cores de borda
+        border: {
+          light: "#E2E8F0", // Borda clara
+          DEFAULT: "#CBD5E1", // Borda padrão
+          dark: "#94A3B8", // Borda escura
+          accent: "#1A2873", // Borda navy
+          success: "#00A859", // Borda sucesso
+          error: "#BD0003", // Borda erro
+          dark: {
+            light: "#334155", // Borda clara dark
+            DEFAULT: "#475569", // Borda padrão dark
+            dark: "#64748B", // Borda escura dark
+          },
+        },
+
+        // Cores funcionais (mantendo compatibilidade com shadcn)
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        navy: {
-          50: "#F0F5FF",
-          100: "#E6EFFF",
-          200: "#D6E4FF",
-          300: "#A6C5FF",
-          400: "#5A8DEB",
-          DEFAULT: "#1A2873",
-          600: "#1B2C8C",
-          700: "#1E2759",
-          800: "#1A1F47",
-          900: "#131835",
-          hover: "#2A3A99",
-          focus: "#3A4AB3",
-        },
-        alert: {
-          50: "#FFE6E6",
-          100: "#FFCCCC",
-          200: "#FF9999",
-          300: "#FF6666",
-          400: "#FF3333",
-          DEFAULT: "#bd0003",
-          600: "#990002",
-          700: "#660001",
-          800: "#330001",
-          900: "#1A0000",
-        },
-        slate: {
-          DEFAULT: "#1E293B",
-          50: "#F8FAFC",
-          100: "#F1F5F9",
-          200: "#E2E8F0",
-          300: "#CBD5E1",
-          400: "#94A3B8",
-          500: "#64748B",
-          600: "#475569",
-          700: "#334155",
-          800: "#1E293B",
-          900: "#0F172A",
-        },
-        offwhite: {
-          DEFAULT: "#FCFCFC",
-          50: "#FFFFFF",
-          100: "#FEFEFE",
-          200: "#FCFCFC",
-          300: "#FAFAFA",
-          400: "#F7F7F7",
-          500: "#F5F5F5",
-        },
-        success: {
-          50: "#F0F9F4",
-          100: "#E6F7EF",
-          200: "#CEEEDF",
-          300: "#A6E0C5",
-          400: "#6DCFA1",
-          DEFAULT: "#00A859",
-          600: "#008745",
-          700: "#006633",
-          800: "#004422",
-          900: "#002211",
-          hover: "#009950",
-          focus: "#008A47",
-        },
-        warning: {
-          50: "#FFF8E6",
-          100: "#FFF2CC",
-          200: "#FFE699",
-          300: "#FFD966",
-          400: "#FFCC33",
-          DEFAULT: "#FF6B00",
-          600: "#E65C00",
-          700: "#CC4D00",
-          800: "#B33E00",
-          900: "#992F00",
-          hover: "#FF7A1A",
-          focus: "#FF8A33",
-        },
-        error: {
-          50: "#FFE6E6",
-          100: "#FFCCCC",
-          200: "#FF9999",
-          300: "#FF6666",
-          400: "#FF3333",
-          DEFAULT: "#bd0003",
-          600: "#990002",
-          700: "#660001",
-          800: "#330001",
-          900: "#1A0000",
-          hover: "#CC0004",
-          focus: "#E60005",
-        },
-        bg: {
-          primary: "#FCFCFC",
-          secondary: "#F0F5FF",
-          tertiary: "#E6EFFF",
-          highlight: "#1A2873",
-          dark: "#1E293B",
-          "dark-primary": "#0F172A",
-          "dark-secondary": "#1E293B",
-          "dark-tertiary": "#334155",
-        },
-        divider: {
-          light: "#E9ECEF",
-          medium: "#DEE2E6",
-          dark: "#1A2873",
-          "dark-light": "#334155",
-          "dark-medium": "#475569",
-        },
-        interactive: {
-          link: {
-            normal: "#1A2873",
-            visited: "#6633CC",
-            hover: "#1B2C8C",
-            active: "#2A3A99",
-          },
-          button: {
-            primary: {
-              normal: "#1A2873",
-              hover: "#1B2C8C",
-              focus: "#2A3A99",
-              disabled: "#94A3B8",
-            },
-            secondary: {
-              normal: "#F0F5FF",
-              hover: "#E6EFFF",
-              focus: "#D6E4FF",
-              disabled: "#F1F5F9",
-            },
-          },
-        },
-        status: {
-          active: "#00A859",
-          inactive: "#FF0000",
-          warning: "#FF6B00",
-          expired: "#6C757D",
-          pending: "#FFCC00",
-          completed: "#00A859",
-          cancelled: "#BD0003",
-          draft: "#6C757D",
-          published: "#00A859",
-          archived: "#8B5CF6",
-        },
-        dark: {
-          bg: {
-            primary: "#0F172A",
-            secondary: "#1E293B",
-            tertiary: "#334155",
-            highlight: "#1E2759",
-          },
-          text: {
-            primary: "#F8FAFC",
-            secondary: "#E2E8F0",
-            tertiary: "#CBD5E1",
-          },
-          border: {
-            primary: "#334155",
-            secondary: "#475569",
-            accent: "#6366F1",
-          },
-        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -230,6 +164,90 @@ const config = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+
+        // Cores utilitárias (mantendo retrocompatibilidade)
+        navy: {
+          DEFAULT: "#1A2873", // Alias para pac.primary
+          50: "#F0F5FF",
+          100: "#E6EFFF",
+          200: "#D6E4FF",
+          300: "#A6C5FF",
+          400: "#5A8DEB",
+          500: "#1A2873",
+          600: "#1B2C8C",
+          700: "#1E2759",
+          800: "#1A1F47",
+          900: "#131835",
+          hover: "#2A3A99",
+          focus: "#3A4AB3",
+        },
+        success: {
+          DEFAULT: "#00A859", // Alias para pac.secondary
+          50: "#F0F9F4",
+          100: "#E6F7EF",
+          200: "#CEEEDF",
+          300: "#A6E0C5",
+          400: "#6DCFA1",
+          500: "#00A859",
+          600: "#008745",
+          700: "#006633",
+          800: "#004422",
+          900: "#002211",
+          hover: "#009950",
+          focus: "#008A47",
+        },
+        error: {
+          DEFAULT: "#bd0003", // Alias para pac.alert
+          50: "#FFE6E6",
+          100: "#FFCCCC",
+          200: "#FF9999",
+          300: "#FF6666",
+          400: "#FF3333",
+          500: "#bd0003",
+          600: "#990002",
+          700: "#660001",
+          800: "#330001",
+          900: "#1A0000",
+          hover: "#CC0004",
+          focus: "#E60005",
+        },
+        warning: {
+          DEFAULT: "#FF6B00", // Alias para pac.warning
+          50: "#FFF8E6",
+          100: "#FFF2CC",
+          200: "#FFE699",
+          300: "#FFD966",
+          400: "#FFCC33",
+          500: "#FF6B00",
+          600: "#E65C00",
+          700: "#CC4D00",
+          800: "#B33E00",
+          900: "#992F00",
+          hover: "#FF7A1A",
+          focus: "#FF8A33",
+        },
+        slate: {
+          DEFAULT: "#1E293B",
+          50: "#F8FAFC",
+          100: "#F1F5F9",
+          200: "#E2E8F0",
+          300: "#CBD5E1",
+          400: "#94A3B8",
+          500: "#64748B",
+          600: "#475569",
+          700: "#334155",
+          800: "#1E293B",
+          900: "#0F172A",
+        },
+        offwhite: {
+          DEFAULT: "#FCFCFC",
+          50: "#FFFFFF",
+          100: "#FEFEFE",
+          200: "#FCFCFC",
+          300: "#FAFAFA",
+          400: "#F7F7F7",
+          500: "#F5F5F5",
         },
       },
       borderRadius: {
@@ -358,24 +376,29 @@ const config = {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic":
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+        "pac-gradient": "linear-gradient(135deg, #1A2873 0%, #00A859 100%)",
+        "pac-gradient-dark":
+          "linear-gradient(135deg, #131835 0%, #006633 100%)",
         "navy-gradient":
           "linear-gradient(135deg, #1A2873 0%, #1B2C8C 50%, #1E2759 100%)",
-        "alert-gradient":
-          "linear-gradient(135deg, #bd0003 0%, #FF3333 50%, #990002 100%)",
         "success-gradient":
           "linear-gradient(135deg, #00A859 0%, #6DCFA1 50%, #008745 100%)",
+        "alert-gradient":
+          "linear-gradient(135deg, #bd0003 0%, #FF3333 50%, #990002 100%)",
         "hero-pattern": "url('/images/site/hero-bg.webp')",
       },
       boxShadow: {
-        "navy-sm": "0 1px 2px 0 rgba(26, 40, 115, 0.05)",
-        navy: "0 4px 6px -1px rgba(26, 40, 115, 0.1), 0 2px 4px -1px rgba(26, 40, 115, 0.06)",
-        "navy-lg":
+        "pac-sm": "0 1px 2px 0 rgba(26, 40, 115, 0.05)",
+        "pac-md":
+          "0 4px 6px -1px rgba(26, 40, 115, 0.1), 0 2px 4px -1px rgba(26, 40, 115, 0.06)",
+        "pac-lg":
           "0 10px 15px -3px rgba(26, 40, 115, 0.1), 0 4px 6px -2px rgba(26, 40, 115, 0.05)",
-        "navy-xl":
+        "pac-xl":
           "0 20px 25px -5px rgba(26, 40, 115, 0.1), 0 10px 10px -5px rgba(26, 40, 115, 0.04)",
-        "glow-navy": "0 0 20px rgba(26, 40, 115, 0.3)",
-        "glow-success": "0 0 20px rgba(0, 168, 89, 0.3)",
-        "glow-alert": "0 0 20px rgba(189, 0, 3, 0.3)",
+        "pac-glow": "0 0 20px rgba(26, 40, 115, 0.3)",
+        "success-glow": "0 0 20px rgba(0, 168, 89, 0.3)",
+        "alert-glow": "0 0 20px rgba(189, 0, 3, 0.3)",
+        "warning-glow": "0 0 20px rgba(255, 107, 0, 0.3)",
       },
       spacing: {
         18: "4.5rem",

@@ -13,7 +13,7 @@ import {
 } from "react-icons/ri";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils/utils";
+import { cn } from "@/lib/utils/cn";
 import { useRef } from "react";
 
 const ACTIVITIES = [

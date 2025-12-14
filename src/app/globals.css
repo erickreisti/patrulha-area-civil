@@ -118,11 +118,6 @@
     display: none;
   }
 
-  /* Smooth scrolling */
-  html {
-    scroll-behavior: smooth;
-  }
-
   /* Screen reader only */
   .sr-only {
     position: absolute;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -15,8 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils/utils";
-import { debounce } from "@/lib/debounce";
+import { cn } from "@/lib/utils/cn";
 import {
   RiFacebookFill,
   RiInstagramLine,
@@ -27,11 +26,9 @@ import {
   RiBarChartLine,
   RiTwitterXLine,
   RiCloseLine,
-  RiSearchLine,
 } from "react-icons/ri";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuthStore } from "@/stores/auth-store";
-import { createClient } from "@/lib/supabase/client";
+import { useAuthStore } from "@/lib/stores/auth";
 
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
@@ -69,16 +66,36 @@ const SOCIAL_ICONS = [
   },
 ];
 
+interface MobileMenuProps {
+  isOpen: boolean;
+  onClose: () => void;
+  pathname: string;
+  id?: string;
+}
+
 const TopBar = () => {
   const [scrolled, setScrolled] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    const handleScroll = debounce(() => {
+    const handleScroll = () => {
       setScrolled(window.scrollY > 10);
-    }, 10);
+    };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    const debouncedScroll = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(handleScroll, 10);
+    };
+
+    window.addEventListener("scroll", debouncedScroll);
+    return () => {
+      window.removeEventListener("scroll", debouncedScroll);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -92,7 +109,6 @@ const TopBar = () => {
     >
       <div className="container mx-auto px-3 xs:px-4 sm:px-6">
         <div className="flex justify-between items-center text-white text-xs xs:text-sm">
-          {/* Mobile: Bandeira e texto reduzido */}
           <div className="flex md:hidden items-center gap-1.5 xs:gap-2">
             <Image
               src="/images/logos/flag-br.webp"
@@ -107,7 +123,6 @@ const TopBar = () => {
             </span>
           </div>
 
-          {/* Desktop: Texto completo */}
           <div className="hidden md:flex items-center gap-2 lg:gap-3">
             <Image
               src="/images/logos/flag-br.webp"
@@ -122,7 +137,6 @@ const TopBar = () => {
             </span>
           </div>
 
-          {/* Redes sociais - tamanhos responsivos */}
           <div
             className="flex gap-1 xs:gap-1.5 sm:gap-2"
             role="list"
@@ -166,7 +180,6 @@ const Logo = () => {
       aria-label="Página inicial da Patrulha Aérea Civil"
       role="banner"
     >
-      {/* Logo responsiva */}
       <div className="relative w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 transition-all duration-300 flex-shrink-0">
         <Image
           src="/images/logos/logo.webp"
@@ -178,7 +191,6 @@ const Logo = () => {
         />
       </div>
 
-      {/* Textos responsivos mantendo por extenso */}
       <div className="text-left transition-all duration-300 min-w-0 flex-1">
         <h1 className="font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl truncate">
           PATRULHA AÉREA CIVIL
@@ -211,7 +223,7 @@ const NavigationItem = ({
           ? "text-navy font-semibold"
           : "text-slate-600 hover:text-navy hover:font-semibold",
         "touch-optimize active:scale-95",
-        "text-xs xs:text-sm sm:text-base" // Tamanhos responsivos
+        "text-xs xs:text-sm sm:text-base"
       )}
       aria-current={isActive ? "page" : undefined}
       role="menuitem"
@@ -270,26 +282,32 @@ const LoadingButton = () => {
 };
 
 const IdentificationButton = () => {
-  const { user, profile, isAdmin, loading, clearAuth } = useAuthStore();
+  const [localLoading, setLocalLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { user, profile, isAdmin, isLoading, logout } = useAuthStore();
   const pathname = usePathname();
   const isOnProfilePage = pathname === "/perfil";
 
   const handleSignOut = useCallback(async () => {
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      clearAuth();
-      localStorage.removeItem("supabase.auth.token");
+      setLocalLoading(true);
+      setError(null);
+      await logout();
       window.location.href = "/";
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
+      setError("Erro ao sair. Tente novamente.");
+    } finally {
+      setLocalLoading(false);
     }
-  }, [clearAuth]);
+  }, [logout]);
 
-  if (loading) {
+  // Se houver erro de configuração do Supabase, mostra botão de login desabilitado
+  if (isLoading || localLoading) {
     return <LoadingButton />;
   }
 
+  // Se não tiver usuário, mostra botão de login normal
   if (!user) {
     return (
       <Button
@@ -306,6 +324,21 @@ const IdentificationButton = () => {
     );
   }
 
+  // Se tiver erro (ex: Supabase não configurado), mostra versão simplificada
+  if (error) {
+    return (
+      <Button
+        className="bg-slate-400 text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider font-roboto border-0 min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] cursor-not-allowed"
+        disabled
+        aria-label="Sistema temporariamente indisponível"
+      >
+        <span className="text-[10px] xs:text-xs sm:text-sm truncate">
+          Sistema Indisponível
+        </span>
+      </Button>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -316,7 +349,7 @@ const IdentificationButton = () => {
           role="button"
         >
           <span className="relative z-10 text-white text-[10px] xs:text-xs sm:text-sm truncate">
-            Identificação
+            {profile?.full_name?.split(" ")[0] || "Agente"}
           </span>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
         </Button>
@@ -400,34 +433,24 @@ const IdentificationButton = () => {
   );
 };
 
-interface MobileMenuProps {
-  isOpen: boolean;
-  onClose: () => void;
-  pathname: string;
-  id?: string;
-}
-
 const MobileMenu = ({
   isOpen,
   onClose,
   pathname,
   id = "mobile-menu",
 }: MobileMenuProps) => {
-  const { user, profile, isAdmin, clearAuth } = useAuthStore();
+  const { user, profile, isAdmin, logout } = useAuthStore();
   const isOnProfilePage = pathname === "/perfil";
 
   const handleSignOut = useCallback(async () => {
     try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      clearAuth();
-      localStorage.removeItem("supabase.auth.token");
+      await logout();
       onClose();
       window.location.href = "/";
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
     }
-  }, [clearAuth, onClose]);
+  }, [logout, onClose]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -456,7 +479,6 @@ const MobileMenu = ({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -467,7 +489,6 @@ const MobileMenu = ({
             role="presentation"
           />
 
-          {/* Menu Panel - Agora desce de cima para baixo */}
           <motion.div
             initial={{ y: "-100%" }}
             animate={{ y: 0 }}
@@ -481,7 +502,6 @@ const MobileMenu = ({
             id={id}
           >
             <div className="flex flex-col h-full">
-              {/* Header - Agora com botão de fechar à direita */}
               <div className="flex items-center justify-between p-3 xs:p-4 border-b border-slate-200 bg-white">
                 <h2 className="text-lg xs:text-xl font-semibold text-navy">
                   Menu
@@ -496,7 +516,6 @@ const MobileMenu = ({
                 </button>
               </div>
 
-              {/* Navigation */}
               <div className="flex-1 overflow-y-auto p-3 xs:p-4">
                 <h3 className="text-xs xs:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
                   Navegação
@@ -520,19 +539,6 @@ const MobileMenu = ({
                     </Link>
                   ))}
                 </nav>
-
-                {/* Search */}
-                <div className="mt-4 xs:mt-6 px-2">
-                  <div className="relative">
-                    <RiSearchLine className="absolute left-2.5 xs:left-3 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 xs:w-4 xs:h-4 text-slate-400 pointer-events-none" />
-                    <input
-                      type="search"
-                      placeholder="Buscar..."
-                      className="w-full pl-8 xs:pl-10 pr-3 xs:pr-4 py-1.5 xs:py-2 text-xs xs:text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-navy/50 focus:border-navy"
-                      aria-label="Buscar no site"
-                    />
-                  </div>
-                </div>
 
                 {user ? (
                   <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
@@ -590,9 +596,7 @@ const MobileMenu = ({
                       )}
 
                       <button
-                        onClick={() => {
-                          handleSignOut();
-                        }}
+                        onClick={handleSignOut}
                         className="flex items-center w-full px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 text-left focus:outline-none focus:ring-2 focus:ring-red-500/50"
                         role="menuitem"
                         type="button"
@@ -618,7 +622,6 @@ const MobileMenu = ({
                   </div>
                 )}
 
-                {/* Social Links */}
                 <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
                   <h3 className="text-xs xs:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
                     Redes Sociais
@@ -654,7 +657,6 @@ const MobileMenu = ({
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="border-t border-slate-200 p-3 xs:p-4 bg-slate-50">
                 <div className="text-center text-[10px] xs:text-xs text-slate-500">
                   <p>© {new Date().getFullYear()} Patrulha Aérea Civil</p>
@@ -673,22 +675,30 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-  const { initializeAuth } = useAuthStore();
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   const toggleMenu = useCallback(() => setIsMenuOpen((prev) => !prev), []);
   const closeMenu = useCallback(() => setIsMenuOpen(false), []);
 
   useEffect(() => {
-    initializeAuth();
-  }, [initializeAuth]);
-
-  useEffect(() => {
-    const handleScroll = debounce(() => {
+    const handleScroll = () => {
       setScrolled(window.scrollY > 20);
-    }, 10);
+    };
 
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    const debouncedScroll = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(handleScroll, 10);
+    };
+
+    window.addEventListener("scroll", debouncedScroll);
+    return () => {
+      window.removeEventListener("scroll", debouncedScroll);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -704,7 +714,6 @@ export function Header() {
 
       <div className="bg-white border-b border-slate-200">
         <div className="container mx-auto px-3 xs:px-4 sm:px-6">
-          {/* Mobile Header (< 768px): Logo + Menu Hamburguer */}
           <div className="flex md:hidden items-center justify-between w-full py-2 xs:py-3">
             <Logo />
             <div className="flex items-center gap-1.5 xs:gap-2">
@@ -723,7 +732,6 @@ export function Header() {
             </div>
           </div>
 
-          {/* Tablet/Desktop Médio (768px - 1280px): Logo + Botão + Menu Hamburguer */}
           <div className="hidden md:flex xl:hidden items-center justify-between w-full py-2.5 xs:py-3">
             <Logo />
             <div className="flex items-center gap-2 xs:gap-3">
@@ -743,7 +751,6 @@ export function Header() {
             </div>
           </div>
 
-          {/* Desktop Grande (> 1280px): Logo + Links + Botão */}
           <div className="hidden xl:flex items-center justify-between w-full py-3 xs:py-4">
             <Logo />
             <DesktopNavigation pathname={pathname} />

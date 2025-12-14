@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { motion, Variants } from "framer-motion";
-import { cn } from "@/lib/utils/utils";
+import { cn } from "@/lib/utils/cn";
 import { RiArrowRightLine, RiAlarmWarningLine } from "react-icons/ri";
 import { useEffect, useState } from "react";
 import Image from "next/image";

@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Roboto } from "next/font/google";
 import "./globals.css";
-import { ServiceWorkerInitializer } from "@/components/service-worker/ServiceWorkerInitializer";
-import { AuthInitializer } from "@/components/auth/AuthInitializer";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -96,6 +94,19 @@ export const metadata: Metadata = {
   },
 };
 
+// Componente para inicialização segura
+async function SupabaseInitializer() {
+  try {
+    // Validar ambiente (opcional)
+    const { validateEnvironment } = await import("@/lib/supabase/validate-env");
+    validateEnvironment();
+  } catch (error) {
+    console.warn("⚠️ Inicialização do Supabase:", error);
+  }
+
+  return null;
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -106,6 +117,7 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${inter.variable} ${roboto.variable}`}
       suppressHydrationWarning
+      data-scroll-behavior="smooth"
     >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -126,6 +138,9 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="msapplication-TileColor" content="#1e3a8a" />
         <meta name="msapplication-tap-highlight" content="no" />
+
+        {/* Inicialização segura do Supabase */}
+        <SupabaseInitializer />
       </head>
       <body className="font-sans antialiased bg-background text-foreground min-h-screen min-w-[320px]">
         {/* Skip to content link para acessibilidade */}
@@ -135,10 +150,6 @@ export default function RootLayout({
         >
           Pular para conteúdo principal
         </a>
-
-        {/* Inicializadores */}
-        <ServiceWorkerInitializer />
-        <AuthInitializer />
 
         <div className="flex flex-col min-h-screen">
           <main

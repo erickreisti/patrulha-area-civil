@@ -1,3 +1,4 @@
+// next.config.js - Este arquivo deve estar na raiz do projeto
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -30,19 +31,6 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   poweredByHeader: false,
-  logging: {
-    fetches: {
-      fullUrl: false,
-    },
-  },
-  webpack: (config, { dev }) => {
-    if (dev) {
-      config.infrastructureLogging = {
-        level: "error",
-      };
-    }
-    return config;
-  },
 };
 
 module.exports = nextConfig;
