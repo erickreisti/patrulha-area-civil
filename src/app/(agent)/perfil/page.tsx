@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,11 +25,14 @@ import {
   RiWhatsappLine,
   RiMailLine,
   RiAlertLine,
+  RiLockLine,
 } from "react-icons/ri";
-import { useAuth } from "@/hooks/useAuth";
-import { UserProfile } from "@/types";
+import { useAuthStore } from "@/lib/stores/useAuthStore";
+import type { Profile } from "@/lib/supabase/types";
+import { Spinner } from "@/components/ui/spinner";
+import { useRouter } from "next/navigation";
 
-type ProfileData = UserProfile;
+type ProfileData = Profile;
 
 interface CertificationInfo {
   text: string;
@@ -41,46 +44,38 @@ interface CertificationInfo {
 // Sistema de escalabilidade para labels (6px em 375px)
 const getLabelFontSize = () => {
   if (typeof window === "undefined") return "text-[6px]";
-
   const width = window.innerWidth;
-
-  if (width < 375) return "text-[6px]"; // Base: 6px
-  if (width < 400) return "text-[7px]"; // +1px: 7px
-  if (width < 480) return "text-[8px]"; // +2px: 8px
-  if (width < 640) return "text-[9px]"; // +3px: 9px
-  if (width < 768) return "text-[10px]"; // +4px: 10px
-  if (width < 1024) return "text-[11px] sm:text-[12px]"; // +6px: 12px
-  return "text-[11px] sm:text-[12px] md:text-[14px]"; // +8px: 14px
+  if (width < 375) return "text-[6px]";
+  if (width < 400) return "text-[7px]";
+  if (width < 480) return "text-[8px]";
+  if (width < 640) return "text-[9px]";
+  if (width < 768) return "text-[10px]";
+  if (width < 1024) return "text-[11px] sm:text-[12px]";
+  return "text-[11px] sm:text-[12px] md:text-[14px]";
 };
 
-// Sistema de escalabilidade para conteúdo PRINCIPAL (um pouco maior que labels)
 const getContentFontSize = () => {
   if (typeof window === "undefined") return "text-xs";
-
   const width = window.innerWidth;
-
-  if (width < 375) return "text-xs"; // Base: 12px (6px maior que labels)
-  if (width < 400) return "text-sm"; // +2px: 14px
-  if (width < 480) return "text-base"; // +4px: 16px
-  if (width < 640) return "text-lg"; // +6px: 18px
-  if (width < 768) return "text-lg sm:text-xl"; // +8px: 20px
-  if (width < 1024) return "text-lg sm:text-xl md:text-2xl"; // +12px: 24px
-  return "text-lg sm:text-xl md:text-2xl lg:text-3xl"; // +16px: 28px
+  if (width < 375) return "text-xs";
+  if (width < 400) return "text-sm";
+  if (width < 480) return "text-base";
+  if (width < 640) return "text-lg";
+  if (width < 768) return "text-lg sm:text-xl";
+  if (width < 1024) return "text-lg sm:text-xl md:text-2xl";
+  return "text-lg sm:text-xl md:text-2xl lg:text-3xl";
 };
 
-// Sistema de escalabilidade para conteúdo SECUNDÁRIO (matrícula, datas)
 const getSecondaryContentFontSize = () => {
   if (typeof window === "undefined") return "text-[10px]";
-
   const width = window.innerWidth;
-
-  if (width < 375) return "text-[10px]"; // Base: 10px (4px maior que labels)
-  if (width < 400) return "text-[11px]"; // +1px: 11px
-  if (width < 480) return "text-[12px]"; // +2px: 12px
-  if (width < 640) return "text-[13px]"; // +3px: 13px
-  if (width < 768) return "text-[14px] sm:text-[15px]"; // +5px: 15px
-  if (width < 1024) return "text-[14px] sm:text-[15px] md:text-[16px]"; // +6px: 16px
-  return "text-[14px] sm:text-[15px] md:text-[16px] lg:text-[18px]"; // +8px: 18px
+  if (width < 375) return "text-[10px]";
+  if (width < 400) return "text-[11px]";
+  if (width < 480) return "text-[12px]";
+  if (width < 640) return "text-[13px]";
+  if (width < 768) return "text-[14px] sm:text-[15px]";
+  if (width < 1024) return "text-[14px] sm:text-[15px] md:text-[16px]";
+  return "text-[14px] sm:text-[15px] md:text-[16px] lg:text-[18px]";
 };
 
 const InactiveAgentDialog = ({
@@ -91,18 +86,18 @@ const InactiveAgentDialog = ({
   onClose: () => void;
 }) => (
   <Dialog open={isOpen} onOpenChange={onClose}>
-    <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-alert/20 shadow-2xl rounded-xl fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-y-auto">
+    <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-error/20 shadow-2xl rounded-xl fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 max-h-[85vh] overflow-y-auto">
       <div className="absolute right-3 top-3 opacity-0 pointer-events-none">
         <div className="w-4 h-4" />
       </div>
 
       <DialogHeader className="px-4 pt-4 pb-2">
         <div className="flex items-center justify-center mb-3">
-          <div className="bg-alert/10 p-2.5 rounded-full">
-            <RiAlertLine className="w-6 h-6 text-alert" />
+          <div className="bg-error/10 p-2.5 rounded-full">
+            <RiAlertLine className="w-6 h-6 text-error" />
           </div>
         </div>
-        <DialogTitle className="text-center text-lg font-bold text-alert font-roboto leading-tight">
+        <DialogTitle className="text-center text-lg font-bold text-error font-roboto leading-tight">
           AGENTE NÃO VINCULADO À PAC
         </DialogTitle>
         <DialogDescription className="text-center text-slate-700 mt-1 text-sm font-roboto">
@@ -111,16 +106,16 @@ const InactiveAgentDialog = ({
       </DialogHeader>
 
       <div className="space-y-3 px-4 py-2">
-        <div className="bg-alert/5 border border-alert/20 rounded-lg p-3">
+        <div className="bg-error/5 border border-error/20 rounded-lg p-3">
           <p className="text-xs text-slate-800 font-medium text-center font-roboto leading-relaxed">
-            <strong className="text-alert">ATENÇÃO:</strong> Você não está mais
+            <strong className="text-error">ATENÇÃO:</strong> Você não está mais
             vinculado à <strong>Patrulha Aérea Civil</strong>.
           </p>
         </div>
 
         <div className="space-y-2">
           <p className="text-xs text-slate-700 font-roboto text-center leading-relaxed">
-            <strong className="text-alert">
+            <strong className="text-error">
               DEVOLUÇÃO IMEDIATA OBRIGATÓRIA:
             </strong>{" "}
             Você deve entregar imediatamente sua credencial aos responsáveis.
@@ -128,7 +123,7 @@ const InactiveAgentDialog = ({
 
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-2">
             <p className="text-[11px] text-slate-600 text-center font-roboto leading-relaxed">
-              <strong className="text-alert">PUNIÇÕES LEGAIS:</strong> A
+              <strong className="text-error">PUNIÇÕES LEGAIS:</strong> A
               retenção indevida da credencial sujeita o portador a medidas
               disciplinares e penais conforme o regulamento interno da PAC.
             </p>
@@ -171,7 +166,7 @@ const InactiveAgentDialog = ({
       <div className="flex justify-center pt-3 px-4 pb-4">
         <Button
           onClick={onClose}
-          className="bg-alert hover:bg-alert/90 text-white font-semibold py-2.5 px-6 text-sm transition-all duration-300 hover:scale-105 font-roboto w-full max-w-[280px]"
+          className="bg-error hover:bg-error/90 text-white font-semibold py-2.5 px-6 text-sm transition-all duration-300 hover:scale-105 font-roboto w-full max-w-[280px]"
           size="lg"
         >
           ENTENDI - CLIQUE PARA CONTINUAR
@@ -187,31 +182,11 @@ const InactiveAgentDialog = ({
   </Dialog>
 );
 
-const LoadingSpinner = () => (
-  <div className="flex items-center justify-center space-x-3">
-    <div className="relative w-6 h-6">
-      <motion.div
-        className="absolute inset-0 border-2 border-navy/30 rounded-full"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-      />
-      <motion.div
-        className="absolute inset-0 border-2 border-transparent border-t-navy rounded-full"
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-      />
-    </div>
-    <span className="text-slate-700 font-medium font-roboto">
-      Carregando...
-    </span>
-  </div>
-);
-
 const BaseLayout = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gradient-to-br from-navy to-navy-700 relative overflow-hidden">
     <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
     <div className="absolute top-0 left-0 w-72 h-72 bg-navy-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-    <div className="absolute bottom-0 right-0 w-96 h-96 bg-alert/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
+    <div className="absolute bottom-0 right-0 w-96 h-96 bg-error/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
     {children}
   </div>
 );
@@ -225,13 +200,10 @@ const LoadingState = () => (
         className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
       >
         <div className="flex justify-center mb-6">
-          <LoadingSpinner />
+          <Spinner className="size-8 text-navy" />
         </div>
-        <h2 className="text-2xl font-bold text-slate-800 mb-3 font-roboto">
-          Carregando Perfil
-        </h2>
         <p className="text-slate-600 text-lg font-roboto">
-          Buscando suas informações...
+          Carregando informações...
         </p>
       </motion.div>
     </div>
@@ -264,8 +236,8 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
   if (!profile.status) {
     return {
       text: "CERTIFICAÇÃO CANCELADA",
-      className: "text-alert font-semibold",
-      iconColor: "text-alert",
+      className: "text-error font-semibold",
+      iconColor: "text-error",
       badgeVariant: "destructive",
     };
   }
@@ -286,8 +258,8 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
   if (isNaN(certificationDate.getTime())) {
     return {
       text: "DATA INVÁLIDA",
-      className: "text-alert font-semibold",
-      iconColor: "text-alert",
+      className: "text-error font-semibold",
+      iconColor: "text-error",
       badgeVariant: "destructive",
     };
   }
@@ -295,8 +267,8 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
   if (certificationDate < today) {
     return {
       text: `EXPIRADA - ${formatDate(profile.validade_certificacao)}`,
-      className: "text-alert font-semibold",
-      iconColor: "text-alert",
+      className: "text-error font-semibold",
+      iconColor: "text-error",
       badgeVariant: "destructive",
     };
   }
@@ -329,21 +301,48 @@ const ActionButton: React.FC<{
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   onClick?: () => void;
-}> = ({ href, icon: Icon, label, onClick }) => {
+  disabled?: boolean;
+  disabledMessage?: string;
+}> = ({
+  href,
+  icon: Icon,
+  label,
+  onClick,
+  disabled = false,
+  disabledMessage,
+}) => {
   const buttonContent = (
     <motion.div
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+      whileHover={disabled ? {} : { scale: 1.05 }}
+      whileTap={disabled ? {} : { scale: 0.95 }}
+      className={`
+        flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 w-full min-h-[44px]
+        ${
+          disabled
+            ? "bg-slate-400 cursor-not-allowed"
+            : "bg-navy/90 hover:bg-navy cursor-pointer"
+        }
+      `}
+      title={disabled ? disabledMessage : ""}
     >
-      {Icon && <Icon className="w-3.5 h-3.5 text-white flex-shrink-0" />}
-      <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+      {Icon && (
+        <Icon
+          className={`w-3.5 h-3.5 flex-shrink-0 ${
+            disabled ? "text-white/60" : "text-white"
+          }`}
+        />
+      )}
+      <span
+        className={`text-xs font-medium whitespace-nowrap font-roboto ${
+          disabled ? "text-white/60" : "text-white"
+        }`}
+      >
         {label}
       </span>
     </motion.div>
   );
 
-  if (href) {
+  if (href && !disabled) {
     return (
       <Link href={href} className="w-full">
         {buttonContent}
@@ -352,7 +351,7 @@ const ActionButton: React.FC<{
   }
 
   return (
-    <div onClick={onClick} className="w-full">
+    <div onClick={disabled ? undefined : onClick} className="w-full">
       {buttonContent}
     </div>
   );
@@ -365,22 +364,84 @@ const ActionButtons = ({
 }: {
   profile: ProfileData;
   isAdmin: boolean;
-  onSignOut: () => void;
+  onSignOut: () => Promise<{ success: boolean; error?: string }>;
 }) => {
+  const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const hasRedirected = useRef(false);
 
   const handleSignOut = async () => {
+    // Prevenir múltiplos cliques
+    if (isSigningOut || hasRedirected.current) return;
+
     setIsSigningOut(true);
+    hasRedirected.current = true;
+
     try {
-      await onSignOut();
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
-      window.location.href = "/login";
-    } finally {
-      setIsSigningOut(false);
+      // Executar logout sem esperar resultado
+      onSignOut().finally(() => {
+        // Redirecionar APÓS o logout completar (não importa sucesso ou erro)
+        setTimeout(() => {
+          router.push("/login");
+          router.refresh();
+        }, 100);
+      });
+    } catch {
+      // Em caso de erro, redirecionar mesmo assim
+      setTimeout(() => {
+        router.push("/login");
+        router.refresh();
+      }, 100);
     }
   };
 
+  // AGENTE INATIVO: Apenas botão Sair
+  if (!profile.status) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.6 }}
+        className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
+      >
+        <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-2 w-full max-w-xs">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSignOut}
+            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
+          >
+            {isSigningOut ? (
+              <Spinner className="w-3.5 h-3.5 text-white" />
+            ) : (
+              <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+            )}
+            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+              {isSigningOut ? "Saindo..." : "Sair"}
+            </span>
+          </motion.div>
+
+          <ActionButton href="/" icon={RiHomeLine} label="Voltar ao Site" />
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.8 }}
+          className="text-center mt-3 w-full"
+        >
+          <p className="text-white/70 text-[10px] font-roboto">
+            Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
+          </p>
+          <p className="text-error text-xs font-bold mt-1 font-roboto">
+            ⚠️ AGENTE INATIVO - ACESSO LIMITADO
+          </p>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // AGENTE ATIVO
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -389,7 +450,8 @@ const ActionButtons = ({
       className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
     >
       <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2 w-full">
-        {isAdmin && (
+        {/* ADMIN: Todos os botões */}
+        {isAdmin ? (
           <>
             <ActionButton
               href={`/admin/agentes/${profile.id}`}
@@ -401,21 +463,52 @@ const ActionButtons = ({
               icon={RiBarChartLine}
               label="Dashboard"
             />
+            <ActionButton href="/" icon={RiHomeLine} label="Site" />
+
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSignOut}
+              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
+            >
+              {isSigningOut ? (
+                <Spinner className="w-3.5 h-3.5 text-white" />
+              ) : (
+                <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+              )}
+              <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                {isSigningOut ? "Saindo..." : "Sair"}
+              </span>
+            </motion.div>
+          </>
+        ) : (
+          // AGENTE ATIVO: Apenas Site e Sair
+          <>
+            <ActionButton href="/" icon={RiHomeLine} label="Site" />
+            <div className="col-span-1" />
+            <ActionButton
+              disabled={true}
+              icon={RiLockLine}
+              label="Acesso Restrito"
+              disabledMessage="Apenas administradores podem editar perfis"
+            />
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSignOut}
+              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
+            >
+              {isSigningOut ? (
+                <Spinner className="w-3.5 h-3.5 text-white" />
+              ) : (
+                <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+              )}
+              <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                {isSigningOut ? "Saindo..." : "Sair"}
+              </span>
+            </motion.div>
           </>
         )}
-        <ActionButton href="/" icon={RiHomeLine} label="Site" />
-
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={handleSignOut}
-          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
-        >
-          <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-          <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-            {isSigningOut ? "Saindo..." : "Sair"}
-          </span>
-        </motion.div>
       </div>
 
       <motion.div
@@ -427,6 +520,11 @@ const ActionButtons = ({
         <p className="text-white/70 text-[10px] font-roboto">
           Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
         </p>
+        {isAdmin && (
+          <p className="text-success text-xs font-bold mt-1 font-roboto">
+            👑 ADMINISTRADOR - ACESSO COMPLETO
+          </p>
+        )}
       </motion.div>
     </motion.div>
   );
@@ -434,35 +532,47 @@ const ActionButtons = ({
 
 // Componente principal
 export default function AgentPerfil() {
-  const { profile, loading, signOut, isAdmin } = useAuth();
+  const { user, profile, isLoading, isAuthenticated, isAdmin, logout } =
+    useAuthStore();
+
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
   const [labelFontSize, setLabelFontSize] = useState("text-[6px]");
   const [contentFontSize, setContentFontSize] = useState("text-xs");
   const [secondaryContentFontSize, setSecondaryContentFontSize] =
     useState("text-[10px]");
 
+  const initializedRef = useRef(false);
+
+  // Inicializar store apenas uma vez
+  useEffect(() => {
+    if (!initializedRef.current && !user && !isLoading) {
+      initializedRef.current = true;
+      const { initialize } = useAuthStore.getState();
+      initialize();
+    }
+  }, [user, isLoading]);
+
+  // Verificar autenticação
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading && user) {
+      // Usuário foi deslogado, redirecionar
+      window.location.href = "/login";
+      return;
+    }
+  }, [isAuthenticated, isLoading, user]);
+
+  // Verificar agente inativo
   useEffect(() => {
     const shouldShowDialog = profile && !profile.status;
-
     if (shouldShowDialog) {
       const timer = setTimeout(() => {
         setShowInactiveDialog(true);
       }, 100);
-
       return () => clearTimeout(timer);
     }
   }, [profile]);
 
-  useEffect(() => {
-    if (!loading && !profile) {
-      const timer = setTimeout(() => {
-        window.location.href = "/login";
-      }, 1000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [profile, loading]);
-
+  // Atualizar tamanhos de fonte
   useEffect(() => {
     const handleResize = () => {
       setLabelFontSize(getLabelFontSize());
@@ -470,15 +580,18 @@ export default function AgentPerfil() {
       setSecondaryContentFontSize(getSecondaryContentFontSize());
     };
 
-    handleResize(); // Set initial values
+    handleResize();
     window.addEventListener("resize", handleResize);
-
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  if (loading) return <LoadingState />;
+  // Estado de carregamento
+  if (isLoading) {
+    return <LoadingState />;
+  }
 
-  if (!profile) {
+  // Verificação de autenticação - SEM redirect automático
+  if (!profile || !isAuthenticated) {
     return (
       <BaseLayout>
         <div className="flex items-center justify-center min-h-screen p-4 relative z-20">
@@ -487,12 +600,12 @@ export default function AgentPerfil() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center border border-white/20"
           >
-            <RiErrorWarningLine className="w-14 h-14 text-alert mx-auto mb-4" />
+            <RiErrorWarningLine className="w-14 h-14 text-error mx-auto mb-4" />
             <h2 className="text-xl font-bold text-slate-800 mb-3 font-roboto">
-              Perfil Não Encontrado
+              Acesso Não Autorizado
             </h2>
             <p className="text-slate-600 text-base mb-6 font-roboto">
-              Não foi possível carregar seu perfil.
+              Faça login para acessar seu perfil.
             </p>
             <Button
               onClick={() => (window.location.href = "/login")}
@@ -511,8 +624,11 @@ export default function AgentPerfil() {
   const labelClass = `${labelFontSize} font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1`;
   const mainContentClass = `${contentFontSize} font-bold text-slate-800 leading-tight font-roboto text-center break-words px-1 uppercase`;
   const secondaryContentClass = `${secondaryContentFontSize} font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1`;
-  const graduationClass = `${contentFontSize} font-bold text-alert font-roboto break-words text-center leading-tight uppercase`;
-  const bloodTypeClass = `${contentFontSize} font-bold text-alert font-roboto text-center leading-tight uppercase`;
+
+  // 1. Graduação e Tipo Sanguíneo em vermelho (error)
+  const graduationClass = `${contentFontSize} font-bold text-error font-roboto break-words text-center leading-tight uppercase`;
+  const bloodTypeClass = `${contentFontSize} font-bold text-error font-roboto text-center leading-tight uppercase`;
+
   const certificationClass = `${secondaryContentFontSize} font-bold font-roboto ${certificationInfo.className} text-center leading-tight`;
 
   return (
@@ -596,7 +712,7 @@ export default function AgentPerfil() {
                 <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3 mb-3 items-stretch">
                   {/* Coluna da Esquerda */}
                   <div className="flex flex-col space-y-2">
-                    {/* Graduação */}
+                    {/* Graduação (EM VERMELHO) */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className={labelClass}>Graduação</label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
@@ -608,7 +724,7 @@ export default function AgentPerfil() {
                       </div>
                     </div>
 
-                    {/* Tipo Sanguíneo */}
+                    {/* Tipo Sanguíneo (EM VERMELHO) */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className={labelClass}>Tipo Sanguíneo</label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
@@ -627,7 +743,7 @@ export default function AgentPerfil() {
                         </p>
                         {!profile.status && (
                           <p
-                            className={`${labelFontSize} text-alert mt-0.5 font-roboto text-center`}
+                            className={`${labelFontSize} text-error mt-0.5 font-roboto text-center`}
                           >
                             ⚠️ Agente inativo - certificação cancelada
                           </p>
@@ -685,6 +801,7 @@ export default function AgentPerfil() {
                       transition={{ duration: 0.3 }}
                       className="w-full max-w-xs"
                     >
+                      {/* 2. Botão ATIVO fica verde, INATIVO fica vermelho */}
                       <div
                         className={`
                           ${secondaryContentFontSize}
@@ -695,8 +812,8 @@ export default function AgentPerfil() {
                           text-center font-roboto
                           ${
                             profile.status
-                              ? "bg-gradient-to-r from-success to-success-600 text-white"
-                              : "bg-gradient-to-r from-alert to-alert-600 text-white"
+                              ? "bg-gradient-to-r from-success to-success-600 text-white" // VERDE para ativo
+                              : "bg-gradient-to-r from-error to-error-600 text-white" // VERMELHO para inativo
                           }
                         `}
                       >
@@ -726,15 +843,21 @@ export default function AgentPerfil() {
                   </div>
                   {!profile.status ? (
                     <p
-                      className={`${labelFontSize} text-alert mt-1.5 text-center font-roboto font-semibold px-1`}
+                      className={`${labelFontSize} text-error mt-1.5 text-center font-roboto font-semibold px-1`}
                     >
                       AGENTE INATIVO - ACESSO LIMITADO AO SISTEMA
+                    </p>
+                  ) : isAdmin ? (
+                    <p
+                      className={`${labelFontSize} text-navy mt-1.5 text-center font-roboto font-semibold px-1`}
+                    >
+                      ADMINISTRADOR - ACESSO COMPLETO AO SISTEMA
                     </p>
                   ) : (
                     <p
                       className={`${labelFontSize} text-success mt-1.5 text-center font-roboto font-semibold px-1`}
                     >
-                      AGENTE ATIVO - ACESSO COMPLETO AO SISTEMA
+                      AGENTE ATIVO - ACESSO AO PERFIL
                     </p>
                   )}
                 </div>
@@ -746,7 +869,7 @@ export default function AgentPerfil() {
           <ActionButtons
             profile={profile}
             isAdmin={isAdmin}
-            onSignOut={signOut}
+            onSignOut={logout}
           />
         </div>
       </div>

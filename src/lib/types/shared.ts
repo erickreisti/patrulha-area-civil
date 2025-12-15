@@ -7,8 +7,7 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[]
-  | Record<string, unknown>;
+  | Json[];
 
 // Labels para UI
 export const USER_ROLE_LABELS: Record<UserRole, string> = {

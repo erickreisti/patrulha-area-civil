@@ -17,7 +17,7 @@ export type Database = {
           validade_certificacao: string | null;
           tipo_sanguineo: string | null;
           status: boolean;
-          role: UserRole; // ← Usando tipo compartilhado
+          role: UserRole;
           created_at: string;
           updated_at: string;
           uf: string | null;
@@ -34,7 +34,7 @@ export type Database = {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
-          role?: UserRole; // ← Usando tipo compartilhado
+          role?: UserRole;
           created_at?: string;
           updated_at?: string;
           uf?: string | null;
@@ -51,7 +51,7 @@ export type Database = {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
-          role?: UserRole; // ← Usando tipo compartilhado
+          role?: UserRole;
           created_at?: string;
           updated_at?: string;
           uf?: string | null;

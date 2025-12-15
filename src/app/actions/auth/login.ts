@@ -1,27 +1,55 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/client";
-import { createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { Session } from "@supabase/supabase-js";
+import type { Profile } from "@/lib/supabase/types";
 
+// Tipos de resposta
+type LoginSuccessResponse = {
+  success: true;
+  message: string;
+  data: {
+    session: Session;
+    user: Profile;
+  };
+};
+
+type LoginErrorResponse = {
+  success: false;
+  error: string;
+  details?: z.ZodError["flatten"] | Record<string, unknown>;
+};
+
+type LoginResponse = LoginSuccessResponse | LoginErrorResponse;
+
+// Schema de validação
 const LoginSchema = z.object({
   matricula: z
     .string()
-    .min(1, "Matrícula é obrigatória")
+    .min(11, "Matrícula deve ter 11 dígitos")
+    .max(11, "Matrícula deve ter 11 dígitos")
     .transform((val) => val.replace(/\D/g, "")),
 });
 
-// Cache para rate limiting (simples)
+// Cache para rate limiting
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
 
-export async function loginWithMatricula(formData: FormData) {
-  const ip = "server-action"; // Em Server Actions, não temos IP direto
+export async function login(formData: FormData): Promise<LoginResponse> {
+  console.log("🔍 [Server Action] login() chamada");
+  console.log("🔍 [Server Action] FormData:", Array.from(formData.entries()));
+
+  const ip = "server-action";
   const now = Date.now();
 
   try {
-    // Rate limiting simples
+    // Rate limiting
     const attempts = loginAttempts.get(ip) || { count: 0, lastAttempt: 0 };
+    console.log("🔍 [Server Action] Rate limiting check:", attempts);
+
     if (now - attempts.lastAttempt < 60000 && attempts.count >= 5) {
+      console.log("🔍 [Server Action] Rate limit excedido");
       return {
         success: false,
         error: "Muitas tentativas. Tente novamente em 1 minuto.",
@@ -30,21 +58,41 @@ export async function loginWithMatricula(formData: FormData) {
 
     // Extrair e validar matrícula
     const matricula = formData.get("matricula") as string;
+    console.log("🔍 [Server Action] Matrícula do formData:", matricula);
+
     const validated = LoginSchema.parse({ matricula });
+    console.log("🔍 [Server Action] Matrícula validada:", validated.matricula);
 
-    // Usar cliente do servidor para buscar dados
-    const supabaseServer = await createServerClient();
+    // 🔐 1. Buscar email pela matrícula usando Service Role (bypass RLS)
+    console.log("🔍 [Server Action] Criando cliente Supabase Admin...");
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false,
+        },
+      }
+    );
 
-    // Buscar perfil pela matrícula
-    const { data: profile, error: profileError } = await supabaseServer
+    // 🔧 BUSCAR TODOS OS CAMPOS DO PERFIL
+    console.log("🔍 [Server Action] Buscando perfil no banco...");
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select(
-        "id, email, full_name, role, status, avatar_url, graduacao, matricula"
-      )
+      .select("*")
       .eq("matricula", validated.matricula)
       .single();
 
+    console.log("🔍 [Server Action] Resultado da busca do perfil:", {
+      profile,
+      profileError,
+      hasProfile: !!profile,
+      status: profile?.status,
+    });
+
     if (profileError || !profile) {
+      console.error("🔍 [Server Action] Erro ao buscar perfil:", profileError);
       loginAttempts.set(ip, { count: attempts.count + 1, lastAttempt: now });
       return {
         success: false,
@@ -52,95 +100,108 @@ export async function loginWithMatricula(formData: FormData) {
       };
     }
 
-    // Verificar status
-    if (!profile.status) {
+    console.log("🔍 [Server Action] Perfil encontrado:", {
+      id: profile.id,
+      email: profile.email,
+      status: profile.status,
+      role: profile.role,
+      has_validade_certificacao: !!profile.validade_certificacao,
+      has_tipo_sanguineo: !!profile.tipo_sanguineo,
+    });
+
+    // 🔑 2. Fazer login com email e senha padrão
+    console.log("🔍 [Server Action] Criando cliente Supabase público...");
+    const supabasePublic = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const defaultPassword =
+      process.env.NEXT_PUBLIC_DEFAULT_PASSWORD || "PAC@2025!Secure";
+    console.log("🔍 [Server Action] Senha padrão usada:", defaultPassword);
+
+    console.log("🔍 [Server Action] Tentando autenticar com:", {
+      email: profile.email,
+      passwordLength: defaultPassword.length,
+    });
+
+    const { data: authData, error: authError } =
+      await supabasePublic.auth.signInWithPassword({
+        email: profile.email,
+        password: defaultPassword,
+      });
+
+    console.log("🔍 [Server Action] Resultado da autenticação:", {
+      hasAuthData: !!authData,
+      hasAuthError: !!authError,
+      authError,
+      session: authData?.session ? "Sessão criada" : "Sem sessão",
+    });
+
+    if (authError) {
+      console.error("🔍 [Server Action] Erro no auth:", authError);
       return {
         success: false,
-        error: "Conta inativa. Entre em contato com o administrador.",
+        error: `Erro ao fazer login: ${authError.message}`,
       };
     }
 
-    // Resetar contador de tentativas
+    if (!authData.session) {
+      return {
+        success: false,
+        error: "Sessão não criada",
+      };
+    }
+
+    // ✅ 3. Resetar contador e retornar sucesso
+    console.log("🔍 [Server Action] Login bem-sucedido!");
     loginAttempts.delete(ip);
 
-    // Retornar informações do perfil (sem fazer login ainda)
-    // O login real será feito pelo cliente com a senha padrão
-    return {
+    // 🗃️ 4. Revalidar cache
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/perfil");
+
+    // 📋 5. Retornar dados COMPLETOS do usuário
+    const responseData: LoginSuccessResponse = {
       success: true,
+      message: profile.status
+        ? "Login realizado com sucesso!"
+        : "Login realizado - Agente inativo",
       data: {
-        id: profile.id,
-        email: profile.email,
-        full_name: profile.full_name,
-        role: profile.role,
-        status: profile.status,
-        matricula: profile.matricula,
-        avatar_url: profile.avatar_url,
-        graduacao: profile.graduacao,
-        security: {
-          default_password: process.env.DEFAULT_PASSWORD || "PAC@2025!Secure",
-          requires_password_change: false,
-        },
+        session: authData.session,
+        user: profile,
       },
     };
+
+    console.log("🔍 [Server Action] Retornando dados:", {
+      success: responseData.success,
+      message: responseData.message,
+      userId: responseData.data.user.id,
+      userStatus: responseData.data.user.status,
+      camposRetornados: Object.keys(responseData.data.user),
+    });
+
+    return responseData;
   } catch (error) {
-    console.error("Erro em loginWithMatricula:", error);
+    console.error("🔍 [Server Action] Erro em login:", error);
 
     if (error instanceof z.ZodError) {
+      console.error(
+        "🔍 [Server Action] Erro de validação Zod:",
+        error.flatten()
+      );
       return {
         success: false,
         error: "Erro de validação",
-        details: error.flatten().fieldErrors,
+        details: error.flatten(),
       };
     }
 
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Erro ao fazer login",
-    };
-  }
-}
-
-// Função para login real com email e senha
-export async function performLogin(formData: FormData) {
-  try {
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    if (!email || !password) {
-      return {
-        success: false,
-        error: "Email e senha são obrigatórios",
-      };
-    }
-
-    // Usar cliente do navegador (isso será executado no cliente)
-    const supabase = createClient();
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
-
-    return {
-      success: true,
-      data: {
-        user: data.user,
-        session: data.session,
-      },
-    };
-  } catch (error) {
-    console.error("Erro em performLogin:", error);
-
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Erro ao fazer login",
+      error:
+        error instanceof Error ? error.message : "Erro desconhecido no login",
     };
   }
 }

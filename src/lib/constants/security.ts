@@ -39,60 +39,10 @@ export const SECURITY = {
   },
 } as const;
 
-// Funções de validação
-export function validatePassword(password: string): {
-  isValid: boolean;
-  errors: string[];
-} {
-  const errors: string[] = [];
-
-  if (password.length < SECURITY.PASSWORD.MIN_LENGTH) {
-    errors.push(
-      `A senha deve ter pelo menos ${SECURITY.PASSWORD.MIN_LENGTH} caracteres`
-    );
-  }
-
-  if (SECURITY.PASSWORD.REQUIRE_UPPERCASE && !/[A-Z]/.test(password)) {
-    errors.push("A senha deve conter pelo menos uma letra maiúscula");
-  }
-
-  if (SECURITY.PASSWORD.REQUIRE_LOWERCASE && !/[a-z]/.test(password)) {
-    errors.push("A senha deve conter pelo menos uma letra minúscula");
-  }
-
-  if (SECURITY.PASSWORD.REQUIRE_NUMBERS && !/\d/.test(password)) {
-    errors.push("A senha deve conter pelo menos um número");
-  }
-
-  if (SECURITY.PASSWORD.REQUIRE_SPECIAL_CHARS && !/[@$!%*?&]/.test(password)) {
-    errors.push(
-      "A senha deve conter pelo menos um caractere especial (@$!%*?&)"
-    );
-  }
-
-  // Verificar senhas comuns
-  const commonPasswords = ["password", "123456", "qwerty", "senha", "admin"];
-  if (commonPasswords.includes(password.toLowerCase())) {
-    errors.push("Essa senha é muito comum. Escolha uma senha mais segura.");
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
-}
-
-export function validateMatricula(matricula: string): boolean {
-  const cleaned = matricula.replace(/\D/g, "");
-  return cleaned.length === 11;
-}
-
-export function formatMatricula(matricula: string): string {
-  const cleaned = matricula.replace(/\D/g, "");
-  if (cleaned.length !== 11) return matricula;
-
-  return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(
-    6,
-    9
-  )}-${cleaned.slice(9, 11)}`;
-}
+export const AGENTS = {
+  PAGINATION_LIMIT: 50,
+  MATRICULA_LENGTH: 11,
+  MIN_NAME_LENGTH: 2,
+  MAX_NAME_LENGTH: 100,
+  DEFAULT_ROLE: "agent" as const,
+} as const;

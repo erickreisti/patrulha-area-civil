@@ -94,16 +94,9 @@ export const metadata: Metadata = {
   },
 };
 
-// Componente para inicialização segura
-async function SupabaseInitializer() {
-  try {
-    // Validar ambiente (opcional)
-    const { validateEnvironment } = await import("@/lib/supabase/validate-env");
-    validateEnvironment();
-  } catch (error) {
-    console.warn("⚠️ Inicialização do Supabase:", error);
-  }
-
+// Componente Client para inicialização segura
+// MOVIDO para fora do head e sem async
+function SupabaseInitializer() {
   return null;
 }
 
@@ -139,8 +132,7 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#1e3a8a" />
         <meta name="msapplication-tap-highlight" content="no" />
 
-        {/* Inicialização segura do Supabase */}
-        <SupabaseInitializer />
+        {/* REMOVIDO: SupabaseInitializer do head */}
       </head>
       <body className="font-sans antialiased bg-background text-foreground min-h-screen min-w-[320px]">
         {/* Skip to content link para acessibilidade */}
@@ -175,6 +167,9 @@ export default function RootLayout({
             </div>
           </div>
         </noscript>
+
+        {/* MOVIDO: Inicialização do Supabase para o final do body */}
+        <SupabaseInitializer />
       </body>
     </html>
   );

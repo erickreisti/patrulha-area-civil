@@ -52,8 +52,6 @@ export async function createServerClient() {
     });
   } catch (error) {
     console.error("❌ Erro ao criar cliente do servidor:", error);
-
-    // Em caso de erro crítico, lançar exceção em vez de retornar cliente inválido
     throw new Error("Falha ao inicializar o cliente do servidor");
   }
 }

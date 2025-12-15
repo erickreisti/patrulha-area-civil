@@ -15,7 +15,6 @@ export function createAdminClient() {
     throw new Error("SUPABASE_SERVICE_ROLE_KEY não configurado");
   }
 
-  // Criar cliente com service role (ignora RLS)
   return createClient<Database>(supabaseUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
@@ -25,17 +24,12 @@ export function createAdminClient() {
     global: {
       headers: {
         Authorization: `Bearer ${supabaseServiceKey}`,
-        apikey: supabaseServiceKey,
         "X-Client-Info": "pac-admin",
       },
-    },
-    db: {
-      schema: "public",
     },
   });
 }
 
-// Função segura para usar apenas em Server Components
 export async function getAdminClient() {
   if (typeof window !== "undefined") {
     throw new Error("Admin client não deve ser usado no navegador");

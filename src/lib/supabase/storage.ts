@@ -1,68 +1,18 @@
-export const STORAGE_BUCKETS = {
-  AVATARES: "avatares-agentes",
-  NOTICIAS: "imagens-noticias",
-  GALERIA_FOTOS: "galeria-fotos",
-  GALERIA_VIDEOS: "galeria-videos",
-  DOCUMENTOS: "documentos-oficiais",
-} as const;
+// Importe TUDO de constants/upload.ts - ele já tem todas as definições
+import {
+  STORAGE_BUCKETS,
+  UPLOAD_CONFIGS,
+  type StorageBucket,
+  type UploadConfig,
+  UPLOAD_PATHS,
+  UPLOAD_DIMENSIONS,
+} from "@/lib/constants/upload";
 
-export type StorageBucket = keyof typeof STORAGE_BUCKETS;
+// Re-export TUDO para manter compatibilidade
+export { STORAGE_BUCKETS, UPLOAD_CONFIGS, UPLOAD_PATHS, UPLOAD_DIMENSIONS };
+export type { StorageBucket, UploadConfig };
 
-export interface UploadConfig {
-  maxSize: number;
-  allowedMimeTypes: readonly string[];
-  allowedExtensions: readonly string[];
-  maxWidth?: number;
-  maxHeight?: number;
-}
-
-export const UPLOAD_CONFIGS: Record<StorageBucket, UploadConfig> = {
-  AVATARES: {
-    maxSize: 2 * 1024 * 1024, // 2MB
-    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    allowedExtensions: [".jpg", ".jpeg", ".png", ".webp", ".gif"],
-    maxWidth: 512,
-    maxHeight: 512,
-  },
-  NOTICIAS: {
-    maxSize: 5 * 1024 * 1024, // 5MB
-    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    allowedExtensions: [".jpg", ".jpeg", ".png", ".webp", ".gif"],
-    maxWidth: 1920,
-    maxHeight: 1080,
-  },
-  GALERIA_FOTOS: {
-    maxSize: 10 * 1024 * 1024, // 10MB
-    allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    allowedExtensions: [".jpg", ".jpeg", ".png", ".webp", ".gif"],
-    maxWidth: 3840,
-    maxHeight: 2160,
-  },
-  GALERIA_VIDEOS: {
-    maxSize: 100 * 1024 * 1024, // 100MB
-    allowedMimeTypes: [
-      "video/mp4",
-      "video/mpeg",
-      "video/quicktime",
-      "video/x-msvideo",
-      "video/webm",
-    ],
-    allowedExtensions: [".mp4", ".mpeg", ".mov", ".avi", ".webm", ".mkv"],
-  },
-  DOCUMENTOS: {
-    maxSize: 50 * 1024 * 1024, // 50MB
-    allowedMimeTypes: [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text/plain",
-    ],
-    allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt"],
-  },
-};
-
+// Agora adicione APENAS as funções que não existem em constants/upload.ts
 export function validateUpload(
   file: File,
   bucket: StorageBucket
@@ -87,7 +37,7 @@ export function validateUpload(
   // Tipo MIME
   if (!config.allowedMimeTypes.includes(file.type)) {
     const allowedTypes = config.allowedMimeTypes
-      .map((t) => t.split("/")[1])
+      .map((t: string) => t.split("/")[1])
       .join(", ");
     return {
       isValid: false,
@@ -130,12 +80,10 @@ export function validateUpload(
   return { isValid: true };
 }
 
-// Helper para obter bucket pelo nome
 export function getBucketName(bucket: StorageBucket): string {
   return STORAGE_BUCKETS[bucket];
 }
 
-// Helper para gerar nome de arquivo seguro
 export function generateSafeFilename(originalName: string): string {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 15);

@@ -1,7 +1,8 @@
-// Importe apenas o que precisa exportar
+// constantes de app.ts
 export * from "./app";
 export * from "./routes";
-export * from "./security";
 export * from "./upload";
 
-// Não exporte tipos daqui - use lib/types/shared.ts
+// constantes de security.ts
+export { SECURITY } from "./security";
+export { AGENTS } from "./security";

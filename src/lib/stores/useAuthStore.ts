@@ -1,24 +1,14 @@
+"use client";
+
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { createClient } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/supabase/types";
-import {
-  type UserRole,
-  type UserStatus,
-  normalizeUserStatus,
-} from "@/lib/types/shared"; // ← Import corrigido
+import { login as serverLogin } from "@/app/actions/auth/login";
+import { logout as serverLogout } from "@/app/actions/auth/logout";
 
-interface AuthUser {
-  id: string;
-  email: string;
-  role: UserRole;
-  status: UserStatus;
-  full_name?: string;
-  avatar_url?: string;
-  matricula?: string;
-  graduacao?: string;
-}
+type AuthUser = Profile;
 
 interface AuthState {
   // Estado
@@ -28,17 +18,23 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
-  // Métodos
-  initialize: () => Promise<void>;
-  login: (matricula: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
-  refresh: () => Promise<void>;
-  clearError: () => void;
-
   // Computed
   isAuthenticated: boolean;
   isAdmin: boolean;
   isActive: boolean;
+
+  // Métodos
+  initialize: () => Promise<void>;
+  login: (matricula: string) => Promise<{
+    success: boolean;
+    error?: string;
+    data?: {
+      user: AuthUser;
+      session: Session;
+    };
+  }>;
+  logout: () => Promise<{ success: boolean; error?: string }>;
+  clearError: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -50,27 +46,15 @@ export const useAuthStore = create<AuthState>()(
       profile: null,
       isLoading: false,
       error: null,
-
-      // Computed properties
-      get isAuthenticated() {
-        const state = get();
-        return !!(
-          state.session &&
-          state.user &&
-          state.user.status === "active"
-        );
-      },
-
-      get isAdmin() {
-        return get().user?.role === "admin";
-      },
-
-      get isActive() {
-        return get().user?.status === "active";
-      },
+      isAuthenticated: false,
+      isAdmin: false,
+      isActive: false,
 
       // Métodos
       initialize: async () => {
+        // Se já está carregando, não faz nada
+        if (get().isLoading) return;
+
         set({ isLoading: true, error: null });
 
         try {
@@ -90,6 +74,9 @@ export const useAuthStore = create<AuthState>()(
               session: null,
               profile: null,
               isLoading: false,
+              isAuthenticated: false,
+              isAdmin: false,
+              isActive: false,
             });
             return;
           }
@@ -103,7 +90,6 @@ export const useAuthStore = create<AuthState>()(
 
           if (profileError) {
             console.warn("Erro ao buscar perfil:", profileError);
-            // Tentar fazer logout se perfil não existe
             await supabase.auth.signOut();
             set({
               user: null,
@@ -111,44 +97,34 @@ export const useAuthStore = create<AuthState>()(
               profile: null,
               isLoading: false,
               error: "Perfil não encontrado",
+              isAuthenticated: false,
+              isAdmin: false,
+              isActive: false,
             });
             return;
           }
 
-          // 3. Verificar se profile tem role
-          if (!profile.role) {
-            throw new Error("Perfil sem role definida");
-          }
-
-          // 4. Criar usuário unificado
-          const user: AuthUser = {
-            id: session.user.id,
-            email: session.user.email!,
-            role: profile.role,
-            status: normalizeUserStatus(profile.status), // ← Usando função compartilhada
-            full_name: profile.full_name || undefined,
-            avatar_url: profile.avatar_url || undefined,
-            graduacao: profile.graduacao || undefined,
-            matricula: profile.matricula || undefined,
-          };
-
           set({
-            user,
+            user: profile,
             session,
             profile,
             isLoading: false,
             error: null,
+            isAuthenticated: true,
+            isAdmin: profile.role === "admin",
+            isActive: profile.status === true,
           });
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Erro desconhecido";
           console.error("Erro na inicialização:", error);
           set({
             user: null,
             session: null,
             profile: null,
             isLoading: false,
-            error: message,
+            error: error instanceof Error ? error.message : "Erro desconhecido",
+            isAuthenticated: false,
+            isAdmin: false,
+            isActive: false,
           });
         }
       },
@@ -157,88 +133,135 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
 
         try {
-          const supabase = createClient();
+          console.log("🔍 [AuthStore] Chamando Server Action login...");
 
-          // 1. Buscar perfil pela matrícula
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("matricula", matricula.replace(/\D/g, ""))
-            .single();
+          // Chamar a Server Action
+          const formData = new FormData();
+          formData.append("matricula", matricula);
 
-          if (profileError || !profile) {
-            throw new Error("Matrícula não encontrada");
-          }
+          const result = await serverLogin(formData);
 
-          // 2. Verificar status
-          if (!profile.status) {
-            throw new Error(
-              "Conta inativa. Entre em contato com o administrador."
-            );
-          }
-
-          // 3. Fazer login
-          const { data: authData, error: authError } =
-            await supabase.auth.signInWithPassword({
-              email: profile.email,
-              password:
-                process.env.NEXT_PUBLIC_DEFAULT_PASSWORD || "PAC@2025!Secure",
+          // Verificar se deu erro
+          if (!result.success) {
+            const errorMsg = result.error || "Erro no login";
+            set({
+              isLoading: false,
+              error: errorMsg,
+              isAuthenticated: false,
+              isAdmin: false,
+              isActive: false,
             });
+            return { success: false, error: errorMsg };
+          }
 
-          if (authError) throw authError;
+          const { session: sessionData, user: userData } = result.data;
 
-          // 4. Atualizar estado
-          const user: AuthUser = {
-            id: authData.user.id,
-            email: authData.user.email!,
-            role: profile.role,
-            status: normalizeUserStatus(profile.status), // ← Usando função compartilhada
-            full_name: profile.full_name || undefined,
-            avatar_url: profile.avatar_url || undefined,
-            graduacao: profile.graduacao || undefined,
-            matricula: profile.matricula || undefined,
-          };
-
+          // Atualizar estado
           set({
-            user,
-            session: authData.session,
-            profile,
+            user: userData,
+            session: sessionData,
+            profile: userData,
             isLoading: false,
             error: null,
+            isAuthenticated: true,
+            isAdmin: userData.role === "admin",
+            isActive: userData.status === true,
           });
 
-          return { success: true };
+          return {
+            success: true,
+            data: {
+              user: userData,
+              session: sessionData,
+            },
+          };
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Erro no login";
-          set({ error: message, isLoading: false });
+          set({
+            error: message,
+            isLoading: false,
+            isAuthenticated: false,
+            isAdmin: false,
+            isActive: false,
+          });
           return { success: false, error: message };
         }
       },
 
       logout: async () => {
-        set({ isLoading: true });
-
         try {
-          const supabase = createClient();
-          await supabase.auth.signOut();
+          console.log("🔍 [AuthStore] Iniciando logout...");
 
+          // 2. Limpar estado local em UMA única chamada
           set({
             user: null,
             session: null,
             profile: null,
             isLoading: false,
             error: null,
+            isAuthenticated: false,
+            isAdmin: false,
+            isActive: false,
           });
+
+          // 3. Limpar localStorage manualmente (APÓS setState)
+          if (typeof window !== "undefined") {
+            // Primeiro limpa o storage do zustand
+            localStorage.removeItem("auth-storage");
+
+            // Depois limpa cookies Supabase
+            document.cookie.split(";").forEach((c) => {
+              const cookie = c.trim();
+              if (
+                cookie.startsWith("sb-") ||
+                cookie.startsWith("supabase-auth")
+              ) {
+                document.cookie = cookie.replace(
+                  /=.*/,
+                  `=;expires=${new Date().toUTCString()};path=/`
+                );
+              }
+            });
+          }
+
+          // 4. Chamar Server Action de logout (assíncrono, não esperar)
+          serverLogout()
+            .then((result) => {
+              if (!result.success) {
+                console.warn(
+                  "🔍 [AuthStore] Server action logout falhou:",
+                  result.error
+                );
+              }
+            })
+            .catch((error) => {
+              console.warn(
+                "🔍 [AuthStore] Erro na Server Action logout:",
+                error
+              );
+            });
+
+          console.log("🔍 [AuthStore] Logout bem-sucedido (estado limpo)");
+          return { success: true };
         } catch (error) {
           const message =
             error instanceof Error ? error.message : "Erro no logout";
-          set({ error: message, isLoading: false });
-        }
-      },
+          console.error("🔍 [AuthStore] Erro no logout:", error);
 
-      refresh: async () => {
-        await get().initialize();
+          // Mesmo com erro, garantir que o estado está limpo
+          set({
+            user: null,
+            session: null,
+            profile: null,
+            isLoading: false,
+            error: message,
+            isAuthenticated: false,
+            isAdmin: false,
+            isActive: false,
+          });
+          return { success: false, error: message };
+        }
       },
 
       clearError: () => {
@@ -250,7 +273,18 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         profile: state.profile,
+        session: state.session,
       }),
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (state) {
+            // Recalcular propriedades computadas
+            state.isAuthenticated = !!state.session && !!state.user;
+            state.isAdmin = state.user?.role === "admin";
+            state.isActive = state.user?.status === true;
+          }
+        };
+      },
     }
   )
 );

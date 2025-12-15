@@ -23,7 +23,6 @@ export function createClient() {
       detectSessionInUrl: true,
     },
     cookies: {
-      // Nova API da versão 0.7.0
       getAll() {
         if (typeof document === "undefined") return [];
 

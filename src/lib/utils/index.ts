@@ -1,9 +1,18 @@
-// Exporte tudo de um lugar
-export * from "./error";
+// Re-exporta tudo de validation
 export * from "./validation";
-export * from "./performance";
-export * from "./retry";
+
+// Exporta outras utilidades
+export * from "./error";
 export * from "./cn";
 
-// Não exporte: validateMatricula, formatMatricula (agora em constants/security)
-// Não exporte: normalizeUserStatus (agora em types/shared)
+// Exporta por categoria para imports específicos
+export { ValidationHelpers, FormatHelpers, StringHelpers } from "./validation";
+
+// Exporta tipos
+export type {
+  FormValidationData,
+  LoginData,
+  ProfileFormData,
+  ValidationResult,
+  FormFieldValidation,
+} from "./validation";

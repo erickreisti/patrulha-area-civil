@@ -2,7 +2,7 @@
 export { createClient } from "./client";
 export { createServerClient } from "./server";
 export { createAdminClient, getAdminClient } from "./admin";
-export { validateEnvironment } from "./validate-env";
+export { validateEnvironment, validateClientEnvironment } from "./validate-env";
 
 // Tipos
 export type { Database } from "./types";
@@ -33,11 +33,12 @@ export type {
 // Storage
 export {
   STORAGE_BUCKETS,
-  type StorageBucket,
   UPLOAD_CONFIGS,
-  type UploadConfig,
   validateUpload,
+  getBucketName,
+  generateSafeFilename,
 } from "./storage";
+export type { StorageBucket, UploadConfig } from "./storage";
 
 // Configuração padrão
 export const supabaseConfig = {
@@ -46,16 +47,9 @@ export const supabaseConfig = {
     persistSession: true,
     detectSessionInUrl: true,
   },
-  global: {
-    headers: {
-      "X-Client-Info": "pac-system",
-      "Content-Type": "application/json",
-    },
-  },
   cookieOptions: {
     name: "sb-pac-auth",
     lifetime: 60 * 60 * 8, // 8 horas
-    domain: "",
     path: "/",
     sameSite: "lax",
   },
