@@ -77,11 +77,11 @@ export default function LoginPage() {
 
       if (result?.success) {
         // Toast de sucesso
-        toastHelpers.login.success("Login realizado com sucesso!");
+        toastHelpers.success("Login realizado com sucesso!");
 
         // Verificar status do usuário
         if (result.data?.user && !result.data.user.status) {
-          toastHelpers.security.warning(
+          toastHelpers.warning(
             "Sua conta está inativa. Entre em contato com o comando."
           );
         }
@@ -104,13 +104,13 @@ export default function LoginPage() {
             "Matrícula não encontrada. Você não faz parte da PAC - Patrulha Aérea Civil";
         }
 
-        toastHelpers.login.error(finalMessage);
+        toastHelpers.error("Falha no login", finalMessage);
         setError(finalMessage);
       }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
-      toastHelpers.login.error(errorMessage);
+      toastHelpers.error("Erro na autenticação", errorMessage);
       setError("Erro inesperado. Tente novamente.");
     } finally {
       setIsLoading(false);

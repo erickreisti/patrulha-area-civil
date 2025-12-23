@@ -2,270 +2,387 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { createClient } from "@/lib/supabase/client";
-import type { Session } from "@supabase/supabase-js";
+import type { User, Session } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/supabase/types";
-import { login as serverLogin } from "@/app/actions/auth/login";
-import { logout as serverLogout } from "@/app/actions/auth/logout";
 
-type AuthUser = Profile;
+// Interface para debug info - simplificada para compatibilidade
+interface DebugInfo {
+  step?: string;
+  error?: string;
+  code?: string;
+  userId?: string;
+  matricula?: string;
+  timestamp?: string;
+  hashExpected?: string;
+  hashReceived?: string;
+  hashLengthExpected?: number;
+  hashLengthReceived?: number;
+  testWithPac2026?: boolean;
+  not_admin?: string;
+  inactive?: boolean;
+  "2fa_disabled"?: boolean;
+  hash_salt_missing?: {
+    hasHash: boolean;
+    hasSalt: boolean;
+  };
+  password_mismatch?: {
+    hashExpected: string;
+    hashReceived: string;
+    hashLengthExpected: number;
+    hashLengthReceived: number;
+    testWithPac2026: boolean;
+  };
+  zod_error?: Array<{
+    code: string;
+    message: string;
+    path: string[];
+  }>;
+  unexpected_error?: string;
+  fetch_profile?: string;
+  profile_not_found?: string;
+  success?: string;
+  [key: string]: unknown;
+}
 
-interface AuthState {
-  // Estado
-  user: AuthUser | null;
-  session: Session | null;
+// Interface para retorno da server action
+interface AdminAuthResult {
+  success: boolean;
+  error?: string;
+  message?: string;
+  details?: {
+    fieldErrors?: Record<string, string[]>;
+    formErrors?: string[];
+  };
+  debug?: DebugInfo;
+}
+
+interface AuthStore {
+  user: User | null;
   profile: Profile | null;
+  session: Session | null;
   isLoading: boolean;
-  error: string | null;
-
-  // Computed
   isAuthenticated: boolean;
   isAdmin: boolean;
-  isActive: boolean;
+  adminAuthenticated: boolean;
+  adminSessionExpires: Date | null;
 
-  // Métodos
-  initialize: () => Promise<void>;
+  setUser: (user: User | null) => void;
+  setProfile: (profile: Profile | null) => void;
+  setSession: (session: Session | null) => void;
+  setIsLoading: (isLoading: boolean) => void;
+  setIsAuthenticated: (isAuthenticated: boolean) => void;
+  setIsAdmin: (isAdmin: boolean) => void;
+
   login: (matricula: string) => Promise<{
     success: boolean;
     error?: string;
     data?: {
-      user: AuthUser;
+      user: Profile;
       session: Session;
     };
   }>;
-  logout: () => Promise<{ success: boolean; error?: string }>;
-  clearError: () => void;
+
+  logout: () => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+
+  initialize: () => Promise<void>;
+
+  verifyAdminAccess: (adminPassword: string) => Promise<AdminAuthResult>;
+
+  clearAdminAuth: () => void;
+  checkAdminAuthExpired: () => boolean;
 }
 
-export const useAuthStore = create<AuthState>()(
+export const useAuthStore = create<AuthStore>()(
   persist(
     (set, get) => ({
-      // Estado inicial
       user: null,
-      session: null,
       profile: null,
+      session: null,
       isLoading: false,
-      error: null,
       isAuthenticated: false,
       isAdmin: false,
-      isActive: false,
+      adminAuthenticated: false,
+      adminSessionExpires: null,
 
-      // Métodos
-      initialize: async () => {
-        // Se já está carregando, não faz nada
-        if (get().isLoading) return;
+      setUser: (user) => set({ user }),
+      setProfile: (profile) =>
+        set({
+          profile,
+          isAdmin: profile?.role === "admin" && profile?.status === true,
+        }),
+      setSession: (session) => set({ session }),
+      setIsLoading: (isLoading) => set({ isLoading }),
+      setIsAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
+      setIsAdmin: (isAdmin) => set({ isAdmin }),
 
-        set({ isLoading: true, error: null });
-
-        try {
-          const supabase = createClient();
-
-          // 1. Obter sessão atual
-          const {
-            data: { session },
-            error: sessionError,
-          } = await supabase.auth.getSession();
-
-          if (sessionError) throw sessionError;
-
-          if (!session?.user) {
-            set({
-              user: null,
-              session: null,
-              profile: null,
-              isLoading: false,
-              isAuthenticated: false,
-              isAdmin: false,
-              isActive: false,
-            });
-            return;
-          }
-
-          // 2. Buscar perfil
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .single();
-
-          if (profileError) {
-            console.warn("Erro ao buscar perfil:", profileError);
-            await supabase.auth.signOut();
-            set({
-              user: null,
-              session: null,
-              profile: null,
-              isLoading: false,
-              error: "Perfil não encontrado",
-              isAuthenticated: false,
-              isAdmin: false,
-              isActive: false,
-            });
-            return;
-          }
-
-          set({
-            user: profile,
-            session,
-            profile,
-            isLoading: false,
-            error: null,
-            isAuthenticated: true,
-            isAdmin: profile.role === "admin",
-            isActive: profile.status === true,
-          });
-        } catch (error) {
-          console.error("Erro na inicialização:", error);
-          set({
-            user: null,
-            session: null,
-            profile: null,
-            isLoading: false,
-            error: error instanceof Error ? error.message : "Erro desconhecido",
-            isAuthenticated: false,
-            isAdmin: false,
-            isActive: false,
-          });
-        }
-      },
-
-      login: async (matricula: string) => {
-        set({ isLoading: true, error: null });
+      login: async (matricula) => {
+        set({ isLoading: true });
 
         try {
-          console.log("🔍 [AuthStore] Chamando Server Action login...");
+          console.log(
+            "🔍 [AuthStore] Iniciando login com matrícula:",
+            matricula
+          );
 
-          // Chamar a Server Action
           const formData = new FormData();
           formData.append("matricula", matricula);
 
-          const result = await serverLogin(formData);
+          const loginModule = await import("@/app/actions/auth/login");
+          const result = await loginModule.login(formData);
 
-          // Verificar se deu erro
-          if (!result.success) {
-            const errorMsg = result.error || "Erro no login";
+          console.log("🔍 [AuthStore] Resultado do login:", result);
+
+          if (result.success && result.data) {
+            set({
+              user: result.data.session?.user || null,
+              profile: result.data.user,
+              session: result.data.session || null,
+              isAuthenticated: true,
+              isAdmin:
+                result.data.user?.role === "admin" &&
+                result.data.user?.status === true,
+              isLoading: false,
+            });
+          } else {
             set({
               isLoading: false,
-              error: errorMsg,
               isAuthenticated: false,
-              isAdmin: false,
-              isActive: false,
             });
-            return { success: false, error: errorMsg };
           }
 
-          const { session: sessionData, user: userData } = result.data;
-
-          // Atualizar estado
-          set({
-            user: userData,
-            session: sessionData,
-            profile: userData,
-            isLoading: false,
-            error: null,
-            isAuthenticated: true,
-            isAdmin: userData.role === "admin",
-            isActive: userData.status === true,
-          });
+          return result;
+        } catch (error) {
+          console.error("❌ [AuthStore] Erro no login:", error);
+          set({ isLoading: false });
 
           return {
-            success: true,
-            data: {
-              user: userData,
-              session: sessionData,
-            },
+            success: false,
+            error: "Erro na comunicação com o servidor",
           };
-        } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Erro no login";
-          set({
-            error: message,
-            isLoading: false,
-            isAuthenticated: false,
-            isAdmin: false,
-            isActive: false,
-          });
-          return { success: false, error: message };
         }
       },
 
       logout: async () => {
         try {
-          console.log("🔍 [AuthStore] Iniciando logout...");
+          console.log("🔍 [AuthStore] Iniciando logout");
 
-          // 2. Limpar estado local em UMA única chamada
-          set({
-            user: null,
-            session: null,
-            profile: null,
-            isLoading: false,
-            error: null,
-            isAuthenticated: false,
-            isAdmin: false,
-            isActive: false,
-          });
+          const logoutModule = await import("@/app/actions/auth/logout");
+          const result = await logoutModule.logout();
 
-          // 3. Limpar localStorage manualmente (APÓS setState)
-          if (typeof window !== "undefined") {
-            // Primeiro limpa o storage do zustand
-            localStorage.removeItem("auth-storage");
+          console.log("🔍 [AuthStore] Resultado do logout:", result);
 
-            // Depois limpa cookies Supabase
-            document.cookie.split(";").forEach((c) => {
-              const cookie = c.trim();
-              if (
-                cookie.startsWith("sb-") ||
-                cookie.startsWith("supabase-auth")
-              ) {
-                document.cookie = cookie.replace(
-                  /=.*/,
-                  `=;expires=${new Date().toUTCString()};path=/`
-                );
-              }
+          if (result.success) {
+            set({
+              user: null,
+              profile: null,
+              session: null,
+              isLoading: false,
+              isAuthenticated: false,
+              isAdmin: false,
+              adminAuthenticated: false,
+              adminSessionExpires: null,
             });
           }
 
-          // 4. Chamar Server Action de logout (assíncrono, não esperar)
-          serverLogout()
-            .then((result) => {
-              if (!result.success) {
-                console.warn(
-                  "🔍 [AuthStore] Server action logout falhou:",
-                  result.error
-                );
-              }
-            })
-            .catch((error) => {
-              console.warn(
-                "🔍 [AuthStore] Erro na Server Action logout:",
-                error
-              );
-            });
-
-          console.log("🔍 [AuthStore] Logout bem-sucedido (estado limpo)");
-          return { success: true };
+          return result;
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "Erro no logout";
-          console.error("🔍 [AuthStore] Erro no logout:", error);
+          console.error("❌ [AuthStore] Erro no logout:", error);
 
-          // Mesmo com erro, garantir que o estado está limpo
           set({
             user: null,
-            session: null,
             profile: null,
+            session: null,
             isLoading: false,
-            error: message,
             isAuthenticated: false,
             isAdmin: false,
-            isActive: false,
+            adminAuthenticated: false,
+            adminSessionExpires: null,
           });
-          return { success: false, error: message };
+
+          return {
+            success: false,
+            error: "Erro ao fazer logout",
+          };
         }
       },
 
-      clearError: () => {
-        set({ error: null });
+      initialize: async () => {
+        set({ isLoading: true });
+
+        try {
+          const { createBrowserClient } = await import("@supabase/ssr");
+
+          const supabase = createBrowserClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+              auth: {
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: true,
+              },
+            }
+          );
+
+          const {
+            data: { session },
+            error,
+          } = await supabase.auth.getSession();
+
+          if (error) {
+            console.error("❌ [AuthStore] Erro ao obter sessão:", error);
+            set({ isLoading: false, isAuthenticated: false });
+            return;
+          }
+
+          if (session?.user) {
+            const { data: profile, error: profileError } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .single();
+
+            if (profileError) {
+              console.error(
+                "❌ [AuthStore] Erro ao buscar perfil:",
+                profileError
+              );
+              set({ isLoading: false, isAuthenticated: false });
+              return;
+            }
+
+            set({
+              user: session.user,
+              profile,
+              session,
+              isAuthenticated: true,
+              isAdmin: profile?.role === "admin" && profile?.status === true,
+              isLoading: false,
+            });
+
+            // Verificar se sessão admin expirou
+            if (profile?.role === "admin") {
+              const store = get();
+              if (store.adminAuthenticated && store.adminSessionExpires) {
+                const isExpired =
+                  new Date() > new Date(store.adminSessionExpires);
+                if (isExpired) {
+                  set({
+                    adminAuthenticated: false,
+                    adminSessionExpires: null,
+                  });
+                }
+              }
+            }
+          } else {
+            set({
+              isLoading: false,
+              isAuthenticated: false,
+            });
+          }
+        } catch (error) {
+          console.error("❌ [AuthStore] Erro na inicialização:", error);
+          set({
+            isLoading: false,
+            isAuthenticated: false,
+          });
+        }
+      },
+
+      verifyAdminAccess: async (adminPassword: string) => {
+        set({ isLoading: true });
+
+        try {
+          console.log("🔍 [AuthStore] Verificando acesso admin...");
+
+          const { profile } = get();
+
+          // Validar se o perfil existe
+          if (!profile) {
+            console.error("❌ [AuthStore] Perfil não encontrado");
+            return {
+              success: false,
+              error: "Perfil não encontrado. Faça login novamente.",
+            } as AdminAuthResult;
+          }
+
+          if (profile.role !== "admin" || !profile.status) {
+            console.error("❌ [AuthStore] Usuário não é admin ou está inativo");
+            return {
+              success: false,
+              error: "Acesso administrativo não autorizado",
+            } as AdminAuthResult;
+          }
+
+          console.log("🔍 [AuthStore] Passando para server action...");
+
+          // Chamar server action diretamente com o userId
+          const formData = new FormData();
+          formData.append("adminPassword", adminPassword);
+          formData.append("userId", profile.id);
+          formData.append("userEmail", profile.email || "");
+
+          const adminAuthModule = await import(
+            "@/app/actions/auth/admin/admin-auth"
+          );
+          const result = await adminAuthModule.verifyAdminPassword(formData);
+
+          console.log("🔍 [AuthStore] Resultado da verificação:", result);
+
+          if (result.success) {
+            const expires = new Date();
+            expires.setMinutes(expires.getMinutes() + 15);
+
+            set({
+              adminAuthenticated: true,
+              adminSessionExpires: expires,
+              isLoading: false,
+            });
+          } else {
+            set({ isLoading: false });
+          }
+
+          // Garantir que o resultado está no formato correto
+          return {
+            success: result.success,
+            error: result.error,
+            message: result.message,
+            details: result.details,
+            debug: result.debug as DebugInfo,
+          } as AdminAuthResult;
+        } catch (error) {
+          console.error("❌ [AuthStore] Erro na verificação admin:", error);
+          set({ isLoading: false });
+
+          return {
+            success: false,
+            error: "Erro na autenticação administrativa",
+            debug: { error: String(error) } as DebugInfo,
+          } as AdminAuthResult;
+        }
+      },
+
+      clearAdminAuth: () => {
+        set({
+          adminAuthenticated: false,
+          adminSessionExpires: null,
+        });
+      },
+
+      checkAdminAuthExpired: () => {
+        const { adminSessionExpires } = get();
+
+        if (!adminSessionExpires) {
+          return true;
+        }
+
+        const now = new Date();
+        const expires = new Date(adminSessionExpires);
+
+        return now > expires;
       },
     }),
     {
@@ -274,16 +391,15 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         profile: state.profile,
         session: state.session,
+        isAuthenticated: state.isAuthenticated,
+        isAdmin: state.isAdmin,
+        adminAuthenticated: state.adminAuthenticated,
+        adminSessionExpires: state.adminSessionExpires?.toISOString(),
       }),
-      onRehydrateStorage: () => {
-        return (state) => {
-          if (state) {
-            // Recalcular propriedades computadas
-            state.isAuthenticated = !!state.session && !!state.user;
-            state.isAdmin = state.user?.role === "admin";
-            state.isActive = state.user?.status === true;
-          }
-        };
+      onRehydrateStorage: () => (state) => {
+        if (state && state.adminSessionExpires) {
+          state.adminSessionExpires = new Date(state.adminSessionExpires);
+        }
       },
     }
   )

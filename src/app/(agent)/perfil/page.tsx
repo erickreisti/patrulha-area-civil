@@ -10,6 +10,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,10 @@ import {
   RiMailLine,
   RiAlertLine,
   RiLockLine,
+  RiShieldKeyholeLine,
+  RiEyeLine,
+  RiEyeOffLine,
+  RiSettingsLine,
 } from "react-icons/ri";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import type { Profile } from "@/lib/supabase/types";
@@ -41,7 +46,7 @@ interface CertificationInfo {
   badgeVariant: "default" | "secondary" | "destructive";
 }
 
-// Sistema de escalabilidade para labels (6px em 375px)
+// Sistema de escalabilidade para labels
 const getLabelFontSize = () => {
   if (typeof window === "undefined") return "text-[6px]";
   const width = window.innerWidth;
@@ -78,6 +83,7 @@ const getSecondaryContentFontSize = () => {
   return "text-[14px] sm:text-[15px] md:text-[16px] lg:text-[18px]";
 };
 
+// Modal para Agente Inativo
 const InactiveAgentDialog = ({
   isOpen,
   onClose,
@@ -181,6 +187,156 @@ const InactiveAgentDialog = ({
     </DialogContent>
   </Dialog>
 );
+
+// Modal de Autenticação Admin
+const AdminAuthModal = ({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) => {
+  const [adminPassword, setAdminPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { verifyAdminAccess } = useAuthStore();
+  const router = useRouter();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!adminPassword.trim()) {
+      setError("Digite a senha de administrador");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const result = await verifyAdminAccess(adminPassword);
+
+      console.log("🔍 [AdminModal] Resultado da autenticação:", result);
+
+      if (result.success) {
+        console.log(
+          "✅ [AdminModal] Autenticação bem-sucedida, redirecionando..."
+        );
+        router.push("/admin/dashboard");
+        onClose();
+      } else {
+        setError(result.error || "Senha de administrador incorreta");
+      }
+    } catch (err) {
+      console.error("❌ [AdminModal] Erro:", err);
+      setError("Erro na autenticação. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-navy/20 shadow-2xl rounded-xl">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <div className="flex items-center justify-center mb-3">
+            <div className="bg-navy/10 p-2.5 rounded-full">
+              <RiShieldKeyholeLine className="w-6 h-6 text-navy" />
+            </div>
+          </div>
+
+          <DialogTitle className="text-center text-lg font-bold text-navy font-roboto">
+            AUTENTICAÇÃO ADMINISTRATIVA
+          </DialogTitle>
+
+          <DialogDescription className="text-center text-slate-700 mt-1 text-sm font-roboto">
+            Acesso restrito ao Painel Administrativo
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 px-4 py-2">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2 font-roboto">
+              Senha Administrativa
+            </label>
+
+            <div className="relative">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  setError("");
+                }}
+                placeholder="Digite sua senha administrativa"
+                disabled={loading}
+                className={`w-full text-lg pr-10 ${
+                  error ? "border-error focus:ring-error" : "border-slate-300"
+                }`}
+                autoFocus
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700 focus:outline-none"
+                aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+                disabled={loading}
+              >
+                {showPassword ? (
+                  <RiEyeOffLine className="w-5 h-5" />
+                ) : (
+                  <RiEyeLine className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 mt-2 text-error text-sm">
+                <RiErrorWarningLine className="w-4 h-4" />
+                <span className="font-roboto">{error}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-navy hover:bg-navy/90 text-white font-semibold py-2.5 text-sm transition-all font-roboto"
+            >
+              {loading ? (
+                <>
+                  <Spinner className="w-4 h-4 mr-2" />
+                  Verificando...
+                </>
+              ) : (
+                "Acessar Painel Admin"
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+              className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50 font-roboto"
+            >
+              Cancelar
+            </Button>
+          </div>
+        </form>
+
+        <div className="text-center px-4 pb-3">
+          <p className="text-[10px] text-slate-500 font-roboto">
+            Esta autenticação é adicional à senha padrão do sistema
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const BaseLayout = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gradient-to-br from-navy to-navy-700 relative overflow-hidden">
@@ -361,33 +517,33 @@ const ActionButtons = ({
   profile,
   isAdmin,
   onSignOut,
+  onOpenAdminAuth,
+  onSetupPassword,
 }: {
   profile: ProfileData;
   isAdmin: boolean;
   onSignOut: () => Promise<{ success: boolean; error?: string }>;
+  onOpenAdminAuth: () => void;
+  onSetupPassword: () => void;
 }) => {
   const router = useRouter();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const hasRedirected = useRef(false);
 
   const handleSignOut = async () => {
-    // Prevenir múltiplos cliques
     if (isSigningOut || hasRedirected.current) return;
 
     setIsSigningOut(true);
     hasRedirected.current = true;
 
     try {
-      // Executar logout sem esperar resultado
       onSignOut().finally(() => {
-        // Redirecionar APÓS o logout completar (não importa sucesso ou erro)
         setTimeout(() => {
           router.push("/login");
           router.refresh();
         }, 100);
       });
     } catch {
-      // Em caso de erro, redirecionar mesmo assim
       setTimeout(() => {
         router.push("/login");
         router.refresh();
@@ -395,7 +551,7 @@ const ActionButtons = ({
     }
   };
 
-  // AGENTE INATIVO: Apenas botão Sair
+  // Se o agente está inativo
   if (!profile.status) {
     return (
       <motion.div
@@ -441,7 +597,6 @@ const ActionButtons = ({
     );
   }
 
-  // AGENTE ATIVO
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -450,19 +605,53 @@ const ActionButtons = ({
       className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
     >
       <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2 w-full">
-        {/* ADMIN: Todos os botões */}
         {isAdmin ? (
           <>
-            <ActionButton
-              href={`/admin/agentes/${profile.id}`}
-              icon={RiEditLine}
-              label="Editar"
-            />
-            <ActionButton
-              href="/admin/dashboard"
-              icon={RiBarChartLine}
-              label="Dashboard"
-            />
+            {/* Botão para configuração de senha se não estiver configurada */}
+            {!profile.admin_2fa_enabled ? (
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onSetupPassword}
+                className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-warning/90 hover:bg-warning w-full min-h-[44px]"
+              >
+                <RiSettingsLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                  Configurar Senha
+                </span>
+              </motion.div>
+            ) : (
+              <ActionButton
+                href={`/admin/agentes/${profile.id}`}
+                icon={RiEditLine}
+                label="Editar"
+              />
+            )}
+
+            {/* Botão Dashboard só aparece se senha estiver configurada */}
+            {profile.admin_2fa_enabled ? (
+              <motion.div
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onOpenAdminAuth}
+                className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+              >
+                <RiBarChartLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                  Dashboard
+                </span>
+              </motion.div>
+            ) : (
+              <div className="opacity-50 cursor-not-allowed">
+                <div className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg bg-slate-400 w-full min-h-[44px]">
+                  <RiBarChartLine className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
+                  <span className="text-xs font-medium text-white/60 whitespace-nowrap font-roboto">
+                    Configure Senha
+                  </span>
+                </div>
+              </div>
+            )}
+
             <ActionButton href="/" icon={RiHomeLine} label="Site" />
 
             <motion.div
@@ -482,7 +671,6 @@ const ActionButtons = ({
             </motion.div>
           </>
         ) : (
-          // AGENTE ATIVO: Apenas Site e Sair
           <>
             <ActionButton href="/" icon={RiHomeLine} label="Site" />
             <div className="col-span-1" />
@@ -521,8 +709,14 @@ const ActionButtons = ({
           Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
         </p>
         {isAdmin && (
-          <p className="text-success text-xs font-bold mt-1 font-roboto">
-            👑 ADMINISTRADOR - ACESSO COMPLETO
+          <p
+            className={`text-xs font-bold mt-1 font-roboto ${
+              profile.admin_2fa_enabled ? "text-success" : "text-warning"
+            }`}
+          >
+            {profile.admin_2fa_enabled
+              ? "👑 ADMINISTRADOR - ACESSO COMPLETO"
+              : "⚠️ ADMINISTRADOR - CONFIGURE A SENHA"}
           </p>
         )}
       </motion.div>
@@ -530,12 +724,13 @@ const ActionButtons = ({
   );
 };
 
-// Componente principal
 export default function AgentPerfil() {
   const { user, profile, isLoading, isAuthenticated, isAdmin, logout } =
     useAuthStore();
+  const router = useRouter();
 
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
+  const [showAdminAuthModal, setShowAdminAuthModal] = useState(false);
   const [labelFontSize, setLabelFontSize] = useState("text-[6px]");
   const [contentFontSize, setContentFontSize] = useState("text-xs");
   const [secondaryContentFontSize, setSecondaryContentFontSize] =
@@ -543,7 +738,6 @@ export default function AgentPerfil() {
 
   const initializedRef = useRef(false);
 
-  // Inicializar store apenas uma vez
   useEffect(() => {
     if (!initializedRef.current && !user && !isLoading) {
       initializedRef.current = true;
@@ -552,16 +746,13 @@ export default function AgentPerfil() {
     }
   }, [user, isLoading]);
 
-  // Verificar autenticação
   useEffect(() => {
     if (!isAuthenticated && !isLoading && user) {
-      // Usuário foi deslogado, redirecionar
       window.location.href = "/login";
       return;
     }
   }, [isAuthenticated, isLoading, user]);
 
-  // Verificar agente inativo
   useEffect(() => {
     const shouldShowDialog = profile && !profile.status;
     if (shouldShowDialog) {
@@ -572,7 +763,13 @@ export default function AgentPerfil() {
     }
   }, [profile]);
 
-  // Atualizar tamanhos de fonte
+  useEffect(() => {
+    // Verificar se admin precisa configurar senha
+    if (isAdmin && profile && !profile.admin_2fa_enabled) {
+      console.log("⚠️ [AgentPerfil] Admin precisa configurar senha");
+    }
+  }, [isAdmin, profile]);
+
   useEffect(() => {
     const handleResize = () => {
       setLabelFontSize(getLabelFontSize());
@@ -585,12 +782,10 @@ export default function AgentPerfil() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Estado de carregamento
   if (isLoading) {
     return <LoadingState />;
   }
 
-  // Verificação de autenticação - SEM redirect automático
   if (!profile || !isAuthenticated) {
     return (
       <BaseLayout>
@@ -625,17 +820,31 @@ export default function AgentPerfil() {
   const mainContentClass = `${contentFontSize} font-bold text-slate-800 leading-tight font-roboto text-center break-words px-1 uppercase`;
   const secondaryContentClass = `${secondaryContentFontSize} font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1`;
 
-  // 1. Graduação e Tipo Sanguíneo em vermelho (error)
   const graduationClass = `${contentFontSize} font-bold text-error font-roboto break-words text-center leading-tight uppercase`;
   const bloodTypeClass = `${contentFontSize} font-bold text-error font-roboto text-center leading-tight uppercase`;
 
   const certificationClass = `${secondaryContentFontSize} font-bold font-roboto ${certificationInfo.className} text-center leading-tight`;
+
+  const handleOpenAdminAuth = () => {
+    console.log("🔍 [AgentPerfil] Abrindo modal de autenticação admin");
+    setShowAdminAuthModal(true);
+  };
+
+  const handleSetupPassword = () => {
+    console.log("🔍 [AgentPerfil] Redirecionando para configuração de senha");
+    router.push("/admin/setup-password");
+  };
 
   return (
     <BaseLayout>
       <InactiveAgentDialog
         isOpen={showInactiveDialog}
         onClose={() => setShowInactiveDialog(false)}
+      />
+
+      <AdminAuthModal
+        isOpen={showAdminAuthModal}
+        onClose={() => setShowAdminAuthModal(false)}
       />
 
       <div className="min-h-screen flex items-center justify-center p-3 sm:p-4 md:p-6 relative z-20">
@@ -648,7 +857,6 @@ export default function AgentPerfil() {
           >
             <Card className="relative bg-white rounded-xl shadow-sm overflow-hidden w-full border border-slate-200 mx-auto">
               <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6 relative z-10">
-                {/* HEADER */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -700,7 +908,6 @@ export default function AgentPerfil() {
                   </div>
                 </motion.div>
 
-                {/* NOME COMPLETO */}
                 <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
                   <label className={labelClass}>Nome</label>
                   <p className={mainContentClass}>
@@ -708,11 +915,8 @@ export default function AgentPerfil() {
                   </p>
                 </div>
 
-                {/* DUAS COLUNAS */}
                 <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3 mb-3 items-stretch">
-                  {/* Coluna da Esquerda */}
                   <div className="flex flex-col space-y-2">
-                    {/* Graduação (EM VERMELHO) */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className={labelClass}>Graduação</label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
@@ -724,7 +928,6 @@ export default function AgentPerfil() {
                       </div>
                     </div>
 
-                    {/* Tipo Sanguíneo (EM VERMELHO) */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className={labelClass}>Tipo Sanguíneo</label>
                       <div className="h-[calc(100%-1.25rem)] flex items-center justify-center">
@@ -734,7 +937,6 @@ export default function AgentPerfil() {
                       </div>
                     </div>
 
-                    {/* Validade */}
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
                       <label className={labelClass}>Validade</label>
                       <div className="h-[calc(100%-1.25rem)] flex flex-col justify-center items-center">
@@ -752,7 +954,6 @@ export default function AgentPerfil() {
                     </div>
                   </div>
 
-                  {/* Coluna da Direita - Foto */}
                   <div className="flex flex-col items-center justify-center w-full">
                     <div className="w-full aspect-[3/4] rounded-md overflow-hidden relative border border-slate-300">
                       {profile.avatar_url ? (
@@ -780,7 +981,6 @@ export default function AgentPerfil() {
                   </div>
                 </div>
 
-                {/* MATRÍCULA */}
                 <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
                   <label className={labelClass}>Matrícula</label>
                   <p className={secondaryContentClass}>
@@ -788,7 +988,6 @@ export default function AgentPerfil() {
                   </p>
                 </div>
 
-                {/* SITUAÇÃO DO PATRULHEIRO */}
                 <div className="mb-3">
                   <label
                     className={`${labelFontSize} font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1.5 text-center`}
@@ -801,7 +1000,6 @@ export default function AgentPerfil() {
                       transition={{ duration: 0.3 }}
                       className="w-full max-w-xs"
                     >
-                      {/* 2. Botão ATIVO fica verde, INATIVO fica vermelho */}
                       <div
                         className={`
                           ${secondaryContentFontSize}
@@ -812,8 +1010,8 @@ export default function AgentPerfil() {
                           text-center font-roboto
                           ${
                             profile.status
-                              ? "bg-gradient-to-r from-success to-success-600 text-white" // VERDE para ativo
-                              : "bg-gradient-to-r from-error to-error-600 text-white" // VERMELHO para inativo
+                              ? "bg-gradient-to-r from-success to-success-600 text-white"
+                              : "bg-gradient-to-r from-error to-error-600 text-white"
                           }
                         `}
                       >
@@ -849,9 +1047,13 @@ export default function AgentPerfil() {
                     </p>
                   ) : isAdmin ? (
                     <p
-                      className={`${labelFontSize} text-navy mt-1.5 text-center font-roboto font-semibold px-1`}
+                      className={`${labelFontSize} ${
+                        profile.admin_2fa_enabled ? "text-navy" : "text-warning"
+                      } mt-1.5 text-center font-roboto font-semibold px-1`}
                     >
-                      ADMINISTRADOR - ACESSO COMPLETO AO SISTEMA
+                      {profile.admin_2fa_enabled
+                        ? "ADMINISTRADOR - ACESSO COMPLETO AO SISTEMA"
+                        : "ADMINISTRADOR - CONFIGURE A SENHA ADMINISTRATIVA"}
                     </p>
                   ) : (
                     <p
@@ -865,11 +1067,12 @@ export default function AgentPerfil() {
             </Card>
           </motion.div>
 
-          {/* BOTÕES DE AÇÃO */}
           <ActionButtons
             profile={profile}
             isAdmin={isAdmin}
             onSignOut={logout}
+            onOpenAdminAuth={handleOpenAdminAuth}
+            onSetupPassword={handleSetupPassword}
           />
         </div>
       </div>

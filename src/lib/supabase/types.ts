@@ -23,6 +23,11 @@ export type Database = {
           uf: string | null;
           data_nascimento: string | null;
           telefone: string | null;
+          // ✅ NOVAS COLUNAS PARA 2FA ADMIN
+          admin_secret_hash: string | null;
+          admin_secret_salt: string | null;
+          admin_2fa_enabled: boolean;
+          admin_last_auth: string | null;
         };
         Insert: {
           id?: string;
@@ -40,6 +45,11 @@ export type Database = {
           uf?: string | null;
           data_nascimento?: string | null;
           telefone?: string | null;
+          // ✅ ADICIONE TAMBÉM NO Insert
+          admin_secret_hash?: string | null;
+          admin_secret_salt?: string | null;
+          admin_2fa_enabled?: boolean;
+          admin_last_auth?: string | null;
         };
         Update: {
           id?: string;
@@ -57,6 +67,11 @@ export type Database = {
           uf?: string | null;
           data_nascimento?: string | null;
           telefone?: string | null;
+          // ✅ ADICIONE TAMBÉM NO Update
+          admin_secret_hash?: string | null;
+          admin_secret_salt?: string | null;
+          admin_2fa_enabled?: boolean;
+          admin_last_auth?: string | null;
         };
         Relationships: [
           {

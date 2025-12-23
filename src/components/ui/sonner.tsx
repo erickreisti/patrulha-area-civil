@@ -1,21 +1,31 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { Toaster as Sonner, type ToasterProps, toast } from "sonner";
+import { Toaster as Sonner, type ToasterProps, toast, ToastT } from "sonner";
 import {
   FaCheckCircle,
   FaInfoCircle,
   FaExclamationTriangle,
   FaExclamationCircle,
   FaSpinner,
-  FaUserCheck,
-  FaShieldAlt,
-  FaBell,
-  FaLock,
-  FaUser,
-  FaSignOutAlt,
 } from "react-icons/fa";
 import { cn } from "@/lib/utils";
+
+// Tipos para as opções do toast
+type ToastOptions = Omit<ToastT, "id" | "type" | "title"> & {
+  description?: string;
+  [key: string]: unknown;
+};
+
+type PromiseMessages = {
+  loading: string;
+  success: string;
+  error: string;
+};
+
+type PromiseOptions = ToastOptions & {
+  description?: string;
+};
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
@@ -29,7 +39,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       duration={4000}
       offset={16}
       expand={false}
-      closeButton={false} // REMOVIDO O BOTÃO DE FECHAR
+      closeButton={false}
       icons={{
         success: <FaCheckCircle className="size-4" />,
         info: <FaInfoCircle className="size-4" />,
@@ -83,14 +93,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "[&>button]:!border-white/20 [&>button:hover]:!bg-navy-600"
           ),
 
-          // Componentes internos (removido as classes para actionButton e cancelButton)
+          // Componentes internos
           content: "font-medium text-sm",
           description: "text-sm opacity-90 mt-1",
           icon: "mt-0.5",
-          // Removido actionButton e cancelButton já que não tem botão de fechar
         },
         style: {
-          // Garante que fique fixo no topo direito
           position: "fixed",
           zIndex: 9999,
           top: "0",
@@ -104,172 +112,46 @@ const Toaster = ({ ...props }: ToasterProps) => {
   );
 };
 
-// Helper functions para toast com formatação específica do sistema
+// Helper functions para facilitar o uso
 const toastHelpers = {
-  // Feedback de autenticação
-  login: {
-    success: (mensagem?: string) => {
-      toast.success("Login realizado com sucesso!", {
-        description: mensagem || "Redirecionando para o portal...",
-        icon: <FaUserCheck className="text-white" />,
-        duration: 3000,
-      });
-    },
-    error: (error?: string) => {
-      toast.error("Falha no login", {
-        description: error || "Verifique sua matrícula e tente novamente.",
-        icon: <FaLock className="text-white" />,
-        duration: 5000,
-      });
-    },
-    loading: () => {
-      return toast.loading("Autenticando...", {
-        icon: <FaSpinner className="animate-spin text-white" />,
-        duration: 8000,
-      });
-    },
+  // Funções básicas
+  success: (title: string, description?: string, options?: ToastOptions) => {
+    return toast.success(title, { description, ...options });
   },
 
-  // Feedback de logout
-  logout: {
-    success: () => {
-      toast.success("Logout realizado", {
-        description: "Você foi desconectado com sucesso.",
-        icon: <FaSignOutAlt className="text-white" />,
-        duration: 3000,
-      });
-    },
-    error: () => {
-      toast.error("Erro no logout", {
-        description: "Tente novamente ou limpe o cache do navegador.",
-        icon: <FaExclamationCircle className="text-white" />,
-        duration: 5000,
-      });
-    },
+  error: (title: string, description?: string, options?: ToastOptions) => {
+    return toast.error(title, { description, ...options });
   },
 
-  // Feedback de sistema
-  system: {
-    info: (title: string, message?: string) => {
-      toast.info(title, {
-        description: message,
-        icon: <FaInfoCircle className="text-white" />,
-        duration: 4000,
-      });
-    },
-    warning: (title: string, message?: string) => {
-      toast.warning(title, {
-        description: message,
-        icon: <FaExclamationTriangle className="text-white" />,
-        duration: 5000,
-      });
-    },
-    error: (title: string, message?: string) => {
-      toast.error(title, {
-        description: message,
-        icon: <FaExclamationCircle className="text-white" />,
-        duration: 6000,
-      });
-    },
-    success: (title: string, message?: string) => {
-      toast.success(title, {
-        description: message,
-        icon: <FaCheckCircle className="text-white" />,
-        duration: 4000,
-      });
-    },
+  warning: (title: string, description?: string, options?: ToastOptions) => {
+    return toast.warning(title, { description, ...options });
   },
 
-  // Feedback de perfil
-  profile: {
-    updated: () => {
-      toast.success("Perfil atualizado", {
-        description: "Suas informações foram salvas com sucesso.",
-        icon: <FaUser className="text-white" />,
-        duration: 4000,
-      });
-    },
-    error: (message?: string) => {
-      toast.error("Erro ao atualizar", {
-        description: message || "Não foi possível salvar as alterações.",
-        icon: <FaExclamationCircle className="text-white" />,
-        duration: 5000,
-      });
-    },
+  info: (title: string, description?: string, options?: ToastOptions) => {
+    return toast.info(title, { description, ...options });
   },
 
-  // Feedback de segurança
-  security: {
-    warning: (message: string) => {
-      toast.warning("Atenção de segurança", {
-        description: message,
-        icon: <FaShieldAlt className="text-white" />,
-        duration: 6000,
-      });
-    },
-    success: (message: string) => {
-      toast.success("Segurança confirmada", {
-        description: message,
-        icon: <FaShieldAlt className="text-white" />,
-        duration: 4000,
-      });
-    },
+  loading: (title: string, description?: string, options?: ToastOptions) => {
+    return toast.loading(title, { description, ...options });
   },
 
-  // Feedback de notificações
-  notification: {
-    new: (title: string, message?: string) => {
-      toast.info(title, {
-        description: message,
-        icon: <FaBell className="text-white" />,
-        duration: 5000,
-      });
-    },
-  },
-
-  // Funções genéricas (para compatibilidade)
-  success: (message: string, description?: string) => {
-    toastHelpers.system.success(message, description);
-  },
-
-  error: (message: string, description?: string) => {
-    toastHelpers.system.error(message, description);
-  },
-
-  warning: (message: string, description?: string) => {
-    toastHelpers.system.warning(message, description);
-  },
-
-  info: (message: string, description?: string) => {
-    toastHelpers.system.info(message, description);
-  },
-
-  loading: (message: string, description?: string) => {
-    return toast.loading(message, {
-      description,
-    });
-  },
-
-  // Versão simplificada para uso no login
+  // Promise helper
   promise: async <T,>(
     promise: Promise<T>,
-    messages: {
-      loading: string;
-      success: string;
-      error: string;
-    },
-    description?: string
+    messages: PromiseMessages,
+    options?: PromiseOptions
   ) => {
     const toastId = toast.loading(messages.loading, {
-      description,
+      description: options?.description,
+      ...options,
     });
 
     try {
       const result = await promise;
       toast.success(messages.success, {
         id: toastId,
-        description,
-        duration: 3000,
+        description: options?.description,
+        ...options,
       });
       return result;
     } catch (error) {
@@ -277,12 +159,23 @@ const toastHelpers = {
         error instanceof Error ? error.message : "Erro desconhecido";
       toast.error(messages.error, {
         id: toastId,
-        description: description || errorMessage,
-        duration: 5000,
+        description: options?.description || errorMessage,
+        ...options,
       });
       throw error;
     }
   },
+
+  // Função para criar toasts customizados
+  custom: (title: string, options?: ToastOptions) => {
+    return toast(title, options);
+  },
+
+  // Função para dismiss
+  dismiss: (toastId?: string) => {
+    toast.dismiss(toastId);
+  },
 };
 
 export { Toaster, toast, toastHelpers };
+export type { ToastOptions, PromiseMessages, PromiseOptions };

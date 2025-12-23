@@ -1,8 +1,8 @@
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "./types";
-import type { CookieOptions } from "@supabase/ssr";
 
+// Versão simplificada - sempre cria um novo cookieStore
 export async function createServerClient() {
   try {
     const cookieStore = await cookies();
@@ -11,12 +11,10 @@ export async function createServerClient() {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl) {
-      console.error("❌ NEXT_PUBLIC_SUPABASE_URL não configurado");
       throw new Error("NEXT_PUBLIC_SUPABASE_URL não configurado");
     }
 
     if (!supabaseAnonKey) {
-      console.error("❌ NEXT_PUBLIC_SUPABASE_ANON_KEY não configurado");
       throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY não configurado");
     }
 
@@ -25,22 +23,13 @@ export async function createServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(
-          cookiesToSet: Array<{
-            name: string;
-            value: string;
-            options: CookieOptions;
-          }>
-        ) {
+        setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch (error) {
+          } catch {
             // Erro silencioso durante pré-renderização
-            if (process.env.NODE_ENV === "development") {
-              console.warn("⚠️ Erro ao definir cookies:", error);
-            }
           }
         },
       },

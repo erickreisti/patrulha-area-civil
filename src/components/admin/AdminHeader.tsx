@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -45,46 +45,23 @@ import {
 // Importar o SearchComponent
 import { SearchComponent } from "./SearchComponent";
 
-// Tipos corrigidos - usando Json do Supabase
-type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+// Importar tipos do Supabase
+import type { Notification as NotificationType } from "@/lib/supabase/types";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 
+// Interface para UserProfile simplificada
 interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
   role: "admin" | "agent";
 }
 
-interface Notification {
-  id: string;
-  user_id: string | null;
-  type:
-    | "system"
-    | "user_created"
-    | "news_published"
-    | "gallery_upload"
-    | "warning"
-    | "info";
-  title: string;
-  message: string;
-  action_url: string | null;
-  is_read: boolean;
-  metadata: Json | null;
-  expires_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 // Hook de notificações otimizado
 const useNotifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = useMemo(() => createClient(), []);
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -92,12 +69,15 @@ const useNotifications = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setNotifications([]);
+        return;
+      }
 
       const { data, error } = await supabase
         .from("notifications")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", user.id) // ✅ FILTRO CRÍTICO: Apenas notificações do usuário atual
         .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
         .order("created_at", { ascending: false })
         .limit(20);
@@ -106,6 +86,7 @@ const useNotifications = () => {
       setNotifications(data || []);
     } catch (err) {
       console.error("Erro ao buscar notificações:", err);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -179,17 +160,64 @@ const useNotifications = () => {
   useEffect(() => {
     fetchNotifications();
 
-    const channel = supabase
-      .channel("notifications-changes")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "notifications" },
-        fetchNotifications
-      )
-      .subscribe();
+    let isMounted = true;
 
+    const setupRealtime = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user || !isMounted) return;
+
+        // Remove qualquer canal existente para este usuário
+        if (channelRef.current) {
+          await supabase.removeChannel(channelRef.current);
+        }
+
+        // Cria novo canal
+        const channel = supabase
+          .channel(`notifications-${user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "notifications",
+              filter: `user_id=eq.${user.id}`, // ✅ FILTRO CRÍTICO
+            },
+            () => {
+              if (isMounted) {
+                fetchNotifications();
+              }
+            }
+          )
+          .subscribe((status) => {
+            console.log(`Canal de notificações: ${status}`);
+          });
+
+        channelRef.current = channel;
+      } catch (error) {
+        console.error("Erro na conexão realtime:", error);
+      }
+    };
+
+    setupRealtime();
+
+    // RETORNO DE LIMPEZA CRÍTICO
     return () => {
-      supabase.removeChannel(channel);
+      isMounted = false;
+
+      if (channelRef.current) {
+        supabase
+          .removeChannel(channelRef.current)
+          .then(() => {
+            console.log("Canal de notificações removido com sucesso");
+          })
+          .catch((err) => {
+            console.error("Erro ao remover canal:", err);
+          });
+        channelRef.current = null;
+      }
     };
   }, [supabase, fetchNotifications]);
 
@@ -212,7 +240,7 @@ const NotificationItem = ({
   onMarkAsRead,
   onDelete,
 }: {
-  notification: Notification;
+  notification: NotificationType;
   onMarkAsRead: (id: string) => void;
   onDelete: (id: string) => void;
 }) => {
@@ -559,7 +587,13 @@ export function AdminHeader() {
           .eq("id", user.id)
           .single();
 
-        if (profile) setUserProfile(profile);
+        if (profile) {
+          setUserProfile({
+            full_name: profile.full_name,
+            avatar_url: profile.avatar_url,
+            role: profile.role as "admin" | "agent",
+          });
+        }
       } catch (error) {
         console.error("Erro ao carregar perfil:", error);
       } finally {
