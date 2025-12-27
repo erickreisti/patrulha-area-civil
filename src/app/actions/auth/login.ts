@@ -1,10 +1,11 @@
+// app/actions/auth/login.ts
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { Session } from "@supabase/supabase-js";
-import type { Profile } from "@/lib/supabase/types";
+import type { Session, User } from "@supabase/supabase-js";
+import type { Profile, Database } from "@/lib/supabase/types";
 
 // Tipos de resposta
 type LoginSuccessResponse = {
@@ -24,126 +25,139 @@ type LoginErrorResponse = {
 
 type LoginResponse = LoginSuccessResponse | LoginErrorResponse;
 
-// Schema de validação
+// Schema
 const LoginSchema = z.object({
   matricula: z
     .string()
-    .min(11, "Matrícula deve ter 11 dígitos")
-    .max(11, "Matrícula deve ter 11 dígitos")
-    .transform((val) => val.replace(/\D/g, "")),
+    .min(1, "Matrícula é obrigatória")
+    .max(20, "Matrícula muito longa")
+    .transform((val) => val.replace(/\D/g, "").trim()),
 });
 
-// Cache para rate limiting
-const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
-
 export async function login(formData: FormData): Promise<LoginResponse> {
-  console.log("🔍 [Server Action] login() chamada");
-  console.log("🔍 [Server Action] FormData:", Array.from(formData.entries()));
-
-  const ip = "server-action";
-  const now = Date.now();
+  console.log("🔍 [Login] Iniciando...");
 
   try {
-    // Rate limiting
-    const attempts = loginAttempts.get(ip) || { count: 0, lastAttempt: 0 };
-    console.log("🔍 [Server Action] Rate limiting check:", attempts);
-
-    if (now - attempts.lastAttempt < 60000 && attempts.count >= 5) {
-      console.log("🔍 [Server Action] Rate limit excedido");
-      return {
-        success: false,
-        error: "Muitas tentativas. Tente novamente em 1 minuto.",
-      };
-    }
-
-    // Extrair e validar matrícula
+    // 1. Validar matrícula
     const matricula = formData.get("matricula") as string;
-    console.log("🔍 [Server Action] Matrícula do formData:", matricula);
+    console.log("🔍 [Login] Matrícula recebida:", matricula);
 
     const validated = LoginSchema.parse({ matricula });
-    console.log("🔍 [Server Action] Matrícula validada:", validated.matricula);
+    console.log("🔍 [Login] Matrícula validada:", validated.matricula);
 
-    // 🔐 1. Buscar email pela matrícula usando Service Role (bypass RLS)
-    console.log("🔍 [Server Action] Criando cliente Supabase Admin...");
-    const supabaseAdmin = createClient(
+    // 2. 🔐 Buscar APENAS email usando Service Role (necessário)
+    const supabaseAdmin = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
       {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
+        auth: { persistSession: false },
       }
     );
 
-    // 🔧 BUSCAR TODOS OS CAMPOS DO PERFIL
-    console.log("🔍 [Server Action] Buscando perfil no banco...");
+    console.log(
+      "🔍 [Login] Buscando email para matrícula:",
+      validated.matricula
+    );
+
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select("*")
+      .select("id, email, status, role")
       .eq("matricula", validated.matricula)
       .single();
 
-    console.log("🔍 [Server Action] Resultado da busca do perfil:", {
-      profile,
-      profileError,
-      hasProfile: !!profile,
-      status: profile?.status,
-    });
-
     if (profileError || !profile) {
-      console.error("🔍 [Server Action] Erro ao buscar perfil:", profileError);
-      loginAttempts.set(ip, { count: attempts.count + 1, lastAttempt: now });
+      console.log(
+        "🔍 [Login] Matrícula não encontrada:",
+        profileError?.message
+      );
       return {
         success: false,
-        error: "Matrícula não encontrada",
+        error: "Matrícula ou senha incorretos",
       };
     }
 
-    console.log("🔍 [Server Action] Perfil encontrado:", {
-      id: profile.id,
+    console.log("🔍 [Login] Perfil encontrado:", {
       email: profile.email,
       status: profile.status,
       role: profile.role,
-      has_validade_certificacao: !!profile.validade_certificacao,
-      has_tipo_sanguineo: !!profile.tipo_sanguineo,
+      id: profile.id,
     });
 
-    // 🔑 2. Fazer login com email e senha padrão
-    console.log("🔍 [Server Action] Criando cliente Supabase público...");
-    const supabasePublic = createClient(
+    // 3. 🔑 Tentar login com email REAL do agente
+    const supabase = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
     const defaultPassword =
       process.env.NEXT_PUBLIC_DEFAULT_PASSWORD || "PAC@2025!Secure";
-    console.log("🔍 [Server Action] Senha padrão usada:", defaultPassword);
-
-    console.log("🔍 [Server Action] Tentando autenticar com:", {
+    console.log("🔍 [Login] Tentando auth com:", {
       email: profile.email,
       passwordLength: defaultPassword.length,
     });
 
     const { data: authData, error: authError } =
-      await supabasePublic.auth.signInWithPassword({
+      await supabase.auth.signInWithPassword({
         email: profile.email,
         password: defaultPassword,
       });
 
-    console.log("🔍 [Server Action] Resultado da autenticação:", {
-      hasAuthData: !!authData,
-      hasAuthError: !!authError,
-      authError,
-      session: authData?.session ? "Sessão criada" : "Sem sessão",
-    });
-
     if (authError) {
-      console.error("🔍 [Server Action] Erro no auth:", authError);
-      return {
-        success: false,
-        error: `Erro ao fazer login: ${authError.message}`,
-      };
+      console.error("🔍 [Login] Erro no auth:", authError.message);
+
+      if (authError.message.includes("Invalid login credentials")) {
+        console.log("🔍 [Login] Criando usuário no Auth...");
+
+        const { error: createError } =
+          await supabaseAdmin.auth.admin.createUser({
+            email: profile.email,
+            password: defaultPassword,
+            email_confirm: true,
+            user_metadata: { matricula: validated.matricula },
+          });
+
+        if (createError) {
+          console.error("🔍 [Login] Erro ao criar usuário:", createError);
+          return {
+            success: false,
+            error: "Erro na autenticação. Contate o administrador.",
+          };
+        }
+
+        const { data: retryAuth, error: retryError } =
+          await supabase.auth.signInWithPassword({
+            email: profile.email,
+            password: defaultPassword,
+          });
+
+        if (retryError) {
+          return {
+            success: false,
+            error: "Erro na autenticação. Tente novamente.",
+          };
+        }
+
+        if (!retryAuth.session) {
+          return {
+            success: false,
+            error: "Sessão não criada",
+          };
+        }
+
+        return await handleSuccessfulLogin(
+          retryAuth.session,
+          retryAuth.user,
+          profile,
+          validated.matricula,
+          supabase,
+          supabaseAdmin
+        );
+      } else {
+        return {
+          success: false,
+          error: `Erro na autenticação: ${authError.message}`,
+        };
+      }
     }
 
     if (!authData.session) {
@@ -153,47 +167,21 @@ export async function login(formData: FormData): Promise<LoginResponse> {
       };
     }
 
-    // ✅ 3. Resetar contador e retornar sucesso
-    console.log("🔍 [Server Action] Login bem-sucedido!");
-    loginAttempts.delete(ip);
-
-    // 🗃️ 4. Revalidar cache
-    revalidatePath("/");
-    revalidatePath("/dashboard");
-    revalidatePath("/perfil");
-
-    // 📋 5. Retornar dados COMPLETOS do usuário
-    const responseData: LoginSuccessResponse = {
-      success: true,
-      message: profile.status
-        ? "Login realizado com sucesso!"
-        : "Login realizado - Agente inativo",
-      data: {
-        session: authData.session,
-        user: profile,
-      },
-    };
-
-    console.log("🔍 [Server Action] Retornando dados:", {
-      success: responseData.success,
-      message: responseData.message,
-      userId: responseData.data.user.id,
-      userStatus: responseData.data.user.status,
-      camposRetornados: Object.keys(responseData.data.user),
-    });
-
-    return responseData;
+    return await handleSuccessfulLogin(
+      authData.session,
+      authData.user,
+      profile,
+      validated.matricula,
+      supabase,
+      supabaseAdmin
+    );
   } catch (error) {
-    console.error("🔍 [Server Action] Erro em login:", error);
+    console.error("🔍 [Login] Erro completo:", error);
 
     if (error instanceof z.ZodError) {
-      console.error(
-        "🔍 [Server Action] Erro de validação Zod:",
-        error.flatten()
-      );
       return {
         success: false,
-        error: "Erro de validação",
+        error: "Matrícula inválida. Verifique o formato.",
         details: error.flatten(),
       };
     }
@@ -201,7 +189,130 @@ export async function login(formData: FormData): Promise<LoginResponse> {
     return {
       success: false,
       error:
-        error instanceof Error ? error.message : "Erro desconhecido no login",
+        error instanceof Error ? error.message : "Erro interno no servidor",
+    };
+  }
+}
+
+// app/actions/auth/login.ts - CORREÇÃO
+async function handleSuccessfulLogin(
+  session: Session,
+  user: User,
+  profile: { id: string; email: string; status: boolean; role: string },
+  matricula: string,
+  supabase: ReturnType<typeof createClient<Database>>,
+  supabaseAdmin: ReturnType<typeof createClient<Database>>
+): Promise<LoginResponse> {
+  try {
+    console.log("🔍 [Login] Buscando perfil completo...");
+
+    // ✅ CORREÇÃO: Usar Service Role para evitar RLS
+    const { data: fullProfile, error: fullProfileError } = await supabaseAdmin
+      .from("profiles")
+      .select("*")
+      .eq("id", profile.id) // Usar o ID que já temos da busca anterior
+      .single();
+
+    if (fullProfileError) {
+      console.error("❌ [Login] Erro Service Role:", fullProfileError);
+
+      // Fallback: criar perfil básico
+      // ✅ CORREÇÃO: Remover o "as any" e usar casting correto
+      const basicProfile: Profile = {
+        id: profile.id,
+        email: profile.email,
+        matricula: matricula,
+        status: profile.status,
+        role: profile.role as "admin" | "agent", // ✅ CORREÇÃO AQUI
+        full_name: null,
+        avatar_url: null,
+        graduacao: null,
+        validade_certificacao: null,
+        tipo_sanguineo: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        uf: null,
+        data_nascimento: null,
+        telefone: null,
+        admin_secret_hash: null,
+        admin_secret_salt: null,
+        admin_2fa_enabled: false,
+        admin_last_auth: null,
+      };
+
+      console.log("⚠️ [Login] Usando perfil básico");
+
+      // Registrar atividade
+      await supabaseAdmin.from("system_activities").insert({
+        user_id: user.id,
+        action_type: "user_login",
+        description: `Login realizado por ${profile.email}`,
+        resource_type: "auth",
+        resource_id: user.id,
+        metadata: {
+          matricula: matricula,
+          ip: "server-action",
+          timestamp: new Date().toISOString(),
+          note: "Perfil básico usado",
+        },
+      });
+
+      revalidatePath("/perfil");
+
+      return {
+        success: true,
+        message: profile.status
+          ? "Login realizado com sucesso!"
+          : "Login realizado - Agente inativo",
+        data: {
+          session: session,
+          user: basicProfile,
+        },
+      };
+    }
+
+    console.log("✅ [Login] Perfil completo:", {
+      nome: fullProfile.full_name,
+      matricula: fullProfile.matricula,
+      uf: fullProfile.uf,
+      status: fullProfile.status,
+      role: fullProfile.role,
+    });
+
+    // Registrar atividade
+    await supabaseAdmin.from("system_activities").insert({
+      user_id: user.id,
+      action_type: "user_login",
+      description: `Login realizado por ${
+        fullProfile.full_name || fullProfile.email
+      }`,
+      resource_type: "auth",
+      resource_id: user.id,
+      metadata: {
+        matricula: fullProfile.matricula,
+        ip: "server-action",
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    revalidatePath("/");
+    revalidatePath("/perfil");
+
+    return {
+      success: true,
+      message: fullProfile.status
+        ? "Login realizado com sucesso!"
+        : "Login realizado - Agente inativo",
+      data: {
+        session: session,
+        user: fullProfile, // ✅ Perfil COMPLETO
+      },
+    };
+  } catch (error) {
+    console.error("❌ [Login] Erro no handleSuccessfulLogin:", error);
+    return {
+      success: false,
+      error: "Erro ao processar login",
     };
   }
 }

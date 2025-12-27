@@ -1,4 +1,5 @@
 import { UserRole, Json } from "@/lib/types/shared";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 
 /**
  * Tipos do banco de dados Supabase
@@ -500,3 +501,5 @@ export function toJson(data?: Record<string, unknown>): Json | null {
     return data as Json;
   }
 }
+
+export type User = SupabaseUser;

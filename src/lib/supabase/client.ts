@@ -1,8 +1,18 @@
+// src/lib/supabase/client.ts
 import { createBrowserClient } from "@supabase/ssr";
 import type { Database } from "./types";
 import type { CookieOptions } from "@supabase/ssr";
 
+// Singleton global
+let supabaseClient: ReturnType<typeof createBrowserClient<Database>> | null =
+  null;
+
 export function createClient() {
+  // Se já existe, retorna a instância
+  if (supabaseClient) {
+    return supabaseClient;
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -16,7 +26,7 @@ export function createClient() {
     throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY não configurado");
   }
 
-  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
+  supabaseClient = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: true,
       persistSession: true,
@@ -58,6 +68,8 @@ export function createClient() {
       },
     },
   });
+
+  return supabaseClient;
 }
 
 // Helper para verificar se estamos no navegador
@@ -70,3 +82,6 @@ export function getClient() {
   }
   return createClient();
 }
+
+// Para compatibilidade com código existente que usa "supabase"
+export const supabase = createClient();

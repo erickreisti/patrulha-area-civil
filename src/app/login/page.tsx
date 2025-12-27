@@ -1,3 +1,4 @@
+// app/login/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -19,7 +20,9 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const { isAuthenticated, login } = useAuthStore();
+
+  // ✅ CORRIGIDO: Usar o nome correto da função
+  const { isAuthenticated, loginWithServerAction } = useAuthStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -70,17 +73,15 @@ export default function LoginPage() {
         localStorage.removeItem("saved_matricula");
       }
 
-      // Simular processamento
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const result = await login(matriculaNumerica);
+      // ✅ CORRIGIDO: Usar a função correta
+      const result = await loginWithServerAction(matriculaNumerica);
 
       if (result?.success) {
         // Toast de sucesso
         toastHelpers.success("Login realizado com sucesso!");
 
-        // Verificar status do usuário
-        if (result.data?.user && !result.data.user.status) {
+        // Verificar status do perfil (não do user)
+        if (result.data?.profile && !result.data.profile.status) {
           toastHelpers.warning(
             "Sua conta está inativa. Entre em contato com o comando."
           );
@@ -89,7 +90,7 @@ export default function LoginPage() {
         // Redirecionar com delay
         setTimeout(() => {
           router.replace(ROUTES.PROTECTED.PROFILE);
-        }, 2500);
+        }, 1500);
       } else {
         // Mensagens de erro específicas
         const errorMessage = result?.error?.toLowerCase() || "";
@@ -102,6 +103,14 @@ export default function LoginPage() {
         ) {
           finalMessage =
             "Matrícula não encontrada. Você não faz parte da PAC - Patrulha Aérea Civil";
+        } else if (errorMessage.includes("inativa")) {
+          finalMessage =
+            "Sua conta está inativa. Entre em contato com o comando.";
+        } else if (
+          errorMessage.includes("senha") ||
+          errorMessage.includes("credenciais")
+        ) {
+          finalMessage = "Credenciais inválidas. Tente novamente.";
         }
 
         toastHelpers.error("Falha no login", finalMessage);

@@ -1,3 +1,4 @@
+// src/app/(agent)/perfil/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -188,7 +189,7 @@ const InactiveAgentDialog = ({
   </Dialog>
 );
 
-// Modal de Autenticação Admin
+// Modal de Autenticação Admin (Corrigido)
 const AdminAuthModal = ({
   isOpen,
   onClose,
@@ -200,7 +201,7 @@ const AdminAuthModal = ({
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { verifyAdminAccess } = useAuthStore();
+  const { user, profile, verifyAdminAccess } = useAuthStore();
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -215,6 +216,22 @@ const AdminAuthModal = ({
     setError("");
 
     try {
+      console.log("🔍 [AdminModal] Iniciando autenticação admin...");
+
+      if (!user || !profile) {
+        setError("Usuário não autenticado");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🔍 [AdminModal] Dados para autenticação:", {
+        userId: user.id,
+        userEmail: user.email,
+        profileId: profile.id,
+        matricula: profile.matricula,
+      });
+
+      // Chamar a função de verificação do store
       const result = await verifyAdminAccess(adminPassword);
 
       console.log("🔍 [AdminModal] Resultado da autenticação:", result);
@@ -223,6 +240,8 @@ const AdminAuthModal = ({
         console.log(
           "✅ [AdminModal] Autenticação bem-sucedida, redirecionando..."
         );
+
+        // Redirecionar para o dashboard admin
         router.push("/admin/dashboard");
         onClose();
       } else {
@@ -386,6 +405,16 @@ const formatMatricula = (matricula: string | null | undefined): string => {
       .toUpperCase();
   }
   return matricula.toUpperCase();
+};
+
+// Nova função para formatar matrícula com UF dinâmica
+const formatMatriculaWithUF = (
+  matricula: string | null | undefined,
+  uf: string | null | undefined
+): string => {
+  const formattedMatricula = formatMatricula(matricula);
+  const ufCode = uf ? uf.toUpperCase() : "RJ"; // Usa RJ como fallback
+  return `${formattedMatricula} ${ufCode}`;
 };
 
 const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
@@ -984,7 +1013,7 @@ export default function AgentPerfil() {
                 <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
                   <label className={labelClass}>Matrícula</label>
                   <p className={secondaryContentClass}>
-                    {formatMatricula(profile.matricula)} RJ
+                    {formatMatriculaWithUF(profile.matricula, profile.uf)}
                   </p>
                 </div>
 

@@ -1,3 +1,4 @@
+// src/app/admin/setup-password/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -26,7 +27,7 @@ export default function AdminSetupPasswordPage() {
   const [passwordStrength, setPasswordStrength] = useState(0);
 
   const router = useRouter();
-  const { profile, isLoading } = useAuthStore();
+  const { profile, isLoading, setProfile } = useAuthStore();
 
   // Verificar se a senha atende aos requisitos
   useEffect(() => {
@@ -85,11 +86,11 @@ export default function AdminSetupPasswordPage() {
       formData.append("adminPassword", adminPassword);
       formData.append("confirmPassword", confirmPassword);
 
-      // Importar e chamar a server action diretamente
-      const adminAuthModule = await import(
-        "@/app/actions/auth/admin/admin-auth"
-      );
-      const result = await adminAuthModule.setupAdminPassword(formData);
+      // Importar e chamar a Server Action
+      const { setupAdminPassword } = await import("@/app/actions/auth/profile");
+
+      console.log("🔍 [SetupPassword] Configurando senha...");
+      const result = await setupAdminPassword(formData);
 
       console.log("🔍 [SetupPassword] Resultado:", result);
 
@@ -97,7 +98,6 @@ export default function AdminSetupPasswordPage() {
         setSuccess("Senha administrativa configurada com sucesso!");
 
         // Atualizar o store local
-        const { setProfile } = useAuthStore.getState();
         if (profile) {
           setProfile({
             ...profile,

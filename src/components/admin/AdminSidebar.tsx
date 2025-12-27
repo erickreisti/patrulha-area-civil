@@ -1,16 +1,18 @@
-// src/components/admin/AdminSidebar.tsx - USANDO REMIX ICONS
+// src/components/admin/AdminSidebar.tsx
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
-// Ícones Remix - Padronizado com AdminHeader
+// ✅ Use o singleton do client
+import { supabase } from "@/lib/supabase/client"; // <-- Alteração aqui
+
+// Ícones Remix
 import {
   RiDashboardLine,
   RiGroupLine,
@@ -106,7 +108,9 @@ const navigation: NavigationItem[] = [
 export function AdminSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
+
+  // ✅ Agora usando o singleton
+  // const supabase = createClient(); // REMOVER esta linha
 
   // Logout do sistema
   const handleSignOut = async () => {
