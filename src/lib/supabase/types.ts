@@ -24,7 +24,6 @@ export type Database = {
           uf: string | null;
           data_nascimento: string | null;
           telefone: string | null;
-          // ✅ NOVAS COLUNAS PARA 2FA ADMIN
           admin_secret_hash: string | null;
           admin_secret_salt: string | null;
           admin_2fa_enabled: boolean;
@@ -46,7 +45,6 @@ export type Database = {
           uf?: string | null;
           data_nascimento?: string | null;
           telefone?: string | null;
-          // ✅ ADICIONE TAMBÉM NO Insert
           admin_secret_hash?: string | null;
           admin_secret_salt?: string | null;
           admin_2fa_enabled?: boolean;
@@ -68,7 +66,6 @@ export type Database = {
           uf?: string | null;
           data_nascimento?: string | null;
           telefone?: string | null;
-          // ✅ ADICIONE TAMBÉM NO Update
           admin_secret_hash?: string | null;
           admin_secret_salt?: string | null;
           admin_2fa_enabled?: boolean;
@@ -439,7 +436,11 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      // ✅ ADICIONE ESTA FUNÇÃO
+      is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
     };
     Enums: {
       [_ in never]: never;

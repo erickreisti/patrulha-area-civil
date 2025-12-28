@@ -1,32 +1,30 @@
+// middleware.ts - ATUALIZADO
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { ROUTES } from "@/lib/constants/routes";
-import type { Database } from "@/lib/supabase/types";
 
-// Rotas que requerem autenticação admin em duas camadas
-const ADMIN_2FA_REQUIRED_PATHS = [
-  "/admin/dashboard",
-  "/admin/agentes",
-  "/admin/noticias",
-  "/admin/galeria",
-  "/admin/relatorios",
+// Rotas que requerem 2FA confirmado (ações destrutivas/críticas)
+const ADMIN_PROTECTED_PATHS = [
+  "/admin/agentes/novo",
+  "/admin/agentes/editar",
+  "/admin/noticias/novo",
+  "/admin/noticias/editar",
+  "/admin/galeria/nova",
+  "/admin/galeria/editar",
   "/admin/configuracoes",
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  console.log(`🔍 [Middleware] Rota: ${pathname} | Método: ${request.method}`);
+  console.log(`🔍 [Middleware] Rota: ${pathname}`);
 
-  // 1. IGNORAR APENAS ARQUIVOS ESTÁTICOS
-  if (pathname.startsWith("/_next") || pathname.includes(".")) {
-    return NextResponse.next();
-  }
-
-  // 2. Permitir server actions de login/logout (sem verificação extra)
+  // 1. Ignorar arquivos estáticos e assets
   if (
-    pathname.includes("/actions/login") ||
-    pathname.includes("/actions/logout")
+    pathname.startsWith("/_next") ||
+    pathname.includes(".") ||
+    pathname.includes("/api/") ||
+    pathname.includes("/actions/")
   ) {
     return NextResponse.next();
   }
@@ -35,7 +33,7 @@ export async function middleware(request: NextRequest) {
 
   try {
     // Criar cliente Supabase
-    const supabase = createServerClient<Database>(
+    const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
@@ -45,11 +43,7 @@ export async function middleware(request: NextRequest) {
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) => {
-              response.cookies.set({
-                name,
-                value,
-                ...options,
-              });
+              response.cookies.set({ name, value, ...options });
             });
           },
         },
@@ -62,24 +56,20 @@ export async function middleware(request: NextRequest) {
 
     const userId = session?.user?.id;
 
-    // 🔒 VERIFICAÇÃO PARA ROTAS ADMIN COM 2FA
-    const requiresAdmin2FA = ADMIN_2FA_REQUIRED_PATHS.some((path) =>
-      pathname.startsWith(path)
-    );
-
-    if (requiresAdmin2FA) {
-      console.log(`🔒 [Middleware] Verificando 2FA admin para: ${pathname}`);
+    // 🔒 VERIFICAÇÃO PARA QUALQUER ROTA /admin/*
+    if (pathname.startsWith("/admin")) {
+      console.log(`🔒 [Middleware] Verificando acesso admin: ${pathname}`);
 
       // 1. Verificar autenticação básica
       if (!userId) {
-        console.log(`❌ [Middleware] Não autenticado`);
+        console.log(`❌ [Middleware] Não autenticado para admin`);
         return redirectToLogin(request, pathname);
       }
 
       // 2. Verificar se é admin no perfil
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, status")
+        .select("role, status, admin_2fa_enabled")
         .eq("id", userId)
         .single();
 
@@ -90,34 +80,32 @@ export async function middleware(request: NextRequest) {
         );
       }
 
-      // 3. VERIFICAR AUTENTICAÇÃO 2FA (verificar cookie)
-      const adminAuthToken = request.cookies.get("admin_auth_token")?.value;
+      console.log(`✅ [Middleware] Admin verificado`);
 
-      if (!adminAuthToken) {
-        console.log(`🔒 [Middleware] Cookie admin não encontrado`);
+      // 3. Verificar se é rota que requer 2FA confirmado
+      const requires2FA = ADMIN_PROTECTED_PATHS.some((path) =>
+        pathname.startsWith(path)
+      );
 
-        // Para server actions, retornar erro JSON
-        if (pathname.includes("/actions/")) {
-          return new Response(
-            JSON.stringify({
-              success: false,
-              error: "Autenticação admin necessária",
-            }),
-            {
-              status: 401,
-              headers: { "Content-Type": "application/json" },
-            }
+      if (requires2FA) {
+        console.log(`🔐 [Middleware] Verificando 2FA para: ${pathname}`);
+
+        const adminAuthToken = request.cookies.get("admin_auth_token")?.value;
+
+        if (!adminAuthToken) {
+          console.log(`❌ [Middleware] 2FA não confirmado, redirecionando`);
+
+          // Para páginas HTML, redirecionar para dashboard
+          return NextResponse.redirect(
+            new URL("/admin/dashboard", request.url)
           );
         }
 
-        // Para navegação normal, redirecionar para perfil
-        return NextResponse.redirect(new URL("/perfil", request.url));
+        console.log(`✅ [Middleware] 2FA confirmado`);
       }
-
-      console.log(`✅ [Middleware] 2FA admin validado`);
     }
 
-    // Proteger rotas de perfil
+    // Proteger rotas de perfil (agentes normais podem acessar)
     if (pathname === "/perfil" && !userId) {
       return redirectToLogin(request, pathname);
     }

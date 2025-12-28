@@ -18,6 +18,7 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256],
+    qualities: [75, 85, 100],
     minimumCacheTTL: 60,
   },
   experimental: {},
@@ -31,6 +32,33 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   poweredByHeader: false,
+
+  // Adicionar headers de segurança
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

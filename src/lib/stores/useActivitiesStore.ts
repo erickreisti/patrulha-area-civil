@@ -11,7 +11,7 @@ import {
   type CreateActivityData,
 } from "@/app/actions/admin/activities";
 import {
-  getDashboardData,
+  getDashboardStats,
   type DashboardStats,
 } from "@/app/actions/admin/dashboard/dashboard";
 
@@ -40,7 +40,7 @@ interface ActivitiesStoreState {
   // Ações
   fetchRecentActivities: () => Promise<void>;
   fetchStats: (timeframe?: "day" | "week" | "month") => Promise<void>;
-  fetchDashboardData: () => Promise<DashboardStats | null>;
+  fetchDashboardStats: () => Promise<DashboardStats | null>;
   createActivity: (data: CreateActivityData) => Promise<void>;
 
   // Real-time Actions
@@ -53,7 +53,7 @@ const initialState: Omit<
   ActivitiesStoreState,
   | "fetchRecentActivities"
   | "fetchStats"
-  | "fetchDashboardData"
+  | "fetchDashboardStats"
   | "createActivity"
   | "setupRealtime"
   | "cleanupRealtime"
@@ -72,31 +72,25 @@ const initialState: Omit<
 export const useActivitiesStore = create<ActivitiesStoreState>((set, get) => ({
   ...initialState,
 
-  // NOVA FUNÇÃO: Buscar todos os dados do dashboard
-  fetchDashboardData: async () => {
+  // ATUALIZADO: Usar getDashboardStats em vez de getDashboardData
+  fetchDashboardStats: async () => {
     set({ loadingDashboard: true, error: null });
 
     try {
-      console.log(
-        "🔍 [ActivitiesStore] Buscando dados completos do dashboard..."
-      );
-      const result = await getDashboardData();
+      console.log("🔍 [ActivitiesStore] Buscando dados do dashboard...");
+      const result = await getDashboardStats();
 
-      if (result.success && result.data) {
+      if (result.success && result.stats) {
         console.log(
           "✅ [ActivitiesStore] Dados do dashboard carregados com sucesso"
         );
 
         set({
-          recentActivities: result.data.recentActivities,
-          stats: result.data.activityStats,
-          dashboardStats: result.data.stats,
+          dashboardStats: result.stats,
           loadingDashboard: false,
-          loadingRecent: false,
-          loadingStats: false,
         });
 
-        return result.data.stats;
+        return result.stats;
       } else {
         console.warn(
           "⚠️ [ActivitiesStore] Erro ao buscar dados do dashboard:",
@@ -105,8 +99,6 @@ export const useActivitiesStore = create<ActivitiesStoreState>((set, get) => ({
 
         set({
           loadingDashboard: false,
-          loadingRecent: false,
-          loadingStats: false,
           error: result.error || "Não foi possível carregar dados do dashboard",
         });
 
@@ -120,8 +112,6 @@ export const useActivitiesStore = create<ActivitiesStoreState>((set, get) => ({
 
       set({
         loadingDashboard: false,
-        loadingRecent: false,
-        loadingStats: false,
         error:
           error instanceof Error
             ? error.message
@@ -420,7 +410,7 @@ export const useDashboardActivities = () => {
     fetchStats,
     dashboardStats,
     loadingDashboard,
-    fetchDashboardData,
+    fetchDashboardStats,
     error,
     setupRealtime,
     cleanupRealtime,
@@ -436,7 +426,7 @@ export const useDashboardActivities = () => {
     fetchStats,
     dashboardStats,
     loadingDashboard,
-    fetchDashboardData,
+    fetchDashboardStats,
     error,
     setupRealtime,
     cleanupRealtime,

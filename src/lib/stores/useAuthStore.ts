@@ -1,9 +1,7 @@
-// src/lib/stores/useAuthStore.ts
 "use client";
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import crypto from "crypto";
 import type { User, Profile } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -38,7 +36,6 @@ interface AuthState {
   clearAdminSession: () => void;
 }
 
-// ✅ Use o singleton importado
 const supabase = createClient();
 
 export const useAuthStore = create<AuthState>()(
@@ -290,47 +287,40 @@ export const useAuthStore = create<AuthState>()(
             };
           }
 
-          // ✅ Verificar senha usando SHA256 (compatível com banco)
-          const hash = crypto
-            .createHash("sha256")
-            .update(adminPassword + profile.admin_secret_salt)
-            .digest("hex");
+          // ✅ Chama a server action para autenticação real
+          const { authenticateAdminSession } = await import(
+            "@/app/actions/auth/admin"
+          );
+          const result = await authenticateAdminSession(
+            user.id,
+            user.email || "",
+            adminPassword
+          );
 
-          const isValid = hash === profile.admin_secret_hash;
+          console.log("🔍 [AuthStore] Resultado da server action:", result);
 
-          console.log("🔍 [AuthStore] Resultado da verificação:", {
-            isValid,
-            inputHashPreview: hash.substring(0, 10) + "...",
-            storedHashPreview:
-              profile.admin_secret_hash.substring(0, 10) + "...",
-            hashLength: hash.length,
-            storedHashLength: profile.admin_secret_hash?.length,
-          });
+          if (result.success) {
+            // Atualizar estado local
+            get().setAdminSession(true);
 
-          if (!isValid) {
-            console.log("❌ [AuthStore] Senha administrativa incorreta");
+            // Atualizar último acesso no perfil local
+            get().setProfile({
+              ...profile,
+              admin_last_auth: new Date().toISOString(),
+            });
+
+            console.log("✅ [AuthStore] Autenticação admin bem-sucedida");
+            return {
+              success: true,
+              message:
+                result.message || "Autenticação administrativa bem-sucedida!",
+            };
+          } else {
             return {
               success: false,
-              error: "Senha de administrador incorreta",
+              error: result.error || "Erro na autenticação administrativa",
             };
           }
-
-          // ✅ CORREÇÃO: Não tentar atualizar banco diretamente aqui
-
-          // Atualizar sessão admin no estado local
-          get().setAdminSession(true);
-
-          // Atualizar último acesso no perfil local
-          get().setProfile({
-            ...profile,
-            admin_last_auth: new Date().toISOString(),
-          });
-
-          console.log("✅ [AuthStore] Autenticação admin bem-sucedida");
-          return {
-            success: true,
-            message: "Autenticação administrativa bem-sucedida!",
-          };
         } catch (error) {
           console.error("❌ [AuthStore] Erro em verifyAdminAccess:", error);
           return {
