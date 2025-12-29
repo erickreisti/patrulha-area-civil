@@ -1,7 +1,7 @@
-// components/admin/AdminAuthModal.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import {
   Dialog,
@@ -25,12 +25,23 @@ interface AdminAuthModalProps {
 }
 
 export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
+  const router = useRouter();
   const [adminPassword, setAdminPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
-  const { user, profile, setAdminSession } = useAuthStore();
+  const { user, profile, verifyAdminAccess } = useAuthStore(); // REMOVI setAdminSession
+
+  // Limpar estados quando o modal abre/fecha
+  useEffect(() => {
+    if (isOpen) {
+      setAdminPassword("");
+      setError("");
+      setSuccessMessage("");
+      setLoading(false);
+    }
+  }, [isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,39 +62,27 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
 
     try {
       console.log("🔍 [AdminModal] Iniciando autenticação admin...");
-      console.log("🔍 [AdminModal] Dados para autenticação:", {
-        userId: user.id,
-        userEmail: user.email,
-        profileId: profile.id,
-        matricula: profile.matricula,
-      });
 
-      // ✅ IMPORTAR e CHAMAR A NOVA SERVER ACTION
-      const { authenticateAdminSession } = await import(
-        "@/app/actions/auth/auth"
-      );
-
-      const result = await authenticateAdminSession(
-        user.id,
-        user.email || "",
-        adminPassword
-      );
+      // Usar a função do store que chama a server action
+      const result = await verifyAdminAccess(adminPassword);
 
       console.log("🔍 [AdminModal] Resultado da autenticação:", result);
 
       if (result.success) {
-        // ✅ Atualizar estado local
-        setAdminSession(true);
-
         setSuccessMessage(result.message || "Autenticação bem-sucedida!");
         setAdminPassword("");
 
-        // ✅ Redirecionar com FORÇA para garantir que os cookies sejam lidos
+        // ✅ AGORA USAMOS router.push COM TIMEOUT PARA COOKIES SEREM PROCESSADOS
         setTimeout(() => {
           console.log("✅ [AdminModal] Redirecionando para dashboard...");
-          // Forçar navegação completa (não usar router.push)
-          window.location.href = "/admin/dashboard";
-        }, 1000);
+
+          // Forçar reload da página para garantir que middleware veja os cookies
+          router.push("/admin/dashboard");
+          router.refresh(); // Força recarga dos dados
+
+          // Fechar modal após redirecionamento
+          setTimeout(() => onClose(), 500);
+        }, 1500); // Tempo para cookies serem processados
       } else {
         setError(result.error || "Senha de administrador incorreta");
       }
@@ -129,7 +128,7 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
                 setSuccessMessage("");
               }}
               placeholder="Digite sua senha administrativa"
-              disabled={loading}
+              disabled={loading || !!successMessage}
               className={`w-full text-lg transition-all duration-200 ${
                 error
                   ? "border-error focus:ring-error"
@@ -151,6 +150,7 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
               <div className="flex items-center gap-2 mt-2 text-green-600 text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200">
                 <RiCheckLine className="w-4 h-4 flex-shrink-0" />
                 <span className="font-roboto">{successMessage}</span>
+                <Spinner className="w-4 h-4 animate-spin" />
               </div>
             )}
           </div>
@@ -161,7 +161,7 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
               disabled={loading || !!successMessage}
               className={`flex-1 transition-all duration-200 font-roboto ${
                 successMessage
-                  ? "bg-green-600 hover:bg-green-700"
+                  ? "bg-green-600 hover:bg-green-700 cursor-wait"
                   : "bg-navy hover:bg-navy/90"
               }`}
             >
@@ -193,6 +193,11 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
           <p className="text-[10px] text-slate-500 font-roboto">
             Esta autenticação é adicional à senha padrão do sistema
           </p>
+          {profile?.admin_2fa_enabled === false && (
+            <p className="text-[10px] text-warning mt-1 font-roboto">
+              ⚠️ Configure sua senha administrativa primeiro
+            </p>
+          )}
         </div>
       </DialogContent>
     </Dialog>

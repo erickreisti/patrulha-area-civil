@@ -11,10 +11,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  adminSession: {
-    isAuthenticated: boolean;
-    authenticatedAt: string | null;
-  };
+  hasAdminSession: boolean; // Novo: indica se tem sessão admin ativa
 
   initialize: () => Promise<void>;
   loginWithServerAction: (matricula: string) => Promise<{
@@ -32,7 +29,7 @@ interface AuthState {
     message?: string;
     error?: string;
   }>;
-  setAdminSession: (authenticated: boolean) => void;
+  checkAdminSession: () => Promise<boolean>; // Novo: verificar cookies
   clearAdminSession: () => void;
 }
 
@@ -46,17 +43,14 @@ export const useAuthStore = create<AuthState>()(
       isLoading: true,
       isAuthenticated: false,
       isAdmin: false,
-      adminSession: {
-        isAuthenticated: false,
-        authenticatedAt: null,
-      },
+      hasAdminSession: false,
 
       initialize: async () => {
         try {
           set({ isLoading: true });
           console.log("🔍 [AuthStore] Inicializando store...");
 
-          // 1. Verificar sessão
+          // 1. Verificar sessão Supabase
           const {
             data: { session },
           } = await supabase.auth.getSession();
@@ -68,6 +62,7 @@ export const useAuthStore = create<AuthState>()(
               profile: null,
               isAuthenticated: false,
               isAdmin: false,
+              hasAdminSession: false,
               isLoading: false,
             });
             return;
@@ -109,6 +104,7 @@ export const useAuthStore = create<AuthState>()(
               set({
                 profile: currentState.profile,
                 isAdmin: currentState.profile.role === "admin",
+                hasAdminSession: currentState.hasAdminSession,
                 isLoading: false,
               });
               return;
@@ -117,6 +113,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               profile: null,
               isAdmin: false,
+              hasAdminSession: false,
               isLoading: false,
             });
             return;
@@ -127,6 +124,7 @@ export const useAuthStore = create<AuthState>()(
             set({
               profile: null,
               isAdmin: false,
+              hasAdminSession: false,
               isLoading: false,
             });
             return;
@@ -142,11 +140,20 @@ export const useAuthStore = create<AuthState>()(
             admin_2fa_enabled: profile.admin_2fa_enabled,
           });
 
-          // 4. Atualizar estado completo
+          // 4. Verificar se tem sessão admin ativa
+          const hasActiveAdminSession = await get().checkAdminSession();
+
+          // 5. Atualizar estado completo
           set({
             profile,
             isAdmin: profile.role === "admin",
+            hasAdminSession: hasActiveAdminSession,
             isLoading: false,
+          });
+
+          console.log("✅ [AuthStore] Estado final:", {
+            isAdmin: profile.role === "admin",
+            hasAdminSession: hasActiveAdminSession,
           });
         } catch (error) {
           console.error("❌ [AuthStore] Erro na inicialização:", error);
@@ -155,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
             profile: null,
             isAuthenticated: false,
             isAdmin: false,
+            hasAdminSession: false,
             isLoading: false,
           });
         }
@@ -172,7 +180,7 @@ export const useAuthStore = create<AuthState>()(
           const formData = new FormData();
           formData.append("matricula", matricula);
 
-          // ✅ ATUALIZADO: Agora usa o arquivo único
+          // ✅ Usar o arquivo único
           const authModule = await import("@/app/actions/auth/auth");
           const result = await authModule.login(formData);
 
@@ -181,12 +189,16 @@ export const useAuthStore = create<AuthState>()(
           if (result.success && "data" in result && result.data) {
             const profileData = result.data.user;
 
+            // Verificar se tem sessão admin
+            const hasActiveAdminSession = await get().checkAdminSession();
+
             // Atualizar estado local
             set({
               user: result.data.session.user,
               profile: profileData,
               isAuthenticated: true,
               isAdmin: profileData.role === "admin",
+              hasAdminSession: hasActiveAdminSession,
               isLoading: false,
             });
 
@@ -223,6 +235,7 @@ export const useAuthStore = create<AuthState>()(
           profile: data.profile,
           isAuthenticated: !!data.user,
           isAdmin: data.profile?.role === "admin",
+          hasAdminSession: false, // Sempre false ao definir auth data manualmente
         });
       },
 
@@ -238,9 +251,10 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
+          // Limpar sessão admin
           get().clearAdminSession();
 
-          // ✅ ATUALIZADO: Chama o logout do arquivo único
+          // Chamar logout do server
           const authModule = await import("@/app/actions/auth/auth");
           const result = await authModule.logout();
 
@@ -250,6 +264,7 @@ export const useAuthStore = create<AuthState>()(
             profile: null,
             isAuthenticated: false,
             isAdmin: false,
+            hasAdminSession: false,
           });
 
           return result.success ? { success: true } : result;
@@ -262,6 +277,7 @@ export const useAuthStore = create<AuthState>()(
             profile: null,
             isAuthenticated: false,
             isAdmin: false,
+            hasAdminSession: false,
           });
 
           return {
@@ -303,7 +319,7 @@ export const useAuthStore = create<AuthState>()(
             };
           }
 
-          // ✅ ATUALIZADO: Agora usa o arquivo único
+          // ✅ Usar o arquivo único
           const authModule = await import("@/app/actions/auth/auth");
           const result = await authModule.authenticateAdminSession(
             user.id,
@@ -314,8 +330,8 @@ export const useAuthStore = create<AuthState>()(
           console.log("🔍 [AuthStore] Resultado da server action:", result);
 
           if (result.success) {
-            // Atualizar estado local
-            get().setAdminSession(true);
+            // Atualizar estado local - CORREÇÃO AQUI
+            set({ hasAdminSession: true });
 
             // Atualizar último acesso no perfil local
             get().setProfile({
@@ -344,21 +360,32 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      setAdminSession: (authenticated) => {
-        set({
-          adminSession: {
-            isAuthenticated: authenticated,
-            authenticatedAt: authenticated ? new Date().toISOString() : null,
-          },
-        });
+      checkAdminSession: async () => {
+        try {
+          // Verificar cookie no client-side
+          const cookies = document.cookie.split("; ");
+          const adminCookie = cookies.find((cookie) =>
+            cookie.startsWith("is_admin=")
+          );
+
+          if (adminCookie) {
+            const value = adminCookie.split("=")[1];
+            const hasSession = value === "true";
+
+            console.log("🔍 [AuthStore] checkAdminSession:", hasSession);
+            return hasSession;
+          }
+
+          return false;
+        } catch (error) {
+          console.error("❌ [AuthStore] Erro ao verificar cookies:", error);
+          return false;
+        }
       },
 
       clearAdminSession: () => {
         set({
-          adminSession: {
-            isAuthenticated: false,
-            authenticatedAt: null,
-          },
+          hasAdminSession: false,
         });
       },
     }),
@@ -369,7 +396,7 @@ export const useAuthStore = create<AuthState>()(
         profile: state.profile,
         isAuthenticated: state.isAuthenticated,
         isAdmin: state.isAdmin,
-        adminSession: state.adminSession,
+        hasAdminSession: state.hasAdminSession,
       }),
     }
   )

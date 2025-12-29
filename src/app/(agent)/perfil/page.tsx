@@ -1,4 +1,3 @@
-// src/app/(agent)/perfil/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -26,9 +25,8 @@ import {
   RiWhatsappLine,
   RiMailLine,
   RiAlertLine,
-  RiLockLine,
   RiSettingsLine,
-} from "react-icons/ri"; // ✅ Removi as importações não usadas
+} from "react-icons/ri";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import type { Profile } from "@/lib/supabase/types";
 import { Spinner } from "@/components/ui/spinner";
@@ -374,12 +372,14 @@ const ActionButton: React.FC<{
 const ActionButtons = ({
   profile,
   isAdmin,
+  hasAdminSession,
   onSignOut,
   onOpenAdminAuth,
   onSetupPassword,
 }: {
   profile: ProfileData;
   isAdmin: boolean;
+  hasAdminSession: boolean;
   onSignOut: () => Promise<{ success: boolean; error?: string }>;
   onOpenAdminAuth: () => void;
   onSetupPassword: () => void;
@@ -409,7 +409,7 @@ const ActionButtons = ({
     }
   };
 
-  // Se o agente está inativo
+  // 🔴 AGENTE INATIVO - Apenas botões básicos
   if (!profile.status) {
     return (
       <motion.div
@@ -455,6 +455,53 @@ const ActionButtons = ({
     );
   }
 
+  // 🟢 AGENTE COMUM ATIVO - Apenas botões básicos
+  if (!isAdmin) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.6 }}
+        className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
+      >
+        <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
+          <ActionButton href="/" icon={RiHomeLine} label="Voltar ao Site" />
+
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={handleSignOut}
+            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
+          >
+            {isSigningOut ? (
+              <Spinner className="w-3.5 h-3.5 text-white" />
+            ) : (
+              <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+            )}
+            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+              {isSigningOut ? "Saindo..." : "Sair"}
+            </span>
+          </motion.div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.8 }}
+          className="text-center mt-3 w-full"
+        >
+          <p className="text-white/70 text-[10px] font-roboto">
+            Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
+          </p>
+          <p className="text-success text-xs font-bold mt-1 font-roboto">
+            ✅ AGENTE ATIVO - ACESSO AO PERFIL
+          </p>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // 👑 AGENTE ADMIN - Com botões especiais
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -463,81 +510,51 @@ const ActionButtons = ({
       className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
     >
       <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2 w-full">
-        {isAdmin ? (
+        {/* Botão para configuração de senha se não estiver configurada */}
+        {!profile.admin_2fa_enabled ? (
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onSetupPassword}
+            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-warning/90 hover:bg-warning w-full min-h-[44px] col-span-2"
+          >
+            <RiSettingsLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+              Configurar Senha Admin
+            </span>
+          </motion.div>
+        ) : (
           <>
-            {/* Botão para configuração de senha se não estiver configurada */}
-            {!profile.admin_2fa_enabled ? (
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={onSetupPassword}
-                className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-warning/90 hover:bg-warning w-full min-h-[44px]"
-              >
-                <RiSettingsLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-                <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-                  Configurar Senha
-                </span>
-              </motion.div>
-            ) : (
+            <ActionButton href="/" icon={RiHomeLine} label="Voltar ao Site" />
+
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onOpenAdminAuth}
+              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+            >
+              <RiBarChartLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+              <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                Dashboard
+              </span>
+            </motion.div>
+
+            {/* Se já tem sessão admin, pode ir direto para edição */}
+            {hasAdminSession ? (
               <ActionButton
                 href={`/admin/agentes/${profile.id}`}
                 icon={RiEditLine}
                 label="Editar"
               />
-            )}
-
-            {/* Botão Dashboard só aparece se senha estiver configurada */}
-            {profile.admin_2fa_enabled ? (
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={onOpenAdminAuth}
-                className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
-              >
-                <RiBarChartLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-                <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-                  Dashboard
-                </span>
-              </motion.div>
             ) : (
-              <div className="opacity-50 cursor-not-allowed">
-                <div className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg bg-slate-400 w-full min-h-[44px]">
-                  <RiBarChartLine className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
-                  <span className="text-xs font-medium text-white/60 whitespace-nowrap font-roboto">
-                    Configure Senha
-                  </span>
-                </div>
-              </div>
+              <ActionButton
+                disabled={true}
+                icon={RiEditLine}
+                label="Editar"
+                disabledMessage="Faça login no dashboard primeiro"
+              />
             )}
 
-            <ActionButton href="/" icon={RiHomeLine} label="Site" />
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSignOut}
-              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
-            >
-              {isSigningOut ? (
-                <Spinner className="w-3.5 h-3.5 text-white" />
-              ) : (
-                <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-              )}
-              <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-                {isSigningOut ? "Saindo..." : "Sair"}
-              </span>
-            </motion.div>
-          </>
-        ) : (
-          <>
-            <ActionButton href="/" icon={RiHomeLine} label="Site" />
-            <div className="col-span-1" />
-            <ActionButton
-              disabled={true}
-              icon={RiLockLine}
-              label="Acesso Restrito"
-              disabledMessage="Apenas administradores podem editar perfis"
-            />
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -566,15 +583,18 @@ const ActionButtons = ({
         <p className="text-white/70 text-[10px] font-roboto">
           Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
         </p>
-        {isAdmin && (
-          <p
-            className={`text-xs font-bold mt-1 font-roboto ${
-              profile.admin_2fa_enabled ? "text-success" : "text-warning"
-            }`}
-          >
-            {profile.admin_2fa_enabled
-              ? "👑 ADMINISTRADOR - ACESSO COMPLETO"
-              : "⚠️ ADMINISTRADOR - CONFIGURE A SENHA"}
+        <p
+          className={`text-xs font-bold mt-1 font-roboto ${
+            profile.admin_2fa_enabled ? "text-navy" : "text-warning"
+          }`}
+        >
+          {profile.admin_2fa_enabled
+            ? "👑 ADMINISTRADOR - ACESSO COMPLETO"
+            : "⚠️ ADMINISTRADOR - CONFIGURE A SENHA ADMINISTRATIVA"}
+        </p>
+        {profile.admin_2fa_enabled && hasAdminSession && (
+          <p className="text-success text-xs font-bold mt-1 font-roboto">
+            ✅ SESSÃO ADMIN ATIVA
           </p>
         )}
       </motion.div>
@@ -583,8 +603,16 @@ const ActionButtons = ({
 };
 
 export default function AgentPerfil() {
-  const { user, profile, isLoading, isAuthenticated, isAdmin, logout } =
-    useAuthStore();
+  const {
+    user,
+    profile,
+    isLoading,
+    isAuthenticated,
+    isAdmin,
+    hasAdminSession,
+    logout,
+  } = useAuthStore();
+
   const router = useRouter();
 
   const [showInactiveDialog, setShowInactiveDialog] = useState(false);
@@ -620,13 +648,6 @@ export default function AgentPerfil() {
       return () => clearTimeout(timer);
     }
   }, [profile]);
-
-  useEffect(() => {
-    // Verificar se admin precisa configurar senha
-    if (isAdmin && profile && !profile.admin_2fa_enabled) {
-      console.log("⚠️ [AgentPerfil] Admin precisa configurar senha");
-    }
-  }, [isAdmin, profile]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -928,6 +949,7 @@ export default function AgentPerfil() {
           <ActionButtons
             profile={profile}
             isAdmin={isAdmin}
+            hasAdminSession={hasAdminSession}
             onSignOut={logout}
             onOpenAdminAuth={handleOpenAdminAuth}
             onSetupPassword={handleSetupPassword}

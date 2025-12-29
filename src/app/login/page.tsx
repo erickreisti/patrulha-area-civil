@@ -1,4 +1,3 @@
-// app/login/page.tsx (Versão Atualizada)
 "use client";
 
 import { useState, useEffect } from "react";
@@ -34,15 +33,16 @@ export default function LoginPage() {
     init();
   }, [initialize]);
 
-  // Redirecionar se já estiver autenticado
+  // ✅ CORREÇÃO: Redirecionar TODOS os agentes para /perfil
   useEffect(() => {
     if (!isInitialized) return;
 
     if (isAuthenticated) {
-      // Verificar se é admin para redirecionar corretamente
-      const { isAdmin } = useAuthStore.getState();
-      const redirectPath = isAdmin ? "/admin/dashboard" : "/perfil";
-      router.replace(redirectPath);
+      // ✅ TODOS OS AGENTES (comuns e admins) vão para /perfil
+      console.log(
+        "✅ [LoginPage] Agente autenticado, redirecionando para /perfil"
+      );
+      router.replace("/perfil");
     }
   }, [isAuthenticated, router, isInitialized]);
 
@@ -91,10 +91,10 @@ export default function LoginPage() {
           );
         }
 
-        // Redirecionar com base no tipo de usuário
-        const isAdmin = result.data?.profile.role === "admin";
+        // ✅ CORREÇÃO: Redirecionar TODOS para /perfil
+        // O middleware já valida se é admin ou comum
         setTimeout(() => {
-          router.replace(isAdmin ? "/admin/dashboard" : "/perfil");
+          router.replace("/perfil");
         }, 1500);
       } else {
         const errorMessage = result?.error?.toLowerCase() || "";

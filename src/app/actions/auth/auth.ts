@@ -1,4 +1,3 @@
-// app/actions/auth/auth.ts
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
@@ -53,6 +52,69 @@ type AdminAuthResponse = {
   message?: string;
   error?: string;
   sessionToken?: string;
+};
+
+// ================ FUNÇÕES DE COOKIE ================
+const setAdminCookies = async (
+  userId: string,
+  userEmail: string,
+  sessionToken: string,
+  expiresAt: Date
+) => {
+  try {
+    const cookieStore = await cookies();
+
+    // Cookie principal da sessão admin
+    cookieStore.set({
+      name: "admin_session",
+      value: JSON.stringify({
+        userId,
+        userEmail,
+        sessionToken,
+        expiresAt: expiresAt.toISOString(),
+        createdAt: new Date().toISOString(),
+      }),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: expiresAt,
+      maxAge: 2 * 60 * 60, // 2 horas em segundos
+    });
+
+    // Flag simples para verificação rápida
+    cookieStore.set({
+      name: "is_admin",
+      value: "true",
+      httpOnly: false, // Pode ser acessado pelo client
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: expiresAt,
+      maxAge: 2 * 60 * 60,
+    });
+
+    console.log("✅ [setAdminCookies] Cookies admin definidos");
+    return true;
+  } catch (error) {
+    console.error("❌ [setAdminCookies] Erro:", error);
+    return false;
+  }
+};
+
+const clearAdminCookies = async () => {
+  try {
+    const cookieStore = await cookies();
+
+    cookieStore.delete("admin_session");
+    cookieStore.delete("is_admin");
+
+    console.log("✅ [clearAdminCookies] Cookies admin removidos");
+    return true;
+  } catch (error) {
+    console.error("❌ [clearAdminCookies] Erro:", error);
+    return false;
+  }
 };
 
 // ================ FUNÇÕES PÚBLICAS ================
@@ -157,10 +219,8 @@ export async function logout(): Promise<LogoutResponse> {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // Limpar sessão admin primeiro
-    const cookieStore = await cookies();
-    cookieStore.delete("admin_session");
-    cookieStore.delete("is_admin");
+    // Limpar cookies admin primeiro
+    await clearAdminCookies();
 
     // Sign out do Supabase
     const { error } = await supabase.auth.signOut();
@@ -232,40 +292,25 @@ export async function authenticateAdminSession(
       })
       .eq("id", validated.userId);
 
-    // Criar sessão admin
+    // Criar sessão admin (2 horas)
     const sessionToken = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 horas
+    const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
-    const cookieStore = await cookies();
+    // Definir cookies
+    const cookiesSet = await setAdminCookies(
+      validated.userId,
+      validated.userEmail,
+      sessionToken,
+      expiresAt
+    );
 
-    cookieStore.set({
-      name: "admin_session",
-      value: JSON.stringify({
-        userId: validated.userId,
-        userEmail: validated.userEmail,
-        sessionToken,
-        expiresAt: expiresAt.toISOString(),
-      }),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: expiresAt,
-    });
-
-    cookieStore.set({
-      name: "is_admin",
-      value: "true",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      expires: expiresAt,
-    });
+    if (!cookiesSet) {
+      return { success: false, error: "Erro ao criar sessão" };
+    }
 
     return {
       success: true,
-      message: "Autenticação bem-sucedida",
+      message: "Autenticação administrativa bem-sucedida",
       sessionToken,
     };
   } catch (error) {
@@ -275,7 +320,7 @@ export async function authenticateAdminSession(
 }
 
 /**
- * 🔍 VERIFICAR SESSÃO ADMIN
+ * 🔍 VERIFICAR SESSÃO ADMIN (Server-side)
  */
 export async function verifyAdminSession() {
   try {
@@ -288,7 +333,9 @@ export async function verifyAdminSession() {
 
     const sessionData = JSON.parse(adminSessionCookie);
 
+    // Verificar expiração
     if (new Date(sessionData.expiresAt) < new Date()) {
+      await clearAdminCookies();
       return { success: false, error: "Sessão expirada" };
     }
 
@@ -305,6 +352,7 @@ export async function verifyAdminSession() {
       .single();
 
     if (!profile || profile.role !== "admin" || !profile.status) {
+      await clearAdminCookies();
       return { success: false, error: "Acesso não autorizado" };
     }
 
@@ -314,8 +362,10 @@ export async function verifyAdminSession() {
         id: sessionData.userId,
         email: sessionData.userEmail,
       },
+      expiresAt: sessionData.expiresAt,
     };
   } catch {
+    await clearAdminCookies();
     return { success: false, error: "Sessão inválida" };
   }
 }
@@ -374,6 +424,23 @@ export async function setupAdminPassword(formData: FormData) {
   } catch (error) {
     console.error("❌ [setupAdminPassword] Erro:", error);
     return { success: false, error: "Erro ao configurar senha" };
+  }
+}
+
+/**
+ * 📱 VERIFICAR SESSÃO NO CLIENT (simplificado)
+ */
+export async function checkAdminSession() {
+  try {
+    const cookieStore = await cookies();
+    const hasAdminCookie = cookieStore.get("is_admin")?.value === "true";
+
+    return {
+      success: hasAdminCookie,
+      isAdmin: hasAdminCookie,
+    };
+  } catch {
+    return { success: false, isAdmin: false };
   }
 }
 
