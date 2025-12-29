@@ -6,7 +6,7 @@ import { getAdminClient } from "@/lib/supabase/admin";
 // Interface para resposta padronizada
 export interface DashboardResponse {
   success: boolean;
-  data?: DashboardStats;
+  data?: DashboardStats; // <-- Renomeie de 'stats' para 'data'
   error?: string;
 }
 
@@ -241,7 +241,7 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
     }
 
     // Coletar estatísticas
-    const stats: DashboardStats = {
+    const data: DashboardStats = {
       totalAgents: getCount(totalProfilesRes),
       activeAgents: getCount(activeProfilesRes),
       inactiveAgents: getCount(inactiveProfilesRes),
@@ -291,7 +291,7 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
 
     return {
       success: true,
-      data: stats,
+      data: data, // <-- Use 'data' em vez de 'stats'
     };
   } catch (error) {
     console.error("❌ [getDashboardStats] Erro:", error);

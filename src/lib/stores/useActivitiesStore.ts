@@ -13,6 +13,7 @@ import {
 import {
   getDashboardStats,
   type DashboardStats,
+  type DashboardResponse,
 } from "@/app/actions/admin/dashboard/dashboard";
 
 export interface ActivityStats {
@@ -72,25 +73,25 @@ const initialState: Omit<
 export const useActivitiesStore = create<ActivitiesStoreState>((set, get) => ({
   ...initialState,
 
-  // ATUALIZADO: Usar getDashboardStats em vez de getDashboardData
+  // ATUALIZADO: Usar getDashboardStats corretamente
   fetchDashboardStats: async () => {
     set({ loadingDashboard: true, error: null });
 
     try {
       console.log("🔍 [ActivitiesStore] Buscando dados do dashboard...");
-      const result = await getDashboardStats();
+      const result: DashboardResponse = await getDashboardStats();
 
-      if (result.success && result.stats) {
+      if (result.success && result.data) {
         console.log(
           "✅ [ActivitiesStore] Dados do dashboard carregados com sucesso"
         );
 
         set({
-          dashboardStats: result.stats,
+          dashboardStats: result.data,
           loadingDashboard: false,
         });
 
-        return result.stats;
+        return result.data;
       } else {
         console.warn(
           "⚠️ [ActivitiesStore] Erro ao buscar dados do dashboard:",
