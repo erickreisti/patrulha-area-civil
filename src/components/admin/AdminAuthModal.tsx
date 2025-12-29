@@ -1,3 +1,4 @@
+// components/admin/AdminAuthModal.tsx
 "use client";
 
 import { useState } from "react";
@@ -59,7 +60,7 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
 
       // ✅ IMPORTAR e CHAMAR A NOVA SERVER ACTION
       const { authenticateAdminSession } = await import(
-        "@/app/actions/auth/admin"
+        "@/app/actions/auth/auth"
       );
 
       const result = await authenticateAdminSession(
@@ -129,26 +130,26 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
               }}
               placeholder="Digite sua senha administrativa"
               disabled={loading}
-              className={`w-full text-lg ${
+              className={`w-full text-lg transition-all duration-200 ${
                 error
                   ? "border-error focus:ring-error"
                   : successMessage
                   ? "border-green-500 focus:ring-green-500"
-                  : "border-slate-300"
+                  : "border-slate-300 focus:border-navy focus:ring-navy/20"
               }`}
               autoFocus
             />
 
             {error && (
-              <div className="flex items-center gap-2 mt-2 text-error text-sm animate-fadeIn">
-                <RiErrorWarningLine className="w-4 h-4" />
+              <div className="flex items-center gap-2 mt-2 text-error text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                <RiErrorWarningLine className="w-4 h-4 flex-shrink-0" />
                 <span className="font-roboto">{error}</span>
               </div>
             )}
 
             {successMessage && (
-              <div className="flex items-center gap-2 mt-2 text-green-600 text-sm animate-fadeIn">
-                <RiCheckLine className="w-4 h-4" />
+              <div className="flex items-center gap-2 mt-2 text-green-600 text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                <RiCheckLine className="w-4 h-4 flex-shrink-0" />
                 <span className="font-roboto">{successMessage}</span>
               </div>
             )}
@@ -158,15 +159,15 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
             <Button
               type="submit"
               disabled={loading || !!successMessage}
-              className={`flex-1 ${
+              className={`flex-1 transition-all duration-200 font-roboto ${
                 successMessage
                   ? "bg-green-600 hover:bg-green-700"
                   : "bg-navy hover:bg-navy/90"
-              } text-white font-semibold py-2.5 text-sm transition-all font-roboto`}
+              }`}
             >
               {loading ? (
                 <>
-                  <Spinner className="w-4 h-4 mr-2" />
+                  <Spinner className="w-4 h-4 mr-2 animate-spin" />
                   Verificando...
                 </>
               ) : successMessage ? (
@@ -181,7 +182,7 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
               variant="outline"
               onClick={onClose}
               disabled={loading || !!successMessage}
-              className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50 font-roboto"
+              className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50 font-roboto transition-colors duration-200"
             >
               Cancelar
             </Button>
@@ -196,22 +197,4 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
       </DialogContent>
     </Dialog>
   );
-}
-
-// Adicione este CSS para animação
-const styles = `
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-5px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .animate-fadeIn {
-    animation: fadeIn 0.3s ease-out;
-  }
-`;
-
-// Adicione estilos ao componente
-if (typeof document !== "undefined") {
-  const styleSheet = document.createElement("style");
-  styleSheet.textContent = styles;
-  document.head.appendChild(styleSheet);
 }

@@ -1,3 +1,4 @@
+// components/admin/DashboardPage.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -5,6 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
+import { useAdminAuth } from "@/lib/contexts/AdminAuthContext";
+import {
+  getDashboardStats,
+  type DashboardStats,
+} from "@/app/actions/admin/dashboard/dashboard";
 import {
   RiUserLine,
   RiShieldLine,
@@ -23,13 +30,24 @@ import {
   RiDashboardLine,
   RiFileTextLine,
 } from "react-icons/ri";
-import {
-  getDashboardStats,
-  type DashboardResponse,
-} from "@/app/actions/admin/dashboard/dashboard";
-import { useRouter } from "next/navigation";
 
-// Tipos de cores para StatCard
+// Interface para atividade
+interface Activity {
+  id: string;
+  action_type: string;
+  description: string;
+  created_at: string;
+  user_name: string | null;
+}
+
+// Interface para resposta
+interface DashboardResponse {
+  success: boolean;
+  data?: DashboardStats;
+  error?: string;
+}
+
+// Tipos de cores
 type StatCardColor =
   | "blue"
   | "green"
@@ -41,8 +59,6 @@ type StatCardColor =
   | "indigo"
   | "gray"
   | "yellow";
-
-// Tipos de cores para QuickActionCard
 type QuickActionColor =
   | "blue"
   | "green"
@@ -52,7 +68,7 @@ type QuickActionColor =
   | "cyan"
   | "indigo";
 
-// Card de estatística
+// ✅ Componente de estatística
 function StatCard({
   title,
   value,
@@ -118,7 +134,7 @@ function StatCard({
   );
 }
 
-// Card de atalho rápido
+// ✅ Componente de atalho rápido
 function QuickActionCard({
   title,
   description,
@@ -165,16 +181,7 @@ function QuickActionCard({
   );
 }
 
-// Interface para atividade
-interface Activity {
-  id: string;
-  action_type: string;
-  description: string;
-  created_at: string;
-  user_name: string | null;
-}
-
-// Card de atividade recente
+// ✅ Componente de atividade recente
 function ActivityCard({ activity }: { activity: Activity }) {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -248,11 +255,45 @@ function ActivityCard({ activity }: { activity: Activity }) {
   );
 }
 
-export default function AdminDashboardPage() {
+// ✅ Loading State
+function LoadingSkeleton() {
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-8 w-64 mb-2" />
+          <Skeleton className="h-4 w-96" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-24" />
+        </div>
+      </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-32" />
+        ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Skeleton key={i} className="h-32" />
+        ))}
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        <Skeleton className="h-64" />
+        <Skeleton className="h-64" />
+      </div>
+      <Skeleton className="h-48" />
+    </div>
+  );
+}
+
+export default function DashboardPage() {
+  const router = useRouter();
+  const { user, profile, isLoading: authLoading } = useAdminAuth();
+
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -263,43 +304,47 @@ export default function AdminDashboardPage() {
       const result = await getDashboardStats();
       console.log("📊 Resultado:", result);
 
-      if (result.success) {
-        setData(result);
-      } else {
-        setError(result.error || "Erro ao carregar dashboard");
+      setData(result);
 
-        if (
-          result.error?.includes("Acesso restrito") ||
-          result.error?.includes("Não autenticado")
-        ) {
-          setTimeout(() => {
-            router.push("/perfil");
-          }, 2000);
-        }
+      if (!result.success) {
+        setError(result.error || "Erro ao carregar dashboard");
       }
     } catch (err) {
       console.error("❌ Erro:", err);
       setError("Erro ao conectar com o servidor");
+      setData({
+        success: false,
+        error: "Erro ao conectar com o servidor",
+      });
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
 
+  // Depuração
+  useEffect(() => {
+    if (data) {
+      console.log("📊 Dashboard data:", data);
+      console.log("📋 Atividades:", data.data?.recentActivities?.length || 0);
+    }
+  }, [data]);
+
   const handleRefresh = () => {
     loadDashboard();
   };
 
+  // Atalhos rápidos
   const quickActions = [
     {
       title: "Novo Agente",
       description: "Adicionar novo agente ao sistema",
       icon: RiUserAddLine,
       color: "blue" as QuickActionColor,
-      path: "/admin/agentes/novo",
+      path: "/admin/agentes/criar",
     },
     {
       title: "Publicar Notícia",
@@ -338,10 +383,12 @@ export default function AdminDashboardPage() {
     },
   ];
 
-  if (loading && !data) {
+  // ✅ Loading do contexto (VERIFICAÇÃO APENAS AQUI)
+  if (authLoading) {
     return <LoadingSkeleton />;
   }
 
+  // ✅ Erro no carregamento de dados
   if (error && !loading) {
     return (
       <div className="container mx-auto p-6">
@@ -351,22 +398,14 @@ export default function AdminDashboardPage() {
               <RiErrorWarningLine className="h-12 w-12 text-red-600" />
               <div>
                 <h3 className="text-lg font-semibold text-red-800">
-                  Acesso Restrito
+                  Erro ao carregar dashboard
                 </h3>
                 <p className="text-red-600 mt-1">{error}</p>
-                {error.includes("redirecionando") && (
-                  <p className="text-sm text-red-500 mt-2">
-                    Redirecionando para o perfil...
-                  </p>
-                )}
               </div>
               <div className="flex gap-2">
                 <Button onClick={handleRefresh} variant="outline">
                   <RiRefreshLine className="h-4 w-4 mr-2" />
                   Tentar novamente
-                </Button>
-                <Button onClick={() => router.push("/perfil")}>
-                  Voltar ao Perfil
                 </Button>
               </div>
             </div>
@@ -376,7 +415,8 @@ export default function AdminDashboardPage() {
     );
   }
 
-  const stats = data?.stats;
+  const stats = data?.data;
+  const activities = stats?.recentActivities || [];
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -385,14 +425,11 @@ export default function AdminDashboardPage() {
         <div>
           <h1 className="text-3xl font-bold">Dashboard Administrativo</h1>
           <p className="text-muted-foreground mt-1">
-            Visão geral do sistema e estatísticas
+            Bem-vindo, {profile?.full_name || user?.email}!
           </p>
-          {data?.debug && (
-            <p className="text-xs text-slate-500 mt-2">
-              Logado como: {data.debug.userEmail} • Última atualização:{" "}
-              {new Date().toLocaleTimeString("pt-BR")}
-            </p>
-          )}
+          <p className="text-xs text-slate-500 mt-2">
+            Última atualização: {new Date().toLocaleTimeString("pt-BR")}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -479,7 +516,7 @@ export default function AdminDashboardPage() {
                 <h3 className="font-semibold text-lg">Atividades</h3>
               </div>
               <div className="text-2xl font-bold mt-4">
-                {stats?.recentActivities?.length || 0}
+                {activities.length || 0}
               </div>
               <div className="text-xs text-muted-foreground">
                 Últimas 24 horas
@@ -611,14 +648,14 @@ export default function AdminDashboardPage() {
               <RiTimeLine className="h-5 w-5" />
               Atividades Recentes
               <Badge variant="outline" className="ml-2">
-                {stats?.recentActivities?.length || 0}
+                {activities.length || 0}
               </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {stats?.recentActivities && stats.recentActivities.length > 0 ? (
+            {activities.length > 0 ? (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {stats.recentActivities.map((activity) => (
+                {activities.map((activity) => (
                   <ActivityCard key={activity.id} activity={activity} />
                 ))}
               </div>
@@ -706,60 +743,6 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Informações de Debug (apenas para desenvolvimento) */}
-      {process.env.NODE_ENV === "development" && data?.debug && (
-        <Card className="border-dashed border-gray-300">
-          <CardHeader>
-            <CardTitle className="text-sm font-medium text-gray-500">
-              Informações de Debug
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs font-mono bg-gray-50 p-4 rounded overflow-auto">
-              <pre>{JSON.stringify(data.debug, null, 2)}</pre>
-              {stats?.summary && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <h4 className="font-medium mb-2">Resumo:</h4>
-                  <pre>{JSON.stringify(stats.summary, null, 2)}</pre>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// Loading State
-function LoadingSkeleton() {
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-24" />
-        </div>
-      </div>
-      <div className="grid gap-4 md:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-32" />
-        ))}
-      </div>
-      <div className="grid gap-4 md:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-32" />
-        ))}
-      </div>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Skeleton className="h-64" />
-        <Skeleton className="h-64" />
-      </div>
-      <Skeleton className="h-48" />
     </div>
   );
 }

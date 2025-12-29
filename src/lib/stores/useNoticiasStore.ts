@@ -1,59 +1,26 @@
-// stores/useNoticiasStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type {
+  NoticiaLista,
+  NoticiaComAutor,
+  NewsStats,
+} from "@/app/actions/news/noticias";
 
-// Tipos locais para evitar dependência do arquivo actions
-export interface NoticiaAutor {
-  full_name: string | null;
-  avatar_url: string | null;
-  graduacao: string | null;
-  matricula?: string | null;
-}
+// Re-exportar tipos das actions para uso nos componentes
+export type {
+  NoticiaLista,
+  NoticiaComAutor,
+  NewsStats,
+  ApiResponse,
+} from "@/app/actions/news/noticias";
 
-export interface NoticiaComAutor {
-  id: string;
-  titulo: string;
-  slug: string;
-  conteudo: string;
-  resumo: string | null;
-  imagem: string | null;
-  categoria: string | null;
-  data_publicacao: string;
-  status: "rascunho" | "publicado" | "arquivado";
-  views: number;
-  destaque: boolean;
-  autor: NoticiaAutor | null;
-  created_at?: string;
-  updated_at?: string;
-  autor_id?: string | null;
-}
-
-export interface NoticiaLista {
-  id: string;
-  titulo: string;
-  slug: string;
-  resumo: string | null;
-  categoria: string | null;
-  data_publicacao: string;
-  status: "rascunho" | "publicado" | "arquivado";
-  imagem: string | null;
-  views: number;
-  destaque: boolean;
-  autor: NoticiaAutor | null;
-}
-
-export interface NewsStats {
-  total: number;
-  published: number;
-  recent: number;
-  featured: number;
-  canViewStats: boolean;
-}
+// Tipos do store
+export type SortBy = "recent" | "oldest" | "destaque" | "popular";
 
 interface NoticiasFiltros {
   searchTerm: string;
   categoria: string;
-  sortBy: "recent" | "oldest" | "destaque" | "popular";
+  sortBy: SortBy;
   itemsPerPage: number;
   currentPage: number;
 }
@@ -78,7 +45,7 @@ interface NoticiasState {
   // Ações
   setSearchTerm: (term: string) => void;
   setCategoria: (categoria: string) => void;
-  setSortBy: (sortBy: "recent" | "oldest" | "destaque" | "popular") => void;
+  setSortBy: (sortBy: SortBy) => void;
   setItemsPerPage: (itemsPerPage: number) => void;
   setCurrentPage: (currentPage: number) => void;
   clearFilters: () => void;
@@ -103,7 +70,19 @@ interface NoticiasState {
   clearNoticiasRelacionadas: () => void;
 }
 
-const initialState = {
+// Apenas os valores iniciais (sem as funções)
+const initialValues: {
+  noticias: NoticiaLista[];
+  noticiaDetalhe: NoticiaComAutor | null;
+  noticiasRelacionadas: NoticiaLista[];
+  categoriasDisponiveis: Array<{ value: string; label: string }>;
+  stats: NewsStats;
+  loadingLista: boolean;
+  loadingDetalhe: boolean;
+  loadingRelacionadas: boolean;
+  filtros: NoticiasFiltros;
+  totalCount: number;
+} = {
   noticias: [],
   noticiaDetalhe: null,
   noticiasRelacionadas: [],
@@ -121,7 +100,7 @@ const initialState = {
   filtros: {
     searchTerm: "",
     categoria: "all",
-    sortBy: "recent" as const,
+    sortBy: "recent",
     itemsPerPage: 8,
     currentPage: 1,
   },
@@ -131,7 +110,7 @@ const initialState = {
 export const useNoticiasStore = create<NoticiasState>()(
   persist(
     (set) => ({
-      ...initialState,
+      ...initialValues,
 
       // Setters de filtros
       setSearchTerm: (searchTerm) =>
@@ -161,7 +140,7 @@ export const useNoticiasStore = create<NoticiasState>()(
 
       clearFilters: () =>
         set({
-          filtros: initialState.filtros,
+          filtros: initialValues.filtros,
         }),
 
       // Setters de dados

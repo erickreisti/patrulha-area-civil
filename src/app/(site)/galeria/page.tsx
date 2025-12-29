@@ -29,12 +29,10 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import {
-  RiCameraLine,
   RiImageLine,
   RiVideoLine,
   RiCalendarLine,
   RiArrowRightLine,
-  RiStackLine,
   RiFolderLine,
   RiSearchLine,
   RiFilterLine,
@@ -49,15 +47,14 @@ import {
   RiSparklingFill,
   RiCameraOffLine,
   RiVideoAddLine,
-  RiErrorWarningLine,
 } from "react-icons/ri";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { getCategoriasGaleria } from "@/app/actions/gallery/galeria";
-import { toast } from "sonner";
 import Image from "next/image";
+import { useGaleriaStore } from "@/lib/stores/useGaleriaStore";
+import type { CategoriaComItens } from "@/app/actions/gallery/galeria";
 
-// ==================== CONFIGURAÇÕES ====================
+// Configurações
 const ITEMS_PER_PAGE_OPTIONS = [
   { value: "6", label: "6 por página" },
   { value: "10", label: "10 por página" },
@@ -80,135 +77,49 @@ const TYPE_OPTIONS = [
   { value: "videos", label: "Vídeos", icon: RiVideoLine },
 ];
 
-// Interface para categorias
-interface CategoriaGaleria {
-  id: string;
-  nome: string;
-  slug: string;
-  descricao: string | null;
-  tipo: "fotos" | "videos";
-  ordem: number;
-  status: boolean;
-  arquivada: boolean;
-  created_at: string;
-  updated_at: string;
-  item_count: number;
-  tem_destaque: boolean;
-  ultima_imagem_url?: string;
-}
-
-// ==================== FUNÇÕES AUXILIARES ====================
-function getSortLabel(sortBy: string): string {
-  const option = SORT_OPTIONS.find((opt) => opt.value === sortBy);
-  return option ? option.label : "Relevância";
-}
-
-// ==================== COMPONENTE DE CARD DE GALERIA ====================
-function GaleriaCard({ categoria }: { categoria: CategoriaGaleria }) {
+// Componente de Card
+function GaleriaCard({ categoria }: { categoria: CategoriaComItens }) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const isActive = categoria.status && !categoria.arquivada;
-
-  // Memoizar propriedades da categoria que usamos no placeholder
-  const {
-    tipo: categoriaTipo,
-    tem_destaque: categoriaDestaque,
-    nome,
-  } = categoria;
-
-  // Função para gerar placeholder baseado no tipo de categoria
-  const getPlaceholderForCategoria = useCallback(() => {
-    const isVideo = categoriaTipo === "videos";
-    const isDestaque = categoriaDestaque;
-
-    return (
-      <div
-        className={`absolute inset-0 flex flex-col items-center justify-center p-4 ${
-          isVideo
-            ? "bg-gradient-to-br from-purple-800 to-pink-900"
-            : isDestaque
-            ? "bg-gradient-to-br from-amber-800 to-orange-900"
-            : "bg-gradient-to-br from-navy-800 to-blue-900"
-        }`}
-      >
-        <div
-          className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center mb-3 ${
-            isVideo
-              ? "bg-gradient-to-r from-purple-500 to-pink-600"
-              : isDestaque
-              ? "bg-gradient-to-r from-amber-500 to-orange-500"
-              : "bg-gradient-to-r from-navy-500 to-blue-600"
-          }`}
-        >
-          {isVideo ? (
-            <RiVideoAddLine className="h-6 w-6 text-white" />
-          ) : (
-            <RiCameraOffLine className="h-6 w-6 text-white" />
-          )}
-        </div>
-        <div className="text-center">
-          <p className="text-white font-semibold mb-1 text-xs sm:text-sm">
-            {isVideo ? "Vídeos não disponíveis" : "Fotos não disponíveis"}
-          </p>
-          <p className="text-white/70 text-xs">{nome}</p>
-        </div>
-        <RiErrorWarningLine className="absolute top-2 left-2 h-4 w-4 text-amber-300" />
-      </div>
-    );
-  }, [categoriaTipo, categoriaDestaque, nome]); // CORRIGIDO: Apenas dependências necessárias
-
-  // Função para renderizar a imagem ou placeholder
-  const renderImageOrPlaceholder = useCallback(() => {
-    // Se já teve erro, mostra placeholder imediatamente
-    if (imageError) {
-      return getPlaceholderForCategoria();
-    }
-
-    // Se tem URL de imagem, tenta carregar
-    if (categoria.ultima_imagem_url) {
-      return (
-        <>
-          {!imageLoaded && (
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-300 animate-pulse" />
-          )}
-          <Image
-            src={categoria.ultima_imagem_url}
-            alt={categoria.nome}
-            fill
-            className={`object-cover transition-all duration-700 group-hover:scale-110 ${
-              imageLoaded ? "opacity-100" : "opacity-0"
-            }`}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)} // SÓ UMA TENTATIVA
-            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            loading="lazy"
-          />
-        </>
-      );
-    }
-
-    // Se não tem URL, mostra placeholder
-    return getPlaceholderForCategoria();
-  }, [
-    categoria.ultima_imagem_url,
-    categoria.nome,
-    imageLoaded,
-    imageError,
-    getPlaceholderForCategoria, // Apenas esta função como dependência
-  ]); // CORRIGIDO: Removidas dependências desnecessárias
+  const hasItems = categoria.item_count > 0;
 
   return (
     <Card className="group border-2 border-slate-200/60 hover:border-navy-300/50 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden h-full flex flex-col">
-      {/* Image Container */}
       <div className="relative h-40 sm:h-44 lg:h-48 overflow-hidden">
-        {renderImageOrPlaceholder()}
-
-        {/* Overlay com badges */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        {categoria.ultima_imagem_url && !imageError ? (
+          <>
+            {!imageLoaded && (
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-300 animate-pulse" />
+            )}
+            <Image
+              src={categoria.ultima_imagem_url}
+              alt={categoria.nome}
+              fill
+              className={`object-cover transition-all duration-700 group-hover:scale-110 ${
+                imageLoaded ? "opacity-100" : "opacity-0"
+              }`}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              loading="lazy"
+            />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center p-4">
+            {categoria.tipo === "videos" ? (
+              <RiVideoAddLine className="h-12 w-12 text-slate-400 mb-3" />
+            ) : (
+              <RiCameraOffLine className="h-12 w-12 text-slate-400 mb-3" />
+            )}
+            <p className="text-slate-500 text-xs text-center">
+              {categoria.tipo === "videos" ? "Vídeos" : "Fotos"} não disponíveis
+            </p>
+          </div>
+        )}
 
         <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-wrap gap-1.5 sm:gap-2">
-          {/* Status Badge */}
           <Badge
             variant={isActive ? "default" : "secondary"}
             className="backdrop-blur-sm text-xs border-0"
@@ -221,7 +132,6 @@ function GaleriaCard({ categoria }: { categoria: CategoriaGaleria }) {
             {isActive ? "Ativa" : "Arquivada"}
           </Badge>
 
-          {/* Tipo Badge */}
           <Badge
             className={`backdrop-blur-sm text-xs border-0 ${
               categoria.tipo === "videos"
@@ -237,7 +147,6 @@ function GaleriaCard({ categoria }: { categoria: CategoriaGaleria }) {
             {categoria.tipo === "videos" ? "Vídeos" : "Fotos"}
           </Badge>
 
-          {/* Destaque Badge */}
           {categoria.tem_destaque && (
             <Badge className="backdrop-blur-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs border-0">
               <RiStarFill className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
@@ -246,9 +155,8 @@ function GaleriaCard({ categoria }: { categoria: CategoriaGaleria }) {
           )}
         </div>
 
-        {/* Item Count Badge */}
         <Badge className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 bg-white/90 backdrop-blur-sm text-slate-700 border-0 text-xs">
-          <RiStackLine className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
+          <RiFolderLine className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
           {categoria.item_count} {categoria.item_count === 1 ? "item" : "itens"}
         </Badge>
       </div>
@@ -264,7 +172,6 @@ function GaleriaCard({ categoria }: { categoria: CategoriaGaleria }) {
       </CardHeader>
 
       <CardContent className="pt-0 mt-auto px-4 sm:px-6">
-        {/* Meta Information */}
         <div className="flex items-center justify-between text-xs text-slate-500 mb-3 sm:mb-4">
           <div className="flex items-center">
             <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
@@ -281,21 +188,32 @@ function GaleriaCard({ categoria }: { categoria: CategoriaGaleria }) {
           </div>
         </div>
 
-        {/* Action Button */}
         <Button
           asChild
           variant="outline"
           size="sm"
           className={`w-full border-navy-200 text-navy-700 hover:bg-navy-600 hover:text-white hover:border-navy-600 transition-all duration-300 group/btn text-xs sm:text-sm ${
-            categoria.item_count === 0 ? "opacity-50 cursor-not-allowed" : ""
+            !hasItems || !isActive ? "opacity-50 cursor-not-allowed" : ""
           }`}
-          disabled={categoria.item_count === 0}
+          disabled={!hasItems || !isActive}
         >
-          <Link href={`/galeria/${categoria.slug}`}>
-            {categoria.item_count === 0 ? (
+          <Link
+            href={hasItems && isActive ? `/galeria/${categoria.slug}` : "#"}
+            onClick={(e) => {
+              if (!hasItems || !isActive) {
+                e.preventDefault();
+              }
+            }}
+          >
+            {!hasItems ? (
               <>
                 <RiCheckLine className="w-3 h-3 mr-1.5" />
                 Sem itens
+              </>
+            ) : !isActive ? (
+              <>
+                <RiEyeOffLine className="w-3 h-3 mr-1.5" />
+                Indisponível
               </>
             ) : (
               <>
@@ -310,25 +228,24 @@ function GaleriaCard({ categoria }: { categoria: CategoriaGaleria }) {
   );
 }
 
-// ==================== COMPONENTE PRINCIPAL ====================
+// Componente Principal
 export default function GaleriaPage() {
-  const [categorias, setCategorias] = useState<CategoriaGaleria[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalCategorias, setTotalCategorias] = useState(0);
+  const {
+    categorias,
+    loadingCategorias,
+    errorCategorias,
+    filtrosCategorias,
+    fetchCategorias,
+    setSearchTermCategorias,
+    setTipoCategorias,
+    setSortByCategorias,
+    setCurrentPageCategorias,
+    setItemsPerPageCategorias,
+    resetFiltrosCategorias,
+  } = useGaleriaStore();
 
-  // Estado para busca com debounce
-  const [localSearch, setLocalSearch] = useState("");
+  const [localSearch, setLocalSearch] = useState(filtrosCategorias.searchTerm);
   const debounceTimer = useRef<NodeJS.Timeout>();
-
-  // Filtros locais
-  const [filtros, setFiltros] = useState({
-    searchTerm: "",
-    tipo: "all" as "all" | "fotos" | "videos",
-    sortBy: "recent" as "recent" | "oldest" | "popular" | "destaque" | "name",
-    currentPage: 1,
-    itemsPerPage: 12,
-  });
 
   // Debounce para busca
   useEffect(() => {
@@ -337,11 +254,7 @@ export default function GaleriaPage() {
     }
 
     debounceTimer.current = setTimeout(() => {
-      setFiltros((prev) => ({
-        ...prev,
-        searchTerm: localSearch,
-        currentPage: 1,
-      }));
+      setSearchTermCategorias(localSearch);
     }, 500);
 
     return () => {
@@ -349,48 +262,27 @@ export default function GaleriaPage() {
         clearTimeout(debounceTimer.current);
       }
     };
-  }, [localSearch]);
-
-  // Carregar categorias com server actions
-  const loadCategorias = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const result = await getCategoriasGaleria({
-        tipo: filtros.tipo,
-        search: filtros.searchTerm,
-        sortBy: filtros.sortBy,
-        limit: filtros.itemsPerPage,
-        page: filtros.currentPage,
-      });
-
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      setCategorias(result.data as CategoriaGaleria[]);
-      setTotalCategorias(result.total);
-    } catch (err: unknown) {
-      console.error("Erro ao carregar categorias:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Erro ao carregar galeria";
-      setError(errorMessage);
-      toast.error("Erro ao carregar categorias da galeria");
-    } finally {
-      setLoading(false);
-    }
-  }, [filtros]);
+  }, [localSearch, setSearchTermCategorias]);
 
   // Carregar categorias quando os filtros mudam
   useEffect(() => {
+    const loadCategorias = async () => {
+      await fetchCategorias();
+    };
     loadCategorias();
-  }, [loadCategorias]);
+  }, [
+    fetchCategorias,
+    filtrosCategorias.searchTerm,
+    filtrosCategorias.tipo,
+    filtrosCategorias.sortBy,
+    filtrosCategorias.currentPage,
+    filtrosCategorias.itemsPerPage,
+  ]);
 
   // Calcular total de páginas
   const totalPages = Math.max(
     1,
-    Math.ceil(totalCategorias / filtros.itemsPerPage)
+    Math.ceil(filtrosCategorias.total / filtrosCategorias.itemsPerPage)
   );
 
   // Estatísticas
@@ -408,46 +300,33 @@ export default function GaleriaPage() {
 
   // Handlers para filtros
   const handleTipoChange = (value: string) => {
-    setFiltros((prev) => ({
-      ...prev,
-      tipo: value as "all" | "fotos" | "videos",
-      currentPage: 1,
-    }));
+    setTipoCategorias(value as "all" | "fotos" | "videos");
   };
 
   const handleSortChange = (value: string) => {
-    setFiltros((prev) => ({
-      ...prev,
-      sortBy: value as "recent" | "oldest" | "popular" | "destaque" | "name",
-      currentPage: 1,
-    }));
+    setSortByCategorias(
+      value as "recent" | "oldest" | "popular" | "destaque" | "name"
+    );
   };
 
   const handleItemsPerPageChange = (value: string) => {
-    setFiltros((prev) => ({
-      ...prev,
-      itemsPerPage: Number(value),
-      currentPage: 1,
-    }));
+    setItemsPerPageCategorias(Number(value));
   };
 
-  const handlePageChange = (page: number) => {
-    setFiltros((prev) => ({ ...prev, currentPage: page }));
-  };
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPageCategorias(page);
+    },
+    [setCurrentPageCategorias]
+  );
 
   const clearFilters = () => {
     setLocalSearch("");
-    setFiltros({
-      searchTerm: "",
-      tipo: "all",
-      sortBy: "recent",
-      currentPage: 1,
-      itemsPerPage: 12,
-    });
+    resetFiltrosCategorias();
   };
 
-  // Loading Skeleton
-  if (loading && categorias.length === 0) {
+  // Loading inicial
+  if (loadingCategorias && categorias.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -455,35 +334,21 @@ export default function GaleriaPage() {
             <Skeleton className="h-10 sm:h-12 w-48 sm:w-64 mx-auto mb-3 sm:mb-4" />
             <Skeleton className="h-5 sm:h-6 w-80 sm:w-96 mx-auto" />
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-24 sm:h-28 rounded-xl" />
-            ))}
-          </div>
-
-          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 mb-6 sm:mb-8">
-            <Skeleton className="h-12 flex-1" />
-            <div className="flex flex-col sm:flex-row gap-4 sm:gap-4 w-full lg:w-auto">
-              <Skeleton className="h-12 w-full sm:w-48" />
-              <Skeleton className="h-12 w-full sm:w-48" />
-              <Skeleton className="h-12 w-full sm:w-48" />
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i} className="border-0 shadow-lg">
-                <CardHeader className="pb-3 sm:pb-4">
-                  <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-full mb-1" />
-                  <Skeleton className="h-4 w-2/3" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-4 w-1/2" />
-                </CardContent>
-              </Card>
-            ))}
+            {Array.from({ length: filtrosCategorias.itemsPerPage }).map(
+              (_, i) => (
+                <Card key={i} className="border-0 shadow-lg">
+                  <CardHeader className="pb-3 sm:pb-4">
+                    <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-full mb-1" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-1/2" />
+                  </CardContent>
+                </Card>
+              )
+            )}
           </div>
         </div>
       </div>
@@ -495,9 +360,6 @@ export default function GaleriaPage() {
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 overflow-hidden">
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
-        <div className="absolute top-0 left-0 w-48 h-48 sm:w-60 sm:h-60 lg:w-72 lg:h-72 bg-blue-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-indigo-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
-
         <div className="container mx-auto px-4 sm:px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -572,11 +434,10 @@ export default function GaleriaPage() {
         </div>
       </section>
 
-      {/* Seção de Filtros - Estilo das Notícias */}
+      {/* Seção de Filtros */}
       <div className="bg-white/95 backdrop-blur-sm border-b border-slate-200/60 relative z-50">
         <div className="container mx-auto px-4 sm:px-6 py-6">
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 items-start lg:items-center justify-between">
-            {/* Search */}
             <div className="flex-1 w-full max-w-2xl">
               <div className="relative">
                 <RiSearchLine className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4 sm:w-5 sm:h-5" />
@@ -598,11 +459,12 @@ export default function GaleriaPage() {
               </div>
             </div>
 
-            {/* Controls - Estilo das Notícias */}
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full lg:w-auto">
-              {/* Tipo Filter */}
               <div className="min-w-[200px]">
-                <Select value={filtros.tipo} onValueChange={handleTipoChange}>
+                <Select
+                  value={filtrosCategorias.tipo}
+                  onValueChange={handleTipoChange}
+                >
                   <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                     <div className="flex items-center">
                       <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
@@ -629,9 +491,11 @@ export default function GaleriaPage() {
                 </Select>
               </div>
 
-              {/* Sort */}
               <div className="min-w-[180px]">
-                <Select value={filtros.sortBy} onValueChange={handleSortChange}>
+                <Select
+                  value={filtrosCategorias.sortBy}
+                  onValueChange={handleSortChange}
+                >
                   <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                     <div className="flex items-center">
                       <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
@@ -658,17 +522,16 @@ export default function GaleriaPage() {
                 </Select>
               </div>
 
-              {/* Items per Page */}
               <div className="min-w-[160px]">
                 <Select
-                  value={filtros.itemsPerPage.toString()}
+                  value={filtrosCategorias.itemsPerPage.toString()}
                   onValueChange={handleItemsPerPageChange}
                 >
                   <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                     <SelectValue
-                      placeholder={`${filtros.itemsPerPage} por página`}
+                      placeholder={`${filtrosCategorias.itemsPerPage} por página`}
                     >
-                      {filtros.itemsPerPage} por página
+                      {filtrosCategorias.itemsPerPage} por página
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
@@ -687,17 +550,17 @@ export default function GaleriaPage() {
             </div>
           </div>
 
-          {/* Indicadores de filtros ativos - Estilo das Notícias */}
-          {(filtros.searchTerm ||
-            filtros.tipo !== "all" ||
-            filtros.sortBy !== "recent") && (
+          {/* Indicadores de filtros ativos */}
+          {(filtrosCategorias.searchTerm ||
+            filtrosCategorias.tipo !== "all" ||
+            filtrosCategorias.sortBy !== "recent") && (
             <div className="flex flex-wrap gap-2 mt-4">
-              {filtros.searchTerm && (
+              {filtrosCategorias.searchTerm && (
                 <Badge
                   variant="outline"
                   className="flex items-center gap-1 bg-blue-50 border-blue-200 text-blue-700"
                 >
-                  Busca: &quot;{filtros.searchTerm}&quot;
+                  Busca: &quot;{filtrosCategorias.searchTerm}&quot;
                   <button
                     onClick={() => setLocalSearch("")}
                     className="ml-1 hover:text-blue-900 w-3 h-3 flex items-center justify-center"
@@ -706,14 +569,14 @@ export default function GaleriaPage() {
                   </button>
                 </Badge>
               )}
-              {filtros.tipo !== "all" && (
+              {filtrosCategorias.tipo !== "all" && (
                 <Badge
                   variant="outline"
                   className="flex items-center gap-1 bg-green-50 border-green-200 text-green-700"
                 >
                   <RiFilterLine className="w-3 h-3" />
-                  {TYPE_OPTIONS.find((c) => c.value === filtros.tipo)?.label ||
-                    filtros.tipo}
+                  {TYPE_OPTIONS.find((c) => c.value === filtrosCategorias.tipo)
+                    ?.label || filtrosCategorias.tipo}
                   <button
                     onClick={() => handleTipoChange("all")}
                     className="ml-1 hover:text-green-900 w-3 h-3 flex items-center justify-center"
@@ -722,15 +585,15 @@ export default function GaleriaPage() {
                   </button>
                 </Badge>
               )}
-              {filtros.sortBy !== "recent" && (
+              {filtrosCategorias.sortBy !== "recent" && (
                 <Badge
                   variant="outline"
                   className="flex items-center gap-1 bg-purple-50 border-purple-200 text-purple-700"
                 >
                   <RiSortAsc className="w-3 h-3" />
                   {SORT_OPTIONS.find(
-                    (option) => option.value === filtros.sortBy
-                  )?.label || filtros.sortBy}
+                    (option) => option.value === filtrosCategorias.sortBy
+                  )?.label || filtrosCategorias.sortBy}
                   <button
                     onClick={() => handleSortChange("recent")}
                     className="ml-1 hover:text-purple-900 w-3 h-3 flex items-center justify-center"
@@ -755,36 +618,35 @@ export default function GaleriaPage() {
       {/* Conteúdo Principal */}
       <section className="py-8 sm:py-12">
         <div className="container mx-auto px-4 sm:px-6">
-          {/* Header Info */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-3 sm:gap-0">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-slate-800 font-bebas tracking-wide">
-                {totalCategorias} CATEGORIAS ENCONTRADAS
+                {filtrosCategorias.total} CATEGORIAS ENCONTRADAS
               </h2>
               <p className="text-slate-600 mt-1 text-sm sm:text-base">
-                {filtros.searchTerm && `Buscando por: "${filtros.searchTerm}"`}
-                {filtros.tipo !== "all" &&
+                {filtrosCategorias.searchTerm &&
+                  `Buscando por: "${filtrosCategorias.searchTerm}"`}
+                {filtrosCategorias.tipo !== "all" &&
                   ` • Tipo: ${
-                    TYPE_OPTIONS.find((c) => c.value === filtros.tipo)?.label
+                    TYPE_OPTIONS.find((c) => c.value === filtrosCategorias.tipo)
+                      ?.label
                   }`}
-                {filtros.sortBy &&
-                  ` • Ordenado por: ${getSortLabel(filtros.sortBy)}`}
               </p>
             </div>
 
             {categorias.length > 0 && (
               <div className="text-xs sm:text-sm text-slate-500">
-                Página {filtros.currentPage} de {totalPages} • {totalCategorias}{" "}
-                categorias no total
+                Página {filtrosCategorias.currentPage} de {totalPages} •{" "}
+                {filtrosCategorias.total} categorias no total
                 <span className="ml-2 font-medium">
-                  • {filtros.itemsPerPage} por página
+                  • {filtrosCategorias.itemsPerPage} por página
                 </span>
               </div>
             )}
           </div>
 
           {/* Error State */}
-          {error && !loading && (
+          {errorCategorias && !loadingCategorias && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -799,12 +661,12 @@ export default function GaleriaPage() {
                     Erro ao carregar galeria
                   </h3>
                   <p className="text-red-600 text-sm sm:text-base mb-2">
-                    {error}
+                    {errorCategorias}
                   </p>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={loadCategorias}
+                    onClick={() => fetchCategorias()}
                     className="border-red-300 text-red-700 hover:bg-red-50"
                   >
                     Tentar novamente
@@ -816,25 +678,27 @@ export default function GaleriaPage() {
 
           {/* Grid de Categorias */}
           <AnimatePresence mode="wait">
-            {loading ? (
+            {loadingCategorias ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                {Array.from({ length: filtros.itemsPerPage }).map((_, i) => (
-                  <Card key={i} className="border-0 shadow-lg">
-                    <CardHeader className="pb-3 sm:pb-4">
-                      <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
-                      <Skeleton className="h-4 w-full mb-1" />
-                      <Skeleton className="h-4 w-2/3" />
-                    </CardHeader>
-                    <CardContent>
-                      <Skeleton className="h-4 w-1/2" />
-                    </CardContent>
-                  </Card>
-                ))}
+                {Array.from({ length: filtrosCategorias.itemsPerPage }).map(
+                  (_, i) => (
+                    <Card key={i} className="border-0 shadow-lg">
+                      <CardHeader className="pb-3 sm:pb-4">
+                        <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-full mb-1" />
+                        <Skeleton className="h-4 w-2/3" />
+                      </CardHeader>
+                      <CardContent>
+                        <Skeleton className="h-4 w-1/2" />
+                      </CardContent>
+                    </Card>
+                  )
+                )}
               </div>
             ) : categorias.length > 0 ? (
               <>
                 <motion.div
-                  key={`grid-${filtros.sortBy}-${filtros.tipo}-${filtros.currentPage}`}
+                  key={`grid-${filtrosCategorias.sortBy}-${filtrosCategorias.tipo}-${filtrosCategorias.currentPage}`}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
@@ -853,7 +717,7 @@ export default function GaleriaPage() {
                   ))}
                 </motion.div>
 
-                {/* Paginação - Estilo das Notícias */}
+                {/* Paginação */}
                 {totalPages > 1 && (
                   <Pagination className="mb-8 sm:mb-12">
                     <PaginationContent className="flex-wrap">
@@ -861,82 +725,57 @@ export default function GaleriaPage() {
                         <PaginationPrevious
                           onClick={() =>
                             handlePageChange(
-                              Math.max(filtros.currentPage - 1, 1)
+                              Math.max(filtrosCategorias.currentPage - 1, 1)
                             )
                           }
                           className={
-                            filtros.currentPage === 1
+                            filtrosCategorias.currentPage === 1
                               ? "pointer-events-none opacity-50"
                               : "cursor-pointer"
                           }
                         />
                       </PaginationItem>
 
-                      {/* Primeira página */}
-                      <PaginationItem>
-                        <PaginationLink
-                          onClick={() => handlePageChange(1)}
-                          isActive={filtros.currentPage === 1}
-                          className="cursor-pointer"
-                        >
-                          1
-                        </PaginationLink>
-                      </PaginationItem>
-
-                      {/* Elipsis após primeira página */}
-                      {filtros.currentPage > 3 && (
-                        <PaginationItem>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      )}
-
-                      {/* Páginas do meio */}
                       {Array.from({ length: totalPages }, (_, i) => i + 1)
-                        .filter((page) => page > 1 && page < totalPages)
                         .filter(
-                          (page) => Math.abs(page - filtros.currentPage) <= 1
+                          (page) =>
+                            page === 1 ||
+                            page === totalPages ||
+                            Math.abs(page - filtrosCategorias.currentPage) <= 1
                         )
-                        .map((page) => (
-                          <PaginationItem key={page}>
-                            <PaginationLink
-                              onClick={() => handlePageChange(page)}
-                              isActive={filtros.currentPage === page}
-                              className="cursor-pointer"
-                            >
-                              {page}
-                            </PaginationLink>
-                          </PaginationItem>
+                        .map((page, index, array) => (
+                          <div key={page} className="flex items-center">
+                            {index > 0 && page - array[index - 1] > 1 && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                            <PaginationItem>
+                              <PaginationLink
+                                onClick={() => handlePageChange(page)}
+                                isActive={
+                                  filtrosCategorias.currentPage === page
+                                }
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </div>
                         ))}
-
-                      {/* Elipsis antes da última página */}
-                      {filtros.currentPage < totalPages - 2 && (
-                        <PaginationItem>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      )}
-
-                      {/* Última página */}
-                      {totalPages > 1 && (
-                        <PaginationItem>
-                          <PaginationLink
-                            onClick={() => handlePageChange(totalPages)}
-                            isActive={filtros.currentPage === totalPages}
-                            className="cursor-pointer"
-                          >
-                            {totalPages}
-                          </PaginationLink>
-                        </PaginationItem>
-                      )}
 
                       <PaginationItem>
                         <PaginationNext
                           onClick={() =>
                             handlePageChange(
-                              Math.min(filtros.currentPage + 1, totalPages)
+                              Math.min(
+                                filtrosCategorias.currentPage + 1,
+                                totalPages
+                              )
                             )
                           }
                           className={
-                            filtros.currentPage === totalPages
+                            filtrosCategorias.currentPage === totalPages
                               ? "pointer-events-none opacity-50"
                               : "cursor-pointer"
                           }
@@ -957,11 +796,13 @@ export default function GaleriaPage() {
                   Nenhuma categoria encontrada
                 </h3>
                 <p className="text-slate-500 max-w-md mx-auto text-sm sm:text-base px-4">
-                  {filtros.searchTerm || filtros.tipo !== "all"
+                  {filtrosCategorias.searchTerm ||
+                  filtrosCategorias.tipo !== "all"
                     ? "Tente ajustar os filtros ou termos de busca."
                     : "Ainda não há categorias cadastradas na galeria."}
                 </p>
-                {(filtros.searchTerm || filtros.tipo !== "all") && (
+                {(filtrosCategorias.searchTerm ||
+                  filtrosCategorias.tipo !== "all") && (
                   <Button
                     variant="outline"
                     onClick={clearFilters}
@@ -973,56 +814,6 @@ export default function GaleriaPage() {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
-      </section>
-
-      {/* Call to Action */}
-      <section className="py-12 sm:py-16 bg-gradient-to-r from-navy-600/5 via-blue-600/5 to-indigo-600/5">
-        <div className="container mx-auto px-4 sm:px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            <Card className="border-0 shadow-2xl bg-gradient-to-br from-white to-slate-50/80 backdrop-blur-sm max-w-4xl mx-auto overflow-hidden">
-              <div className="absolute inset-0 bg-grid-slate-900/[0.02] bg-[size:60px_60px]" />
-              <CardHeader className="text-center pb-4 sm:pb-6 pt-6 sm:pt-8 relative z-10">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 lg:w-16 lg:h-16 bg-gradient-to-br from-navy-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                  <RiCameraLine className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-white" />
-                </div>
-                <CardTitle className="text-xl sm:text-2xl font-bebas tracking-wide text-slate-800">
-                  TEM FOTOS OU VÍDEOS?
-                </CardTitle>
-                <CardDescription className="text-slate-600 text-base sm:text-lg">
-                  Contribua com nossa galeria documentando o trabalho da PAC
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pb-6 sm:pb-8 relative z-10">
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-md mx-auto">
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="border-2 border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 transition-all duration-300 hover:scale-105 text-sm sm:text-base"
-                  >
-                    <Link href="/contato">
-                      <RiCameraLine className="w-4 h-4 mr-2" />
-                      Enviar Material
-                    </Link>
-                  </Button>
-                  <Button
-                    asChild
-                    className="bg-gradient-to-r from-navy-600 to-blue-600 hover:from-navy-700 hover:to-blue-700 text-white font-semibold py-2.5 sm:py-3 px-4 sm:px-6 transition-all duration-300 hover:scale-105 shadow-lg text-sm sm:text-base"
-                  >
-                    <Link href="/galeria">
-                      <RiGalleryLine className="w-4 h-4 mr-2" />
-                      Explorar Tudo
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
         </div>
       </section>
     </div>

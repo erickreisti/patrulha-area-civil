@@ -12,30 +12,14 @@ import {
 } from "react-icons/ri";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils/cn";
-import { getCategoriasDestaque } from "@/app/actions/gallery/galeria";
-
-// Interface para categorias da galeria
-interface CategoriaGaleria {
-  id: string;
-  nome: string;
-  slug: string;
-  descricao: string | null;
-  tipo: "fotos" | "videos";
-  ordem: number;
-  status: boolean;
-  item_count: number;
-  tem_destaque: boolean;
-  ultima_imagem_url?: string;
-}
+import { useGaleriaStore } from "@/lib/stores/useGaleriaStore";
+import type { CategoriaComItens } from "@/app/actions/gallery/galeria";
 
 const SectionHeader = () => {
-  const ref = useRef(null);
-
   return (
     <motion.div
-      ref={ref}
       className="text-center mb-8 sm:mb-12 lg:mb-16"
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
@@ -81,18 +65,16 @@ const SectionHeader = () => {
 };
 
 interface GalleryCardProps {
-  categoria: CategoriaGaleria;
+  categoria: CategoriaComItens;
   index: number;
 }
 
 const GalleryCard = ({ categoria, index }: GalleryCardProps) => {
-  const ref = useRef(null);
   const IconTipo = categoria.tipo === "fotos" ? RiImageLine : RiVideoLine;
-  const labelTipo = categoria.tipo === "fotos" ? "Fotos" : "Vídeos";
+  const isDisabled = categoria.item_count === 0 || categoria.arquivada;
 
   return (
     <motion.div
-      ref={ref}
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -100,7 +82,6 @@ const GalleryCard = ({ categoria, index }: GalleryCardProps) => {
     >
       <Card className="border-slate-200 bg-white overflow-hidden hover:shadow-xl transition-all duration-300 group h-full flex flex-col hover:scale-[1.02]">
         <div className="h-32 sm:h-40 lg:h-48 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center relative overflow-hidden">
-          {/* Imagem de preview se disponível */}
           {categoria.ultima_imagem_url ? (
             <div className="absolute inset-0">
               <div
@@ -120,32 +101,15 @@ const GalleryCard = ({ categoria, index }: GalleryCardProps) => {
               {categoria.nome}
             </span>
           </div>
-          <div className="absolute inset-0 bg-navy/0 group-hover:bg-navy/20 transition-all duration-300 flex items-center justify-center">
-            <RiEyeLine className="w-6 h-6 sm:w-8 sm:h-8 lg:w-10 lg:h-10 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          </div>
 
-          {/* Badge de tipo */}
           <div className="absolute top-3 right-3">
             <span className="bg-white/90 backdrop-blur-sm text-navy text-xs font-bold px-2 py-1 rounded-full">
-              {labelTipo}
+              {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
             </span>
           </div>
         </div>
 
         <CardContent className="p-4 sm:p-5 lg:p-6 flex-1 flex flex-col">
-          <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-navy rounded-full flex-shrink-0"></div>
-            <span className="text-xs sm:text-sm lg:text-base font-medium text-navy uppercase tracking-wide">
-              {categoria.tipo === "fotos"
-                ? "Galeria de Fotos"
-                : "Galeria de Vídeos"}
-            </span>
-            <span className="text-xs sm:text-sm text-slate-500 ml-auto">
-              {categoria.item_count}{" "}
-              {categoria.item_count === 1 ? "item" : "itens"}
-            </span>
-          </div>
-
           <h3 className="font-bold text-slate-800 text-sm sm:text-base lg:text-lg mb-3 sm:mb-4 leading-tight">
             {categoria.nome}
           </h3>
@@ -156,7 +120,6 @@ const GalleryCard = ({ categoria, index }: GalleryCardProps) => {
             </p>
           )}
 
-          {/* Badge de destaque */}
           {categoria.tem_destaque && (
             <div className="mb-3 sm:mb-4">
               <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 text-xs font-semibold px-2 py-1 rounded-full">
@@ -166,42 +129,40 @@ const GalleryCard = ({ categoria, index }: GalleryCardProps) => {
             </div>
           )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            asChild
-            className="w-full border-navy text-navy hover:bg-navy hover:text-white transition-all duration-300 mt-auto text-xs sm:text-sm touch-optimize active:scale-95"
-          >
-            <Link
-              href={`/galeria/${categoria.slug}`}
-              className="flex items-center justify-center gap-2"
+          <div className="w-full mt-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              className={cn(
+                "w-full border-navy text-navy hover:bg-navy hover:text-white transition-all duration-300 text-xs sm:text-sm",
+                isDisabled &&
+                  "opacity-50 cursor-not-allowed bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-500 hover:border-slate-300"
+              )}
+              disabled={isDisabled}
+              asChild
             >
-              <RiEyeLine className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span>Ver Galeria</span>
-            </Link>
-          </Button>
+              <Link
+                href={isDisabled ? "#" : `/galeria/${categoria.slug}`}
+                onClick={(e) => {
+                  if (isDisabled) {
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <RiEyeLine className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
+                <span>
+                  {isDisabled
+                    ? categoria.arquivada
+                      ? "Arquivada"
+                      : "Sem itens"
+                    : "Ver Galeria"}
+                </span>
+              </Link>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </motion.div>
-  );
-};
-
-interface GalleryGridProps {
-  categorias: CategoriaGaleria[];
-}
-
-const GalleryGrid = ({ categorias }: GalleryGridProps) => {
-  return (
-    <div
-      className={cn(
-        "grid gap-3 sm:gap-4 lg:gap-6 max-w-6xl mx-auto mb-8 sm:mb-12 lg:mb-16",
-        "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-      )}
-    >
-      {categorias.map((categoria, index) => (
-        <GalleryCard key={categoria.id} categoria={categoria} index={index} />
-      ))}
-    </div>
   );
 };
 
@@ -220,7 +181,7 @@ const CTAButton = () => {
         className={cn(
           "bg-navy hover:bg-navy-700 text-white font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl",
           "px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4",
-          "text-sm sm:text-base lg:text-lg touch-optimize active:scale-95"
+          "text-sm sm:text-base lg:text-lg"
         )}
       >
         <Link
@@ -236,80 +197,44 @@ const CTAButton = () => {
   );
 };
 
-const SkeletonLoader = () => (
-  <div
-    className={cn(
-      "grid gap-3 sm:gap-4 lg:gap-6 max-w-6xl mx-auto mb-8 sm:mb-12 lg:mb-16",
-      "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
-    )}
-  >
-    {[1, 2, 3].map((i) => (
-      <Card
-        key={i}
-        className="border-slate-200 bg-white animate-pulse h-56 sm:h-64 lg:h-72"
-      >
-        <div className="h-32 sm:h-40 lg:h-48 bg-slate-200"></div>
-        <CardContent className="p-4 sm:p-5 lg:p-6">
-          <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <div className="h-3 sm:h-4 bg-slate-200 rounded w-1/4"></div>
-            <div className="h-3 sm:h-4 bg-slate-200 rounded w-1/3 ml-auto"></div>
-          </div>
-          <div className="h-4 sm:h-6 bg-slate-200 rounded mb-2 sm:mb-3"></div>
-          <div className="h-3 sm:h-4 bg-slate-200 rounded w-3/4 mb-3 sm:mb-4"></div>
-          <div className="h-8 sm:h-9 bg-slate-200 rounded"></div>
-        </CardContent>
-      </Card>
-    ))}
-  </div>
-);
-
-// Hook customizado para buscar categorias em destaque
-function useCategoriasDestaque() {
-  const [categorias, setCategorias] = useState<CategoriaGaleria[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export function GalleryShowcase() {
+  const {
+    categoriasDestaque,
+    loadingDestaque,
+    errorDestaque,
+    fetchCategoriasDestaque,
+  } = useGaleriaStore();
 
   useEffect(() => {
-    async function loadCategoriasDestaque() {
-      try {
-        setLoading(true);
-        setError(null);
+    fetchCategoriasDestaque(6);
+  }, [fetchCategoriasDestaque]);
 
-        // Usar a server action diretamente
-        const categoriasDestaque = await getCategoriasDestaque(3);
-
-        setCategorias(categoriasDestaque as CategoriaGaleria[]);
-      } catch (err: unknown) {
-        console.error("Erro ao carregar categorias em destaque:", err);
-        const errorMessage =
-          err instanceof Error ? err.message : "Erro ao carregar galeria";
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadCategoriasDestaque();
-  }, []);
-
-  return {
-    categorias,
-    loading,
-    error,
-  };
-}
-
-export function GalleryShowcase() {
-  const { categorias, loading, error } = useCategoriasDestaque();
+  // Categorias filtradas
+  const filteredCategories = categoriasDestaque
+    .filter((cat) => cat.status && !cat.arquivada && cat.item_count > 0)
+    .slice(0, 3);
 
   return (
     <section className="w-full bg-offwhite py-8 sm:py-12 lg:py-16 xl:py-20 overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <SectionHeader />
 
-        {loading ? (
-          <SkeletonLoader />
-        ) : error ? (
+        {loadingDestaque ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3].map((i) => (
+              <Card
+                key={i}
+                className="border-slate-200 bg-white animate-pulse h-72"
+              >
+                <div className="h-48 bg-slate-200"></div>
+                <CardContent className="p-6">
+                  <div className="h-4 bg-slate-200 rounded mb-3"></div>
+                  <div className="h-3 bg-slate-200 rounded w-3/4"></div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : errorDestaque ? (
           <motion.div
             className="text-center py-8 sm:py-12"
             initial={{ opacity: 0 }}
@@ -321,20 +246,30 @@ export function GalleryShowcase() {
               <h3 className="text-red-800 font-bold text-lg sm:text-xl mb-2">
                 Erro ao carregar galeria
               </h3>
-              <p className="text-red-600 text-sm sm:text-base">{error}</p>
+              <p className="text-red-600 text-sm sm:text-base">
+                {errorDestaque}
+              </p>
               <Button
                 variant="outline"
                 size="sm"
                 className="mt-3 border-red-300 text-red-700 hover:bg-red-50"
-                onClick={() => window.location.reload()}
+                onClick={() => fetchCategoriasDestaque(3)}
               >
                 Tentar novamente
               </Button>
             </div>
           </motion.div>
-        ) : categorias.length > 0 ? (
+        ) : filteredCategories.length > 0 ? (
           <>
-            <GalleryGrid categorias={categorias} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+              {filteredCategories.map((categoria, index) => (
+                <GalleryCard
+                  key={categoria.id}
+                  categoria={categoria}
+                  index={index}
+                />
+              ))}
+            </div>
             <CTAButton />
           </>
         ) : (

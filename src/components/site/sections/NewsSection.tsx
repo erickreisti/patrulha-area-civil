@@ -1,4 +1,3 @@
-// components/site/sections/NewsSection.tsx - VERSÃO SEM HOOK
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -21,8 +20,8 @@ import {
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
-import { useState, useEffect } from "react"; // ← IMPORTE useState e useEffect
-import { getLatestNews } from "@/app/actions/news"; // ← IMPORTE a server action
+import { useState, useEffect } from "react";
+import { getLatestNews } from "@/app/actions/news/noticias";
 import type { NoticiaLista } from "@/lib/stores/useNoticiasStore";
 
 const SectionHeader = () => {
@@ -71,7 +70,6 @@ const SectionHeader = () => {
   );
 };
 
-// Interface atualizada para usar NoticiaLista
 interface NewsCardProps {
   noticia: NoticiaLista;
   index: number;
@@ -344,7 +342,6 @@ const EmptyState = () => (
 );
 
 export function NewsSection() {
-  // Substitua o hook por estado local + useEffect
   const [noticias, setNoticias] = useState<NoticiaLista[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -356,7 +353,7 @@ export function NewsSection() {
       const result = await getLatestNews(3);
 
       if (result.success) {
-        setNoticias(result.data);
+        setNoticias(result.data || []);
       } else {
         setError(result.error || "Erro ao carregar notícias");
       }

@@ -95,7 +95,6 @@ export const metadata: Metadata = {
 };
 
 // Componente Client para inicialização segura
-// MOVIDO para fora do head e sem async
 function SupabaseInitializer() {
   return null;
 }
@@ -131,11 +130,8 @@ export default function RootLayout({
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="msapplication-TileColor" content="#1e3a8a" />
         <meta name="msapplication-tap-highlight" content="no" />
-
-        {/* REMOVIDO: SupabaseInitializer do head */}
       </head>
       <body className="font-sans antialiased bg-background text-foreground min-h-screen min-w-[320px]">
-        {/* Skip to content link para acessibilidade */}
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-navy focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:outline-none focus:ring-2 focus:ring-white"
@@ -153,7 +149,6 @@ export default function RootLayout({
           </main>
         </div>
 
-        {/* Feedback para JavaScript desabilitado */}
         <noscript>
           <div className="fixed inset-0 bg-white z-50 flex items-center justify-center p-4">
             <div className="max-w-md text-center">
@@ -168,7 +163,6 @@ export default function RootLayout({
           </div>
         </noscript>
 
-        {/* MOVIDO: Inicialização do Supabase para o final do body */}
         <SupabaseInitializer />
       </body>
     </html>

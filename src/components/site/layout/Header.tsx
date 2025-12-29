@@ -1,3 +1,5 @@
+// src/components/site/layout/Header.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";

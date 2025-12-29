@@ -1,27 +1,52 @@
+// app/actions/admin/dashboard/dashboard.ts
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
-import { cookies } from "next/headers";
-import type { Database } from "@/lib/supabase/types";
+import { getAdminClient } from "@/lib/supabase/admin";
+
+// Interface para resposta padronizada
+export interface DashboardResponse {
+  success: boolean;
+  data?: DashboardStats;
+  error?: string;
+}
+
+// Interface para atividade do sistema
+interface SystemActivity {
+  id: string;
+  action_type: string;
+  description: string;
+  created_at: string;
+  user_id: string | null;
+  profiles: {
+    full_name: string | null;
+  } | null;
+}
 
 export interface DashboardStats {
+  // Usuários
   totalAgents: number;
   activeAgents: number;
   inactiveAgents: number;
   totalAdmins: number;
   activeAdmins: number;
   inactiveAdmins: number;
+
+  // Notícias
   totalNews: number;
   publishedNews: number;
   draftNews: number;
   archivedNews: number;
   featuredNews: number;
+
+  // Galeria
   totalGalleryItems: number;
   totalFotos: number;
   totalVideos: number;
   totalCategories: number;
   categoriesWithPhotos: number;
   categoriesWithVideos: number;
+
+  // Atividades
   recentActivities: Array<{
     id: string;
     action_type: string;
@@ -29,6 +54,8 @@ export interface DashboardStats {
     created_at: string;
     user_name: string | null;
   }>;
+
+  // Resumo
   summary: {
     agents: { total: number; active: number; inactive: number };
     admins: { total: number; active: number; inactive: number };
@@ -48,188 +75,116 @@ export interface DashboardStats {
   };
 }
 
-export interface DashboardResponse {
-  success: boolean;
-  stats?: DashboardStats;
-  error?: string;
-  debug?: {
-    userId: string;
-    userEmail: string;
-    isAdmin: boolean;
-    timestamp: string;
-    queryResults?: {
-      totalAgents: number;
-      activeAgents: number;
-      inactiveAgents: number;
-      totalAdmins: number;
-      activeAdmins: number;
-      inactiveAdmins: number;
-    };
-  };
-}
-
-// Tipo para a resposta de atividades com relacionamento
-type ActivityWithProfile =
-  Database["public"]["Tables"]["system_activities"]["Row"] & {
-    profiles: {
-      full_name: string | null;
-    } | null;
-  };
-
 export async function getDashboardStats(): Promise<DashboardResponse> {
   try {
     console.log("📊 [getDashboardStats] Iniciando...");
 
-    // ✅ 1. PRIMEIRO verificar se é admin (CRÍTICO!)
-    const { checkAdminAccess } = await import("@/app/actions/auth/admin");
-    const accessResult = await checkAdminAccess();
-
-    if (!accessResult.success) {
-      console.error(
-        "❌ [getDashboardStats] Acesso negado:",
-        accessResult.error
-      );
-      return {
-        success: false,
-        error: accessResult.error || "Acesso restrito a administradores",
-      };
-    }
-
-    console.log("✅ [getDashboardStats] Admin verificado:", {
-      userId: accessResult.user?.id,
-      email: accessResult.user?.email,
-    });
-
-    // ✅ 2. AGORA usar admin client do arquivo correto
-    const { getAdminClient } = await import("@/lib/supabase/admin");
+    // 1. USAR ADMIN CLIENT (ignora RLS)
     const adminClient = await getAdminClient();
 
-    // ✅ 3. Criar cliente normal para atividades
-    const cookieStore = await cookies();
-    const supabase = await createServerClient(cookieStore);
+    console.log("✅ [getDashboardStats] Admin client conectado");
 
-    // Buscar todas as estatísticas em paralelo
+    // 2. BUSCAR TODAS AS ESTATÍSTICAS EM PARALELO
     console.log("🔍 [getDashboardStats] Executando queries...");
 
     const [
-      totalAgentsRes,
-      activeAgentsRes,
-      inactiveAgentsRes,
-      totalAdminsRes,
+      // Perfis (Agentes/Admins)
+      totalProfilesRes,
+      activeProfilesRes,
+      inactiveProfilesRes,
+      adminProfilesRes,
       activeAdminsRes,
       inactiveAdminsRes,
-      newsRes,
+
+      // Notícias
+      totalNewsRes,
       publishedNewsRes,
       draftNewsRes,
       archivedNewsRes,
       featuredNewsRes,
-      galleryRes,
-      fotosRes,
-      videosRes,
-      categoriesRes,
+
+      // Galeria
+      galleryItemsRes,
+      galleryFotosRes,
+      galleryVideosRes,
+      galleryCategoriesRes,
       categoriesPhotosRes,
       categoriesVideosRes,
-      activitiesRes,
-    ] = await Promise.all([
-      // 1. TOTAL DE PERFIS (agentes + admins)
-      adminClient.from("profiles").select("id", { count: "exact", head: true }),
 
-      // 2. PERFIS ATIVOS (status = true)
+      // Atividades recentes
+      recentActivitiesRes,
+    ] = await Promise.allSettled([
+      // ========= PERFIS =========
+      adminClient.from("profiles").select("id", { count: "exact", head: true }),
       adminClient
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("status", true),
-
-      // 3. PERFIS INATIVOS (status = false)
       adminClient
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("status", false),
-
-      // 4. TOTAL DE ADMINS (role = 'admin')
       adminClient
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("role", "admin"),
-
-      // 5. ADMINS ATIVOS (role = 'admin' e status = true)
       adminClient
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("role", "admin")
         .eq("status", true),
-
-      // 6. ADMINS INATIVOS (role = 'admin' e status = false)
       adminClient
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("role", "admin")
         .eq("status", false),
 
-      // 7. TOTAL DE NOTÍCIAS
+      // ========= NOTÍCIAS =========
       adminClient.from("noticias").select("id", { count: "exact", head: true }),
-
-      // 8. NOTÍCIAS PUBLICADAS
       adminClient
         .from("noticias")
         .select("id", { count: "exact", head: true })
         .eq("status", "publicado"),
-
-      // 9. NOTÍCIAS EM RASCUNHO
       adminClient
         .from("noticias")
         .select("id", { count: "exact", head: true })
         .eq("status", "rascunho"),
-
-      // 10. NOTÍCIAS ARQUIVADAS
       adminClient
         .from("noticias")
         .select("id", { count: "exact", head: true })
         .eq("status", "arquivado"),
-
-      // 11. NOTÍCIAS EM DESTAQUE
       adminClient
         .from("noticias")
         .select("id", { count: "exact", head: true })
         .eq("destaque", true)
         .eq("status", "publicado"),
 
-      // 12. TOTAL DE ITENS DA GALERIA
+      // ========= GALERIA =========
       adminClient
         .from("galeria_itens")
         .select("id", { count: "exact", head: true })
         .eq("status", true),
-
-      // 13. FOTOS
       adminClient
         .from("galeria_itens")
         .select("id", { count: "exact", head: true })
         .eq("tipo", "foto")
         .eq("status", true),
-
-      // 14. VÍDEOS
       adminClient
         .from("galeria_itens")
         .select("id", { count: "exact", head: true })
         .eq("tipo", "video")
         .eq("status", true),
-
-      // 15. CATEGORIAS - total
       adminClient
         .from("galeria_categorias")
         .select("id", { count: "exact", head: true })
         .eq("status", true)
         .eq("arquivada", false),
-
-      // 16. CATEGORIAS COM FOTOS
       adminClient
         .from("galeria_categorias")
         .select("id", { count: "exact", head: true })
         .eq("tipo", "fotos")
         .eq("status", true)
         .eq("arquivada", false),
-
-      // 17. CATEGORIAS COM VÍDEOS
       adminClient
         .from("galeria_categorias")
         .select("id", { count: "exact", head: true })
@@ -237,137 +192,97 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
         .eq("status", true)
         .eq("arquivada", false),
 
-      // 18. ATIVIDADES RECENTES (usa cliente normal)
-      supabase
+      // ========= ATIVIDADES RECENTES =========
+      adminClient
         .from("system_activities")
         .select(
-          "id, action_type, description, created_at, user_id, profiles:user_id(full_name)"
+          "id, action_type, description, created_at, user_id, profiles!inner(full_name)"
         )
         .order("created_at", { ascending: false })
         .limit(10),
     ]);
 
-    // Processar resultados
-    console.log("🔍 [getDashboardStats] Processando resultados...");
+    console.log("✅ [getDashboardStats] Queries concluídas");
 
-    // Verificar erros nas queries principais
-    const queryErrors = [
-      totalAgentsRes.error,
-      activeAgentsRes.error,
-      inactiveAgentsRes.error,
-      totalAdminsRes.error,
-      activeAdminsRes.error,
-      inactiveAdminsRes.error,
-    ].filter(Boolean);
+    // 3. PROCESSAR RESULTADOS
+    const getCount = (
+      result: PromiseSettledResult<{ count: number | null }>
+    ): number => {
+      if (result.status === "fulfilled") {
+        return result.value.count || 0;
+      }
+      console.warn("❌ [getDashboardStats] Query falhou:", result.reason);
+      return 0;
+    };
 
-    if (queryErrors.length > 0) {
-      console.error("❌ [getDashboardStats] Erros nas queries:", queryErrors);
-      throw new Error(
-        `Erro ao buscar estatísticas: ${queryErrors[0]?.message}`
-      );
+    // Processar atividades recentes
+    let recentActivities: Array<{
+      id: string;
+      action_type: string;
+      description: string;
+      created_at: string;
+      user_name: string | null;
+    }> = [];
+
+    if (
+      recentActivitiesRes.status === "fulfilled" &&
+      recentActivitiesRes.value.data
+    ) {
+      const activitiesData = recentActivitiesRes.value.data as SystemActivity[];
+      if (Array.isArray(activitiesData)) {
+        recentActivities = activitiesData.map((activity) => ({
+          id: activity.id,
+          action_type: activity.action_type,
+          description: activity.description,
+          created_at: activity.created_at,
+          user_name: activity.profiles?.full_name || "Sistema",
+        }));
+      }
     }
 
-    // Calcular totais
-    const totalAgents = totalAgentsRes.count || 0;
-    const activeAgents = activeAgentsRes.count || 0;
-    const inactiveAgents = inactiveAgentsRes.count || 0;
-    const totalAdmins = totalAdminsRes.count || 0;
-    const activeAdmins = activeAdminsRes.count || 0;
-    const inactiveAdmins = inactiveAdminsRes.count || 0;
-    const totalNews = newsRes.count || 0;
-    const publishedNews = publishedNewsRes.count || 0;
-    const draftNews = draftNewsRes.count || 0;
-    const archivedNews = archivedNewsRes.count || 0;
-    const featuredNews = featuredNewsRes.count || 0;
-    const totalGalleryItems = galleryRes.count || 0;
-    const totalFotos = fotosRes.count || 0;
-    const totalVideos = videosRes.count || 0;
-    const totalCategories = categoriesRes.count || 0;
-    const categoriesWithPhotos = categoriesPhotosRes.count || 0;
-    const categoriesWithVideos = categoriesVideosRes.count || 0;
-
-    // Processar atividades com tipo correto
-    const activitiesData = activitiesRes.data as ActivityWithProfile[] | null;
-    const recentActivities = (activitiesData || []).map((activity) => ({
-      id: activity.id,
-      action_type: activity.action_type,
-      description: activity.description,
-      created_at: activity.created_at,
-      user_name: activity.profiles?.full_name || "Sistema",
-    }));
-
-    // Debug: Mostrar resultados
-    console.log("📊 [getDashboardStats] Resultados obtidos:", {
-      totalAgents,
-      activeAgents,
-      inactiveAgents,
-      totalAdmins,
-      activeAdmins,
-      inactiveAdmins,
-      totalNews,
-      publishedNews,
-      totalGalleryItems,
-      totalFotos,
-      totalVideos,
-      recentActivitiesCount: recentActivities.length,
-    });
-
-    // Verificar consistência
-    if (activeAgents + inactiveAgents !== totalAgents) {
-      console.warn(
-        "⚠️ [getDashboardStats] Inconsistência: ativos + inativos ≠ total"
-      );
-    }
-
-    if (activeAdmins + inactiveAdmins !== totalAdmins) {
-      console.warn(
-        "⚠️ [getDashboardStats] Inconsistência: admins ativos + inativos ≠ total"
-      );
-    }
-
-    // Montar resposta
+    // Coletar estatísticas
     const stats: DashboardStats = {
-      totalAgents,
-      activeAgents,
-      inactiveAgents,
-      totalAdmins,
-      activeAdmins,
-      inactiveAdmins,
-      totalNews,
-      publishedNews,
-      draftNews,
-      archivedNews,
-      featuredNews,
-      totalGalleryItems,
-      totalFotos,
-      totalVideos,
-      totalCategories,
-      categoriesWithPhotos,
-      categoriesWithVideos,
+      totalAgents: getCount(totalProfilesRes),
+      activeAgents: getCount(activeProfilesRes),
+      inactiveAgents: getCount(inactiveProfilesRes),
+      totalAdmins: getCount(adminProfilesRes),
+      activeAdmins: getCount(activeAdminsRes),
+      inactiveAdmins: getCount(inactiveAdminsRes),
+      totalNews: getCount(totalNewsRes),
+      publishedNews: getCount(publishedNewsRes),
+      draftNews: getCount(draftNewsRes),
+      archivedNews: getCount(archivedNewsRes),
+      featuredNews: getCount(featuredNewsRes),
+      totalGalleryItems: getCount(galleryItemsRes),
+      totalFotos: getCount(galleryFotosRes),
+      totalVideos: getCount(galleryVideosRes),
+      totalCategories: getCount(galleryCategoriesRes),
+      categoriesWithPhotos: getCount(categoriesPhotosRes),
+      categoriesWithVideos: getCount(categoriesVideosRes),
       recentActivities,
       summary: {
         agents: {
-          total: totalAgents,
-          active: activeAgents,
-          inactive: inactiveAgents,
+          total: getCount(totalProfilesRes),
+          active: getCount(activeProfilesRes),
+          inactive: getCount(inactiveProfilesRes),
         },
         admins: {
-          total: totalAdmins,
-          active: activeAdmins,
-          inactive: inactiveAdmins,
+          total: getCount(adminProfilesRes),
+          active: getCount(activeAdminsRes),
+          inactive: getCount(inactiveAdminsRes),
         },
         news: {
-          total: totalNews,
-          published: publishedNews,
-          draft: draftNews,
-          archived: archivedNews,
-          featured: featuredNews,
+          total: getCount(totalNewsRes),
+          published: getCount(publishedNewsRes),
+          draft: getCount(draftNewsRes),
+          archived: getCount(archivedNewsRes),
+          featured: getCount(featuredNewsRes),
         },
         gallery: {
-          total: totalGalleryItems,
-          photos: totalFotos,
-          videos: totalVideos,
-          categories: totalCategories,
+          total: getCount(galleryItemsRes),
+          photos: getCount(galleryFotosRes),
+          videos: getCount(galleryVideosRes),
+          categories: getCount(galleryCategoriesRes),
         },
       },
     };
@@ -376,21 +291,7 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
 
     return {
       success: true,
-      stats,
-      debug: {
-        userId: accessResult.user?.id || "",
-        userEmail: accessResult.user?.email || "",
-        isAdmin: true,
-        timestamp: new Date().toISOString(),
-        queryResults: {
-          totalAgents,
-          activeAgents,
-          inactiveAgents,
-          totalAdmins,
-          activeAdmins,
-          inactiveAdmins,
-        },
-      },
+      data: stats,
     };
   } catch (error) {
     console.error("❌ [getDashboardStats] Erro:", error);

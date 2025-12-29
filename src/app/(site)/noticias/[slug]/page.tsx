@@ -22,7 +22,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useNoticiasStore, NoticiaLista } from "@/lib/stores/useNoticiasStore";
-import { getNewsBySlug, getNewsByCategory } from "@/app/actions/news";
+import { getNewsBySlug, getNewsByCategory } from "@/app/actions/news/noticias";
 
 interface PageProps {
   params: Promise<{ slug: string }>;

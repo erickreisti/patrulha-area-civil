@@ -1,3 +1,5 @@
+// src/lib/supabase/types.ts
+
 import { UserRole, Json } from "@/lib/types/shared";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -436,7 +438,6 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      // ✅ ADICIONE ESTA FUNÇÃO
       is_admin: {
         Args: Record<string, never>;
         Returns: boolean;

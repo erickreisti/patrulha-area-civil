@@ -1,22 +1,26 @@
-// src/app/(app)/layout.tsx
+// app/(admin)/layout.tsx
+import { AdminAuthProvider } from "@/lib/contexts/AdminAuthContext";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
+import { Toaster } from "@/components/ui/sonner";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <div className="flex">
-        {/* Sidebar para Desktop */}
-        <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
+    <AdminAuthProvider>
+      <div className="min-h-screen bg-gray-50">
+        <AdminHeader />
+        <div className="flex">
           <AdminSidebar />
+          <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
+            <div className="max-w-7xl mx-auto">{children}</div>
+          </main>
         </div>
-
-        {/* Conteúdo Principal */}
-        <div className="lg:pl-64 flex-1 flex flex-col min-h-screen">
-          <AdminHeader />
-          <main className="flex-1">{children}</main>
-        </div>
+        <Toaster />
       </div>
-    </div>
+    </AdminAuthProvider>
   );
 }

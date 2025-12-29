@@ -2,12 +2,28 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/types";
 
-// Tipos baseados no Database
-type TipoCategoria =
+// Interface padronizada para respostas
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// Tipos derivados do Database
+export type TipoCategoriaDB =
   Database["public"]["Tables"]["galeria_categorias"]["Row"]["tipo"];
-type TipoItem = Database["public"]["Tables"]["galeria_itens"]["Row"]["tipo"];
+export type TipoItemDB =
+  Database["public"]["Tables"]["galeria_itens"]["Row"]["tipo"];
+export type TipoCategoriaFilter = "all" | TipoCategoriaDB;
 
 // Tipo para a resposta das categorias
 export interface CategoriaComItens {
@@ -15,7 +31,7 @@ export interface CategoriaComItens {
   nome: string;
   slug: string;
   descricao: string | null;
-  tipo: TipoCategoria;
+  tipo: TipoCategoriaDB;
   ordem: number;
   status: boolean;
   arquivada: boolean;
@@ -32,7 +48,7 @@ export interface ItemGaleria {
   titulo: string;
   descricao: string | null;
   categoria_id: string | null;
-  tipo: TipoItem;
+  tipo: TipoItemDB;
   arquivo_url: string;
   thumbnail_url: string | null;
   ordem: number;
@@ -61,17 +77,52 @@ export interface EstatisticasGaleria {
   categoriasComDestaque: number;
 }
 
+// ==================== HELPER FUNCTIONS ====================
+
+// Tipo para itens da galeria com destaque
+interface GaleriaItemComDestaque {
+  id: string;
+  destaque: boolean;
+  arquivo_url: string;
+  thumbnail_url: string | null;
+}
+
+// Função para processar itens da galeria com type safety
+function processarItensGaleria(itens: unknown): GaleriaItemComDestaque[] {
+  if (!itens || !Array.isArray(itens)) {
+    return [];
+  }
+
+  return itens
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item && typeof item === "object" && "id" in item
+    )
+    .map((item) => ({
+      id: String(item.id),
+      destaque: Boolean(item.destaque),
+      arquivo_url: String(item.arquivo_url || ""),
+      thumbnail_url: item.thumbnail_url ? String(item.thumbnail_url) : null,
+    }));
+}
+
 // ==================== CATEGORIAS ====================
 
 export async function getCategoriasGaleria(filters?: {
-  tipo?: "all" | TipoCategoria;
+  tipo?: TipoCategoriaFilter;
   search?: string;
   sortBy?: "recent" | "oldest" | "name" | "popular" | "destaque";
   limit?: number;
   page?: number;
-}) {
+}): Promise<ApiResponse<CategoriaComItens[]>> {
   try {
-    const supabase = await createServerClient();
+    const cookieStore = await cookies();
+    const supabase = await createServerClient(cookieStore);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const isAuthenticated = !!session;
 
     const {
       tipo = "all",
@@ -84,28 +135,33 @@ export async function getCategoriasGaleria(filters?: {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    let query = supabase
-      .from("galeria_categorias")
-      .select(
-        `*,
-        galeria_itens:galeria_itens!galeria_itens_categoria_id_fkey(
+    // Query base
+    let query = supabase.from("galeria_categorias").select(
+      `
+        *,
+        galeria_itens!galeria_itens_categoria_id_fkey(
           id,
           destaque,
           arquivo_url,
           thumbnail_url
-        )`,
-        { count: "exact" }
-      )
-      .eq("status", true)
-      .eq("arquivada", false);
+        )
+      `,
+      { count: "exact" }
+    );
 
-    // Filtros
-    if (search.trim()) {
-      query = query.or(`nome.ilike.%${search}%,descricao.ilike.%${search}%`);
+    // Filtros baseados na autenticação
+    if (!isAuthenticated) {
+      query = query.eq("status", true).eq("arquivada", false);
     }
 
+    // Filtro de tipo
     if (tipo !== "all") {
       query = query.eq("tipo", tipo);
+    }
+
+    // Filtro de busca
+    if (search.trim()) {
+      query = query.or(`nome.ilike.%${search}%,descricao.ilike.%${search}%`);
     }
 
     // Ordenação
@@ -119,11 +175,11 @@ export async function getCategoriasGaleria(filters?: {
       case "name":
         query = query.order("nome", { ascending: true });
         break;
-      case "destaque":
-        query = query.order("ordem", { ascending: true });
-        break;
       case "popular":
-        query = query.order("ordem", { ascending: true });
+        query = query.order("created_at", { ascending: false });
+        break;
+      case "destaque":
+        query = query.order("created_at", { ascending: false });
         break;
     }
 
@@ -131,12 +187,22 @@ export async function getCategoriasGaleria(filters?: {
 
     if (error) {
       console.error("Erro ao buscar categorias:", error);
-      throw new Error(`Erro ao buscar categorias: ${error.message}`);
+      return {
+        success: false,
+        error: `Erro ao buscar categorias: ${error.message}`,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
+      };
     }
 
     // Processar dados para o frontend
     const categorias: CategoriaComItens[] = (data || []).map((categoria) => {
-      const itens = categoria.galeria_itens || [];
+      const itens = processarItensGaleria(categoria.galeria_itens);
       const tem_destaque = itens.some((item) => item.destaque);
 
       // Buscar a imagem do último item em destaque ou o último item
@@ -171,98 +237,166 @@ export async function getCategoriasGaleria(filters?: {
     }
 
     return {
+      success: true,
       data: categorias,
-      total: count || 0,
-      page,
-      limit,
-      totalPages: Math.ceil((count || 0) / limit),
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
     };
   } catch (error) {
     console.error("Erro em getCategoriasGaleria:", error);
     return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Erro interno do servidor",
       data: [],
-      total: 0,
-      page: 1,
-      limit: 12,
-      totalPages: 0,
-      error: "Erro ao carregar categorias",
+      pagination: {
+        page: filters?.page || 1,
+        limit: filters?.limit || 12,
+        total: 0,
+        totalPages: 0,
+      },
     };
   }
 }
 
-export async function getCategoriaPorSlug(slug: string) {
+export async function getCategoriaPorSlug(
+  slug: string
+): Promise<ApiResponse<CategoriaComItens>> {
   try {
-    const supabase = await createServerClient();
+    const cookieStore = await cookies();
+    const supabase = await createServerClient(cookieStore);
 
-    const { data, error } = await supabase
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const isAuthenticated = !!session;
+
+    // Construir query corretamente - aplicar todos os filtros ANTES do .single()
+    let query = supabase
       .from("galeria_categorias")
       .select("*")
-      .eq("slug", slug)
-      .eq("status", true)
-      .eq("arquivada", false)
-      .single();
+      .eq("slug", slug);
 
-    if (error) {
-      if (error.code === "PGRST116") return null;
-      throw error;
+    // Aplicar filtros baseados na autenticação
+    if (!isAuthenticated) {
+      query = query.eq("status", true).eq("arquivada", false);
     }
 
-    return {
-      id: data.id,
-      nome: data.nome,
-      slug: data.slug,
-      descricao: data.descricao,
-      tipo: data.tipo,
-      ordem: data.ordem,
-      status: data.status,
-      arquivada: data.arquivada,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
+    // Chamar .single() depois de aplicar todos os filtros
+    const { data: categoria, error: catError } = await query.single();
+
+    if (catError) {
+      if (catError.code === "PGRST116") {
+        return {
+          success: false,
+          error: "Categoria não encontrada",
+        };
+      }
+      console.error("Erro ao buscar categoria:", catError);
+      return {
+        success: false,
+        error: `Erro ao buscar categoria: ${catError.message}`,
+      };
+    }
+
+    // Agora buscar os itens da categoria
+    const { data: itens, error: itensError } = await supabase
+      .from("galeria_itens")
+      .select("id, destaque, arquivo_url, thumbnail_url")
+      .eq("categoria_id", categoria.id);
+
+    if (itensError) {
+      console.error("Erro ao buscar itens da categoria:", itensError);
+    }
+
+    // Processar dados
+    const itensProcessados = processarItensGaleria(itens || []);
+    const tem_destaque = itensProcessados.some((item) => item.destaque);
+
+    const ultimoItemDestaque = itensProcessados.find((item) => item.destaque);
+    const ultimoItem = itensProcessados[0];
+    const ultima_imagem_url =
+      ultimoItemDestaque?.thumbnail_url ||
+      ultimoItemDestaque?.arquivo_url ||
+      ultimoItem?.thumbnail_url ||
+      ultimoItem?.arquivo_url;
+
+    const categoriaComItens: CategoriaComItens = {
+      id: categoria.id,
+      nome: categoria.nome,
+      slug: categoria.slug,
+      descricao: categoria.descricao,
+      tipo: categoria.tipo,
+      ordem: categoria.ordem,
+      status: categoria.status,
+      arquivada: categoria.arquivada,
+      created_at: categoria.created_at,
+      updated_at: categoria.updated_at,
+      item_count: itensProcessados.length,
+      tem_destaque,
+      ultima_imagem_url,
     };
-  } catch (error: unknown) {
+
+    return {
+      success: true,
+      data: categoriaComItens,
+    };
+  } catch (error) {
     console.error("Erro ao buscar categoria por slug:", error);
-    return null;
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Erro interno do servidor",
+    };
   }
 }
 
 export async function getCategoriasDestaque(
   limit: number = 3
-): Promise<CategoriaComItens[]> {
+): Promise<ApiResponse<CategoriaComItens[]>> {
   try {
-    const supabase = await createServerClient();
+    const cookieStore = await cookies();
+    const supabase = await createServerClient(cookieStore);
 
-    const { data, error } = await supabase
+    // Buscar categorias ativas
+    const { data: categorias, error: catError } = await supabase
       .from("galeria_categorias")
-      .select(
-        `*,
-        galeria_itens:galeria_itens!galeria_itens_categoria_id_fkey(
-          id,
-          destaque,
-          arquivo_url,
-          thumbnail_url
-        )`
-      )
+      .select("*")
       .eq("status", true)
       .eq("arquivada", false)
-      .order("ordem", { ascending: true });
+      .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Erro ao buscar categorias:", error);
-      throw error;
+    if (catError) {
+      console.error("Erro na query Supabase:", catError);
+      throw catError;
     }
 
-    if (!data) {
-      return [];
+    if (!categorias || categorias.length === 0) {
+      return {
+        success: true,
+        data: [],
+      };
     }
 
-    // Processar dados e filtrar categorias que possuem itens
-    const categorias: CategoriaComItens[] = data
-      .map((categoria) => {
-        const itens = categoria.galeria_itens || [];
+    // Para cada categoria, buscar seus itens
+    const categoriasComItens = await Promise.all(
+      categorias.map(async (categoria) => {
+        const { data: itens } = await supabase
+          .from("galeria_itens")
+          .select("id, destaque, arquivo_url, thumbnail_url")
+          .eq("categoria_id", categoria.id);
+
+        const itensProcessados = processarItensGaleria(itens || []);
 
         // Buscar a imagem do último item em destaque ou o último item
-        const ultimoItemDestaque = itens.find((item) => item.destaque);
-        const ultimoItem = itens[0];
+        const ultimoItemDestaque = itensProcessados.find(
+          (item) => item.destaque
+        );
+        const ultimoItem = itensProcessados[0];
         const ultima_imagem_url =
           ultimoItemDestaque?.thumbnail_url ||
           ultimoItemDestaque?.arquivo_url ||
@@ -280,12 +414,16 @@ export async function getCategoriasDestaque(
           arquivada: categoria.arquivada,
           created_at: categoria.created_at,
           updated_at: categoria.updated_at,
-          item_count: itens.length,
-          tem_destaque: itens.some((item) => item.destaque),
+          item_count: itensProcessados.length,
+          tem_destaque: itensProcessados.some((item) => item.destaque),
           ultima_imagem_url,
         };
       })
-      .filter((cat) => cat.item_count > 0) // Apenas categorias com itens
+    );
+
+    // Filtrar, ordenar e limitar
+    const categoriasFiltradas = categoriasComItens
+      .filter((cat) => cat.item_count > 0)
       .sort((a, b) => {
         // Ordenar por: 1) tem destaque, 2) quantidade de itens, 3) ordem
         if (a.tem_destaque !== b.tem_destaque) {
@@ -296,12 +434,20 @@ export async function getCategoriasDestaque(
         }
         return a.ordem - b.ordem;
       })
-      .slice(0, limit); // Limitar ao número solicitado
+      .slice(0, limit);
 
-    return categorias;
+    return {
+      success: true,
+      data: categoriasFiltradas,
+    };
   } catch (error) {
-    console.error("Erro ao buscar categorias em destaque:", error);
-    return [];
+    console.error("Erro em getCategoriasDestaque:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Erro interno do servidor",
+      data: [],
+    };
   }
 }
 
@@ -316,9 +462,15 @@ export async function getItensPorCategoria(
     limit?: number;
     page?: number;
   }
-) {
+): Promise<ApiResponse<ItemGaleria[]>> {
   try {
-    const supabase = await createServerClient();
+    const cookieStore = await cookies();
+    const supabase = await createServerClient(cookieStore);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const isAuthenticated = !!session;
 
     const {
       search = "",
@@ -334,15 +486,29 @@ export async function getItensPorCategoria(
     let query = supabase
       .from("galeria_itens")
       .select(
-        `*,
-        categoria:galeria_categorias(id, nome, slug),
-        autor:profiles(id, full_name, avatar_url)`,
+        `
+        *,
+        categoria:galeria_categorias!categoria_id(
+          id,
+          nome,
+          slug
+        ),
+        autor:profiles!autor_id(
+          id,
+          full_name,
+          avatar_url
+        )
+      `,
         { count: "exact" }
       )
-      .eq("categoria_id", categoriaId)
-      .eq("status", true);
+      .eq("categoria_id", categoriaId);
 
-    // Filtros
+    // Aplicar filtros baseados na autenticação
+    if (!isAuthenticated) {
+      query = query.eq("status", true);
+    }
+
+    // Filtros adicionais
     if (search.trim()) {
       query = query.or(`titulo.ilike.%${search}%,descricao.ilike.%${search}%`);
     }
@@ -373,7 +539,20 @@ export async function getItensPorCategoria(
 
     const { data, error, count } = await query.range(from, to);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro ao buscar itens:", error);
+      return {
+        success: false,
+        error: `Erro ao buscar itens: ${error.message}`,
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
+      };
+    }
 
     const itens: ItemGaleria[] = (data || []).map((item) => ({
       id: item.id,
@@ -389,152 +568,141 @@ export async function getItensPorCategoria(
       destaque: item.destaque,
       created_at: item.created_at,
       views: item.views || 0,
-      categoria: item.categoria,
-      autor: item.autor,
+      categoria: item.categoria
+        ? {
+            id: item.categoria.id,
+            nome: item.categoria.nome,
+            slug: item.categoria.slug,
+          }
+        : null,
+      autor: item.autor
+        ? {
+            id: item.autor.id,
+            full_name: item.autor.full_name,
+            avatar_url: item.autor.avatar_url,
+          }
+        : null,
     }));
 
     return {
+      success: true,
       data: itens,
-      total: count || 0,
-      page,
-      limit,
-      totalPages: Math.ceil((count || 0) / limit),
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
     };
   } catch (error) {
     console.error("Erro ao buscar itens da galeria:", error);
     return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Erro interno do servidor",
       data: [],
-      total: 0,
-      page: 1,
-      limit: 12,
-      totalPages: 0,
-      error: "Erro ao carregar itens",
+      pagination: {
+        page: filters?.page || 1,
+        limit: filters?.limit || 12,
+        total: 0,
+        totalPages: 0,
+      },
     };
-  }
-}
-
-export async function getItemPorId(
-  itemId: string
-): Promise<ItemGaleria | null> {
-  try {
-    const supabase = await createServerClient();
-
-    const { data, error } = await supabase
-      .from("galeria_itens")
-      .select(
-        `*,
-        categoria:galeria_categorias(id, nome, slug),
-        autor:profiles(id, full_name, avatar_url)`
-      )
-      .eq("id", itemId)
-      .single();
-
-    if (error) {
-      if (error.code === "PGRST116") return null;
-      throw error;
-    }
-
-    return {
-      id: data.id,
-      titulo: data.titulo,
-      descricao: data.descricao,
-      categoria_id: data.categoria_id,
-      tipo: data.tipo,
-      arquivo_url: data.arquivo_url,
-      thumbnail_url: data.thumbnail_url,
-      ordem: data.ordem,
-      autor_id: data.autor_id,
-      status: data.status,
-      destaque: data.destaque,
-      created_at: data.created_at,
-      views: data.views || 0,
-      categoria: data.categoria,
-      autor: data.autor,
-    };
-  } catch (error: unknown) {
-    console.error("Erro ao buscar item por ID:", error);
-    return null;
-  }
-}
-
-export async function incrementarViewsItem(itemId: string): Promise<boolean> {
-  try {
-    const supabase = await createServerClient();
-
-    // Buscar views atuais
-    const { data: item, error: fetchError } = await supabase
-      .from("galeria_itens")
-      .select("views")
-      .eq("id", itemId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
-    // Incrementar views
-    const { error: updateError } = await supabase
-      .from("galeria_itens")
-      .update({ views: (item.views || 0) + 1 })
-      .eq("id", itemId);
-
-    if (updateError) throw updateError;
-
-    return true;
-  } catch (error) {
-    console.error("Erro ao incrementar views:", error);
-    return false;
   }
 }
 
 // ==================== ESTATÍSTICAS ====================
 
-export async function getEstatisticasGaleria(): Promise<EstatisticasGaleria> {
+export async function getEstatisticasGaleria(): Promise<
+  ApiResponse<EstatisticasGaleria>
+> {
   try {
-    const supabase = await createServerClient();
+    const cookieStore = await cookies();
+    const supabase = await createServerClient(cookieStore);
 
-    // Buscar todas as categorias ativas
+    // Buscar todas as categorias ativas (públicas)
     const { data: categorias, error: catError } = await supabase
       .from("galeria_categorias")
-      .select(
-        `id,
-        tipo,
-        galeria_itens:galeria_itens!galeria_itens_categoria_id_fkey(id, destaque)`
-      )
+      .select("*")
       .eq("status", true)
       .eq("arquivada", false);
 
-    if (catError) throw catError;
+    if (catError) {
+      console.error("Erro ao buscar categorias:", catError);
+      return {
+        success: false,
+        error: `Erro ao buscar categorias: ${catError.message}`,
+        data: {
+          totalFotos: 0,
+          totalVideos: 0,
+          totalCategorias: 0,
+          categoriasComDestaque: 0,
+        },
+      };
+    }
 
+    // Buscar estatísticas de itens
+    const { data: itensFotos } = await supabase
+      .from("galeria_itens")
+      .select("categoria_id, destaque")
+      .eq("status", true);
+
+    const { data: itensVideos } = await supabase
+      .from("galeria_itens")
+      .select("categoria_id, destaque")
+      .eq("status", true);
+
+    // Processar estatísticas
     let totalFotos = 0;
     let totalVideos = 0;
     let categoriasComDestaque = 0;
 
     categorias?.forEach((categoria) => {
-      const itens = categoria.galeria_itens || [];
+      const itensDaCategoria = [
+        ...(itensFotos?.filter((item) => item.categoria_id === categoria.id) ||
+          []),
+        ...(itensVideos?.filter((item) => item.categoria_id === categoria.id) ||
+          []),
+      ];
 
       if (categoria.tipo === "fotos") {
-        totalFotos += itens.length;
-      } else {
-        totalVideos += itens.length;
+        totalFotos +=
+          itensFotos?.filter((item) => item.categoria_id === categoria.id)
+            .length || 0;
+      } else if (categoria.tipo === "videos") {
+        totalVideos +=
+          itensVideos?.filter((item) => item.categoria_id === categoria.id)
+            .length || 0;
       }
 
-      if (itens.some((item) => item.destaque)) {
+      if (itensDaCategoria.some((item) => item.destaque)) {
         categoriasComDestaque++;
       }
     });
 
-    return {
+    const stats: EstatisticasGaleria = {
       totalFotos,
       totalVideos,
       totalCategorias: categorias?.length || 0,
       categoriasComDestaque,
     };
+
+    return {
+      success: true,
+      data: stats,
+    };
   } catch (error) {
     console.error("Erro ao buscar estatísticas da galeria:", error);
     return {
-      totalFotos: 0,
-      totalVideos: 0,
-      totalCategorias: 0,
-      categoriasComDestaque: 0,
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Erro ao buscar estatísticas",
+      data: {
+        totalFotos: 0,
+        totalVideos: 0,
+        totalCategorias: 0,
+        categoriasComDestaque: 0,
+      },
     };
   }
 }
@@ -545,25 +713,36 @@ export async function criarCategoriaGaleria(dados: {
   nome: string;
   slug: string;
   descricao?: string;
-  tipo: TipoCategoria;
+  tipo: TipoCategoriaDB;
   ordem?: number;
   status?: boolean;
-}) {
+}): Promise<ApiResponse<CategoriaComItens>> {
   try {
-    const supabase = await createServerClient();
+    const cookieStore = await cookies();
+    const supabase = await createServerClient(cookieStore);
 
     // Verificar se é admin
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error("Não autorizado");
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        success: false,
+        error: "Não autorizado",
+      };
+    }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
-      .eq("id", user.user.id)
+      .eq("id", user.id)
       .single();
 
-    if (profile?.role !== "admin") {
-      throw new Error("Apenas administradores podem criar categorias");
+    if (profileError || profile?.role !== "admin") {
+      return {
+        success: false,
+        error: "Apenas administradores podem criar categorias",
+      };
     }
 
     const { data, error } = await supabase
@@ -576,171 +755,42 @@ export async function criarCategoriaGaleria(dados: {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return {
+        success: false,
+        error: `Erro ao criar categoria: ${error.message}`,
+      };
+    }
 
     // Revalidar cache
     revalidatePath("/galeria");
+    revalidatePath("/");
+
+    const categoria: CategoriaComItens = {
+      id: data.id,
+      nome: data.nome,
+      slug: data.slug,
+      descricao: data.descricao,
+      tipo: data.tipo,
+      ordem: data.ordem,
+      status: data.status,
+      arquivada: data.arquivada,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      item_count: 0,
+      tem_destaque: false,
+    };
 
     return {
       success: true,
-      data: {
-        id: data.id,
-        nome: data.nome,
-        slug: data.slug,
-        descricao: data.descricao,
-        tipo: data.tipo,
-        ordem: data.ordem,
-        status: data.status,
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        arquivada: data.arquivada,
-      },
+      data: categoria,
     };
-  } catch (error: unknown) {
+  } catch (error) {
     console.error("Erro ao criar categoria:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro ao criar categoria";
     return {
       success: false,
-      error: errorMessage,
-    };
-  }
-}
-
-export async function atualizarCategoriaGaleria(
-  categoriaId: string,
-  dados: Partial<{
-    nome: string;
-    slug: string;
-    descricao: string;
-    tipo: TipoCategoria;
-    ordem: number;
-    status: boolean;
-    arquivada: boolean;
-  }>
-) {
-  try {
-    const supabase = await createServerClient();
-
-    // Verificar se é admin
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error("Não autorizado");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      throw new Error("Apenas administradores podem atualizar categorias");
-    }
-
-    const { error } = await supabase
-      .from("galeria_categorias")
-      .update({
-        ...dados,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", categoriaId);
-
-    if (error) throw error;
-
-    // Revalidar cache
-    revalidatePath("/galeria");
-    revalidatePath("/galeria/*");
-
-    return { success: true };
-  } catch (error: unknown) {
-    console.error("Erro ao atualizar categoria:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro ao atualizar categoria";
-    return {
-      success: false,
-      error: errorMessage,
-    };
-  }
-}
-
-export async function criarItemGaleria(dados: {
-  titulo: string;
-  descricao?: string;
-  categoria_id: string;
-  tipo: TipoItem;
-  arquivo_url: string;
-  thumbnail_url?: string;
-  ordem?: number;
-  destaque?: boolean;
-  status?: boolean;
-}) {
-  try {
-    const supabase = await createServerClient();
-
-    // Verificar se é admin
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error("Não autorizado");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      throw new Error("Apenas administradores podem criar itens");
-    }
-
-    const { data, error } = await supabase
-      .from("galeria_itens")
-      .insert({
-        ...dados,
-        autor_id: user.user.id,
-        ordem: dados.ordem || 0,
-        destaque: dados.destaque ?? false,
-        status: dados.status ?? true,
-      })
-      .select(
-        `*,
-        categoria:galeria_categorias(id, nome, slug),
-        autor:profiles(id, full_name, avatar_url)`
-      )
-      .single();
-
-    if (error) throw error;
-
-    // Revalidar cache
-    revalidatePath("/galeria");
-    if (data.categoria?.slug) {
-      revalidatePath(`/galeria/${data.categoria.slug}`);
-    }
-
-    return {
-      success: true,
-      data: {
-        id: data.id,
-        titulo: data.titulo,
-        descricao: data.descricao,
-        categoria_id: data.categoria_id,
-        tipo: data.tipo,
-        arquivo_url: data.arquivo_url,
-        thumbnail_url: data.thumbnail_url,
-        ordem: data.ordem,
-        autor_id: data.autor_id,
-        status: data.status,
-        destaque: data.destaque,
-        created_at: data.created_at,
-        views: data.views || 0,
-        categoria: data.categoria,
-        autor: data.autor,
-      },
-    };
-  } catch (error: unknown) {
-    console.error("Erro ao criar item:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Erro ao criar item";
-    return {
-      success: false,
-      error: errorMessage,
+      error:
+        error instanceof Error ? error.message : "Erro interno do servidor",
     };
   }
 }

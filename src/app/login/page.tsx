@@ -1,18 +1,18 @@
-// app/login/page.tsx
+// app/login/page.tsx (Versão Atualizada)
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/lib/stores/useAuthStore";
-import { Toaster, toastHelpers } from "@/components/ui/sonner";
+import { useAuthStore } from "@/lib/stores";
+import { toast } from "sonner";
 import {
   formatMatricula,
   validateMatricula,
   extractMatriculaNumbers,
 } from "@/lib/utils/validation";
-import { ROUTES } from "@/lib/constants";
 import Image from "next/image";
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [matricula, setMatricula] = useState("");
@@ -21,23 +21,29 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // ✅ CORRIGIDO: Usar o nome correto da função
-  const { isAuthenticated, loginWithServerAction } = useAuthStore();
+  const { isAuthenticated, loginWithServerAction, initialize } = useAuthStore();
 
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Inicializar o auth store
   useEffect(() => {
-    useAuthStore
-      .getState()
-      .initialize()
-      .then(() => setIsInitialized(true));
-  }, []);
+    const init = async () => {
+      await initialize();
+      setIsInitialized(true);
+    };
+    init();
+  }, [initialize]);
 
   // Redirecionar se já estiver autenticado
   useEffect(() => {
-    if (!isInitialized || !isAuthenticated) return;
-    router.replace(ROUTES.PROTECTED.PROFILE);
+    if (!isInitialized) return;
+
+    if (isAuthenticated) {
+      // Verificar se é admin para redirecionar corretamente
+      const { isAdmin } = useAuthStore.getState();
+      const redirectPath = isAdmin ? "/admin/dashboard" : "/perfil";
+      router.replace(redirectPath);
+    }
   }, [isAuthenticated, router, isInitialized]);
 
   // Carregar matrícula salva
@@ -73,33 +79,30 @@ export default function LoginPage() {
         localStorage.removeItem("saved_matricula");
       }
 
-      // ✅ CORRIGIDO: Usar a função correta
       const result = await loginWithServerAction(matriculaNumerica);
 
       if (result?.success) {
-        // Toast de sucesso
-        toastHelpers.success("Login realizado com sucesso!");
+        toast.success("Login realizado com sucesso!");
 
-        // Verificar status do perfil (não do user)
+        // Verificar status do perfil
         if (result.data?.profile && !result.data.profile.status) {
-          toastHelpers.warning(
+          toast.warning(
             "Sua conta está inativa. Entre em contato com o comando."
           );
         }
 
-        // Redirecionar com delay
+        // Redirecionar com base no tipo de usuário
+        const isAdmin = result.data?.profile.role === "admin";
         setTimeout(() => {
-          router.replace(ROUTES.PROTECTED.PROFILE);
+          router.replace(isAdmin ? "/admin/dashboard" : "/perfil");
         }, 1500);
       } else {
-        // Mensagens de erro específicas
         const errorMessage = result?.error?.toLowerCase() || "";
         let finalMessage = result?.error || "Erro ao fazer login";
 
         if (
           errorMessage.includes("não encontrada") ||
-          errorMessage.includes("não existe") ||
-          errorMessage.includes("inexistente")
+          errorMessage.includes("não existe")
         ) {
           finalMessage =
             "Matrícula não encontrada. Você não faz parte da PAC - Patrulha Aérea Civil";
@@ -113,13 +116,17 @@ export default function LoginPage() {
           finalMessage = "Credenciais inválidas. Tente novamente.";
         }
 
-        toastHelpers.error("Falha no login", finalMessage);
+        toast.error("Falha no login", {
+          description: finalMessage,
+        });
         setError(finalMessage);
       }
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
-      toastHelpers.error("Erro na autenticação", errorMessage);
+      toast.error("Erro na autenticação", {
+        description: errorMessage,
+      });
       setError("Erro inesperado. Tente novamente.");
     } finally {
       setIsLoading(false);
@@ -198,7 +205,7 @@ export default function LoginPage() {
                 />
                 {isLoading && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600" />
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
                   </div>
                 )}
               </div>
@@ -245,26 +252,7 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Autenticando...
                 </>
               ) : (
@@ -278,21 +266,7 @@ export default function LoginPage() {
                 href="/"
                 className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
               >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
-                Voltar ao site principal
+                ← Voltar ao site principal
               </Link>
             </div>
           </form>
@@ -306,8 +280,6 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
-
-      <Toaster />
     </>
   );
 }

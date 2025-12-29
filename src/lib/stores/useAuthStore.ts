@@ -172,8 +172,9 @@ export const useAuthStore = create<AuthState>()(
           const formData = new FormData();
           formData.append("matricula", matricula);
 
-          const loginModule = await import("@/app/actions/auth/login");
-          const result = await loginModule.login(formData);
+          // ✅ ATUALIZADO: Agora usa o arquivo único
+          const authModule = await import("@/app/actions/auth/auth");
+          const result = await authModule.login(formData);
 
           console.log("🔍 [AuthStore] Resultado da Server Action:", result);
 
@@ -238,16 +239,31 @@ export const useAuthStore = create<AuthState>()(
       logout: async () => {
         try {
           get().clearAdminSession();
-          await supabase.auth.signOut();
+
+          // ✅ ATUALIZADO: Chama o logout do arquivo único
+          const authModule = await import("@/app/actions/auth/auth");
+          const result = await authModule.logout();
+
+          // Limpar estado local mesmo se der erro no server
           set({
             user: null,
             profile: null,
             isAuthenticated: false,
             isAdmin: false,
           });
-          return { success: true };
+
+          return result.success ? { success: true } : result;
         } catch (error) {
           console.error("Logout error:", error);
+
+          // Limpar estado local mesmo com erro
+          set({
+            user: null,
+            profile: null,
+            isAuthenticated: false,
+            isAdmin: false,
+          });
+
           return {
             success: false,
             error: "Erro ao fazer logout",
@@ -287,11 +303,9 @@ export const useAuthStore = create<AuthState>()(
             };
           }
 
-          // ✅ Chama a server action para autenticação real
-          const { authenticateAdminSession } = await import(
-            "@/app/actions/auth/admin"
-          );
-          const result = await authenticateAdminSession(
+          // ✅ ATUALIZADO: Agora usa o arquivo único
+          const authModule = await import("@/app/actions/auth/auth");
+          const result = await authModule.authenticateAdminSession(
             user.id,
             user.email || "",
             adminPassword

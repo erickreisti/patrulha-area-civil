@@ -1,4 +1,5 @@
-// SiteLayout.tsx - VERSÃO CORRIGIDA
+// src/app/(site)/layout.tsx
+
 "use client";
 
 import { Header } from "@/components/site/layout/Header";

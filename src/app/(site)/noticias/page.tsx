@@ -1,3 +1,5 @@
+// src/app/(site)/noticias/page.tsx
+
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -51,7 +53,7 @@ import {
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNoticiasStore, NoticiaLista } from "@/lib/stores/useNoticiasStore";
-import { getNews, getNewsStats } from "@/app/actions/news";
+import { getNews, getNewsStats } from "@/app/actions/news/noticias";
 
 // ==================== CONFIGURAÇÕES ====================
 const ITEMS_PER_PAGE_OPTIONS = [
@@ -147,7 +149,7 @@ export default function NoticiasPage() {
 
       const result = await getNews(options);
 
-      if (result.success) {
+      if (result.success && result.data) {
         let sortedNoticias = result.data;
 
         // Ordenar localmente se necessário
@@ -156,7 +158,7 @@ export default function NoticiasPage() {
         }
 
         setNoticias(sortedNoticias);
-        setTotalCount(result.pagination.total);
+        setTotalCount(result.pagination?.total || 0);
 
         // Extrair categorias únicas das notícias
         const categoriasUnicas = Array.from(
@@ -179,6 +181,11 @@ export default function NoticiasPage() {
         ];
 
         setCategoriasDisponiveis(categoriasOptions);
+      } else {
+        // Se não tiver sucesso ou dados, limpar
+        setNoticias([]);
+        setTotalCount(0);
+        setCategoriasDisponiveis([{ value: "all", label: "Todas categorias" }]);
       }
     } catch (error) {
       console.error("Erro ao buscar notícias:", error);

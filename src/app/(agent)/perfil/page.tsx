@@ -11,7 +11,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,15 +27,13 @@ import {
   RiMailLine,
   RiAlertLine,
   RiLockLine,
-  RiShieldKeyholeLine,
-  RiEyeLine,
-  RiEyeOffLine,
   RiSettingsLine,
-} from "react-icons/ri";
+} from "react-icons/ri"; // ✅ Removi as importações não usadas
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import type { Profile } from "@/lib/supabase/types";
 import { Spinner } from "@/components/ui/spinner";
 import { useRouter } from "next/navigation";
+import { AdminAuthModal } from "@/components/admin/AdminAuthModal";
 
 type ProfileData = Profile;
 
@@ -188,174 +185,6 @@ const InactiveAgentDialog = ({
     </DialogContent>
   </Dialog>
 );
-
-// Modal de Autenticação Admin (Corrigido)
-const AdminAuthModal = ({
-  isOpen,
-  onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) => {
-  const [adminPassword, setAdminPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const { user, profile, verifyAdminAccess } = useAuthStore();
-  const router = useRouter();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!adminPassword.trim()) {
-      setError("Digite a senha de administrador");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      console.log("🔍 [AdminModal] Iniciando autenticação admin...");
-
-      if (!user || !profile) {
-        setError("Usuário não autenticado");
-        setLoading(false);
-        return;
-      }
-
-      console.log("🔍 [AdminModal] Dados para autenticação:", {
-        userId: user.id,
-        userEmail: user.email,
-        profileId: profile.id,
-        matricula: profile.matricula,
-      });
-
-      // Chamar a função de verificação do store
-      const result = await verifyAdminAccess(adminPassword);
-
-      console.log("🔍 [AdminModal] Resultado da autenticação:", result);
-
-      if (result.success) {
-        console.log(
-          "✅ [AdminModal] Autenticação bem-sucedida, redirecionando..."
-        );
-
-        // Redirecionar para o dashboard admin
-        router.push("/admin/dashboard");
-        onClose();
-      } else {
-        setError(result.error || "Senha de administrador incorreta");
-      }
-    } catch (err) {
-      console.error("❌ [AdminModal] Erro:", err);
-      setError("Erro na autenticação. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-navy/20 shadow-2xl rounded-xl">
-        <DialogHeader className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-center mb-3">
-            <div className="bg-navy/10 p-2.5 rounded-full">
-              <RiShieldKeyholeLine className="w-6 h-6 text-navy" />
-            </div>
-          </div>
-
-          <DialogTitle className="text-center text-lg font-bold text-navy font-roboto">
-            AUTENTICAÇÃO ADMINISTRATIVA
-          </DialogTitle>
-
-          <DialogDescription className="text-center text-slate-700 mt-1 text-sm font-roboto">
-            Acesso restrito ao Painel Administrativo
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 py-2">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2 font-roboto">
-              Senha Administrativa
-            </label>
-
-            <div className="relative">
-              <Input
-                type={showPassword ? "text" : "password"}
-                value={adminPassword}
-                onChange={(e) => {
-                  setAdminPassword(e.target.value);
-                  setError("");
-                }}
-                placeholder="Digite sua senha administrativa"
-                disabled={loading}
-                className={`w-full text-lg pr-10 ${
-                  error ? "border-error focus:ring-error" : "border-slate-300"
-                }`}
-                autoFocus
-              />
-
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700 focus:outline-none"
-                aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
-                disabled={loading}
-              >
-                {showPassword ? (
-                  <RiEyeOffLine className="w-5 h-5" />
-                ) : (
-                  <RiEyeLine className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 mt-2 text-error text-sm">
-                <RiErrorWarningLine className="w-4 h-4" />
-                <span className="font-roboto">{error}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex-1 bg-navy hover:bg-navy/90 text-white font-semibold py-2.5 text-sm transition-all font-roboto"
-            >
-              {loading ? (
-                <>
-                  <Spinner className="w-4 h-4 mr-2" />
-                  Verificando...
-                </>
-              ) : (
-                "Acessar Painel Admin"
-              )}
-            </Button>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={loading}
-              className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50 font-roboto"
-            >
-              Cancelar
-            </Button>
-          </div>
-        </form>
-
-        <div className="text-center px-4 pb-3">
-          <p className="text-[10px] text-slate-500 font-roboto">
-            Esta autenticação é adicional à senha padrão do sistema
-          </p>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 const BaseLayout = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gradient-to-br from-navy to-navy-700 relative overflow-hidden">
