@@ -1,4 +1,3 @@
-// middleware.ts
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { ROUTES } from "@/lib/constants";
@@ -83,11 +82,34 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL("/perfil", request.url));
     }
 
-    // 👑 ROTAS ADMIN: Verificar se é admin
+    // 👑 ROTAS ADMIN: Verificar se é admin E tem cookie de sessão admin
     if (pathname.startsWith("/admin")) {
       if (profile.role !== "admin") {
         console.log(`❌ [Middleware] Agente tentou acessar admin: ${pathname}`);
         return NextResponse.redirect(new URL("/perfil", request.url));
+      }
+
+      // ✅ VERIFICAR COOKIE DE SESSÃO ADMIN ADICIONAL
+      const adminSessionCookie = request.cookies.get("admin_session")?.value;
+      const isAdminCookie = request.cookies.get("is_admin")?.value === "true";
+
+      console.log("🔍 [Middleware] Verificando sessão admin:", {
+        adminSessionCookie: !!adminSessionCookie,
+        isAdminCookie,
+      });
+
+      if (!adminSessionCookie || !isAdminCookie) {
+        console.log(`❌ [Middleware] Admin sem sessão válida: ${pathname}`);
+
+        // Se for dashboard, redirecionar para perfil
+        if (pathname === "/admin/dashboard") {
+          return NextResponse.redirect(new URL("/perfil", request.url));
+        }
+
+        // Para outras rotas admin, permitir mas o frontend deve verificar
+        console.log(
+          `⚠️ [Middleware] Admin sem sessão completa acessando: ${pathname}`
+        );
       }
     }
 

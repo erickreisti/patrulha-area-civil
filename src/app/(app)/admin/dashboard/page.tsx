@@ -1,4 +1,3 @@
-// components/admin/DashboardPage.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -7,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
-import { useAdminAuth } from "@/lib/contexts/AdminAuthContext";
+import { useAuthStore } from "@/lib/stores/useAuthStore";
 import {
   getDashboardStats,
   type DashboardStats,
@@ -289,20 +288,33 @@ function LoadingSkeleton() {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, profile, isLoading: authLoading } = useAdminAuth();
+  const {
+    user,
+    profile,
+    isLoading: authLoading,
+    hasAdminSession,
+  } = useAuthStore();
 
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ FUNÇÃO PARA CARREGAR DADOS DO DASHBOARD
   const loadDashboard = useCallback(async () => {
+    // ✅ NÃO CARREGAR SE NÃO TEM SESSÃO ADMIN
+    if (!hasAdminSession || !user) {
+      console.log("⚠️ [Dashboard] Não carregando dados - sem sessão admin");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      console.log("🔄 Carregando dashboard...");
+      console.log("🔄 [Dashboard] Carregando dados do dashboard...");
       const result = await getDashboardStats();
-      console.log("📊 Resultado:", result);
+      console.log("📊 [Dashboard] Resultado:", result);
 
       setData(result);
 
@@ -310,7 +322,7 @@ export default function DashboardPage() {
         setError(result.error || "Erro ao carregar dashboard");
       }
     } catch (err) {
-      console.error("❌ Erro:", err);
+      console.error("❌ [Dashboard] Erro:", err);
       setError("Erro ao conectar com o servidor");
       setData({
         success: false,
@@ -319,17 +331,40 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [hasAdminSession, user]);
 
+  // ✅ USEEFFECT PRINCIPAL: Só carrega dados quando tem sessão admin
   useEffect(() => {
+    console.log("🔍 [Dashboard] useEffect - verificando:", {
+      authLoading,
+      hasAdminSession,
+      user: !!user,
+    });
+
+    if (authLoading) return;
+
+    // ✅ VERIFICAÇÃO DE ACESSO: Se não tem sessão admin, redireciona
+    if (!hasAdminSession || !user) {
+      console.log(
+        "⚠️ [Dashboard] Redirecionando para /perfil - sem sessão admin"
+      );
+      router.push("/perfil");
+      return;
+    }
+
+    // ✅ SE TEM SESSÃO ADMIN: Carrega os dados
+    console.log("✅ [Dashboard] Tem sessão admin, carregando dados...");
     loadDashboard();
-  }, [loadDashboard]);
+  }, [authLoading, hasAdminSession, user, router, loadDashboard]);
 
   // Depuração
   useEffect(() => {
     if (data) {
-      console.log("📊 Dashboard data:", data);
-      console.log("📋 Atividades:", data.data?.recentActivities?.length || 0);
+      console.log("📊 [Dashboard] Dados carregados:", data);
+      console.log(
+        "📋 [Dashboard] Atividades:",
+        data.data?.recentActivities?.length || 0
+      );
     }
   }, [data]);
 
@@ -383,9 +418,32 @@ export default function DashboardPage() {
     },
   ];
 
-  // ✅ Loading do contexto (VERIFICAÇÃO APENAS AQUI)
+  // ✅ Loading do contexto
   if (authLoading) {
     return <LoadingSkeleton />;
+  }
+
+  // ✅ Se não tem sessão admin, mostra loading enquanto redireciona
+  if (!hasAdminSession) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <RiErrorWarningLine className="h-12 w-12 text-yellow-600" />
+              <div>
+                <h3 className="text-lg font-semibold text-yellow-800">
+                  Redirecionando...
+                </h3>
+                <p className="text-yellow-600 mt-1">
+                  Verificando permissões administrativas
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // ✅ Erro no carregamento de dados

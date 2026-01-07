@@ -11,7 +11,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
-  hasAdminSession: boolean; // Novo: indica se tem sessão admin ativa
+  hasAdminSession: boolean;
 
   initialize: () => Promise<void>;
   loginWithServerAction: (matricula: string) => Promise<{
@@ -29,7 +29,7 @@ interface AuthState {
     message?: string;
     error?: string;
   }>;
-  checkAdminSession: () => Promise<boolean>; // Novo: verificar cookies
+  checkAdminSession: () => Promise<boolean>;
   clearAdminSession: () => void;
 }
 
@@ -50,12 +50,147 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: true });
           console.log("🔍 [AuthStore] Inicializando store...");
 
-          // 1. Verificar sessão Supabase
+          // ✅ 1. VERIFICAR COOKIES ADMIN PRIMEIRO (ANTES DE QUALQUER LIMPEZA)
+          const hasActiveAdminSession = await get().checkAdminSession();
+          console.log("🔍 [AuthStore] Cookies admin:", hasActiveAdminSession);
+
+          // ✅ 2. VERIFICAR SESSÃO SUPABASE
           const {
             data: { session },
           } = await supabase.auth.getSession();
 
-          if (!session?.user) {
+          console.log("🔍 [AuthStore] Sessão Supabase:", {
+            hasSession: !!session?.user,
+            userId: session?.user?.id,
+          });
+
+          // ✅ CASO A: TEM SESSÃO SUPABASE
+          if (session?.user) {
+            console.log("✅ [AuthStore] Sessão Supabase encontrada");
+
+            // ✅ 3. BUSCAR PERFIL NO BANCO
+            const { data: profile, error: profileError } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", session.user.id)
+              .single();
+
+            if (profileError) {
+              console.error(
+                "❌ [AuthStore] Erro ao buscar perfil:",
+                profileError
+              );
+
+              // Se erro mas tem cookies admin, manter estado atual
+              if (hasActiveAdminSession) {
+                console.log(
+                  "⚠️ [AuthStore] Erro no perfil, mas tem cookies admin - mantendo estado"
+                );
+                const currentState = get();
+                set({
+                  user: currentState.user || session.user,
+                  isAuthenticated: true,
+                  isLoading: false,
+                  hasAdminSession: hasActiveAdminSession,
+                });
+                return;
+              }
+
+              // Sem cookies admin, limpar tudo
+              set({
+                user: session.user,
+                profile: null,
+                isAuthenticated: true,
+                isAdmin: false,
+                hasAdminSession: false,
+                isLoading: false,
+              });
+              return;
+            }
+
+            if (!profile) {
+              console.error("❌ [AuthStore] Perfil não encontrado");
+
+              if (hasActiveAdminSession) {
+                console.log(
+                  "⚠️ [AuthStore] Perfil não encontrado, mas tem cookies admin"
+                );
+                const currentState = get();
+                set({
+                  user: currentState.user || session.user,
+                  isAuthenticated: true,
+                  isLoading: false,
+                  hasAdminSession: hasActiveAdminSession,
+                });
+                return;
+              }
+
+              set({
+                user: session.user,
+                profile: null,
+                isAuthenticated: true,
+                isAdmin: false,
+                hasAdminSession: false,
+                isLoading: false,
+              });
+              return;
+            }
+
+            console.log("✅ [AuthStore] Perfil carregado:", {
+              id: profile.id,
+              email: profile.email,
+              role: profile.role,
+              status: profile.status,
+            });
+
+            // ✅ 4. ATUALIZAR ESTADO COMPLETO
+            set({
+              user: session.user,
+              profile,
+              isAuthenticated: true,
+              isAdmin: profile.role === "admin",
+              hasAdminSession: hasActiveAdminSession,
+              isLoading: false,
+            });
+
+            console.log("✅ [AuthStore] Estado final:", {
+              isAdmin: profile.role === "admin",
+              hasAdminSession: hasActiveAdminSession,
+            });
+          }
+          // ✅ CASO B: NÃO TEM SESSÃO SUPABASE MAS TEM COOKIES ADMIN
+          else if (hasActiveAdminSession) {
+            console.log(
+              "⚠️ [AuthStore] Sem sessão Supabase, mas TEM cookies admin"
+            );
+
+            const currentState = get();
+
+            // Se já tem estado armazenado, manter ele
+            if (currentState.user && currentState.profile) {
+              console.log("🔍 [AuthStore] Mantendo estado com cookies admin");
+              set({
+                isLoading: false,
+                // Manter todo o resto do estado
+              });
+              return;
+            }
+
+            // Se não tem estado, tentar recuperar do localStorage
+            console.log(
+              "⚠️ [AuthStore] Cookies admin sem estado - mantendo vazio"
+            );
+            set({
+              user: null,
+              profile: null,
+              isAuthenticated: false,
+              isAdmin: false,
+              hasAdminSession: hasActiveAdminSession, // IMPORTANTE: manter true!
+              isLoading: false,
+            });
+          }
+          // ✅ CASO C: NÃO TEM NADA
+          else {
             console.log("🔍 [AuthStore] Nenhuma sessão encontrada");
             set({
               user: null,
@@ -65,105 +200,22 @@ export const useAuthStore = create<AuthState>()(
               hasAdminSession: false,
               isLoading: false,
             });
-            return;
           }
-
-          console.log("✅ [AuthStore] Sessão encontrada:", {
-            userId: session.user.id,
-            userEmail: session.user.email,
-          });
-
-          // 2. Definir usuário imediatamente
-          set({
-            user: session.user,
-            isAuthenticated: true,
-          });
-
-          // 3. Buscar perfil
-          console.log(
-            "🔍 [AuthStore] Buscando perfil para ID:",
-            session.user.id
-          );
-
-          const { data: profile, error: profileError } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", session.user.id)
-            .single();
-
-          if (profileError) {
-            console.error(
-              "❌ [AuthStore] Erro ao buscar perfil:",
-              profileError
-            );
-
-            // Tentar buscar como admin (se tiver cache)
-            const currentState = get();
-            if (currentState.profile) {
-              console.log("🔍 [AuthStore] Usando perfil do cache");
-              set({
-                profile: currentState.profile,
-                isAdmin: currentState.profile.role === "admin",
-                hasAdminSession: currentState.hasAdminSession,
-                isLoading: false,
-              });
-              return;
-            }
-
-            set({
-              profile: null,
-              isAdmin: false,
-              hasAdminSession: false,
-              isLoading: false,
-            });
-            return;
-          }
-
-          if (!profile) {
-            console.error("❌ [AuthStore] Perfil não encontrado no banco");
-            set({
-              profile: null,
-              isAdmin: false,
-              hasAdminSession: false,
-              isLoading: false,
-            });
-            return;
-          }
-
-          console.log("✅ [AuthStore] Perfil carregado:", {
-            id: profile.id,
-            email: profile.email,
-            status: profile.status,
-            role: profile.role,
-            full_name: profile.full_name,
-            matricula: profile.matricula,
-            admin_2fa_enabled: profile.admin_2fa_enabled,
-          });
-
-          // 4. Verificar se tem sessão admin ativa
-          const hasActiveAdminSession = await get().checkAdminSession();
-
-          // 5. Atualizar estado completo
-          set({
-            profile,
-            isAdmin: profile.role === "admin",
-            hasAdminSession: hasActiveAdminSession,
-            isLoading: false,
-          });
-
-          console.log("✅ [AuthStore] Estado final:", {
-            isAdmin: profile.role === "admin",
-            hasAdminSession: hasActiveAdminSession,
-          });
         } catch (error) {
           console.error("❌ [AuthStore] Erro na inicialização:", error);
+
+          // Em caso de erro, manter estado atual se possível
+          const currentState = get();
+          const hasActiveAdminSession = await get().checkAdminSession();
+
           set({
-            user: null,
-            profile: null,
-            isAuthenticated: false,
-            isAdmin: false,
-            hasAdminSession: false,
             isLoading: false,
+            hasAdminSession: hasActiveAdminSession,
+            // Manter o resto do estado se existir
+            user: currentState.user || null,
+            profile: currentState.profile || null,
+            isAuthenticated: currentState.isAuthenticated || false,
+            isAdmin: currentState.isAdmin || false,
           });
         }
       },
@@ -180,7 +232,6 @@ export const useAuthStore = create<AuthState>()(
           const formData = new FormData();
           formData.append("matricula", matricula);
 
-          // ✅ Usar o arquivo único
           const authModule = await import("@/app/actions/auth/auth");
           const result = await authModule.login(formData);
 
@@ -192,7 +243,6 @@ export const useAuthStore = create<AuthState>()(
             // Verificar se tem sessão admin
             const hasActiveAdminSession = await get().checkAdminSession();
 
-            // Atualizar estado local
             set({
               user: result.data.session.user,
               profile: profileData,
@@ -235,7 +285,7 @@ export const useAuthStore = create<AuthState>()(
           profile: data.profile,
           isAuthenticated: !!data.user,
           isAdmin: data.profile?.role === "admin",
-          hasAdminSession: false, // Sempre false ao definir auth data manualmente
+          hasAdminSession: false,
         });
       },
 
@@ -251,14 +301,11 @@ export const useAuthStore = create<AuthState>()(
 
       logout: async () => {
         try {
-          // Limpar sessão admin
           get().clearAdminSession();
 
-          // Chamar logout do server
           const authModule = await import("@/app/actions/auth/auth");
           const result = await authModule.logout();
 
-          // Limpar estado local mesmo se der erro no server
           set({
             user: null,
             profile: null,
@@ -271,7 +318,6 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           console.error("Logout error:", error);
 
-          // Limpar estado local mesmo com erro
           set({
             user: null,
             profile: null,
@@ -310,7 +356,6 @@ export const useAuthStore = create<AuthState>()(
             profile.email
           );
 
-          // Verificar se o admin tem senha configurada
           if (!profile.admin_secret_hash || !profile.admin_secret_salt) {
             return {
               success: false,
@@ -319,7 +364,6 @@ export const useAuthStore = create<AuthState>()(
             };
           }
 
-          // ✅ Usar o arquivo único
           const authModule = await import("@/app/actions/auth/auth");
           const result = await authModule.authenticateAdminSession(
             user.id,
@@ -330,10 +374,8 @@ export const useAuthStore = create<AuthState>()(
           console.log("🔍 [AuthStore] Resultado da server action:", result);
 
           if (result.success) {
-            // Atualizar estado local - CORREÇÃO AQUI
             set({ hasAdminSession: true });
 
-            // Atualizar último acesso no perfil local
             get().setProfile({
               ...profile,
               admin_last_auth: new Date().toISOString(),
@@ -362,21 +404,45 @@ export const useAuthStore = create<AuthState>()(
 
       checkAdminSession: async () => {
         try {
-          // Verificar cookie no client-side
+          if (typeof document === "undefined") return false;
+
           const cookies = document.cookie.split("; ");
           const adminCookie = cookies.find((cookie) =>
             cookie.startsWith("is_admin=")
           );
 
-          if (adminCookie) {
-            const value = adminCookie.split("=")[1];
-            const hasSession = value === "true";
+          if (!adminCookie) return false;
 
-            console.log("🔍 [AuthStore] checkAdminSession:", hasSession);
-            return hasSession;
+          const value = adminCookie.split("=")[1];
+          const hasSession = value === "true";
+
+          if (!hasSession) return false;
+
+          // ✅ VERIFICAR SE NÃO ESTÁ EXPIRADO
+          const adminSessionCookie = cookies.find((cookie) =>
+            cookie.startsWith("admin_session=")
+          );
+
+          if (adminSessionCookie) {
+            try {
+              const sessionValue = adminSessionCookie.split("=")[1];
+              const sessionData = JSON.parse(decodeURIComponent(sessionValue));
+
+              if (sessionData.expiresAt) {
+                const expiresAt = new Date(sessionData.expiresAt);
+                if (expiresAt < new Date()) {
+                  console.log("❌ [AuthStore] Sessão admin expirada");
+                  get().clearAdminSession();
+                  return false;
+                }
+              }
+            } catch {
+              return false;
+            }
           }
 
-          return false;
+          console.log("🔍 [AuthStore] checkAdminSession:", hasSession);
+          return hasSession;
         } catch (error) {
           console.error("❌ [AuthStore] Erro ao verificar cookies:", error);
           return false;
