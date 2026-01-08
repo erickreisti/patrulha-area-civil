@@ -1,806 +1,383 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+
+// Zustand Stores
 import { useAuthStore } from "@/lib/stores/useAuthStore";
-import {
-  getDashboardStats,
-  type DashboardStats,
-} from "@/app/actions/admin/dashboard/dashboard";
-import {
-  RiUserLine,
-  RiShieldLine,
-  RiNewspaperLine,
-  RiImageLine,
-  RiVideoLine,
-  RiBarChartLine,
-  RiRefreshLine,
-  RiErrorWarningLine,
-  RiTimeLine,
-  RiCheckLine,
-  RiUserAddLine,
-  RiFileAddLine,
-  RiFolderAddLine,
-  RiSettingsLine,
-  RiDashboardLine,
-  RiFileTextLine,
-} from "react-icons/ri";
+import { useActivitiesStore } from "@/lib/stores/useActivitiesStore";
 
-// Interface para atividade
-interface Activity {
-  id: string;
-  action_type: string;
-  description: string;
-  created_at: string;
-  user_name: string | null;
+// Componentes
+import { LoadingSkeleton } from "./components/dashboard/LoadingSkeleton";
+import { DashboardStats } from "./components/dashboard/DashboardStats";
+import { AdminHeader } from "./components/layout/AdminHeader";
+import { Button } from "@/components/ui/button";
+import { RiRefreshLine } from "react-icons/ri";
+
+// Tipos
+interface AgentsStats {
+  total: number;
+  active: number;
+  inactive: number;
+  admins: number;
+  agents: number;
 }
 
-// Interface para resposta
-interface DashboardResponse {
-  success: boolean;
-  data?: DashboardStats;
-  error?: string;
-}
-
-// Tipos de cores
-type StatCardColor =
-  | "blue"
-  | "green"
-  | "purple"
-  | "orange"
-  | "red"
-  | "cyan"
-  | "pink"
-  | "indigo"
-  | "gray"
-  | "yellow";
-type QuickActionColor =
-  | "blue"
-  | "green"
-  | "purple"
-  | "orange"
-  | "red"
-  | "cyan"
-  | "indigo";
-
-// ✅ Componente de estatística
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  loading,
-  color = "blue",
-  subtitle,
-  trend,
-}: {
-  title: string;
-  value: number;
-  icon: React.ComponentType<{ className?: string }>;
-  loading: boolean;
-  color?: StatCardColor;
-  subtitle?: string;
-  trend?: number;
-}) {
-  const colors: Record<StatCardColor, string> = {
-    blue: "bg-blue-50 text-blue-700 border-blue-200",
-    green: "bg-green-50 text-green-700 border-green-200",
-    purple: "bg-purple-50 text-purple-700 border-purple-200",
-    orange: "bg-orange-50 text-orange-700 border-orange-200",
-    red: "bg-red-50 text-red-700 border-red-200",
-    cyan: "bg-cyan-50 text-cyan-700 border-cyan-200",
-    pink: "bg-pink-50 text-pink-700 border-pink-200",
-    indigo: "bg-indigo-50 text-indigo-700 border-indigo-200",
-    gray: "bg-gray-50 text-gray-700 border-gray-200",
-    yellow: "bg-yellow-50 text-yellow-700 border-yellow-200",
-  };
-
-  return (
-    <Card
-      className={`${colors[color]} border hover:shadow-md transition-shadow`}
-    >
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4" />
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-8 w-20" />
-        ) : (
-          <>
-            <div className="flex items-baseline gap-2">
-              <div className="text-3xl font-bold">{value}</div>
-              {trend !== undefined && (
-                <Badge
-                  variant={trend >= 0 ? "default" : "destructive"}
-                  className="text-xs"
-                >
-                  {trend >= 0 ? "+" : ""}
-                  {trend}%
-                </Badge>
-              )}
-            </div>
-            {subtitle && (
-              <p className="text-xs text-muted-foreground mt-2">{subtitle}</p>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ✅ Componente de atalho rápido
-function QuickActionCard({
-  title,
-  description,
-  icon: Icon,
-  color = "blue",
-  onClick,
-}: {
-  title: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  color?: QuickActionColor;
-  onClick: () => void;
-}) {
-  const colors: Record<QuickActionColor, string> = {
-    blue: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100",
-    green: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100",
-    purple:
-      "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100",
-    orange:
-      "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100",
-    red: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100",
-    cyan: "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100",
-    indigo:
-      "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100",
-  };
-
-  return (
-    <Card
-      className={`${colors[color]} border cursor-pointer transition-all hover:shadow-md hover:-translate-y-1`}
-      onClick={onClick}
-    >
-      <CardContent className="p-6">
-        <div className="flex items-start gap-4">
-          <div className="p-2 bg-white rounded-lg">
-            <Icon className="h-6 w-6" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg">{title}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{description}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// ✅ Componente de atividade recente
-function ActivityCard({ activity }: { activity: Activity }) {
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return "Agora mesmo";
-    if (diffMins < 60) return `${diffMins} min atrás`;
-    if (diffHours < 24) return `${diffHours} h atrás`;
-    if (diffDays < 7) return `${diffDays} dias atrás`;
-
-    return date.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  };
-
-  const getActivityIcon = (actionType: string) => {
-    switch (actionType) {
-      case "user_login":
-        return <RiUserLine className="h-4 w-4" />;
-      case "user_created":
-        return <RiUserAddLine className="h-4 w-4" />;
-      case "news_published":
-        return <RiNewspaperLine className="h-4 w-4" />;
-      case "agent_creation":
-        return <RiUserAddLine className="h-4 w-4" />;
-      case "agent_update":
-        return <RiSettingsLine className="h-4 w-4" />;
-      case "gallery_upload":
-        return <RiImageLine className="h-4 w-4" />;
-      default:
-        return <RiTimeLine className="h-4 w-4" />;
-    }
-  };
-
-  const getActivityColor = (actionType: string) => {
-    if (actionType.includes("user") || actionType.includes("login"))
-      return "text-blue-600 bg-blue-100";
-    if (actionType.includes("news") || actionType.includes("publish"))
-      return "text-green-600 bg-green-100";
-    if (actionType.includes("agent") || actionType.includes("creation"))
-      return "text-purple-600 bg-purple-100";
-    if (actionType.includes("gallery") || actionType.includes("upload"))
-      return "text-orange-600 bg-orange-100";
-    return "text-gray-600 bg-gray-100";
-  };
-
-  return (
-    <div className="flex items-start gap-3 p-3 border rounded-lg hover:bg-slate-50 transition-colors">
-      <div
-        className={`p-2 rounded-full ${getActivityColor(activity.action_type)}`}
-      >
-        {getActivityIcon(activity.action_type)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-800">
-          {activity.description}
-        </p>
-        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-          <span>{activity.user_name}</span>
-          <span>•</span>
-          <span>{formatDate(activity.created_at)}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ✅ Loading State
-function LoadingSkeleton() {
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Skeleton className="h-8 w-64 mb-2" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-24" />
-        </div>
-      </div>
-      <div className="grid gap-4 md:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-32" />
-        ))}
-      </div>
-      <div className="grid gap-4 md:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-32" />
-        ))}
-      </div>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Skeleton className="h-64" />
-        <Skeleton className="h-64" />
-      </div>
-      <Skeleton className="h-48" />
-    </div>
-  );
+interface DashboardSummaryData {
+  totalNews: number;
+  totalGalleryItems: number;
+  totalCategories: number;
+  recentActivities: Array<{
+    id: string;
+    action_type: string;
+    description: string;
+    created_at: string;
+    user_name: string | null;
+  }>;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
-  const {
-    user,
-    profile,
-    isLoading: authLoading,
-    hasAdminSession,
-  } = useAuthStore();
 
-  const [data, setData] = useState<DashboardResponse | null>(null);
+  // Zustand Stores
+  const { profile } = useAuthStore();
+  const { dashboardStats, loadingDashboard, fetchDashboardStats } =
+    useActivitiesStore();
+
+  // Estado local
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [localAgentsStats, setLocalAgentsStats] = useState<AgentsStats>({
+    total: 0,
+    active: 0,
+    inactive: 0,
+    admins: 0,
+    agents: 0,
+  });
 
-  // ✅ FUNÇÃO PARA CARREGAR DADOS DO DASHBOARD
+  // Carregar dados - useCallback para evitar recriação
   const loadDashboard = useCallback(async () => {
-    // ✅ NÃO CARREGAR SE NÃO TEM SESSÃO ADMIN
-    if (!hasAdminSession || !user) {
-      console.log("⚠️ [Dashboard] Não carregando dados - sem sessão admin");
-      setLoading(false);
-      return;
-    }
-
+    console.log("📊 [DashboardPage] Carregando dados do dashboard...");
     setLoading(true);
     setError(null);
 
     try {
-      console.log("🔄 [Dashboard] Carregando dados do dashboard...");
-      const result = await getDashboardStats();
-      console.log("📊 [Dashboard] Resultado:", result);
+      // 1. Verificar sessão admin via cookies primeiro (mais confiável)
+      const authModule = await import("@/app/actions/auth/auth");
+      const sessionCheck = await authModule.verifyAdminSession();
 
-      setData(result);
+      if (!sessionCheck.success) {
+        console.log(
+          "❌ [DashboardPage] Sem sessão admin válida:",
+          sessionCheck.error
+        );
+        throw new Error(
+          "Acesso não autorizado. Faça login como administrador."
+        );
+      }
 
-      if (!result.success) {
-        setError(result.error || "Erro ao carregar dashboard");
+      console.log(
+        "✅ [DashboardPage] Sessão admin verificada:",
+        sessionCheck.user?.id
+      );
+
+      // 2. Carregar estatísticas do dashboard em paralelo
+      console.log("🔄 [DashboardPage] Carregando estatísticas...");
+
+      const [dashboardResult, agentsResult] = await Promise.all([
+        fetchDashboardStats(),
+        (async () => {
+          try {
+            const agentsModule = await import(
+              "@/app/actions/admin/agents/agents"
+            );
+            const result = await agentsModule.getAgentsStats();
+            return result;
+          } catch (err) {
+            console.error("⚠️ Erro ao carregar agentes:", err);
+            // Retorna estrutura vazia para não quebrar o dashboard
+            return {
+              success: false,
+              data: {
+                total: 0,
+                active: 0,
+                inactive: 0,
+                admins: 0,
+                agents: 0,
+                updated_at: new Date().toISOString(),
+              },
+            };
+          }
+        })(),
+      ]);
+
+      // 3. Processar resultados
+      if (dashboardResult) {
+        console.log("✅ [DashboardPage] Estatísticas do dashboard carregadas");
+      }
+
+      if (agentsResult?.success && agentsResult.data) {
+        console.log(
+          "✅ [DashboardPage] Estatísticas de agentes carregadas:",
+          agentsResult.data
+        );
+        setLocalAgentsStats(agentsResult.data);
+      } else {
+        console.warn(
+          "⚠️ [DashboardPage] Estatísticas de agentes não disponíveis"
+        );
       }
     } catch (err) {
-      console.error("❌ [Dashboard] Erro:", err);
-      setError("Erro ao conectar com o servidor");
-      setData({
-        success: false,
-        error: "Erro ao conectar com o servidor",
-      });
+      console.error("❌ [DashboardPage] Erro ao carregar dashboard:", err);
+      setError(err instanceof Error ? err.message : "Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
-  }, [hasAdminSession, user]);
+  }, [fetchDashboardStats]);
 
-  // ✅ USEEFFECT PRINCIPAL: Só carrega dados quando tem sessão admin
+  // Efeito inicial
   useEffect(() => {
-    console.log("🔍 [Dashboard] useEffect - verificando:", {
-      authLoading,
-      hasAdminSession,
-      user: !!user,
-    });
+    console.log("🔍 [DashboardPage] Iniciando useEffect...");
 
-    if (authLoading) return;
+    const checkAndLoad = async () => {
+      try {
+        // Verificar cookies admin diretamente
+        const authModule = await import("@/app/actions/auth/auth");
+        const sessionCheck = await authModule.verifyAdminSession();
 
-    // ✅ VERIFICAÇÃO DE ACESSO: Se não tem sessão admin, redireciona
-    if (!hasAdminSession || !user) {
-      console.log(
-        "⚠️ [Dashboard] Redirecionando para /perfil - sem sessão admin"
-      );
-      router.push("/perfil");
-      return;
+        if (sessionCheck.success && sessionCheck.user) {
+          console.log(
+            "✅ [DashboardPage] Admin com sessão, carregando dashboard..."
+          );
+          await loadDashboard();
+        } else {
+          console.log("❌ [DashboardPage] Acesso negado:", sessionCheck.error);
+
+          // Redirecionar para perfil após 1 segundo
+          const timer = setTimeout(() => {
+            console.log("🔄 [DashboardPage] Redirecionando para /perfil...");
+            router.push("/perfil");
+          }, 1000);
+
+          return () => clearTimeout(timer);
+        }
+      } catch (err) {
+        console.error("❌ [DashboardPage] Erro na verificação:", err);
+        setError("Erro na verificação de acesso");
+        setLoading(false);
+      }
+    };
+
+    checkAndLoad();
+  }, [router, loadDashboard]);
+
+  // Preparar dados para exibição
+  const getDashboardData = (): DashboardSummaryData => {
+    if (dashboardStats) {
+      return {
+        totalNews: dashboardStats.summary?.news?.total || 0,
+        totalGalleryItems: dashboardStats.summary?.gallery?.total || 0,
+        totalCategories: dashboardStats.summary?.gallery?.categories || 0,
+        recentActivities: dashboardStats.recentActivities || [],
+      };
     }
 
-    // ✅ SE TEM SESSÃO ADMIN: Carrega os dados
-    console.log("✅ [Dashboard] Tem sessão admin, carregando dados...");
-    loadDashboard();
-  }, [authLoading, hasAdminSession, user, router, loadDashboard]);
-
-  // Depuração
-  useEffect(() => {
-    if (data) {
-      console.log("📊 [Dashboard] Dados carregados:", data);
-      console.log(
-        "📋 [Dashboard] Atividades:",
-        data.data?.recentActivities?.length || 0
-      );
-    }
-  }, [data]);
+    // Dados fallback
+    return {
+      totalNews: 0,
+      totalGalleryItems: 0,
+      totalCategories: 0,
+      recentActivities: [],
+    };
+  };
 
   const handleRefresh = () => {
     loadDashboard();
   };
 
-  // Atalhos rápidos
-  const quickActions = [
-    {
-      title: "Novo Agente",
-      description: "Adicionar novo agente ao sistema",
-      icon: RiUserAddLine,
-      color: "blue" as QuickActionColor,
-      path: "/admin/agentes/criar",
-    },
-    {
-      title: "Publicar Notícia",
-      description: "Criar e publicar nova notícia",
-      icon: RiFileAddLine,
-      color: "green" as QuickActionColor,
-      path: "/admin/noticias/nova",
-    },
-    {
-      title: "Upload na Galeria",
-      description: "Adicionar fotos ou vídeos",
-      icon: RiFolderAddLine,
-      color: "orange" as QuickActionColor,
-      path: "/admin/galeria/upload",
-    },
-    {
-      title: "Configurações",
-      description: "Configurar sistema e permissões",
-      icon: RiSettingsLine,
-      color: "purple" as QuickActionColor,
-      path: "/admin/configuracoes",
-    },
-    {
-      title: "Ver Logs",
-      description: "Visualizar logs do sistema",
-      icon: RiFileTextLine,
-      color: "indigo" as QuickActionColor,
-      path: "/admin/logs",
-    },
-    {
-      title: "Dashboard Avançado",
-      description: "Estatísticas detalhadas",
-      icon: RiDashboardLine,
-      color: "cyan" as QuickActionColor,
-      path: "/admin/estatisticas",
-    },
-  ];
+  const navigateTo = (path: string) => {
+    router.push(path);
+  };
 
-  // ✅ Loading do contexto
-  if (authLoading) {
+  // Se está carregando
+  if (loading) {
     return <LoadingSkeleton />;
   }
 
-  // ✅ Se não tem sessão admin, mostra loading enquanto redireciona
-  if (!hasAdminSession) {
+  // Se tem erro
+  if (error) {
     return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <RiErrorWarningLine className="h-12 w-12 text-yellow-600" />
-              <div>
-                <h3 className="text-lg font-semibold text-yellow-800">
-                  Redirecionando...
-                </h3>
-                <p className="text-yellow-600 mt-1">
-                  Verificando permissões administrativas
-                </p>
-              </div>
+      <div className="min-h-screen bg-gray-50">
+        <AdminHeader />
+        <div className="container mx-auto p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <h2 className="text-lg font-medium text-red-800">
+              Erro ao carregar dashboard
+            </h2>
+            <p className="text-red-600 mt-2">{error}</p>
+            <div className="mt-4 space-x-4">
+              <Button
+                onClick={handleRefresh}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                <RiRefreshLine className="mr-2 h-4 w-4" />
+                Tentar novamente
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push("/perfil")}
+                className="border-red-600 text-red-600 hover:bg-red-50"
+              >
+                Voltar para Perfil
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     );
   }
-
-  // ✅ Erro no carregamento de dados
-  if (error && !loading) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <RiErrorWarningLine className="h-12 w-12 text-red-600" />
-              <div>
-                <h3 className="text-lg font-semibold text-red-800">
-                  Erro ao carregar dashboard
-                </h3>
-                <p className="text-red-600 mt-1">{error}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleRefresh} variant="outline">
-                  <RiRefreshLine className="h-4 w-4 mr-2" />
-                  Tentar novamente
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const stats = data?.data;
-  const activities = stats?.recentActivities || [];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="min-h-screen bg-gray-50"
+    >
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard Administrativo</h1>
-          <p className="text-muted-foreground mt-1">
-            Bem-vindo, {profile?.full_name || user?.email}!
-          </p>
-          <p className="text-xs text-slate-500 mt-2">
-            Última atualização: {new Date().toLocaleTimeString("pt-BR")}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <AdminHeader />
+
+      {/* Conteúdo Principal */}
+      <main className="container mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+        {/* Botão de Refresh */}
+        <div className="flex justify-end">
           <Button
             variant="outline"
-            size="sm"
             onClick={handleRefresh}
-            disabled={loading}
+            disabled={loadingDashboard}
+            className="flex items-center gap-2"
           >
-            <RiRefreshLine
-              className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`}
-            />
-            {loading ? "Atualizando..." : "Atualizar"}
+            <RiRefreshLine className="h-4 w-4" />
+            Atualizar Dados
           </Button>
         </div>
-      </div>
 
-      {/* Resumo Geral */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card className="border-blue-200">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <RiUserLine className="h-5 w-5 text-blue-600" />
-                <h3 className="font-semibold text-lg">Usuários</h3>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">
-                    {stats?.totalAgents || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Agentes</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">
-                    {stats?.totalAdmins || 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Admins</div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Estatísticas */}
+        <DashboardStats
+          agentsStats={localAgentsStats}
+          dashboardData={getDashboardData()}
+          loading={loadingDashboard}
+          navigateTo={navigateTo}
+          profile={profile}
+        />
 
-        <Card className="border-green-200">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <RiNewspaperLine className="h-5 w-5 text-green-600" />
-                <h3 className="font-semibold text-lg">Notícias</h3>
-              </div>
-              <div className="text-2xl font-bold mt-4">
-                {stats?.totalNews || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {stats?.publishedNews || 0} publicadas
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-orange-200">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <RiImageLine className="h-5 w-5 text-orange-600" />
-                <h3 className="font-semibold text-lg">Galeria</h3>
-              </div>
-              <div className="text-2xl font-bold mt-4">
-                {stats?.totalGalleryItems || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {stats?.totalFotos || 0} fotos • {stats?.totalVideos || 0}{" "}
-                vídeos
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <RiTimeLine className="h-5 w-5 text-purple-600" />
-                <h3 className="font-semibold text-lg">Atividades</h3>
-              </div>
-              <div className="text-2xl font-bold mt-4">
-                {activities.length || 0}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Últimas 24 horas
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Grid de Estatísticas Detalhadas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Agentes Ativos"
-          value={stats?.activeAgents || 0}
-          icon={RiUserLine}
-          loading={loading}
-          color="green"
-          subtitle={`de ${stats?.totalAgents || 0} total`}
-        />
-        <StatCard
-          title="Agentes Inativos"
-          value={stats?.inactiveAgents || 0}
-          icon={RiUserLine}
-          loading={loading}
-          color="red"
-        />
-        <StatCard
-          title="Admins Ativos"
-          value={stats?.activeAdmins || 0}
-          icon={RiShieldLine}
-          loading={loading}
-          color="green"
-          subtitle={`de ${stats?.totalAdmins || 0} total`}
-        />
-        <StatCard
-          title="Notícias em Destaque"
-          value={stats?.featuredNews || 0}
-          icon={RiNewspaperLine}
-          loading={loading}
-          color="orange"
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          title="Notícias Publicadas"
-          value={stats?.publishedNews || 0}
-          icon={RiCheckLine}
-          loading={loading}
-          color="green"
-        />
-        <StatCard
-          title="Notícias em Rascunho"
-          value={stats?.draftNews || 0}
-          icon={RiFileTextLine}
-          loading={loading}
-          color="blue"
-        />
-        <StatCard
-          title="Notícias Arquivadas"
-          value={stats?.archivedNews || 0}
-          icon={RiFileTextLine}
-          loading={loading}
-          color="gray"
-        />
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total de Fotos"
-          value={stats?.totalFotos || 0}
-          icon={RiImageLine}
-          loading={loading}
-          color="blue"
-        />
-        <StatCard
-          title="Total de Vídeos"
-          value={stats?.totalVideos || 0}
-          icon={RiVideoLine}
-          loading={loading}
-          color="purple"
-        />
-        <StatCard
-          title="Categorias"
-          value={stats?.totalCategories || 0}
-          icon={RiFolderAddLine}
-          loading={loading}
-          color="green"
-        />
-        <StatCard
-          title="Itens na Galeria"
-          value={stats?.totalGalleryItems || 0}
-          icon={RiImageLine}
-          loading={loading}
-          color="orange"
-        />
-      </div>
-
-      {/* Atalhos Rápidos */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <RiBarChartLine className="h-5 w-5" />
-            Atalhos Rápidos
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {quickActions.map((action, index) => (
-              <QuickActionCard
-                key={index}
-                title={action.title}
-                description={action.description}
-                icon={action.icon}
-                color={action.color}
-                onClick={() => router.push(action.path)}
-              />
-            ))}
+        {/* Área para widgets adicionais */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">
+              Resumo do Sistema
+            </h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              className="flex items-center gap-2"
+              disabled={loadingDashboard}
+            >
+              <RiRefreshLine className="h-4 w-4" />
+              Atualizar
+            </Button>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Atividades Recentes e Status */}
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Atividades Recentes */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RiTimeLine className="h-5 w-5" />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-3xl font-bold text-blue-600">
+                {localAgentsStats.total}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">
+                Total de Usuários
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {localAgentsStats.active} ativos • {localAgentsStats.inactive}{" "}
+                inativos
+              </div>
+            </div>
+
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-3xl font-bold text-green-600">
+                {getDashboardData().totalNews}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">
+                Notícias Publicadas
+              </div>
+            </div>
+
+            <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <div className="text-3xl font-bold text-purple-600">
+                {getDashboardData().totalGalleryItems}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">Itens na Galeria</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {getDashboardData().totalCategories} categorias
+              </div>
+            </div>
+
+            <div className="text-center p-4 bg-yellow-50 rounded-lg">
+              <div className="text-3xl font-bold text-yellow-600">
+                {localAgentsStats.admins}
+              </div>
+              <div className="text-sm text-gray-600 mt-1">Administradores</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {localAgentsStats.agents} agentes comuns
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Seção de Atividades Recentes */}
+        {getDashboardData().recentActivities.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm"
+          >
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
               Atividades Recentes
-              <Badge variant="outline" className="ml-2">
-                {activities.length || 0}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activities.length > 0 ? (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {activities.map((activity) => (
-                  <ActivityCard key={activity.id} activity={activity} />
+            </h3>
+            <div className="space-y-3">
+              {getDashboardData()
+                .recentActivities.slice(0, 5)
+                .map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <div>
+                      <div className="font-medium text-gray-900">
+                        {activity.description}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Por: {activity.user_name || "Sistema"} •{" "}
+                        {new Date(activity.created_at).toLocaleDateString(
+                          "pt-BR"
+                        )}
+                      </div>
+                    </div>
+                    <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                      {activity.action_type}
+                    </span>
+                  </div>
                 ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhuma atividade recente
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Status do Sistema */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RiDashboardLine className="h-5 w-5" />
-              Status do Sistema
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Usuários Online</span>
-                <Badge variant="outline" className="bg-green-50 text-green-700">
-                  {Math.floor((stats?.totalAgents || 0) * 0.3)} ativos
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Notícias Hoje</span>
-                <Badge variant="outline">
-                  {Math.floor((stats?.totalNews || 0) * 0.1)} novas
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Uploads Hoje</span>
-                <Badge variant="outline">
-                  {Math.floor((stats?.totalGalleryItems || 0) * 0.05)} itens
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Uso do Sistema</span>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                  Normal
-                </Badge>
-              </div>
             </div>
-
-            <div className="mt-6 pt-6 border-t">
-              <h4 className="font-medium mb-3">Links Úteis</h4>
-              <div className="space-y-2">
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => router.push("/admin/agentes")}
-                >
-                  <RiUserLine className="h-4 w-4 mr-2" />
-                  Gerenciar Agentes
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => router.push("/admin/noticias")}
-                >
-                  <RiNewspaperLine className="h-4 w-4 mr-2" />
-                  Gerenciar Notícias
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => router.push("/admin/galeria")}
-                >
-                  <RiImageLine className="h-4 w-4 mr-2" />
-                  Gerenciar Galeria
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start"
-                  onClick={() => router.push("/admin/logs")}
-                >
-                  <RiFileTextLine className="h-4 w-4 mr-2" />
-                  Ver Logs do Sistema
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+          </motion.div>
+        )}
+      </main>
+    </motion.div>
   );
 }

@@ -47,39 +47,8 @@ import {
   RiAlertLine,
 } from "react-icons/ri";
 
-// Opções baseadas no schema
-const GRADUACOES = [
-  "COMODORO DE BRIGADA - PAC",
-  "COMODORO - PAC",
-  "VICE COMODORO - PAC",
-  "CORONEL - PAC",
-  "TENENTE CORONEL - PAC",
-  "MAJOR - PAC",
-  "CAPITÃO - PAC",
-  "1° TENENTE - PAC",
-  "2° TENENTE - PAC",
-  "ASPIRANTE -a- OFICIAL - PAC",
-  "SUBOFICIAL - PAC",
-  "1° SARGENTO - PAC",
-  "2° SARGENTO - PAC",
-  "3° SARGENTO - PAC",
-  "CABO - PAC",
-  "PATRULHEIRO",
-  "AGENTE - PAC",
-];
-
-const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
-
-interface FormData {
-  matricula: string;
-  email: string;
-  full_name: string;
-  graduacao: string;
-  tipo_sanguineo: string;
-  validade_certificacao: string;
-  role: "agent" | "admin";
-  avatar_url?: string;
-}
+// IMPORT DO STORE
+import { useAgentCreate, GRADUACOES, TIPOS_SANGUINEOS } from "@/lib/stores";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -95,21 +64,21 @@ const fadeInUp = {
 export default function CriarAgentePage() {
   const router = useRouter();
   const supabase = createClient();
-  const [loading, setLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [dateOpen, setDateOpen] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [formData, setFormData] = useState<FormData>({
-    matricula: "",
-    email: "",
-    full_name: "",
-    graduacao: "",
-    tipo_sanguineo: "",
-    validade_certificacao: "",
-    role: "agent",
-    avatar_url: "",
-  });
+
+  // USANDO O STORE
+  const {
+    saving,
+    formData,
+    createAgent,
+    setFormData,
+    resetFormData,
+    validateForm,
+    generateMatricula,
+  } = useAgentCreate();
 
   // Verificar autenticação e permissões
   useEffect(() => {
@@ -117,7 +86,6 @@ export default function CriarAgentePage() {
       try {
         setAuthLoading(true);
 
-        // Obter sessão atual
         const {
           data: { session },
         } = await supabase.auth.getSession();
@@ -130,11 +98,8 @@ export default function CriarAgentePage() {
           return;
         }
 
-        console.log("✅ Sessão encontrada:", session.user.email);
-        console.log("✅ Token disponível:", !!session.access_token);
         setCurrentSession(session);
 
-        // Verificar se é admin
         const { data: profile, error } = await supabase
           .from("profiles")
           .select("role, full_name, status")
@@ -166,7 +131,6 @@ export default function CriarAgentePage() {
         }
 
         setIsAdmin(true);
-        console.log("✅ Usuário é admin:", profile.full_name);
       } catch (error) {
         console.error("💥 Erro na verificação de autenticação:", error);
         toast.error("Erro de autenticação");
@@ -179,35 +143,26 @@ export default function CriarAgentePage() {
     checkAuth();
   }, [router, supabase]);
 
-  const generateMatricula = () => {
-    const randomNum = Math.floor(10000000000 + Math.random() * 90000000000);
-    setFormData((prev) => ({ ...prev, matricula: randomNum.toString() }));
-  };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData({ [name]: value });
   };
 
   const handleAvatarChange = (avatarUrl: string | null) => {
-    setFormData((prev) => ({
-      ...prev,
-      avatar_url: avatarUrl || "",
-    }));
+    // Converter null para undefined para o FileUpload
+    setFormData({ avatar_url: avatarUrl || undefined });
   };
 
   const handleDateSelect = (date: Date | undefined) => {
-    setFormData((prev) => ({
-      ...prev,
-      validade_certificacao: date ? date.toISOString().split("T")[0] : "",
-    }));
+    setFormData({
+      validade_certificacao: date
+        ? date.toISOString().split("T")[0]
+        : undefined,
+    });
     setDateOpen(false);
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string | null) => {
     if (!dateString) return "Selecionar data";
     try {
       const date = new Date(dateString);
@@ -215,32 +170,6 @@ export default function CriarAgentePage() {
     } catch {
       return "Data inválida";
     }
-  };
-
-  const validateForm = (): string[] => {
-    const errors: string[] = [];
-
-    if (!formData.matricula.trim()) {
-      errors.push("Matrícula é obrigatória");
-    }
-
-    if (!formData.email.trim()) {
-      errors.push("Email é obrigatório");
-    }
-
-    if (!formData.full_name.trim()) {
-      errors.push("Nome completo é obrigatório");
-    }
-
-    if (!/^\d{11}$/.test(formData.matricula)) {
-      errors.push("Matrícula deve conter exatamente 11 dígitos numéricos");
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.push("Email inválido");
-    }
-
-    return errors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -261,83 +190,58 @@ export default function CriarAgentePage() {
       return;
     }
 
-    setLoading(true);
+    // Validações
+    const validationErrors = validateForm();
+    if (validationErrors.length > 0) {
+      validationErrors.forEach((error) => toast.error(error));
+      return;
+    }
+
+    const toastId = toast.loading(
+      `Cadastrando agente ${formData.full_name}...`,
+      {
+        description: "Criando conta e configurando perfil",
+      }
+    );
 
     try {
-      // Validações
-      const validationErrors = validateForm();
-      if (validationErrors.length > 0) {
-        validationErrors.forEach((error) => toast.error(error));
-        setLoading(false);
-        return;
-      }
-
-      console.log("🔄 [CRIAR AGENTE] Iniciando criação...");
-      console.log("🔍 Usuário atual:", currentSession.user.email);
-      console.log("🔍 Token disponível:", !!currentSession.access_token);
-
-      // Toast de loading
-      const toastId = toast.loading(
-        `Cadastrando agente ${formData.full_name}...`,
-        {
-          description: "Criando conta e configurando perfil",
-        }
-      );
-
-      // Enviar dados para API com token de autenticação
-      const response = await fetch("/api/admin/agentes/criar", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${currentSession.access_token}`,
-        },
-        body: JSON.stringify(formData),
+      const result = await createAgent({
+        matricula: formData.matricula || "",
+        email: formData.email || "",
+        full_name: formData.full_name || "",
+        graduacao: formData.graduacao || null,
+        tipo_sanguineo: formData.tipo_sanguineo || null,
+        validade_certificacao: formData.validade_certificacao || null,
+        role: formData.role || "agent",
+        status: true,
+        avatar_url: formData.avatar_url || null,
       });
 
-      console.log("📥 Status da resposta:", response.status);
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        console.error("❌ Erro da API:", result);
-        throw new Error(
-          result.error || result.details || "Erro ao criar agente"
-        );
-      }
-
-      console.log("✅ Agente criado com sucesso:", result);
-
-      // FEEDBACK DE SUCESSO
-      toast.success("✅ Agente criado com sucesso!", {
-        id: toastId,
-        description: `O agente ${formData.full_name} foi cadastrado no sistema com sucesso.`,
-        duration: 5000,
-        action: {
-          label: "Ver Agentes",
-          onClick: () => {
-            router.push("/admin/agentes");
-            router.refresh();
+      if (result.success) {
+        toast.success("✅ Agente criado com sucesso!", {
+          id: toastId,
+          description: `O agente ${formData.full_name} foi cadastrado no sistema com sucesso.`,
+          duration: 5000,
+          action: {
+            label: "Ver Agentes",
+            onClick: () => {
+              router.push("/admin/agentes");
+              router.refresh();
+            },
           },
-        },
-      });
+        });
 
-      // Limpar formulário
-      setFormData({
-        matricula: "",
-        email: "",
-        full_name: "",
-        graduacao: "",
-        tipo_sanguineo: "",
-        validade_certificacao: "",
-        role: "agent",
-        avatar_url: "",
-      });
+        // Limpar formulário
+        resetFormData();
 
-      // Redirecionar após 3 segundos
-      setTimeout(() => {
-        router.push("/admin/agentes");
-        router.refresh();
-      }, 3000);
+        // Redirecionar após 3 segundos
+        setTimeout(() => {
+          router.push("/admin/agentes");
+          router.refresh();
+        }, 3000);
+      } else {
+        throw new Error(result.error || "Erro ao criar agente");
+      }
     } catch (err: unknown) {
       console.error("💥 Erro completo:", err);
       const errorMessage =
@@ -345,14 +249,12 @@ export default function CriarAgentePage() {
           ? err.message
           : "Erro desconhecido ao criar agente";
 
-      // Toast de erro
       toast.error("❌ Falha ao criar agente", {
+        id: toastId,
         description: errorMessage,
         duration: 6000,
         icon: <RiErrorWarningLine className="w-5 h-5 text-red-500" />,
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -387,6 +289,9 @@ export default function CriarAgentePage() {
         "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
     },
   ];
+
+  // Converter null para undefined para o FileUpload
+  const currentAvatarUrl = formData.avatar_url || undefined;
 
   // Loading durante verificação de autenticação
   if (authLoading) {
@@ -462,16 +367,12 @@ export default function CriarAgentePage() {
   }
 
   // Loading skeleton durante criação
-  if (loading) {
+  if (saving) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4">
           <div className="text-center py-16">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto mb-4"
-            />
+            <Spinner className="w-8 h-8 mx-auto mb-4 text-navy-600" />
             <p className="text-gray-600">Criando novo agente...</p>
           </div>
         </div>
@@ -561,7 +462,7 @@ export default function CriarAgentePage() {
                       <FileUpload
                         type="avatar"
                         onFileChange={handleAvatarChange}
-                        currentFile={formData.avatar_url}
+                        currentFile={currentAvatarUrl}
                         className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-500 transition-all duration-300"
                         userId={formData.matricula || "new"}
                       />
@@ -590,13 +491,13 @@ export default function CriarAgentePage() {
                             id="matricula"
                             type="text"
                             name="matricula"
-                            value={formData.matricula}
+                            value={formData.matricula || ""}
                             onChange={handleInputChange}
                             placeholder="00000000000"
                             maxLength={11}
                             required
                             className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
-                            disabled={loading}
+                            disabled={saving}
                           />
                         </div>
                         <motion.div
@@ -608,7 +509,7 @@ export default function CriarAgentePage() {
                             onClick={generateMatricula}
                             variant="outline"
                             className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300 h-14 px-5"
-                            disabled={loading}
+                            disabled={saving}
                           >
                             <RiAddLine className="w-5 h-5 mr-2" />
                             Gerar
@@ -639,12 +540,12 @@ export default function CriarAgentePage() {
                           id="full_name"
                           type="text"
                           name="full_name"
-                          value={formData.full_name}
+                          value={formData.full_name || ""}
                           onChange={handleInputChange}
                           placeholder="Nome completo do agente"
                           required
                           className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
-                          disabled={loading}
+                          disabled={saving}
                         />
                       </div>
                     </motion.div>
@@ -668,12 +569,12 @@ export default function CriarAgentePage() {
                           id="email"
                           type="email"
                           name="email"
-                          value={formData.email}
+                          value={formData.email || ""}
                           onChange={handleInputChange}
                           placeholder="agente@pac.org.br"
                           required
                           className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
-                          disabled={loading}
+                          disabled={saving}
                         />
                       </div>
                     </motion.div>
@@ -693,14 +594,11 @@ export default function CriarAgentePage() {
                           Graduação
                         </Label>
                         <Select
-                          value={formData.graduacao}
+                          value={formData.graduacao || ""}
                           onValueChange={(value) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              graduacao: value,
-                            }))
+                            setFormData({ graduacao: value })
                           }
-                          disabled={loading}
+                          disabled={saving}
                         >
                           <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione uma graduação" />
@@ -728,14 +626,11 @@ export default function CriarAgentePage() {
                           Tipo Sanguíneo
                         </Label>
                         <Select
-                          value={formData.tipo_sanguineo}
+                          value={formData.tipo_sanguineo || ""}
                           onValueChange={(value) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              tipo_sanguineo: value,
-                            }))
+                            setFormData({ tipo_sanguineo: value })
                           }
-                          disabled={loading}
+                          disabled={saving}
                         >
                           <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo sanguíneo" />
@@ -767,7 +662,7 @@ export default function CriarAgentePage() {
                             <Button
                               variant="outline"
                               className="w-full h-14 justify-between text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
-                              disabled={loading}
+                              disabled={saving}
                             >
                               <div className="flex items-center">
                                 <RiArrowDownSLine className="w-5 h-5 mr-3 text-navy-500" />
@@ -825,11 +720,11 @@ export default function CriarAgentePage() {
                           Tipo de Usuário
                         </Label>
                         <Select
-                          value={formData.role}
+                          value={formData.role || "agent"}
                           onValueChange={(value: "agent" | "admin") =>
-                            setFormData((prev) => ({ ...prev, role: value }))
+                            setFormData({ role: value })
                           }
-                          disabled={loading}
+                          disabled={saving}
                         >
                           <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo" />
@@ -865,10 +760,10 @@ export default function CriarAgentePage() {
                       >
                         <Button
                           type="submit"
-                          disabled={loading}
+                          disabled={saving}
                           className="w-full bg-green-600 hover:bg-green-700 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
                         >
-                          {loading ? (
+                          {saving ? (
                             <>
                               <Spinner className="w-5 h-5 mr-3" />
                               Cadastrando...
@@ -892,7 +787,7 @@ export default function CriarAgentePage() {
                             type="button"
                             variant="outline"
                             className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-4 h-14 text-lg transition-all duration-300 rounded-xl"
-                            disabled={loading}
+                            disabled={saving}
                           >
                             <RiArrowLeftLine className="w-5 h-5 mr-3" />
                             Cancelar

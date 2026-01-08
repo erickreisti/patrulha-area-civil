@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuthStore } from "@/lib/stores";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { toast } from "sonner";
 import {
   formatMatricula,
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const { isAuthenticated, loginWithServerAction, initialize } = useAuthStore();
 
@@ -27,24 +28,37 @@ export default function LoginPage() {
   // Inicializar o auth store
   useEffect(() => {
     const init = async () => {
+      console.log("🔄 [LoginPage] Inicializando auth store...");
       await initialize();
       setIsInitialized(true);
+      console.log("✅ [LoginPage] Auth store inicializado");
     };
     init();
   }, [initialize]);
 
-  // ✅ CORREÇÃO: Redirecionar TODOS os agentes para /perfil
+  // ✅ CORREÇÃO: Redirecionar TODOS os agentes autenticados para /perfil
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized) {
+      console.log("⏳ [LoginPage] Aguardando inicialização...");
+      return;
+    }
 
     if (isAuthenticated) {
-      // ✅ TODOS OS AGENTES (comuns e admins) vão para /perfil
       console.log(
-        "✅ [LoginPage] Agente autenticado, redirecionando para /perfil"
+        "✅ [LoginPage] Usuário autenticado, redirecionando para /perfil"
       );
-      router.replace("/perfil");
+
+      // Obter redirect URL dos parâmetros de busca
+      const redirectTo = searchParams.get("redirect") || "/perfil";
+
+      // Pequeno delay para garantir que o estado foi atualizado
+      const timer = setTimeout(() => {
+        router.replace(redirectTo);
+      }, 500);
+
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, router, isInitialized]);
+  }, [isAuthenticated, router, isInitialized, searchParams]);
 
   // Carregar matrícula salva
   useEffect(() => {
@@ -79,7 +93,10 @@ export default function LoginPage() {
         localStorage.removeItem("saved_matricula");
       }
 
+      console.log("🔄 [LoginPage] Iniciando login...");
       const result = await loginWithServerAction(matriculaNumerica);
+
+      console.log("📊 [LoginPage] Resultado do login:", result);
 
       if (result?.success) {
         toast.success("Login realizado com sucesso!");
@@ -91,11 +108,12 @@ export default function LoginPage() {
           );
         }
 
-        // ✅ CORREÇÃO: Redirecionar TODOS para /perfil
-        // O middleware já valida se é admin ou comum
-        setTimeout(() => {
-          router.replace("/perfil");
-        }, 1500);
+        console.log(
+          "✅ [LoginPage] Login bem-sucedido, aguardando redirecionamento..."
+        );
+
+        // O redirecionamento será tratado pelo useEffect acima
+        // Não redirecionamos manualmente aqui para evitar race conditions
       } else {
         const errorMessage = result?.error?.toLowerCase() || "";
         let finalMessage = result?.error || "Erro ao fazer login";
@@ -122,6 +140,7 @@ export default function LoginPage() {
         setError(finalMessage);
       }
     } catch (err) {
+      console.error("❌ [LoginPage] Erro no login:", err);
       const errorMessage =
         err instanceof Error ? err.message : "Erro desconhecido";
       toast.error("Erro na autenticação", {
@@ -138,6 +157,18 @@ export default function LoginPage() {
   };
 
   const isFormValid = extractMatriculaNumbers(matricula).length === 11;
+
+  // Mostrar loading enquanto inicializa
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+          <p className="text-gray-600">Inicializando sistema...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

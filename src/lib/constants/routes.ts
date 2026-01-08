@@ -7,19 +7,21 @@ export const ROUTES = {
     "/reset-password",
     "/about",
     "/contact",
+    "/noticias",
+    "/galeria",
   ],
 
   PROTECTED: {
     ADMIN: "/admin",
     AGENT: "/agent",
     PROFILE: "/perfil",
-    DASHBOARD: "/dashboard",
+    DASHBOARD: "/admin/dashboard",
     SETTINGS: "/configuracoes",
   },
 
   REDIRECT: {
     AFTER_LOGIN: {
-      ADMIN: "/admin/dashboard",
+      ADMIN: "/perfil",
       AGENT: "/perfil",
     },
     UNAUTHENTICATED: "/login",

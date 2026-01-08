@@ -1,9 +1,6 @@
-// src/app/(app)/admin/agentes/page.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +22,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -50,19 +48,12 @@ import {
   RiCloseLine,
 } from "react-icons/ri";
 
-interface AgentProfile {
-  id: string;
-  matricula: string;
-  email: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  graduacao: string | null;
-  validade_certificacao: string | null;
-  tipo_sanguineo: string | null;
-  status: boolean;
-  role: "admin" | "agent";
-  created_at: string;
-}
+// IMPORT DO STORE
+import {
+  useAgentsList,
+  formatDate,
+  getCertificationStatus,
+} from "@/lib/stores";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -187,34 +178,6 @@ const ImageWithFallback = ({
       />
     </div>
   );
-};
-
-// Função para formatar data
-const formatDate = (dateString: string | null) => {
-  if (!dateString) return "Não informada";
-  const date = new Date(dateString);
-  return date.toLocaleDateString("pt-BR");
-};
-
-// Função para verificar status da certificação
-const getCertificationStatus = (validadeCertificacao: string | null) => {
-  if (!validadeCertificacao) return { status: "nao-informada", color: "gray" };
-
-  const today = new Date();
-  const certDate = new Date(validadeCertificacao);
-
-  if (certDate < today) {
-    return { status: "expirada", color: "red" };
-  }
-
-  const diffTime = certDate.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 30) {
-    return { status: "proximo-vencimento", color: "yellow" };
-  }
-
-  return { status: "valida", color: "green" };
 };
 
 // Componente de Paginação Customizado
@@ -343,354 +306,62 @@ const CustomPagination = ({
   );
 };
 
-// Hook customizado para verificar permissões
-const usePermissions = () => {
-  const [currentUserRole, setCurrentUserRole] = useState<"admin" | "agent">(
-    "agent"
-  );
-  const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-
-  const checkCurrentUser = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        setCurrentUserId(session.user.id);
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-
-        if (profile) {
-          setCurrentUserRole(profile.role);
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao verificar permissões:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkCurrentUser();
-  }, [checkCurrentUser]);
-
-  return { currentUserRole, currentUserId, loading, checkCurrentUser };
-};
-
 export default function AgentesPage() {
-  const router = useRouter();
-  const [agents, setAgents] = useState<AgentProfile[]>([]);
-  const [loading, setLoading] = useState(true);
+  // USANDO O STORE
+  const {
+    agents,
+    loading,
+    error,
+    filters,
+    pagination,
+    agentsStats,
+    filteredAgents,
+    fetchAgents,
+    setFilters,
+    setPagination,
+    toggleAgentStatus,
+    deleteAgent,
+    clearError,
+  } = useAgentsList();
+
   const [refreshing, setRefreshing] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterRole, setFilterRole] = useState<"all" | "admin" | "agent">(
-    "all"
-  );
-  const [filterStatus, setFilterStatus] = useState<
-    "all" | "active" | "inactive"
-  >("all");
-  const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
-  const supabase = createClient();
-  const { currentUserRole, loading: permissionsLoading } = usePermissions();
-
-  // Função para buscar TODOS os agentes - VERSÃO CORRIGIDA (usando API)
-  const fetchAgents = useCallback(async () => {
-    try {
-      setLoading(true);
-      setRefreshing(true);
-
-      console.log("🔄 [AGENTES PAGE] Iniciando busca de agentes via API...");
-
-      // 1. Verificar se há sessão ativa
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        console.log("❌ Nenhuma sessão ativa");
-        toast.error("Sessão expirada. Faça login novamente.");
-        router.push("/login");
-        return;
-      }
-
-      console.log("✅ Sessão ativa encontrada:", {
-        userId: session.user.id,
-        email: session.user.email,
-      });
-
-      // 2. Verificar se o usuário atual é admin
-      if (currentUserRole !== "admin") {
-        console.log("❌ Usuário não é admin, redirecionando...");
-        toast.error("Apenas administradores podem acessar esta página");
-        router.push("/perfil");
-        return;
-      }
-
-      console.log("✅ Usuário é admin, buscando agentes via API...");
-
-      // 3. Buscar agentes via API segura
-      const response = await fetch("/api/admin/agentes", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        console.log(`✅ ${result.count} agentes carregados via API`);
-        setAgents(result.data || []);
-      } else {
-        throw new Error(result.error || "Erro ao buscar agentes");
-      }
-
-      setCurrentPage(1);
-
-      // Log detalhado para debug
-      if (result.data && result.data.length > 0) {
-        console.log("📊 DETALHES DOS AGENTES CARREGADOS:");
-        result.data
-          .slice(0, 3)
-          .forEach((agent: AgentProfile, index: number) => {
-            console.log(
-              `  ${index + 1}. ${agent.full_name || "Sem nome"} - ${
-                agent.email
-              } - ${agent.matricula}`
-            );
-          });
-        if (result.data.length > 3) {
-          console.log(`  ... e mais ${result.data.length - 3} agentes`);
-        }
-      }
-    } catch (error: unknown) {
-      console.error("💥 ERRO CRÍTICO ao buscar agentes:", error);
-
-      if (error instanceof Error) {
-        console.error("Stack trace:", error.stack);
-        console.error("Error name:", error.name);
-        console.error("Error message:", error.message);
-      }
-
-      const errorMessage =
-        error instanceof Error ? error.message : "Erro desconhecido";
-
-      toast.error(`Falha ao carregar agentes: ${errorMessage}`, {
-        description: "Verifique o console para mais detalhes",
-        duration: 8000,
-      });
-
-      // Verificar se é erro de permissão
-      const errorString =
-        error instanceof Error ? error.toString() : String(error);
-      if (errorString.includes("permission") || errorString.includes("42501")) {
-        console.log("⚠️ Erro de permissão detectado, redirecionando...");
-        router.push("/perfil");
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [supabase, currentUserRole, router]);
-
-  // Função para alterar status do agente - VERSÃO CORRIGIDA (usando API)
-  const toggleAgentStatus = async (agentId: string, currentStatus: boolean) => {
-    if (currentUserRole !== "admin") {
-      toast.error("Apenas administradores podem alterar status");
-      return;
-    }
-
-    const newStatus = !currentStatus;
-    const actionName = newStatus ? "ativar" : "desativar";
-    const agentName =
-      agents.find((a) => a.id === agentId)?.full_name || "Agente";
-
-    try {
-      console.log(
-        `🔄 Alterando status do agente ${agentId} para ${
-          newStatus ? "ATIVO" : "INATIVO"
-        }`
-      );
-
-      // Obter sessão para o token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error("Sessão expirada");
-      }
-
-      // Usar API para alterar status
-      const response = await fetch(`/api/admin/agentes/${agentId}/status`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao alterar status");
-      }
-
-      // Atualiza o estado local
-      setAgents((prev) =>
-        prev.map((agent) =>
-          agent.id === agentId ? { ...agent, status: newStatus } : agent
-        )
-      );
-
-      console.log(
-        `✅ Status alterado com sucesso para ${newStatus ? "ATIVO" : "INATIVO"}`
-      );
-      toast.success(
-        `${agentName} ${newStatus ? "ativado" : "desativado"} com sucesso!`
-      );
-    } catch (error: unknown) {
-      console.error("❌ Erro ao alterar status:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      toast.error(`Falha ao ${actionName} agente: ${errorMessage}`);
-    }
-  };
-
-  // Função para excluir agente - VERSÃO CORRIGIDA (usando API)
-  const deleteAgent = async (agentId: string, agentName: string) => {
-    if (currentUserRole !== "admin") {
-      toast.error("Apenas administradores podem excluir agentes");
-      return;
-    }
-
-    if (
-      !confirm(
-        `🚨 EXCLUSÃO PERMANENTE!\n\nTem certeza que deseja excluir o agente "${agentName}"?\n\nEsta ação removerá permanentemente o agente do sistema.\n\nDigite "CONFIRMAR" para continuar:`
-      )
-    ) {
-      toast.info("Exclusão cancelada");
-      return;
-    }
-
-    try {
-      console.log(`🗑️ Iniciando exclusão do agente ${agentId} (${agentName})`);
-
-      // Obter sessão para o token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        throw new Error("Sessão expirada");
-      }
-
-      // Usar API para exclusão
-      const response = await fetch(`/api/admin/agentes/${agentId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro ao excluir agente");
-      }
-
-      console.log(`✅ Agente ${agentName} excluído com sucesso`);
-      toast.success(`Agente ${agentName} excluído com sucesso`);
-
-      // Remove do estado local
-      setAgents((prev) => prev.filter((agent) => agent.id !== agentId));
-
-      // Ajustar página atual se necessário
-      const filtered = filterAgents(
-        agents.filter((agent) => agent.id !== agentId)
-      );
-      const newTotalPages = Math.ceil(filtered.length / itemsPerPage);
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(newTotalPages);
-      }
-    } catch (error: unknown) {
-      console.error("💥 ERRO ao excluir agente:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erro desconhecido";
-
-      toast.error(`Falha ao excluir agente: ${errorMessage}`, {
-        description: "Verifique as permissões ou tente novamente",
-        duration: 8000,
-      });
-    }
-  };
-
-  // Função de filtro
-  const filterAgents = useCallback(
-    (agentsList: AgentProfile[]) => {
-      return agentsList.filter((agent) => {
-        const matchesSearch =
-          agent.matricula.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          agent.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (agent.full_name &&
-            agent.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-        const matchesRole = filterRole === "all" || agent.role === filterRole;
-        const matchesStatus =
-          filterStatus === "all" ||
-          (filterStatus === "active" && agent.status) ||
-          (filterStatus === "inactive" && !agent.status);
-
-        return matchesSearch && matchesRole && matchesStatus;
-      });
-    },
-    [searchTerm, filterRole, filterStatus]
-  );
-
-  // Aplicar filtros e paginação
-  const filteredAgents = useMemo(() => {
-    return filterAgents(agents);
-  }, [agents, filterAgents]);
 
   // Calcular agentes paginados
   const paginatedAgents = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
+    const startIndex = (pagination.page - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filteredAgents.slice(startIndex, endIndex);
-  }, [filteredAgents, currentPage, itemsPerPage]);
+  }, [filteredAgents, pagination.page, itemsPerPage]);
 
-  // Calcular total de páginas
   const totalPages = Math.ceil(filteredAgents.length / itemsPerPage);
 
-  // Resetar para página 1 quando filtros mudarem
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm, filterRole, filterStatus]);
+  // Função para buscar agentes
+  const handleFetchAgents = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      await fetchAgents(true); // Force refresh
+      toast.success("Lista de agentes atualizada");
+    } catch (err) {
+      console.error("Erro ao atualizar agentes:", err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchAgents]);
 
-  // Calcular estatísticas
-  const stats = useMemo(
-    () => ({
-      total: agents.length,
-      active: agents.filter((a) => a.status).length,
-      inactive: agents.filter((a) => !a.status).length,
-      admins: agents.filter((a) => a.role === "admin").length,
-      agents: agents.filter((a) => a.role === "agent").length,
-    }),
-    [agents]
-  );
+  // Função para excluir agente
+  const handleDeleteAgent = async (agentId: string, agentName: string) => {
+    if (!confirm(`Tem certeza que deseja excluir o agente "${agentName}"?`)) {
+      return;
+    }
+
+    const result = await deleteAgent(agentId);
+    if (result.success) {
+      toast.success(`Agente ${agentName} excluído com sucesso`);
+    } else {
+      toast.error(result.error || "Erro ao excluir agente");
+    }
+  };
 
   // Botões de navegação
   const navigationButtons = [
@@ -731,35 +402,23 @@ export default function AgentesPage() {
     },
   };
 
-  // Efeito para buscar agentes quando permissões carregarem
+  // Carregar agentes na inicialização
   useEffect(() => {
-    if (!permissionsLoading) {
-      fetchAgents();
+    fetchAgents();
+  }, [fetchAgents]);
+
+  // Resetar página 1 quando filtros mudarem
+  useEffect(() => {
+    setPagination({ page: 1 });
+  }, [filters.search, filters.role, filters.status, setPagination]);
+
+  // Tratar erros
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+      clearError();
     }
-  }, [fetchAgents, permissionsLoading]);
-
-  // Mostrar loading enquanto verifica permissões
-  if (permissionsLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-        <div className="container mx-auto px-4">
-          <div className="text-center py-16">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto mb-4"
-            />
-            <p className="text-gray-600">Verificando permissões...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se não for admin, não mostra nada (já redirecionou)
-  if (currentUserRole !== "admin") {
-    return null;
-  }
+  }, [error, clearError]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
@@ -792,7 +451,7 @@ export default function AgentesPage() {
           {/* Botão de Atualizar */}
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
-              onClick={() => fetchAgents()}
+              onClick={handleFetchAgents}
               disabled={refreshing}
               variant="outline"
               className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
@@ -810,7 +469,14 @@ export default function AgentesPage() {
                   }`}
                 />
               </motion.div>
-              {refreshing ? "Atualizando..." : "Atualizar Lista"}
+              {refreshing ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Atualizando...
+                </>
+              ) : (
+                "Atualizar Lista"
+              )}
             </Button>
           </motion.div>
 
@@ -851,7 +517,7 @@ export default function AgentesPage() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <StatCard
             title="Total"
-            value={stats.total}
+            value={agentsStats.total}
             icon={<RiUserLine className="w-6 h-6" />}
             description="Agentes no sistema"
             color="blue"
@@ -860,7 +526,7 @@ export default function AgentesPage() {
           />
           <StatCard
             title="Ativos"
-            value={stats.active}
+            value={agentsStats.active}
             icon={<RiEyeLine className="w-6 h-6" />}
             description="Agentes ativos"
             color="green"
@@ -869,7 +535,7 @@ export default function AgentesPage() {
           />
           <StatCard
             title="Inativos"
-            value={stats.inactive}
+            value={agentsStats.inactive}
             icon={<RiEyeOffLine className="w-6 h-6" />}
             description="Agentes inativos"
             color="red"
@@ -878,7 +544,7 @@ export default function AgentesPage() {
           />
           <StatCard
             title="Administradores"
-            value={stats.admins}
+            value={agentsStats.admins}
             icon={<RiShieldUserLine className="w-6 h-6" />}
             description="Com acesso total"
             color="purple"
@@ -887,7 +553,7 @@ export default function AgentesPage() {
           />
           <StatCard
             title="Agentes"
-            value={stats.agents}
+            value={agentsStats.agents}
             icon={<RiIdCardLine className="w-6 h-6" />}
             description="Com acesso básico"
             color="gray"
@@ -919,8 +585,8 @@ export default function AgentesPage() {
                     <Input
                       type="text"
                       placeholder="Buscar por matrícula, nome ou email..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      value={filters.search}
+                      onChange={(e) => setFilters({ search: e.target.value })}
                       className="pl-10 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -929,9 +595,9 @@ export default function AgentesPage() {
                 {/* Filtro por Tipo */}
                 <div>
                   <Select
-                    value={filterRole}
+                    value={filters.role}
                     onValueChange={(value: "all" | "admin" | "agent") =>
-                      setFilterRole(value)
+                      setFilters({ role: value })
                     }
                   >
                     <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
@@ -948,9 +614,9 @@ export default function AgentesPage() {
                 {/* Filtro por Status */}
                 <div>
                   <Select
-                    value={filterStatus}
+                    value={filters.status}
                     onValueChange={(value: "all" | "active" | "inactive") =>
-                      setFilterStatus(value)
+                      setFilters({ status: value })
                     }
                   >
                     <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
@@ -972,7 +638,7 @@ export default function AgentesPage() {
                   {totalPages > 1 && (
                     <span>
                       {" "}
-                      (Página <strong>{currentPage}</strong> de{" "}
+                      (Página <strong>{pagination.page}</strong> de{" "}
                       <strong>{totalPages}</strong>)
                     </span>
                   )}
@@ -1041,15 +707,15 @@ export default function AgentesPage() {
                     Nenhum agente encontrado
                   </h3>
                   <p className="text-gray-500 mb-6">
-                    {searchTerm ||
-                    filterRole !== "all" ||
-                    filterStatus !== "all"
+                    {filters.search ||
+                    filters.role !== "all" ||
+                    filters.status !== "all"
                       ? "Tente ajustar os filtros de busca"
                       : "Cadastre o primeiro agente do sistema"}
                   </p>
-                  {!searchTerm &&
-                    filterRole === "all" &&
-                    filterStatus === "all" && (
+                  {!filters.search &&
+                    filters.role === "all" &&
+                    filters.status === "all" && (
                       <motion.div
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -1224,10 +890,7 @@ export default function AgentesPage() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() =>
-                                          toggleAgentStatus(
-                                            agent.id,
-                                            agent.status
-                                          )
+                                          toggleAgentStatus(agent.id)
                                         }
                                         className={
                                           agent.status
@@ -1257,7 +920,7 @@ export default function AgentesPage() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() =>
-                                          deleteAgent(
+                                          handleDeleteAgent(
                                             agent.id,
                                             agent.full_name || "Agente"
                                           )
@@ -1287,16 +950,16 @@ export default function AgentesPage() {
                       className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200"
                     >
                       <div className="text-sm text-gray-600">
-                        Página <strong>{currentPage}</strong> de{" "}
+                        Página <strong>{pagination.page}</strong> de{" "}
                         <strong>{totalPages}</strong> -{" "}
                         <strong>{filteredAgents.length}</strong> agentes no
                         total
                       </div>
 
                       <CustomPagination
-                        currentPage={currentPage}
+                        currentPage={pagination.page}
                         totalPages={totalPages}
-                        onPageChange={setCurrentPage}
+                        onPageChange={(page) => setPagination({ page })}
                       />
                     </motion.div>
                   )}

@@ -1,8 +1,9 @@
-// constantes de app.ts
+// src/lib/constants/index.ts
 export * from "./app";
 export * from "./routes";
 export * from "./upload";
+export * from "./security";
 
-// constantes de security.ts
+// Re-exportar constantes específicas
 export { SECURITY } from "./security";
-export { AGENTS } from "./security";
+// Remover export { AGENTS } from "./security"; pois não existe nesse arquivo

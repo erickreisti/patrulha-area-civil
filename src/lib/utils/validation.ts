@@ -58,7 +58,7 @@ export function formatPhone(phone: string): string {
   return phone;
 }
 
-// =========== MATRÍCULA (PAC) ===========
+// =========== MATRÍCULA (PAC) - Padrão: XXX.XXX.XXX-XX (11 dígitos) ===========
 
 // Formatação de matrícula no padrão: XXX.XXX.XXX-XX (3-3-3-2)
 export function formatMatricula(matricula: string): string {
@@ -67,8 +67,8 @@ export function formatMatricula(matricula: string): string {
   // Remove qualquer caractere não numérico
   const cleaned = matricula.replace(/\D/g, "");
 
-  // Verifica se tem 11 dígitos
-  if (cleaned.length !== 11) return matricula;
+  // Se não tiver 11 dígitos, retorna o valor limpo
+  if (cleaned.length !== 11) return cleaned;
 
   // Formata: XXX.XXX.XXX-XX (3-3-3-2)
   return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(
@@ -77,21 +77,25 @@ export function formatMatricula(matricula: string): string {
   )}-${cleaned.slice(9, 11)}`;
 }
 
-// Validação de matrícula
+// Validação de matrícula - aceita com ou sem formatação
 export function validateMatricula(matricula: string): boolean {
+  if (!matricula || typeof matricula !== "string") return false;
+
+  // Remove formatação e verifica se tem 11 dígitos
   const cleaned = matricula.replace(/\D/g, "");
   return cleaned.length === 11;
 }
 
 // Extrair apenas números da matrícula
 export function extractMatriculaNumbers(matricula: string): string {
+  if (!matricula) return "";
   return matricula.replace(/\D/g, "");
 }
 
-// Mascarar matrícula para exibição (últimos 2 dígitos visíveis)
+// Mascarar matrícula para exibição (primeiros 9 dígitos mascarados, últimos 2 visíveis)
 export function maskMatricula(matricula: string): string {
   const cleaned = extractMatriculaNumbers(matricula);
-  if (cleaned.length !== 11) return matricula;
+  if (cleaned.length !== 11) return "***.***.***-**";
 
   return `***.***.${cleaned.slice(6, 9)}-${cleaned.slice(9, 11)}`;
 }
@@ -99,7 +103,31 @@ export function maskMatricula(matricula: string): string {
 // Normalizar matrícula (remove formatação e garante 11 dígitos)
 export function normalizeMatricula(matricula: string): string {
   const cleaned = extractMatriculaNumbers(matricula);
-  return cleaned.padStart(11, "0");
+
+  if (cleaned.length > 11) {
+    return cleaned.substring(0, 11); // Trunca se tiver mais de 11
+  }
+
+  if (cleaned.length < 11) {
+    return cleaned.padStart(11, "0"); // Adiciona zeros à esquerda
+  }
+
+  return cleaned;
+}
+
+// Valida se uma string tem formato de matrícula (aceita formatada ou não)
+export function isMatriculaFormat(value: string): boolean {
+  if (!value) return false;
+
+  // Verifica se tem formato XXX.XXX.XXX-XX
+  const formattedPattern = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+  if (formattedPattern.test(value)) {
+    return true;
+  }
+
+  // Verifica se tem apenas números
+  const numericPattern = /^\d{11}$/;
+  return numericPattern.test(value);
 }
 
 // =========== FUNÇÕES DE VALIDAÇÃO COMPOSTAS ===========
@@ -109,7 +137,7 @@ export interface FormValidationData {
   email?: string;
   telefone?: string;
   matricula?: string;
-  [key: string]: unknown; // Para outros campos
+  [key: string]: unknown;
 }
 
 export function validateFormData(data: FormValidationData): {
@@ -251,6 +279,48 @@ export function truncateText(text: string, maxLength: number = 50): string {
   return text.substring(0, maxLength) + "...";
 }
 
+// Função específica para verificar se pode ser convertida para formato de matrícula
+export function canBeFormattedAsMatricula(value: string): boolean {
+  if (!value) return false;
+
+  const cleaned = value.replace(/\D/g, "");
+
+  // Pode ser formatada se tiver entre 9 e 11 dígitos
+  return cleaned.length >= 9 && cleaned.length <= 11;
+}
+
+// Formata matrícula mesmo se incompleta (para UX)
+export function formatMatriculaPartial(value: string): string {
+  if (!value) return "";
+
+  const cleaned = value.replace(/\D/g, "");
+
+  if (cleaned.length <= 3) {
+    return cleaned;
+  }
+
+  if (cleaned.length <= 6) {
+    return `${cleaned.slice(0, 3)}.${cleaned.slice(3)}`;
+  }
+
+  if (cleaned.length <= 9) {
+    return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(6)}`;
+  }
+
+  if (cleaned.length <= 11) {
+    return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(
+      6,
+      9
+    )}-${cleaned.slice(9, 11)}`;
+  }
+
+  // Se tiver mais de 11 dígitos, trunca
+  return `${cleaned.slice(0, 3)}.${cleaned.slice(3, 6)}.${cleaned.slice(
+    6,
+    9
+  )}-${cleaned.slice(9, 11)}`;
+}
+
 // =========== EXPORTAÇÃO POR CATEGORIA ===========
 
 export const ValidationHelpers = {
@@ -260,11 +330,13 @@ export const ValidationHelpers = {
   matricula: validateMatricula,
   numeric: isNumeric,
   empty: isEmpty,
+  isMatriculaFormat,
 };
 
 export const FormatHelpers = {
   phone: formatPhone,
   matricula: formatMatricula,
+  matriculaPartial: formatMatriculaPartial,
   maskMatricula,
   initials: getInitials,
   capitalize: capitalizeWords,
@@ -275,6 +347,7 @@ export const StringHelpers = {
   sanitize: sanitizeInput,
   extractMatriculaNumbers,
   normalizeMatricula,
+  canBeFormattedAsMatricula,
 };
 
 // =========== TIPOS UTILITÁRIOS ===========

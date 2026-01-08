@@ -16,6 +16,9 @@ import {
   RiCheckLine,
 } from "react-icons/ri";
 
+// ✅ Importar a server action correta
+import { setupAdminPassword } from "@/app/actions/auth/auth";
+
 export default function AdminSetupPasswordPage() {
   const [adminPassword, setAdminPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -86,10 +89,9 @@ export default function AdminSetupPasswordPage() {
       formData.append("adminPassword", adminPassword);
       formData.append("confirmPassword", confirmPassword);
 
-      // Importar e chamar a Server Action
-      const { setupAdminPassword } = await import("@/app/actions/auth/profile");
-
       console.log("🔍 [SetupPassword] Configurando senha...");
+
+      // ✅ Agora usando a importação direta
       const result = await setupAdminPassword(formData);
 
       console.log("🔍 [SetupPassword] Resultado:", result);
@@ -102,6 +104,7 @@ export default function AdminSetupPasswordPage() {
           setProfile({
             ...profile,
             admin_2fa_enabled: true,
+            admin_last_auth: new Date().toISOString(),
           });
         }
 
@@ -363,6 +366,11 @@ export default function AdminSetupPasswordPage() {
               Esta senha é adicional à senha padrão do sistema e será usada para
               acessar o painel administrativo. Guarde-a em local seguro.
             </p>
+            {profile.admin_2fa_enabled === false && (
+              <p className="text-warning text-xs mt-2 font-medium">
+                ⚠️ Você precisa configurar esta senha para acessar o dashboard
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -1,11 +1,12 @@
+// src/lib/constants/security.ts
 export const SECURITY = {
   // Senhas
   PASSWORD: {
-    MIN_LENGTH: 12,
+    MIN_LENGTH: 6,
     REQUIRE_UPPERCASE: true,
     REQUIRE_LOWERCASE: true,
     REQUIRE_NUMBERS: true,
-    REQUIRE_SPECIAL_CHARS: true,
+    REQUIRE_SPECIAL_CHARS: false,
     ROTATION_DAYS: 180,
     HISTORY_COUNT: 5,
   },
@@ -13,15 +14,20 @@ export const SECURITY = {
   // Rate limiting
   RATE_LIMIT: {
     MAX_ATTEMPTS: 5,
-    WINDOW_MS: 60 * 1000, // 1 minuto
-    BLOCK_DURATION_MS: 15 * 60 * 1000, // 15 minutos
+    WINDOW_MS: 60 * 1000,
+    BLOCK_DURATION_MS: 15 * 60 * 1000,
   },
 
-  // Sessão
+  // Sessões
   SESSION: {
-    TIMEOUT_MINUTES: 60,
+    // Sessão principal Supabase (padrão)
+    SUPABASE_TIMEOUT_MINUTES: 1440, // 24 horas
+    // Sessão administrativa adicional
+    ADMIN_TIMEOUT_MINUTES: 120, // 2 horas
+    ADMIN_WARNING_MINUTES: 5, // Aviso 5 minutos antes
     REFRESH_ENABLED: true,
     MULTI_SESSION: false,
+    INACTIVITY_TIMEOUT_MINUTES: 30, // Timeout por inatividade
   },
 
   // Validações

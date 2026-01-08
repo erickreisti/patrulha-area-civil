@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,15 +28,15 @@ import {
   RiMailLine,
   RiAlertLine,
   RiSettingsLine,
+  RiShieldKeyholeLine,
+  RiEyeLine,
+  RiEyeOffLine,
+  RiCheckLine,
 } from "react-icons/ri";
-import { useAuthStore } from "@/lib/stores/useAuthStore";
 import type { Profile } from "@/lib/supabase/types";
 import { Spinner } from "@/components/ui/spinner";
-import { useRouter } from "next/navigation";
-import { AdminAuthModal } from "@/components/admin/AdminAuthModal";
 
-type ProfileData = Profile;
-
+// ========== TIPOS ==========
 interface CertificationInfo {
   text: string;
   className: string;
@@ -42,42 +44,7 @@ interface CertificationInfo {
   badgeVariant: "default" | "secondary" | "destructive";
 }
 
-// Sistema de escalabilidade para labels
-const getLabelFontSize = () => {
-  if (typeof window === "undefined") return "text-[6px]";
-  const width = window.innerWidth;
-  if (width < 375) return "text-[6px]";
-  if (width < 400) return "text-[7px]";
-  if (width < 480) return "text-[8px]";
-  if (width < 640) return "text-[9px]";
-  if (width < 768) return "text-[10px]";
-  if (width < 1024) return "text-[11px] sm:text-[12px]";
-  return "text-[11px] sm:text-[12px] md:text-[14px]";
-};
-
-const getContentFontSize = () => {
-  if (typeof window === "undefined") return "text-xs";
-  const width = window.innerWidth;
-  if (width < 375) return "text-xs";
-  if (width < 400) return "text-sm";
-  if (width < 480) return "text-base";
-  if (width < 640) return "text-lg";
-  if (width < 768) return "text-lg sm:text-xl";
-  if (width < 1024) return "text-lg sm:text-xl md:text-2xl";
-  return "text-lg sm:text-xl md:text-2xl lg:text-3xl";
-};
-
-const getSecondaryContentFontSize = () => {
-  if (typeof window === "undefined") return "text-[10px]";
-  const width = window.innerWidth;
-  if (width < 375) return "text-[10px]";
-  if (width < 400) return "text-[11px]";
-  if (width < 480) return "text-[12px]";
-  if (width < 640) return "text-[13px]";
-  if (width < 768) return "text-[14px] sm:text-[15px]";
-  if (width < 1024) return "text-[14px] sm:text-[15px] md:text-[16px]";
-  return "text-[14px] sm:text-[15px] md:text-[16px] lg:text-[18px]";
-};
+// ========== COMPONENTES AUXILIARES ==========
 
 // Modal para Agente Inativo
 const InactiveAgentDialog = ({
@@ -184,6 +151,247 @@ const InactiveAgentDialog = ({
   </Dialog>
 );
 
+// Modal de Autenticação Admin
+const AdminAuthModal = ({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) => {
+  const [adminPassword, setAdminPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [countdown, setCountdown] = useState(3);
+
+  const { user, profile, verifyAdminAccess } = useAuthStore();
+
+  useEffect(() => {
+    if (isOpen) {
+      setAdminPassword("");
+      setError("");
+      setSuccessMessage("");
+      setShowPassword(false);
+      setLoading(false);
+      setCountdown(3);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (successMessage && countdown > 0) {
+      interval = setInterval(() => {
+        setCountdown((prev) => prev - 1);
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [successMessage, countdown]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user || !profile) {
+      setError("Usuário não autenticado");
+      return;
+    }
+
+    if (!adminPassword.trim()) {
+      setError("Digite a senha de administrador");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      if (!profile.admin_2fa_enabled) {
+        setError("Configure sua senha administrativa primeiro");
+        setLoading(false);
+        return;
+      }
+
+      const result = await verifyAdminAccess(adminPassword);
+
+      if (result.success) {
+        setSuccessMessage(result.message || "Autenticação bem-sucedida!");
+        setAdminPassword("");
+
+        const interval = setInterval(() => {
+          setCountdown((prev) => {
+            if (prev <= 1) {
+              clearInterval(interval);
+              window.location.href = "/admin/dashboard";
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        setError(result.error || "Senha de administrador incorreta");
+      }
+    } catch (err) {
+      console.error("❌ [AdminModal] Erro:", err);
+      setError("Erro na autenticação. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-navy/20 shadow-2xl rounded-xl">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <div className="flex items-center justify-center mb-3">
+            <div className="bg-navy/10 p-2.5 rounded-full">
+              <RiShieldKeyholeLine className="w-6 h-6 text-navy" />
+            </div>
+          </div>
+
+          <DialogTitle className="text-center text-lg font-bold text-navy font-roboto">
+            AUTENTICAÇÃO ADMINISTRATIVA
+          </DialogTitle>
+
+          <DialogDescription className="text-center text-slate-700 mt-1 text-sm font-roboto">
+            Acesso restrito ao Painel Administrativo
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 px-4 py-2">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2 font-roboto">
+              Senha Administrativa
+            </label>
+
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  setError("");
+                  setSuccessMessage("");
+                }}
+                placeholder="Digite sua senha administrativa"
+                disabled={loading || !!successMessage}
+                className={`w-full px-3 py-2 border rounded-lg text-lg transition-all duration-200 pr-10 ${
+                  error
+                    ? "border-error focus:ring-error"
+                    : successMessage
+                    ? "border-green-500 focus:ring-green-500"
+                    : "border-slate-300 focus:border-navy focus:ring-navy/20"
+                }`}
+                autoFocus
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700"
+                aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+                disabled={loading || !!successMessage}
+              >
+                {showPassword ? (
+                  <RiEyeOffLine className="w-5 h-5" />
+                ) : (
+                  <RiEyeLine className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 mt-2 text-error text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                <RiErrorWarningLine className="w-4 h-4 flex-shrink-0" />
+                <span className="font-roboto">{error}</span>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="flex items-center gap-2 mt-2 text-green-600 text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                <RiCheckLine className="w-4 h-4 flex-shrink-0" />
+                <span className="font-roboto">
+                  {successMessage} Redirecionando em {countdown}s...
+                </span>
+                <Spinner className="w-4 h-4 animate-spin" />
+              </div>
+            )}
+
+            {profile?.admin_2fa_enabled === false && (
+              <div className="mt-2 text-warning text-xs bg-warning/10 p-2 rounded-lg">
+                <p className="font-medium flex items-center gap-1">
+                  <RiErrorWarningLine className="w-3 h-3" />
+                  Configure sua senha administrativa primeiro
+                </p>
+                <p className="text-warning/80 text-[10px] mt-1">
+                  Acesse &quot;Configurar Senha Admin&quot; no seu perfil
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
+            <button
+              type="submit"
+              disabled={
+                loading ||
+                !!successMessage ||
+                profile?.admin_2fa_enabled === false
+              }
+              className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 font-roboto ${
+                successMessage
+                  ? "bg-green-600 hover:bg-green-700 cursor-wait text-white"
+                  : profile?.admin_2fa_enabled === false
+                  ? "bg-gray-400 cursor-not-allowed text-white"
+                  : "bg-navy hover:bg-navy/90 text-white"
+              }`}
+            >
+              {loading ? (
+                <>
+                  <Spinner className="w-4 h-4 mr-2 animate-spin inline" />
+                  Verificando...
+                </>
+              ) : successMessage ? (
+                `Redirecionando... (${countdown})`
+              ) : profile?.admin_2fa_enabled === false ? (
+                "Configure a senha primeiro"
+              ) : (
+                "Acessar Painel Admin"
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={loading || !!successMessage}
+              className="flex-1 py-2 px-4 border border-slate-300 text-slate-700 hover:bg-slate-50 font-roboto transition-colors duration-200 rounded-lg"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+
+        <div className="text-center px-4 pb-3">
+          <p className="text-[10px] text-slate-500 font-roboto">
+            Sessão administrativa válida por 2 horas
+          </p>
+          {profile?.role === "admin" && profile?.admin_2fa_enabled && (
+            <p className="text-green-600 text-[10px] mt-1 font-roboto">
+              ✅ Senha administrativa configurada
+            </p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ========== FUNÇÕES AUXILIARES ==========
 const BaseLayout = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gradient-to-br from-navy to-navy-700 relative overflow-hidden">
     <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
@@ -202,7 +410,7 @@ const LoadingState = () => (
         className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 w-full max-w-md text-center border border-white/20"
       >
         <div className="flex justify-center mb-6">
-          <Spinner className="size-8 text-navy" />
+          <Spinner className="w-8 h-8 text-navy" />
         </div>
         <p className="text-slate-600 text-lg font-roboto">
           Carregando informações...
@@ -223,28 +431,31 @@ const formatDate = (dateString: string | null | undefined): string => {
   }
 };
 
-const formatMatricula = (matricula: string | null | undefined): string => {
-  if (!matricula) return "NÃO DEFINIDA";
-  const onlyNumbers = matricula.replace(/\D/g, "");
-  if (onlyNumbers.length === 11) {
-    return onlyNumbers
-      .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
-      .toUpperCase();
-  }
-  return matricula.toUpperCase();
-};
-
-// Nova função para formatar matrícula com UF dinâmica
+// Função única para formatar matrícula com UF
 const formatMatriculaWithUF = (
   matricula: string | null | undefined,
   uf: string | null | undefined
 ): string => {
-  const formattedMatricula = formatMatricula(matricula);
-  const ufCode = uf ? uf.toUpperCase() : "RJ"; // Usa RJ como fallback
+  if (!matricula) return "NÃO DEFINIDA";
+
+  // Remove qualquer caractere não numérico
+  const onlyNumbers = matricula.replace(/\D/g, "");
+
+  // Formata no padrão XXX.XXX.XXX-XX (11 dígitos)
+  let formattedMatricula = matricula.toUpperCase();
+
+  if (onlyNumbers.length === 11) {
+    formattedMatricula = onlyNumbers
+      .replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+      .toUpperCase();
+  }
+
+  // Adiciona UF
+  const ufCode = uf ? uf.toUpperCase() : "RJ";
   return `${formattedMatricula} ${ufCode}`;
 };
 
-const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
+const getCertificationInfo = (profile: Profile): CertificationInfo => {
   if (!profile.status) {
     return {
       text: "CERTIFICAÇÃO CANCELADA",
@@ -303,308 +514,50 @@ const getCertificationInfo = (profile: ProfileData): CertificationInfo => {
   return {
     text: formatDate(profile.validade_certificacao),
     className: "text-slate-800 font-semibold",
-    iconColor: "text-success",
+    iconColor: "text-green-600",
     badgeVariant: "default",
   };
 };
 
-const ActionButton: React.FC<{
-  href?: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  onClick?: () => void;
-  disabled?: boolean;
-  disabledMessage?: string;
-}> = ({
-  href,
-  icon: Icon,
-  label,
-  onClick,
-  disabled = false,
-  disabledMessage,
-}) => {
-  const buttonContent = (
-    <motion.div
-      whileHover={disabled ? {} : { scale: 1.05 }}
-      whileTap={disabled ? {} : { scale: 0.95 }}
-      className={`
-        flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 w-full min-h-[44px]
-        ${
-          disabled
-            ? "bg-slate-400 cursor-not-allowed"
-            : "bg-navy/90 hover:bg-navy cursor-pointer"
-        }
-      `}
-      title={disabled ? disabledMessage : ""}
-    >
-      {Icon && (
-        <Icon
-          className={`w-3.5 h-3.5 flex-shrink-0 ${
-            disabled ? "text-white/60" : "text-white"
-          }`}
-        />
-      )}
-      <span
-        className={`text-xs font-medium whitespace-nowrap font-roboto ${
-          disabled ? "text-white/60" : "text-white"
-        }`}
-      >
-        {label}
-      </span>
-    </motion.div>
-  );
-
-  if (href && !disabled) {
-    return (
-      <Link href={href} className="w-full">
-        {buttonContent}
-      </Link>
-    );
-  }
-
-  return (
-    <div onClick={disabled ? undefined : onClick} className="w-full">
-      {buttonContent}
-    </div>
-  );
+const getLabelFontSize = () => {
+  if (typeof window === "undefined") return "text-[6px]";
+  const width = window.innerWidth;
+  if (width < 375) return "text-[6px]";
+  if (width < 400) return "text-[7px]";
+  if (width < 480) return "text-[8px]";
+  if (width < 640) return "text-[9px]";
+  if (width < 768) return "text-[10px]";
+  if (width < 1024) return "text-[11px] sm:text-[12px]";
+  return "text-[11px] sm:text-[12px] md:text-[14px]";
 };
 
-const ActionButtons = ({
-  profile,
-  isAdmin,
-  hasAdminSession,
-  onSignOut,
-  onOpenAdminAuth,
-  onSetupPassword,
-}: {
-  profile: ProfileData;
-  isAdmin: boolean;
-  hasAdminSession: boolean;
-  onSignOut: () => Promise<{ success: boolean; error?: string }>;
-  onOpenAdminAuth: () => void;
-  onSetupPassword: () => void;
-}) => {
-  const router = useRouter();
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const hasRedirected = useRef(false);
-
-  const handleSignOut = async () => {
-    if (isSigningOut || hasRedirected.current) return;
-
-    setIsSigningOut(true);
-    hasRedirected.current = true;
-
-    try {
-      onSignOut().finally(() => {
-        setTimeout(() => {
-          router.push("/login");
-          router.refresh();
-        }, 100);
-      });
-    } catch {
-      setTimeout(() => {
-        router.push("/login");
-        router.refresh();
-      }, 100);
-    }
-  };
-
-  // 🔴 AGENTE INATIVO - Apenas botões básicos
-  if (!profile.status) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-        className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
-      >
-        <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-2 w-full max-w-xs">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleSignOut}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
-          >
-            {isSigningOut ? (
-              <Spinner className="w-3.5 h-3.5 text-white" />
-            ) : (
-              <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-            )}
-            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-              {isSigningOut ? "Saindo..." : "Sair"}
-            </span>
-          </motion.div>
-
-          <ActionButton href="/" icon={RiHomeLine} label="Voltar ao Site" />
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className="text-center mt-3 w-full"
-        >
-          <p className="text-white/70 text-[10px] font-roboto">
-            Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
-          </p>
-          <p className="text-error text-xs font-bold mt-1 font-roboto">
-            ⚠️ AGENTE INATIVO - ACESSO LIMITADO
-          </p>
-        </motion.div>
-      </motion.div>
-    );
-  }
-
-  // 🟢 AGENTE COMUM ATIVO - Apenas botões básicos
-  if (!isAdmin) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.6 }}
-        className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
-      >
-        <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
-          <ActionButton href="/" icon={RiHomeLine} label="Voltar ao Site" />
-
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleSignOut}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
-          >
-            {isSigningOut ? (
-              <Spinner className="w-3.5 h-3.5 text-white" />
-            ) : (
-              <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-            )}
-            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-              {isSigningOut ? "Saindo..." : "Sair"}
-            </span>
-          </motion.div>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
-          className="text-center mt-3 w-full"
-        >
-          <p className="text-white/70 text-[10px] font-roboto">
-            Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
-          </p>
-          <p className="text-success text-xs font-bold mt-1 font-roboto">
-            ✅ AGENTE ATIVO - ACESSO AO PERFIL
-          </p>
-        </motion.div>
-      </motion.div>
-    );
-  }
-
-  // 👑 AGENTE ADMIN - Com botões especiais
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.6 }}
-      className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto"
-    >
-      <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2 w-full">
-        {/* Botão para configuração de senha se não estiver configurada */}
-        {!profile.admin_2fa_enabled ? (
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onSetupPassword}
-            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-warning/90 hover:bg-warning w-full min-h-[44px] col-span-2"
-          >
-            <RiSettingsLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-              Configurar Senha Admin
-            </span>
-          </motion.div>
-        ) : (
-          <>
-            <ActionButton href="/" icon={RiHomeLine} label="Voltar ao Site" />
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onOpenAdminAuth}
-              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
-            >
-              <RiBarChartLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-              <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-                Dashboard
-              </span>
-            </motion.div>
-
-            {/* Se já tem sessão admin, pode ir direto para edição */}
-            {hasAdminSession ? (
-              <ActionButton
-                href={`/admin/agentes/${profile.id}`}
-                icon={RiEditLine}
-                label="Editar"
-              />
-            ) : (
-              <ActionButton
-                disabled={true}
-                icon={RiEditLine}
-                label="Editar"
-                disabledMessage="Faça login no dashboard primeiro"
-              />
-            )}
-
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSignOut}
-              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
-            >
-              {isSigningOut ? (
-                <Spinner className="w-3.5 h-3.5 text-white" />
-              ) : (
-                <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
-              )}
-              <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
-                {isSigningOut ? "Saindo..." : "Sair"}
-              </span>
-            </motion.div>
-          </>
-        )}
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.8 }}
-        className="text-center mt-3 w-full"
-      >
-        <p className="text-white/70 text-[10px] font-roboto">
-          Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
-        </p>
-        <p
-          className={`text-xs font-bold mt-1 font-roboto ${
-            profile.admin_2fa_enabled ? "text-navy" : "text-warning"
-          }`}
-        >
-          {profile.admin_2fa_enabled
-            ? "👑 ADMINISTRADOR - ACESSO COMPLETO"
-            : "⚠️ ADMINISTRADOR - CONFIGURE A SENHA ADMINISTRATIVA"}
-        </p>
-        {profile.admin_2fa_enabled && hasAdminSession && (
-          <p className="text-success text-xs font-bold mt-1 font-roboto">
-            ✅ SESSÃO ADMIN ATIVA
-          </p>
-        )}
-      </motion.div>
-    </motion.div>
-  );
+const getContentFontSize = () => {
+  if (typeof window === "undefined") return "text-xs";
+  const width = window.innerWidth;
+  if (width < 375) return "text-xs";
+  if (width < 400) return "text-sm";
+  if (width < 480) return "text-base";
+  if (width < 640) return "text-lg";
+  if (width < 768) return "text-lg sm:text-xl";
+  if (width < 1024) return "text-lg sm:text-xl md:text-2xl";
+  return "text-lg sm:text-xl md:text-2xl lg:text-3xl";
 };
 
+const getSecondaryContentFontSize = () => {
+  if (typeof window === "undefined") return "text-[10px]";
+  const width = window.innerWidth;
+  if (width < 375) return "text-[10px]";
+  if (width < 400) return "text-[11px]";
+  if (width < 480) return "text-[12px]";
+  if (width < 640) return "text-[13px]";
+  if (width < 768) return "text-[14px] sm:text-[15px]";
+  if (width < 1024) return "text-[14px] sm:text-[15px] md:text-[16px]";
+  return "text-[14px] sm:text-[15px] md:text-[16px] lg:text-[18px]";
+};
+
+// ========== COMPONENTE PRINCIPAL ==========
 export default function AgentPerfil() {
   const {
-    user,
     profile,
     isLoading,
     isAuthenticated,
@@ -624,21 +577,33 @@ export default function AgentPerfil() {
 
   const initializedRef = useRef(false);
 
+  // Inicializar auth store se necessário
   useEffect(() => {
-    if (!initializedRef.current && !user && !isLoading) {
+    if (
+      !initializedRef.current &&
+      !useAuthStore.getState().user &&
+      !isLoading
+    ) {
       initializedRef.current = true;
       const { initialize } = useAuthStore.getState();
       initialize();
     }
-  }, [user, isLoading]);
+  }, [isLoading]);
 
+  // Redirecionar se não autenticado
   useEffect(() => {
-    if (!isAuthenticated && !isLoading && user) {
-      window.location.href = "/login";
-      return;
+    if (!isAuthenticated && !isLoading) {
+      console.log(
+        "🔄 [AgentPerfil] Não autenticado, redirecionando para login..."
+      );
+      const timer = setTimeout(() => {
+        router.push("/login");
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, isLoading, user]);
+  }, [isAuthenticated, isLoading, router]);
 
+  // Mostrar diálogo para agentes inativos
   useEffect(() => {
     const shouldShowDialog = profile && !profile.status;
     if (shouldShowDialog) {
@@ -649,6 +614,7 @@ export default function AgentPerfil() {
     }
   }, [profile]);
 
+  // Ajustar tamanhos de fonte responsivos
   useEffect(() => {
     const handleResize = () => {
       setLabelFontSize(getLabelFontSize());
@@ -682,7 +648,7 @@ export default function AgentPerfil() {
               Faça login para acessar seu perfil.
             </p>
             <Button
-              onClick={() => (window.location.href = "/login")}
+              onClick={() => router.push("/login")}
               className="bg-navy hover:bg-navy-700 text-white py-3 text-base font-semibold font-roboto transition-all duration-300 hover:scale-105 w-full"
               size="lg"
             >
@@ -701,17 +667,41 @@ export default function AgentPerfil() {
 
   const graduationClass = `${contentFontSize} font-bold text-error font-roboto break-words text-center leading-tight uppercase`;
   const bloodTypeClass = `${contentFontSize} font-bold text-error font-roboto text-center leading-tight uppercase`;
-
   const certificationClass = `${secondaryContentFontSize} font-bold font-roboto ${certificationInfo.className} text-center leading-tight`;
 
   const handleOpenAdminAuth = () => {
     console.log("🔍 [AgentPerfil] Abrindo modal de autenticação admin");
-    setShowAdminAuthModal(true);
+
+    // Verificar se já tem sessão admin ativa
+    if (hasAdminSession) {
+      console.log("✅ [AgentPerfil] Sessão admin já ativa, redirecionando...");
+      router.push("/admin/dashboard");
+    } else {
+      setShowAdminAuthModal(true);
+    }
   };
 
   const handleSetupPassword = () => {
     console.log("🔍 [AgentPerfil] Redirecionando para configuração de senha");
     router.push("/admin/setup-password");
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push("/login");
+    } catch (error) {
+      console.error("❌ [AgentPerfil] Erro ao fazer logout:", error);
+    }
+  };
+
+  // Função para admin sem senha configurada
+  const handleAdminWithoutPassword = () => {
+    if (!profile.admin_2fa_enabled) {
+      router.push("/admin/setup-password");
+    } else {
+      handleOpenAdminAuth();
+    }
   };
 
   return (
@@ -889,7 +879,7 @@ export default function AgentPerfil() {
                           text-center font-roboto
                           ${
                             profile.status
-                              ? "bg-gradient-to-r from-success to-success-600 text-white"
+                              ? "bg-gradient-to-r from-green-600 to-green-700 text-white"
                               : "bg-gradient-to-r from-error to-error-600 text-white"
                           }
                         `}
@@ -936,24 +926,197 @@ export default function AgentPerfil() {
                     </p>
                   ) : (
                     <p
-                      className={`${labelFontSize} text-success mt-1.5 text-center font-roboto font-semibold px-1`}
+                      className={`${labelFontSize} text-green-600 mt-1.5 text-center font-roboto font-semibold px-1`}
                     >
                       AGENTE ATIVO - ACESSO AO PERFIL
                     </p>
                   )}
                 </div>
+
+                {/* BOTÕES DE AÇÃO */}
+                <div className="flex flex-col items-center gap-3 mt-4 px-2 w-full max-w-lg mx-auto">
+                  {!profile.status ? (
+                    // AGENTE INATIVO
+                    <div className="grid grid-cols-1 min-[480px]:grid-cols-2 gap-2 w-full max-w-xs">
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleSignOut}
+                        className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
+                      >
+                        <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                        <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                          Sair
+                        </span>
+                      </motion.div>
+
+                      <Link href="/" className="w-full">
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+                        >
+                          <RiHomeLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                          <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                            Voltar ao Site
+                          </span>
+                        </motion.div>
+                      </Link>
+                    </div>
+                  ) : !isAdmin ? (
+                    // AGENTE COMUM ATIVO
+                    <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
+                      <Link href="/" className="w-full">
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+                        >
+                          <RiHomeLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                          <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                            Voltar ao Site
+                          </span>
+                        </motion.div>
+                      </Link>
+
+                      <motion.div
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleSignOut}
+                        className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
+                      >
+                        <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                        <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                          Sair
+                        </span>
+                      </motion.div>
+                    </div>
+                  ) : (
+                    // ADMINISTRADOR
+                    <div className="grid grid-cols-2 min-[480px]:grid-cols-4 gap-2 w-full">
+                      {!profile.admin_2fa_enabled ? (
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={handleSetupPassword}
+                          className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-warning/90 hover:bg-warning w-full min-h-[44px] col-span-2"
+                        >
+                          <RiSettingsLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                          <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                            Configurar Senha Admin
+                          </span>
+                        </motion.div>
+                      ) : (
+                        <>
+                          <Link href="/" className="w-full">
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+                            >
+                              <RiHomeLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                              <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                                Voltar ao Site
+                              </span>
+                            </motion.div>
+                          </Link>
+
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleAdminWithoutPassword}
+                            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+                          >
+                            <RiBarChartLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                              Dashboard
+                            </span>
+                          </motion.div>
+
+                          {hasAdminSession ? (
+                            <Link
+                              href={`/admin/agentes/${profile.id}`}
+                              className="w-full"
+                            >
+                              <motion.div
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
+                              >
+                                <RiEditLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                                <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                                  Editar
+                                </span>
+                              </motion.div>
+                            </Link>
+                          ) : (
+                            <div
+                              className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-not-allowed bg-gray-400 w-full min-h-[44px]"
+                              title="Faça login no dashboard primeiro"
+                            >
+                              <RiEditLine className="w-3.5 h-3.5 text-white/60 flex-shrink-0" />
+                              <span className="text-xs font-medium text-white/60 whitespace-nowrap font-roboto">
+                                Editar
+                              </span>
+                            </div>
+                          )}
+
+                          <motion.div
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={handleSignOut}
+                            className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-red-600/90 hover:bg-red-700 w-full min-h-[44px]"
+                          >
+                            <RiLogoutBoxLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                            <span className="text-xs font-medium text-white whitespace-nowrap font-roboto">
+                              Sair
+                            </span>
+                          </motion.div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.5, delay: 0.8 }}
+                    className="text-center mt-3 w-full"
+                  >
+                    <p className="text-white/70 text-[10px] font-roboto">
+                      Sistema Patrulha Aérea Civil • {new Date().getFullYear()}
+                    </p>
+                    {profile.status && (
+                      <p
+                        className={`text-xs font-bold mt-1 font-roboto ${
+                          isAdmin
+                            ? profile.admin_2fa_enabled
+                              ? "text-navy"
+                              : "text-warning"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {!profile.status
+                          ? "⚠️ AGENTE INATIVO - ACESSO LIMITADO"
+                          : isAdmin
+                          ? profile.admin_2fa_enabled
+                            ? "👑 ADMINISTRADOR - ACESSO COMPLETO"
+                            : "⚠️ ADMINISTRADOR - CONFIGURE A SENHA ADMINISTRATIVA"
+                          : "✅ AGENTE ATIVO - ACESSO AO PERFIL"}
+                      </p>
+                    )}
+                    {isAdmin &&
+                      profile.admin_2fa_enabled &&
+                      hasAdminSession && (
+                        <p className="text-green-600 text-xs font-bold mt-1 font-roboto">
+                          ✅ SESSÃO ADMIN ATIVA
+                        </p>
+                      )}
+                  </motion.div>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
-
-          <ActionButtons
-            profile={profile}
-            isAdmin={isAdmin}
-            hasAdminSession={hasAdminSession}
-            onSignOut={logout}
-            onOpenAdminAuth={handleOpenAdminAuth}
-            onSetupPassword={handleSetupPassword}
-          />
         </div>
       </div>
     </BaseLayout>
