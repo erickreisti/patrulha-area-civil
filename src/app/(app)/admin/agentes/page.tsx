@@ -1,9 +1,7 @@
-// app/admin/agentes/page.tsx - COMPLETA
+// app/admin/agentes/page.tsx - COM AdminRouteGuard
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,17 +45,15 @@ import {
   RiCalendarLine,
   RiDropLine,
   RiDashboardLine,
-  RiCheckLine,
-  RiCloseLine,
-  RiAlertLine,
 } from "react-icons/ri";
 
-// IMPORT DO STORE
+// IMPORT DO STORE E COMPONENTES
 import {
   useAgentsList,
   formatDate,
   getCertificationStatus,
 } from "@/lib/stores";
+import { AdminRouteGuard } from "@/components/admin/AdminRouteGuard";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -311,11 +307,6 @@ const CustomPagination = ({
 };
 
 export default function AgentesPage() {
-  const router = useRouter();
-  const supabase = createClient();
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-
   // USANDO O STORE
   const {
     agents,
@@ -336,79 +327,10 @@ export default function AgentesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const itemsPerPage = 10;
 
-  // Verificar autenticação e permissões
+  // Carregar agentes no início
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        setAuthLoading(true);
-
-        // Verificar sessão Supabase
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          toast.error("Sessão expirada", {
-            description: "Faça login novamente para acessar esta página.",
-          });
-          router.push("/login");
-          return;
-        }
-
-        // Verificar perfil do usuário
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("role, full_name, status, admin_2fa_enabled")
-          .eq("id", session.user.id)
-          .single();
-
-        if (error || !profile) {
-          toast.error("Erro ao verificar permissões");
-          router.push("/login");
-          return;
-        }
-
-        if (profile.role !== "admin") {
-          toast.error("Acesso restrito", {
-            description: "Apenas administradores podem acessar esta página.",
-          });
-          router.push("/perfil");
-          return;
-        }
-
-        if (!profile.status) {
-          toast.error("Conta inativa", {
-            description:
-              "Sua conta está inativa. Entre em contato com o administrador.",
-          });
-          router.push("/login");
-          return;
-        }
-
-        // Verificar se tem senha admin configurada
-        if (!profile.admin_2fa_enabled) {
-          toast.error("Senha administrativa não configurada", {
-            description: "Configure sua senha administrativa primeiro.",
-          });
-          router.push("/admin/setup-password");
-          return;
-        }
-
-        setIsAdmin(true);
-
-        // Carregar agentes
-        await fetchAgents();
-      } catch (error) {
-        console.error("Erro na verificação de autenticação:", error);
-        toast.error("Erro de autenticação");
-        router.push("/login");
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router, supabase, fetchAgents]);
+    fetchAgents();
+  }, [fetchAgents]);
 
   // Calcular agentes paginados
   const paginatedAgents = useMemo(() => {
@@ -427,6 +349,7 @@ export default function AgentesPage() {
       toast.success("Lista de agentes atualizada");
     } catch (err) {
       console.error("Erro ao atualizar agentes:", err);
+      toast.error("Erro ao atualizar agentes");
     } finally {
       setRefreshing(false);
     }
@@ -498,622 +421,560 @@ export default function AgentesPage() {
     }
   }, [error, clearError]);
 
-  if (authLoading) {
-    return (
+  return (
+    <AdminRouteGuard requireAdminSession={true}>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4">
-          <div className="text-center py-16">
-            <Spinner className="w-8 h-8 mx-auto mb-4 text-navy-600" />
-            <p className="text-gray-600">Verificando permissões...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-        <div className="container mx-auto px-4">
+          {/* Header - TÍTULO E DESCRIÇÃO */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="mb-6"
           >
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="border-b border-red-200">
-                <CardTitle className="flex items-center text-xl text-gray-800">
-                  <RiAlertLine className="w-6 h-6 mr-2 text-red-500" />
-                  Acesso Restrito
+            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+              GERENCIAR AGENTES
+            </h1>
+            <p className="text-gray-600">
+              Gerencie todos os agentes da Patrulha Aérea Civil
+              <span className="block text-sm text-gray-500 mt-1">
+                Total de agentes carregados: <strong>{agents.length}</strong>
+              </span>
+            </p>
+          </motion.div>
+
+          {/* ✅ BOTÕES ABAIXO DO HEADER */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="flex flex-wrap gap-3 mb-8"
+          >
+            {/* Botão de Atualizar */}
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                onClick={handleFetchAgents}
+                disabled={refreshing || loading}
+                variant="outline"
+                className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
+              >
+                <motion.div
+                  animate={{ rotate: refreshing ? 360 : 0 }}
+                  transition={{
+                    duration: 1,
+                    repeat: refreshing ? Infinity : 0,
+                  }}
+                >
+                  <RiRefreshLine
+                    className={`w-4 h-4 ${
+                      refreshing ? "text-blue-600" : "text-gray-600"
+                    }`}
+                  />
+                </motion.div>
+                {refreshing ? (
+                  <>
+                    <Spinner className="mr-2" />
+                    Atualizando...
+                  </>
+                ) : (
+                  "Atualizar Lista"
+                )}
+              </Button>
+            </motion.div>
+
+            {/* Botão Novo Agente */}
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Link href="/admin/agentes/criar">
+                <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
+                  <RiUserAddLine className="w-4 h-4 mr-2" />
+                  Novo Agente
+                </Button>
+              </Link>
+            </motion.div>
+
+            {/* Botões de Navegação */}
+            {navigationButtons.map((button, index) => (
+              <motion.div
+                key={button.href}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Link href={button.href}>
+                  <Button
+                    variant="outline"
+                    className={`transition-all duration-300 ${button.className}`}
+                  >
+                    <button.icon className="w-4 h-4 mr-2" />
+                    {button.label}
+                  </Button>
+                </Link>
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* Estatísticas */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+            <StatCard
+              title="Total"
+              value={agentsStats.total}
+              icon={<RiUserLine className="w-6 h-6" />}
+              description="Agentes no sistema"
+              color="blue"
+              delay={0}
+              loading={loading}
+            />
+            <StatCard
+              title="Ativos"
+              value={agentsStats.active}
+              icon={<RiEyeLine className="w-6 h-6" />}
+              description="Agentes ativos"
+              color="green"
+              delay={1}
+              loading={loading}
+            />
+            <StatCard
+              title="Inativos"
+              value={agentsStats.inactive}
+              icon={<RiEyeOffLine className="w-6 h-6" />}
+              description="Agentes inativos"
+              color="red"
+              delay={2}
+              loading={loading}
+            />
+            <StatCard
+              title="Administradores"
+              value={agentsStats.admins}
+              icon={<RiShieldUserLine className="w-6 h-6" />}
+              description="Com acesso total"
+              color="purple"
+              delay={3}
+              loading={loading}
+            />
+            <StatCard
+              title="Agentes"
+              value={agentsStats.agents}
+              icon={<RiIdCardLine className="w-6 h-6" />}
+              description="Com acesso básico"
+              color="gray"
+              delay={4}
+              loading={loading}
+            />
+          </div>
+
+          {/* Filtros e Busca */}
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="border-0 shadow-lg mb-8 transition-all duration-300 hover:shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-gray-800">
+                  <RiSearchLine className="w-5 h-5 text-navy-600" />
+                  Filtros e Busca
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-6 text-center">
-                <div className="mb-4">
-                  <RiShieldKeyholeLine className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Permissão Insuficiente
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Apenas administradores podem acessar esta página.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Link href="/perfil">
-                    <Button
-                      variant="outline"
-                      className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Busca */}
+                  <div className="md:col-span-2">
+                    <div className="relative">
+                      <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
+                      <Input
+                        type="text"
+                        placeholder="Buscar por matrícula, nome ou email..."
+                        value={filters.search}
+                        onChange={(e) => setFilters({ search: e.target.value })}
+                        className="pl-10 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Filtro por Tipo */}
+                  <div>
+                    <Select
+                      value={filters.role}
+                      onValueChange={(value: "all" | "admin" | "agent") =>
+                        setFilters({ role: value })
+                      }
                     >
-                      <RiUserLine className="w-4 h-4 mr-2" />
-                      Meu Perfil
-                    </Button>
-                  </Link>
-                  <Link href="/">
-                    <Button
-                      variant="outline"
-                      className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
+                      <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                        <SelectValue placeholder="Todos os tipos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os tipos</SelectItem>
+                        <SelectItem value="admin">Administradores</SelectItem>
+                        <SelectItem value="agent">Agentes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Filtro por Status */}
+                  <div>
+                    <Select
+                      value={filters.status}
+                      onValueChange={(value: "all" | "active" | "inactive") =>
+                        setFilters({ status: value })
+                      }
                     >
-                      <RiHomeLine className="w-4 h-4 mr-2" />
-                      Voltar ao Site
-                    </Button>
-                  </Link>
+                      <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                        <SelectValue placeholder="Todos os status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os status</SelectItem>
+                        <SelectItem value="active">Ativos</SelectItem>
+                        <SelectItem value="inactive">Inativos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
+                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 pt-6 border-t border-gray-200">
+                  <div className="text-sm text-gray-600 transition-colors duration-300">
+                    Mostrando <strong>{paginatedAgents.length}</strong> de{" "}
+                    <strong>{filteredAgents.length}</strong> agentes
+                    {totalPages > 1 && (
+                      <span>
+                        {" "}
+                        (Página <strong>{pagination.page}</strong> de{" "}
+                        <strong>{totalPages}</strong>)
+                      </span>
+                    )}
+                  </div>
+
+                  {filteredAgents.length > 0 && (
+                    <div className="text-sm text-gray-500">
+                      <strong>{itemsPerPage}</strong> itens por página
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Lista de Agentes */}
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={fadeInUp}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="border-0 shadow-lg transition-all duration-300 hover:shadow-xl">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-gray-800">
+                  <div className="flex items-center">
+                    <RiUserLine className="w-5 h-5 mr-2 text-navy-600" />
+                    Lista de Agentes
+                  </div>
+                  {filteredAgents.length > 0 && (
+                    <Badge variant="secondary" className="text-sm">
+                      {filteredAgents.length} agentes
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-4">
+                    {[...Array(5)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.5, delay: i * 0.1 }}
+                      >
+                        <div className="flex items-center space-x-4 p-4 border rounded-lg">
+                          <Skeleton className="h-12 w-12 rounded-full bg-gray-200" />
+                          <div className="space-y-2 flex-1">
+                            <Skeleton className="h-4 w-[250px] bg-gray-200" />
+                            <Skeleton className="h-4 w-[200px] bg-gray-200" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : filteredAgents.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                    className="text-center py-12"
+                  >
+                    <RiUserLine className="w-20 h-20 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-600 mb-2">
+                      Nenhum agente encontrado
+                    </h3>
+                    <p className="text-gray-500 mb-6">
+                      {filters.search ||
+                      filters.role !== "all" ||
+                      filters.status !== "all"
+                        ? "Tente ajustar os filtros de busca"
+                        : "Cadastre o primeiro agente do sistema"}
+                    </p>
+                    {!filters.search &&
+                      filters.role === "all" &&
+                      filters.status === "all" && (
+                        <motion.div
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <Link href="/admin/agentes/criar">
+                            <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
+                              <RiUserAddLine className="w-4 h-4 mr-2" />
+                              Cadastrar Primeiro Agente
+                            </Button>
+                          </Link>
+                        </motion.div>
+                      )}
+                  </motion.div>
+                ) : (
+                  <>
+                    <motion.div
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="visible"
+                      className="space-y-4 mb-6"
+                    >
+                      <AnimatePresence>
+                        {paginatedAgents.map((agent) => {
+                          const certStatus = getCertificationStatus(
+                            agent.validade_certificacao
+                          );
+
+                          return (
+                            <motion.div
+                              key={agent.id}
+                              variants={itemVariants}
+                              initial="hidden"
+                              animate="visible"
+                              exit="hidden"
+                              whileHover={{
+                                backgroundColor: "rgba(0, 0, 0, 0.02)",
+                              }}
+                              className="border border-gray-200 rounded-lg transition-colors duration-300"
+                            >
+                              <Card className="border-0 shadow-none">
+                                <CardContent className="p-4">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex items-start space-x-4 flex-1">
+                                      <ImageWithFallback
+                                        src={agent.avatar_url}
+                                        alt={agent.full_name || "Agente"}
+                                        className="w-16 h-16 flex-shrink-0"
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <h3 className="font-semibold text-gray-800 truncate">
+                                            {agent.full_name ||
+                                              "Nome não informado"}
+                                          </h3>
+                                          <Badge
+                                            className={
+                                              agent.status
+                                                ? "bg-green-100 text-green-800 border-green-200"
+                                                : "bg-red-100 text-red-800 border-red-200"
+                                            }
+                                          >
+                                            {agent.status ? (
+                                              <>
+                                                <span className="mr-1">✅</span>
+                                                ATIVO
+                                              </>
+                                            ) : (
+                                              <>
+                                                <span className="mr-1">❌</span>
+                                                INATIVO
+                                              </>
+                                            )}
+                                          </Badge>
+                                          <Badge
+                                            className={
+                                              agent.role === "admin"
+                                                ? "bg-purple-100 text-purple-800 border-purple-200"
+                                                : "bg-blue-100 text-blue-800 border-blue-200"
+                                            }
+                                          >
+                                            {agent.role === "admin"
+                                              ? "ADMIN"
+                                              : "AGENTE"}
+                                          </Badge>
+                                        </div>
+                                        <div className="space-y-1 text-sm text-gray-600">
+                                          <div className="flex items-center gap-2">
+                                            <RiIdCardLine className="w-3 h-3" />
+                                            <span className="font-mono">
+                                              {agent.matricula}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <RiMailLine className="w-3 h-3" />
+                                            <span>{agent.email}</span>
+                                          </div>
+                                          {agent.graduacao && (
+                                            <div className="flex items-center gap-2">
+                                              <RiShieldKeyholeLine className="w-3 h-3" />
+                                              <span>{agent.graduacao}</span>
+                                            </div>
+                                          )}
+                                          {agent.tipo_sanguineo && (
+                                            <div className="flex items-center gap-2">
+                                              <RiDropLine className="w-3 h-3" />
+                                              <span>
+                                                Tipo Sanguíneo:{" "}
+                                                {agent.tipo_sanguineo}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {agent.validade_certificacao && (
+                                            <div className="flex items-center gap-2">
+                                              <RiCalendarLine className="w-3 h-3" />
+                                              <span>
+                                                Certificação:{" "}
+                                                {formatDate(
+                                                  agent.validade_certificacao
+                                                )}{" "}
+                                                <Badge
+                                                  variant="outline"
+                                                  className={`ml-2 text-xs ${
+                                                    certStatus.color === "green"
+                                                      ? "bg-green-50 text-green-700 border-green-200"
+                                                      : certStatus.color ===
+                                                        "yellow"
+                                                      ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                                                      : certStatus.color ===
+                                                        "red"
+                                                      ? "bg-red-50 text-red-700 border-red-200"
+                                                      : "bg-gray-50 text-gray-700 border-gray-200"
+                                                  }`}
+                                                >
+                                                  {certStatus.status ===
+                                                    "valida" && "✅ Válida"}
+                                                  {certStatus.status ===
+                                                    "proximo-vencimento" &&
+                                                    "⚠️ Próximo"}
+                                                  {certStatus.status ===
+                                                    "expirada" && "❌ Expirada"}
+                                                  {certStatus.status ===
+                                                    "nao-informada" &&
+                                                    "ℹ️ Não informada"}
+                                                </Badge>
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 ml-4">
+                                      <motion.div
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                      >
+                                        <Link
+                                          href={`/admin/agentes/${agent.id}`}
+                                        >
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors duration-300"
+                                          >
+                                            <RiEditLine className="w-3 h-3 mr-1" />
+                                            Editar
+                                          </Button>
+                                        </Link>
+                                      </motion.div>
+
+                                      <motion.div
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                      >
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            toggleAgentStatus(agent.id)
+                                          }
+                                          className={
+                                            agent.status
+                                              ? "w-full sm:w-auto border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white transition-colors duration-300"
+                                              : "w-full sm:w-auto border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
+                                          }
+                                        >
+                                          {agent.status ? (
+                                            <>
+                                              <RiEyeOffLine className="w-3 h-3 mr-1" />
+                                              Desativar
+                                            </>
+                                          ) : (
+                                            <>
+                                              <RiEyeLine className="w-3 h-3 mr-1" />
+                                              Ativar
+                                            </>
+                                          )}
+                                        </Button>
+                                      </motion.div>
+
+                                      <motion.div
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                      >
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleDeleteAgent(
+                                              agent.id,
+                                              agent.full_name || "Agente"
+                                            )
+                                          }
+                                          className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
+                                        >
+                                          <RiDeleteBinLine className="w-3 h-3 mr-1" />
+                                          Excluir
+                                        </Button>
+                                      </motion.div>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                    </motion.div>
+
+                    {/* Paginação */}
+                    {totalPages > 1 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.6 }}
+                        className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200"
+                      >
+                        <div className="text-sm text-gray-600">
+                          Página <strong>{pagination.page}</strong> de{" "}
+                          <strong>{totalPages}</strong> -{" "}
+                          <strong>{filteredAgents.length}</strong> agentes no
+                          total
+                        </div>
+
+                        <CustomPagination
+                          currentPage={pagination.page}
+                          totalPages={totalPages}
+                          onPageChange={(page) => setPagination({ page })}
+                        />
+                      </motion.div>
+                    )}
+                  </>
+                )}
               </CardContent>
             </Card>
           </motion.div>
         </div>
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-      <div className="container mx-auto px-4">
-        {/* Header - TÍTULO E DESCRIÇÃO */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-6"
-        >
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-            GERENCIAR AGENTES
-          </h1>
-          <p className="text-gray-600">
-            Gerencie todos os agentes da Patrulha Aérea Civil
-            <span className="block text-sm text-gray-500 mt-1">
-              Total de agentes carregados: <strong>{agents.length}</strong>
-            </span>
-          </p>
-        </motion.div>
-
-        {/* ✅ BOTÕES ABAIXO DO HEADER */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="flex flex-wrap gap-3 mb-8"
-        >
-          {/* Botão de Atualizar */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              onClick={handleFetchAgents}
-              disabled={refreshing || loading}
-              variant="outline"
-              className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
-            >
-              <motion.div
-                animate={{ rotate: refreshing ? 360 : 0 }}
-                transition={{
-                  duration: 1,
-                  repeat: refreshing ? Infinity : 0,
-                }}
-              >
-                <RiRefreshLine
-                  className={`w-4 h-4 ${
-                    refreshing ? "text-blue-600" : "text-gray-600"
-                  }`}
-                />
-              </motion.div>
-              {refreshing ? (
-                <>
-                  <Spinner className="mr-2" />
-                  Atualizando...
-                </>
-              ) : (
-                "Atualizar Lista"
-              )}
-            </Button>
-          </motion.div>
-
-          {/* Botão Novo Agente */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link href="/admin/agentes/criar">
-              <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
-                <RiUserAddLine className="w-4 h-4 mr-2" />
-                Novo Agente
-              </Button>
-            </Link>
-          </motion.div>
-
-          {/* Botões de Navegação */}
-          {navigationButtons.map((button, index) => (
-            <motion.div
-              key={button.href}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link href={button.href}>
-                <Button
-                  variant="outline"
-                  className={`transition-all duration-300 ${button.className}`}
-                >
-                  <button.icon className="w-4 h-4 mr-2" />
-                  {button.label}
-                </Button>
-              </Link>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        {/* Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
-          <StatCard
-            title="Total"
-            value={agentsStats.total}
-            icon={<RiUserLine className="w-6 h-6" />}
-            description="Agentes no sistema"
-            color="blue"
-            delay={0}
-            loading={loading}
-          />
-          <StatCard
-            title="Ativos"
-            value={agentsStats.active}
-            icon={<RiEyeLine className="w-6 h-6" />}
-            description="Agentes ativos"
-            color="green"
-            delay={1}
-            loading={loading}
-          />
-          <StatCard
-            title="Inativos"
-            value={agentsStats.inactive}
-            icon={<RiEyeOffLine className="w-6 h-6" />}
-            description="Agentes inativos"
-            color="red"
-            delay={2}
-            loading={loading}
-          />
-          <StatCard
-            title="Administradores"
-            value={agentsStats.admins}
-            icon={<RiShieldUserLine className="w-6 h-6" />}
-            description="Com acesso total"
-            color="purple"
-            delay={3}
-            loading={loading}
-          />
-          <StatCard
-            title="Agentes"
-            value={agentsStats.agents}
-            icon={<RiIdCardLine className="w-6 h-6" />}
-            description="Com acesso básico"
-            color="gray"
-            delay={4}
-            loading={loading}
-          />
-        </div>
-
-        {/* Filtros e Busca */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="border-0 shadow-lg mb-8 transition-all duration-300 hover:shadow-xl">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-800">
-                <RiSearchLine className="w-5 h-5 text-navy-600" />
-                Filtros e Busca
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Busca */}
-                <div className="md:col-span-2">
-                  <div className="relative">
-                    <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
-                    <Input
-                      type="text"
-                      placeholder="Buscar por matrícula, nome ou email..."
-                      value={filters.search}
-                      onChange={(e) => setFilters({ search: e.target.value })}
-                      className="pl-10 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Filtro por Tipo */}
-                <div>
-                  <Select
-                    value={filters.role}
-                    onValueChange={(value: "all" | "admin" | "agent") =>
-                      setFilters({ role: value })
-                    }
-                  >
-                    <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
-                      <SelectValue placeholder="Todos os tipos" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os tipos</SelectItem>
-                      <SelectItem value="admin">Administradores</SelectItem>
-                      <SelectItem value="agent">Agentes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Filtro por Status */}
-                <div>
-                  <Select
-                    value={filters.status}
-                    onValueChange={(value: "all" | "active" | "inactive") =>
-                      setFilters({ status: value })
-                    }
-                  >
-                    <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
-                      <SelectValue placeholder="Todos os status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os status</SelectItem>
-                      <SelectItem value="active">Ativos</SelectItem>
-                      <SelectItem value="inactive">Inativos</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 pt-6 border-t border-gray-200">
-                <div className="text-sm text-gray-600 transition-colors duration-300">
-                  Mostrando <strong>{paginatedAgents.length}</strong> de{" "}
-                  <strong>{filteredAgents.length}</strong> agentes
-                  {totalPages > 1 && (
-                    <span>
-                      {" "}
-                      (Página <strong>{pagination.page}</strong> de{" "}
-                      <strong>{totalPages}</strong>)
-                    </span>
-                  )}
-                </div>
-
-                {filteredAgents.length > 0 && (
-                  <div className="text-sm text-gray-500">
-                    <strong>{itemsPerPage}</strong> itens por página
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Lista de Agentes */}
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="border-0 shadow-lg transition-all duration-300 hover:shadow-xl">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between text-gray-800">
-                <div className="flex items-center">
-                  <RiUserLine className="w-5 h-5 mr-2 text-navy-600" />
-                  Lista de Agentes
-                </div>
-                {filteredAgents.length > 0 && (
-                  <Badge variant="secondary" className="text-sm">
-                    {filteredAgents.length} agentes
-                  </Badge>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5, delay: i * 0.1 }}
-                    >
-                      <div className="flex items-center space-x-4 p-4 border rounded-lg">
-                        <Skeleton className="h-12 w-12 rounded-full bg-gray-200" />
-                        <div className="space-y-2 flex-1">
-                          <Skeleton className="h-4 w-[250px] bg-gray-200" />
-                          <Skeleton className="h-4 w-[200px] bg-gray-200" />
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : filteredAgents.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5 }}
-                  className="text-center py-12"
-                >
-                  <RiUserLine className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-600 mb-2">
-                    Nenhum agente encontrado
-                  </h3>
-                  <p className="text-gray-500 mb-6">
-                    {filters.search ||
-                    filters.role !== "all" ||
-                    filters.status !== "all"
-                      ? "Tente ajustar os filtros de busca"
-                      : "Cadastre o primeiro agente do sistema"}
-                  </p>
-                  {!filters.search &&
-                    filters.role === "all" &&
-                    filters.status === "all" && (
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <Link href="/admin/agentes/criar">
-                          <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
-                            <RiUserAddLine className="w-4 h-4 mr-2" />
-                            Cadastrar Primeiro Agente
-                          </Button>
-                        </Link>
-                      </motion.div>
-                    )}
-                </motion.div>
-              ) : (
-                <>
-                  <motion.div
-                    variants={containerVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="space-y-4 mb-6"
-                  >
-                    <AnimatePresence>
-                      {paginatedAgents.map((agent) => {
-                        const certStatus = getCertificationStatus(
-                          agent.validade_certificacao
-                        );
-
-                        return (
-                          <motion.div
-                            key={agent.id}
-                            variants={itemVariants}
-                            initial="hidden"
-                            animate="visible"
-                            exit="hidden"
-                            whileHover={{
-                              backgroundColor: "rgba(0, 0, 0, 0.02)",
-                            }}
-                            className="border border-gray-200 rounded-lg transition-colors duration-300"
-                          >
-                            <Card className="border-0 shadow-none">
-                              <CardContent className="p-4">
-                                <div className="flex items-start justify-between">
-                                  <div className="flex items-start space-x-4 flex-1">
-                                    <ImageWithFallback
-                                      src={agent.avatar_url}
-                                      alt={agent.full_name || "Agente"}
-                                      className="w-16 h-16 flex-shrink-0"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <h3 className="font-semibold text-gray-800 truncate">
-                                          {agent.full_name ||
-                                            "Nome não informado"}
-                                        </h3>
-                                        <Badge
-                                          className={
-                                            agent.status
-                                              ? "bg-green-100 text-green-800 border-green-200"
-                                              : "bg-red-100 text-red-800 border-red-200"
-                                          }
-                                        >
-                                          {agent.status ? (
-                                            <>
-                                              <RiCheckLine className="w-3 h-3 mr-1" />{" "}
-                                              ATIVO
-                                            </>
-                                          ) : (
-                                            <>
-                                              <RiCloseLine className="w-3 h-3 mr-1" />{" "}
-                                              INATIVO
-                                            </>
-                                          )}
-                                        </Badge>
-                                        <Badge
-                                          className={
-                                            agent.role === "admin"
-                                              ? "bg-purple-100 text-purple-800 border-purple-200"
-                                              : "bg-blue-100 text-blue-800 border-blue-200"
-                                          }
-                                        >
-                                          {agent.role === "admin"
-                                            ? "ADMIN"
-                                            : "AGENTE"}
-                                        </Badge>
-                                      </div>
-                                      <div className="space-y-1 text-sm text-gray-600">
-                                        <div className="flex items-center gap-2">
-                                          <RiIdCardLine className="w-3 h-3" />
-                                          <span className="font-mono">
-                                            {agent.matricula}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <RiMailLine className="w-3 h-3" />
-                                          <span>{agent.email}</span>
-                                        </div>
-                                        {agent.graduacao && (
-                                          <div className="flex items-center gap-2">
-                                            <RiShieldKeyholeLine className="w-3 h-3" />
-                                            <span>{agent.graduacao}</span>
-                                          </div>
-                                        )}
-                                        {agent.tipo_sanguineo && (
-                                          <div className="flex items-center gap-2">
-                                            <RiDropLine className="w-3 h-3" />
-                                            <span>
-                                              Tipo Sanguíneo:{" "}
-                                              {agent.tipo_sanguineo}
-                                            </span>
-                                          </div>
-                                        )}
-                                        {agent.validade_certificacao && (
-                                          <div className="flex items-center gap-2">
-                                            <RiCalendarLine className="w-3 h-3" />
-                                            <span>
-                                              Certificação:{" "}
-                                              {formatDate(
-                                                agent.validade_certificacao
-                                              )}{" "}
-                                              <Badge
-                                                variant="outline"
-                                                className={`ml-2 text-xs ${
-                                                  certStatus.color === "green"
-                                                    ? "bg-green-50 text-green-700 border-green-200"
-                                                    : certStatus.color ===
-                                                      "yellow"
-                                                    ? "bg-yellow-50 text-yellow-700 border-yellow-200"
-                                                    : certStatus.color === "red"
-                                                    ? "bg-red-50 text-red-700 border-red-200"
-                                                    : "bg-gray-50 text-gray-700 border-gray-200"
-                                                }`}
-                                              >
-                                                {certStatus.status ===
-                                                  "valida" && "✅ Válida"}
-                                                {certStatus.status ===
-                                                  "proximo-vencimento" &&
-                                                  "⚠️ Próximo"}
-                                                {certStatus.status ===
-                                                  "expirada" && "❌ Expirada"}
-                                                {certStatus.status ===
-                                                  "nao-informada" &&
-                                                  "ℹ️ Não informada"}
-                                              </Badge>
-                                            </span>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 ml-4">
-                                    <motion.div
-                                      whileHover={{ scale: 1.05 }}
-                                      whileTap={{ scale: 0.95 }}
-                                    >
-                                      <Link href={`/admin/agentes/${agent.id}`}>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors duration-300"
-                                        >
-                                          <RiEditLine className="w-3 h-3 mr-1" />
-                                          Editar
-                                        </Button>
-                                      </Link>
-                                    </motion.div>
-
-                                    <motion.div
-                                      whileHover={{ scale: 1.05 }}
-                                      whileTap={{ scale: 0.95 }}
-                                    >
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                          toggleAgentStatus(agent.id)
-                                        }
-                                        className={
-                                          agent.status
-                                            ? "w-full sm:w-auto border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white transition-colors duration-300"
-                                            : "w-full sm:w-auto border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
-                                        }
-                                      >
-                                        {agent.status ? (
-                                          <>
-                                            <RiEyeOffLine className="w-3 h-3 mr-1" />
-                                            Desativar
-                                          </>
-                                        ) : (
-                                          <>
-                                            <RiEyeLine className="w-3 h-3 mr-1" />
-                                            Ativar
-                                          </>
-                                        )}
-                                      </Button>
-                                    </motion.div>
-
-                                    <motion.div
-                                      whileHover={{ scale: 1.05 }}
-                                      whileTap={{ scale: 0.95 }}
-                                    >
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleDeleteAgent(
-                                            agent.id,
-                                            agent.full_name || "Agente"
-                                          )
-                                        }
-                                        className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
-                                      >
-                                        <RiDeleteBinLine className="w-3 h-3 mr-1" />
-                                        Excluir
-                                      </Button>
-                                    </motion.div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </motion.div>
-
-                  {/* Paginação */}
-                  {totalPages > 1 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.5, delay: 0.6 }}
-                      className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200"
-                    >
-                      <div className="text-sm text-gray-600">
-                        Página <strong>{pagination.page}</strong> de{" "}
-                        <strong>{totalPages}</strong> -{" "}
-                        <strong>{filteredAgents.length}</strong> agentes no
-                        total
-                      </div>
-
-                      <CustomPagination
-                        currentPage={pagination.page}
-                        totalPages={totalPages}
-                        onPageChange={(page) => setPagination({ page })}
-                      />
-                    </motion.div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-    </div>
+    </AdminRouteGuard>
   );
 }
