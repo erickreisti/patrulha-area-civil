@@ -1,3 +1,4 @@
+// app/admin/agentes/[id]/page.tsx - COMPLETA
 "use client";
 
 import { useState, useEffect } from "react";
@@ -113,7 +114,7 @@ const usePermissions = () => {
     };
 
     checkCurrentUser();
-  }, [supabase]); // CORRIGIDO: Adicionado supabase como dependência
+  }, [supabase]);
 
   return {
     loading,
@@ -131,12 +132,10 @@ export default function EditarAgentePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  const {
-    loading: permissionsLoading,
-    currentUserRole,
-    currentUserId,
-  } = usePermissions();
+  const { loading: permissionsLoading, currentUserId } = usePermissions();
 
   // USANDO O STORE
   const {
@@ -151,8 +150,76 @@ export default function EditarAgentePage() {
     validateForm,
   } = useAgentEdit(agentId);
 
-  const isAdmin = currentUserRole === "admin";
   const isEditingOwnProfile = currentUserId === agentId;
+
+  // Verificar autenticação e permissões
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setAuthLoading(true);
+        const supabase = createClient();
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          toast.error("Sessão expirada", {
+            description: "Faça login novamente para acessar esta página.",
+          });
+          router.push("/login");
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, status, admin_2fa_enabled")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!profile) {
+          toast.error("Perfil não encontrado");
+          router.push("/login");
+          return;
+        }
+
+        if (profile.role !== "admin" && !isEditingOwnProfile) {
+          toast.error("Acesso restrito", {
+            description: "Apenas administradores podem editar outros agentes.",
+          });
+          router.push("/perfil");
+          return;
+        }
+
+        if (!profile.status) {
+          toast.error("Conta inativa", {
+            description:
+              "Sua conta está inativa. Entre em contato com o administrador.",
+          });
+          router.push("/login");
+          return;
+        }
+
+        if (profile.role === "admin" && !profile.admin_2fa_enabled) {
+          toast.error("Senha administrativa não configurada", {
+            description: "Configure sua senha administrativa primeiro.",
+          });
+          router.push("/admin/setup-password");
+          return;
+        }
+
+        setIsAdmin(profile.role === "admin");
+      } catch (error) {
+        console.error("Erro na verificação de autenticação:", error);
+        toast.error("Erro de autenticação");
+        router.push("/login");
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router, isEditingOwnProfile]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -391,7 +458,7 @@ export default function EditarAgentePage() {
     }
   };
 
-  if (loading || permissionsLoading) {
+  if (authLoading || loading || permissionsLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4 max-w-7xl">

@@ -1,3 +1,4 @@
+// src/app/(app)/perfil/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -627,6 +628,36 @@ export default function AgentPerfil() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // ========== FUNÇÕES DE MANIPULAÇÃO ==========
+  const handleDashboardAccess = () => {
+    console.log("🔍 [AgentPerfil] Clicou em Dashboard");
+
+    // Verificar se configurou senha admin
+    if (!profile?.admin_2fa_enabled) {
+      console.log("⚠️ [AgentPerfil] Admin sem senha configurada");
+      router.push("/admin/setup-password");
+      return;
+    }
+
+    // Verificar se já tem sessão ativa
+    if (hasAdminSession) {
+      console.log("✅ [AgentPerfil] Sessão admin já ativa, redirecionando...");
+      router.push("/admin/dashboard");
+    } else {
+      console.log("🔐 [AgentPerfil] Mostrando modal de autenticação");
+      setShowAdminAuthModal(true);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await logout();
+      router.push("/login");
+    } catch (error) {
+      console.error("❌ [AgentPerfil] Erro ao fazer logout:", error);
+    }
+  };
+
   if (isLoading) {
     return <LoadingState />;
   }
@@ -668,41 +699,6 @@ export default function AgentPerfil() {
   const graduationClass = `${contentFontSize} font-bold text-error font-roboto break-words text-center leading-tight uppercase`;
   const bloodTypeClass = `${contentFontSize} font-bold text-error font-roboto text-center leading-tight uppercase`;
   const certificationClass = `${secondaryContentFontSize} font-bold font-roboto ${certificationInfo.className} text-center leading-tight`;
-
-  const handleOpenAdminAuth = () => {
-    console.log("🔍 [AgentPerfil] Abrindo modal de autenticação admin");
-
-    // Verificar se já tem sessão admin ativa
-    if (hasAdminSession) {
-      console.log("✅ [AgentPerfil] Sessão admin já ativa, redirecionando...");
-      router.push("/admin/dashboard");
-    } else {
-      setShowAdminAuthModal(true);
-    }
-  };
-
-  const handleSetupPassword = () => {
-    console.log("🔍 [AgentPerfil] Redirecionando para configuração de senha");
-    router.push("/admin/setup-password");
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await logout();
-      router.push("/login");
-    } catch (error) {
-      console.error("❌ [AgentPerfil] Erro ao fazer logout:", error);
-    }
-  };
-
-  // Função para admin sem senha configurada
-  const handleAdminWithoutPassword = () => {
-    if (!profile.admin_2fa_enabled) {
-      router.push("/admin/setup-password");
-    } else {
-      handleOpenAdminAuth();
-    }
-  };
 
   return (
     <BaseLayout>
@@ -998,7 +994,7 @@ export default function AgentPerfil() {
                         <motion.div
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={handleSetupPassword}
+                          onClick={() => router.push("/admin/setup-password")}
                           className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-warning/90 hover:bg-warning w-full min-h-[44px] col-span-2"
                         >
                           <RiSettingsLine className="w-3.5 h-3.5 text-white flex-shrink-0" />
@@ -1024,7 +1020,7 @@ export default function AgentPerfil() {
                           <motion.div
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={handleAdminWithoutPassword}
+                            onClick={handleDashboardAccess}
                             className="flex items-center justify-center space-x-1.5 px-3 py-2.5 rounded-lg transition-all duration-300 cursor-pointer bg-navy/90 hover:bg-navy w-full min-h-[44px]"
                           >
                             <RiBarChartLine className="w-3.5 h-3.5 text-white flex-shrink-0" />

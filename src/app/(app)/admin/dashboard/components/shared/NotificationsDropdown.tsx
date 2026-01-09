@@ -1,4 +1,3 @@
-// src/app/admin/dashboard/components/shared/NotificationsDropdown.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";

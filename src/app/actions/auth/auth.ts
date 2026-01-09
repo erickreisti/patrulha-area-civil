@@ -1,3 +1,4 @@
+// src/app/actions/auth/auth.ts
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
@@ -22,7 +23,7 @@ const AdminAuthSchema = z.object({
   adminPassword: z.string().min(1, "Senha de administrador é obrigatória"),
 });
 
-// 🔧 CORREÇÃO CRÍTICA: Função para definir cookies de forma correta
+// 🔧 Função para definir cookies de admin
 const setAdminCookies = async (
   userId: string,
   userEmail: string,
@@ -38,36 +39,32 @@ const setAdminCookies = async (
 
     const cookieStore = await cookies();
 
-    // ✅ Usar expiresAt passado como parâmetro
-    const expires = expiresAt;
-
-    // Cookie de sessão admin - IMPORTANTE: httpOnly false para middleware ler
+    // ✅ CORRETO: httpOnly true para segurança
     cookieStore.set({
       name: "admin_session",
       value: JSON.stringify({
         userId,
         userEmail,
         sessionToken,
-        expiresAt: expires.toISOString(),
+        expiresAt: expiresAt.toISOString(),
         createdAt: new Date().toISOString(),
       }),
-      httpOnly: false, // 🔥 CRÍTICO: false para middleware poder ler
+      httpOnly: true, // 🔒 Proteção contra XSS
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      expires: expires,
+      expires: expiresAt,
       maxAge: 2 * 60 * 60, // 2 horas em segundos
     });
 
-    // Flag de admin
     cookieStore.set({
       name: "is_admin",
       value: "true",
-      httpOnly: false,
+      httpOnly: true, // 🔒 Proteção contra XSS
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      expires: expires,
+      expires: expiresAt,
       maxAge: 2 * 60 * 60, // 2 horas em segundos
     });
 
@@ -92,7 +89,10 @@ const clearAdminCookies = async (): Promise<boolean> => {
   }
 };
 
+// ============================================
 // PRINCIPAIS FUNÇÕES
+// ============================================
+
 export async function login(formData: FormData) {
   try {
     console.log("🔐 [login] Iniciando processo de login...");
@@ -490,7 +490,10 @@ export async function checkAdminSession() {
   }
 }
 
+// ============================================
 // FUNÇÃO INTERNA
+// ============================================
+
 async function handleSuccessfulLogin(
   session: Session,
   user: User,

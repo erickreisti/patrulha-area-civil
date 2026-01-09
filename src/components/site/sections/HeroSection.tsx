@@ -68,17 +68,10 @@ const buttonVariants: Variants = {
   tap: { scale: 0.95 },
 };
 
+// ✅ CORRIGIDO: BackgroundImage simplificado sem estado
 const BackgroundImage = () => {
-  const [isLoaded, setIsLoaded] = useState(false);
-
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Fallback background for loading */}
-      <div
-        className="absolute inset-0 bg-gradient-to-br from-navy-900 to-navy-800"
-        style={{ opacity: isLoaded ? 0 : 1, transition: "opacity 0.5s" }}
-      />
-
       {/* Background Image with Next.js Image component */}
       <div className="absolute inset-0">
         <Image
@@ -87,20 +80,20 @@ const BackgroundImage = () => {
           fill
           priority
           quality={85}
-          className={cn(
-            "object-cover object-center transition-opacity duration-1000",
-            isLoaded ? "opacity-100" : "opacity-0"
-          )}
+          className="object-cover object-center"
           sizes="100vw"
           style={{
             objectPosition: "center 30%",
           }}
-          onLoad={() => setIsLoaded(true)}
+          // ✅ REMOVIDO: onLoad e loading state
+          loading="eager"
+          // ✅ ADICIONADO: Decoding async para melhor performance
+          decoding="async"
         />
       </div>
 
-      {/* Overlay gradients */}
-      <div className="absolute inset-0 bg-gradient-to-b from-navy-900/60 via-navy-800/40 to-navy-900/50"></div>
+      {/* Overlay gradients - sempre visíveis */}
+      <div className="absolute inset-0 bg-gradient-to-b from-navy-900/70 via-navy-800/50 to-navy-900/60"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-navy-800/40 to-transparent"></div>
       <div className="absolute inset-0 bg-gradient-to-r from-navy-900/30 via-navy-800/20 to-navy-900/40"></div>
 
@@ -109,39 +102,6 @@ const BackgroundImage = () => {
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]"></div>
       </div>
     </div>
-  );
-};
-
-const MainTitle = () => {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  return (
-    <motion.div
-      className="mb-3 sm:mb-4 md:mb-5 lg:mb-6"
-      variants={itemVariants}
-    >
-      <h1
-        className={cn(
-          "font-bold text-white leading-tight drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
-          isMobile
-            ? "text-4xl xs:text-5xl leading-[0.9] px-2"
-            : "text-5xl sm:text-6xl md:text-7xl lg:text-8xl whitespace-nowrap leading-[0.9] px-4",
-          "mx-auto max-w-[90vw]"
-        )}
-      >
-        PATRULHA AÉREA CIVIL
-      </h1>
-    </motion.div>
   );
 };
 
@@ -190,7 +150,7 @@ const ActionButtons = () => (
     className={cn(
       "flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6 justify-center items-stretch",
       "px-4 sm:px-6 w-full mx-auto max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl",
-      "mb-4 sm:mb-6" // Adicionado espaçamento na parte inferior
+      "mb-4 sm:mb-6"
     )}
     variants={containerVariants}
   >
@@ -303,6 +263,7 @@ const ScrollIndicator = () => {
 };
 
 export function HeroSection() {
+  // ✅ CORRIGIDO: Remover lógica de mounted - não é mais necessária
   const [height, setHeight] = useState("calc(100vh - 90px)");
 
   useEffect(() => {
@@ -323,7 +284,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative bg-slate-800 text-white overflow-hidden ios-h-screen"
+      className="relative bg-navy-800 text-white overflow-hidden ios-h-screen"
       style={{
         height,
         minHeight: "600px",
@@ -342,14 +303,26 @@ export function HeroSection() {
         <div
           className={cn(
             "mx-auto w-full h-full flex flex-col justify-end items-center",
-            // Aumentado o padding bottom para mobile e ajustado para outros dispositivos
             "pb-12 sm:pb-16 md:pb-20 lg:pb-24 pt-16 sm:pt-20",
-            // Garantir que o conteúdo não fique muito colado na parte inferior
             "min-h-[600px]"
           )}
         >
           <div className="text-center w-full">
-            <MainTitle />
+            <motion.div
+              className="mb-3 sm:mb-4 md:mb-5 lg:mb-6"
+              variants={itemVariants}
+            >
+              <h1
+                className={cn(
+                  "font-bold text-white leading-tight drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
+                  "text-4xl xs:text-5xl leading-[0.9] px-2",
+                  "sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl",
+                  "mx-auto max-w-[90vw]"
+                )}
+              >
+                PATRULHA AÉREA CIVIL
+              </h1>
+            </motion.div>
             <Subtitle />
             <Description />
             <ActionButtons />

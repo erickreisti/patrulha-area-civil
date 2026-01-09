@@ -1,3 +1,4 @@
+// src/lib/stores/useAuthStore.ts
 "use client";
 
 import { create } from "zustand";
@@ -31,7 +32,7 @@ interface AuthState {
     message?: string;
     error?: string;
   }>;
-  checkAdminSession: () => boolean; // 🔥 MUDANÇA: Agora é síncrono
+  checkAdminSession: () => boolean;
   clearAdminSession: () => void;
 
   // Utilitários
@@ -67,15 +68,16 @@ export const useAuthStore = create<AuthState>()(
               .eq("id", session.user.id)
               .single();
 
-            // 2. Verificar cookies admin (agora síncrono)
-            const hasAdminCookies = get().checkAdminSession();
+            // 2. Verificar sessão admin via API
+            const authModule = await import("@/app/actions/auth/auth");
+            const sessionCheck = await authModule.verifyAdminSession();
 
             set({
               user: session.user,
               profile: profile || null,
               isAuthenticated: true,
               isAdmin: profile?.role === "admin",
-              hasAdminSession: hasAdminCookies,
+              hasAdminSession: sessionCheck.success,
               isLoading: false,
             });
           } else {
@@ -112,15 +114,15 @@ export const useAuthStore = create<AuthState>()(
           if (result.success && "data" in result && result.data) {
             const profileData = result.data.user;
 
-            // Verificar cookies admin após login
-            const hasAdminCookies = get().checkAdminSession();
+            // Verificar sessão admin após login
+            const sessionCheck = await authModule.verifyAdminSession();
 
             set({
               user: result.data.session.user,
               profile: profileData,
               isAuthenticated: true,
               isAdmin: profileData.role === "admin",
-              hasAdminSession: hasAdminCookies,
+              hasAdminSession: sessionCheck.success,
               isLoading: false,
             });
 
@@ -214,10 +216,8 @@ export const useAuthStore = create<AuthState>()(
 
           if (result.success && "message" in result) {
             // Atualizar estado com nova sessão
-            const hasAdminCookies = get().checkAdminSession();
-
             set({
-              hasAdminSession: hasAdminCookies,
+              hasAdminSession: true,
             });
 
             // Atualizar último auth no perfil
@@ -252,71 +252,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 🔥 MUDANÇA CRÍTICA: Agora é função síncrona
       checkAdminSession: () => {
-        try {
-          if (typeof document === "undefined") return false;
-
-          const cookies = document.cookie.split("; ");
-
-          console.log("🍪 [AuthStore] Verificando cookies...");
-
-          // Verificar ambos os cookies
-          const adminCookie = cookies.find((cookie) =>
-            cookie.trim().startsWith("is_admin=")
-          );
-          const sessionCookie = cookies.find((cookie) =>
-            cookie.trim().startsWith("admin_session=")
-          );
-
-          console.log("🍪 [AuthStore] Cookies encontrados:", {
-            adminCookie: adminCookie || "não encontrado",
-            sessionCookie: sessionCookie || "não encontrado",
-          });
-
-          if (!adminCookie || !sessionCookie) {
-            console.log("❌ [AuthStore] Cookies admin não encontrados");
-            return false;
-          }
-
-          // Verificar valor
-          const adminValue = adminCookie.split("=")[1];
-          if (adminValue !== "true") {
-            console.log("❌ [AuthStore] Cookie is_admin não é true");
-            return false;
-          }
-
-          // Verificar sessão
-          try {
-            const sessionValue = decodeURIComponent(
-              sessionCookie.split("=")[1]
-            );
-            const sessionData = JSON.parse(sessionValue);
-
-            console.log("📅 [AuthStore] Dados da sessão:", {
-              expiresAt: sessionData.expiresAt,
-              now: new Date().toISOString(),
-            });
-
-            if (sessionData.expiresAt) {
-              const expiresAt = new Date(sessionData.expiresAt);
-              if (expiresAt < new Date()) {
-                console.log("❌ [AuthStore] Sessão admin expirada");
-                get().clearAdminSession();
-                return false;
-              }
-            }
-          } catch (error) {
-            console.log("❌ [AuthStore] Cookie admin_session inválido:", error);
-            return false;
-          }
-
-          console.log("✅ [AuthStore] Sessão admin válida");
-          return true;
-        } catch (error) {
-          console.error("❌ [AuthStore] Erro ao verificar cookies:", error);
-          return false;
-        }
+        // Esta função agora é apenas para UI/estado
+        const state = get();
+        return state.hasAdminSession;
       },
 
       clearAdminSession: () => {

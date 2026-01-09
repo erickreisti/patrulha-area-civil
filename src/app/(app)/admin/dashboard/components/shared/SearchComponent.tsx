@@ -242,8 +242,6 @@ export function SearchComponent({ className }: SearchComponentProps) {
     return new Date(dateString).toLocaleDateString("pt-BR");
   };
 
-  // Removida a variável não utilizada: const unreadCount = searchResults.length;
-
   return (
     <div className={`relative ${className}`} ref={searchAreaRef}>
       <div className="relative">

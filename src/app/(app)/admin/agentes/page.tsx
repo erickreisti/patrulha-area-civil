@@ -1,6 +1,9 @@
+// app/admin/agentes/page.tsx - COMPLETA
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +49,7 @@ import {
   RiDashboardLine,
   RiCheckLine,
   RiCloseLine,
+  RiAlertLine,
 } from "react-icons/ri";
 
 // IMPORT DO STORE
@@ -307,6 +311,11 @@ const CustomPagination = ({
 };
 
 export default function AgentesPage() {
+  const router = useRouter();
+  const supabase = createClient();
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
   // USANDO O STORE
   const {
     agents,
@@ -326,6 +335,80 @@ export default function AgentesPage() {
 
   const [refreshing, setRefreshing] = useState(false);
   const itemsPerPage = 10;
+
+  // Verificar autenticação e permissões
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        setAuthLoading(true);
+
+        // Verificar sessão Supabase
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          toast.error("Sessão expirada", {
+            description: "Faça login novamente para acessar esta página.",
+          });
+          router.push("/login");
+          return;
+        }
+
+        // Verificar perfil do usuário
+        const { data: profile, error } = await supabase
+          .from("profiles")
+          .select("role, full_name, status, admin_2fa_enabled")
+          .eq("id", session.user.id)
+          .single();
+
+        if (error || !profile) {
+          toast.error("Erro ao verificar permissões");
+          router.push("/login");
+          return;
+        }
+
+        if (profile.role !== "admin") {
+          toast.error("Acesso restrito", {
+            description: "Apenas administradores podem acessar esta página.",
+          });
+          router.push("/perfil");
+          return;
+        }
+
+        if (!profile.status) {
+          toast.error("Conta inativa", {
+            description:
+              "Sua conta está inativa. Entre em contato com o administrador.",
+          });
+          router.push("/login");
+          return;
+        }
+
+        // Verificar se tem senha admin configurada
+        if (!profile.admin_2fa_enabled) {
+          toast.error("Senha administrativa não configurada", {
+            description: "Configure sua senha administrativa primeiro.",
+          });
+          router.push("/admin/setup-password");
+          return;
+        }
+
+        setIsAdmin(true);
+
+        // Carregar agentes
+        await fetchAgents();
+      } catch (error) {
+        console.error("Erro na verificação de autenticação:", error);
+        toast.error("Erro de autenticação");
+        router.push("/login");
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
+    checkAuth();
+  }, [router, supabase, fetchAgents]);
 
   // Calcular agentes paginados
   const paginatedAgents = useMemo(() => {
@@ -402,11 +485,6 @@ export default function AgentesPage() {
     },
   };
 
-  // Carregar agentes na inicialização
-  useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
-
   // Resetar página 1 quando filtros mudarem
   useEffect(() => {
     setPagination({ page: 1 });
@@ -419,6 +497,73 @@ export default function AgentesPage() {
       clearError();
     }
   }, [error, clearError]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
+        <div className="container mx-auto px-4">
+          <div className="text-center py-16">
+            <Spinner className="w-8 h-8 mx-auto mb-4 text-navy-600" />
+            <p className="text-gray-600">Verificando permissões...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-2xl mx-auto"
+          >
+            <Card className="border-0 shadow-lg">
+              <CardHeader className="border-b border-red-200">
+                <CardTitle className="flex items-center text-xl text-gray-800">
+                  <RiAlertLine className="w-6 h-6 mr-2 text-red-500" />
+                  Acesso Restrito
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 text-center">
+                <div className="mb-4">
+                  <RiShieldKeyholeLine className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    Permissão Insuficiente
+                  </h3>
+                  <p className="text-gray-600 mb-6">
+                    Apenas administradores podem acessar esta página.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Link href="/perfil">
+                    <Button
+                      variant="outline"
+                      className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                    >
+                      <RiUserLine className="w-4 h-4 mr-2" />
+                      Meu Perfil
+                    </Button>
+                  </Link>
+                  <Link href="/">
+                    <Button
+                      variant="outline"
+                      className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
+                    >
+                      <RiHomeLine className="w-4 h-4 mr-2" />
+                      Voltar ao Site
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
@@ -452,7 +597,7 @@ export default function AgentesPage() {
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               onClick={handleFetchAgents}
-              disabled={refreshing}
+              disabled={refreshing || loading}
               variant="outline"
               className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
             >

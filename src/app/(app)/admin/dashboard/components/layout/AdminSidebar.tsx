@@ -21,12 +21,12 @@ import {
   RiSettingsLine,
   RiCalendarLine,
   RiShieldLine,
-  RiBarChart2Line, // Corrigindo RiChartLine para RiBarChart2Line
+  RiBarChart2Line,
 } from "react-icons/ri";
 
 // Singleton do Supabase
 import { supabase } from "@/lib/supabase/client";
-import { LogoHeader } from "./LogoHeader";
+import LogoHeader from "./LogoHeader";
 
 // Tipos para navegação
 interface NavigationChild {
@@ -71,7 +71,7 @@ const navigation: NavigationItem[] = [
       {
         name: "Estatísticas",
         href: "/admin/agentes/estatisticas",
-        icon: RiBarChart2Line, // Corrigido
+        icon: RiBarChart2Line,
       },
     ],
   },
@@ -152,7 +152,7 @@ const navigation: NavigationItem[] = [
       {
         name: "Atividades",
         href: "/admin/atividades",
-        icon: RiBarChart2Line, // Corrigido
+        icon: RiBarChart2Line,
       },
       {
         name: "Segurança",
@@ -235,9 +235,11 @@ export function AdminSidebar() {
   };
 
   return (
-    <div className="hidden lg:flex flex-col w-64 min-h-0 bg-white border-r border-gray-200 shadow-lg">
+    <div className="hidden lg:flex lg:flex-col w-64 min-h-0 bg-white border-r border-gray-200 shadow-lg h-screen fixed left-0 top-0 z-40">
       {/* Logo */}
-      <LogoHeader />
+      <div className="p-6 border-b border-gray-200">
+        <LogoHeader />
+      </div>
 
       {/* Navegação principal */}
       <div className="flex-1 flex flex-col pt-4 pb-4 overflow-y-auto">

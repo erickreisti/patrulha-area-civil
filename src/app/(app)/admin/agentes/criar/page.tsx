@@ -1,3 +1,4 @@
+// app/admin/agentes/criar/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -45,6 +46,7 @@ import {
   RiEditLine,
   RiErrorWarningLine,
   RiAlertLine,
+  RiShieldCheckLine,
 } from "react-icons/ri";
 
 // IMPORT DO STORE
@@ -68,6 +70,7 @@ export default function CriarAgentePage() {
   const [dateOpen, setDateOpen] = useState(false);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hasAdminSession, setHasAdminSession] = useState(false);
 
   // USANDO O STORE
   const {
@@ -86,11 +89,30 @@ export default function CriarAgentePage() {
       try {
         setAuthLoading(true);
 
+        // Primeiro, verificar cookies admin
+        const adminSessionCookie = document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("admin_session="))
+          ?.split("=")[1];
+
+        const isAdminCookie =
+          document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("is_admin="))
+            ?.split("=")[1] === "true";
+
+        console.log("🔐 [CriarAgente] Verificando cookies admin:", {
+          hasAdminSession: !!adminSessionCookie,
+          hasIsAdmin: isAdminCookie,
+        });
+
+        // Verificar sessão Supabase
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
         if (!session) {
+          console.log("❌ [CriarAgente] Nenhuma sessão encontrada");
           toast.error("Sessão expirada", {
             description: "Faça login novamente para acessar esta página.",
           });
@@ -100,9 +122,10 @@ export default function CriarAgentePage() {
 
         setCurrentSession(session);
 
+        // Verificar perfil do usuário
         const { data: profile, error } = await supabase
           .from("profiles")
-          .select("role, full_name, status")
+          .select("role, full_name, status, admin_2fa_enabled")
           .eq("id", session.user.id)
           .single();
 
@@ -112,6 +135,12 @@ export default function CriarAgentePage() {
           router.push("/login");
           return;
         }
+
+        console.log("👤 [CriarAgente] Perfil encontrado:", {
+          role: profile?.role,
+          status: profile?.status,
+          admin_2fa_enabled: profile?.admin_2fa_enabled,
+        });
 
         if (!profile || profile.role !== "admin") {
           toast.error("Acesso restrito", {
@@ -130,7 +159,25 @@ export default function CriarAgentePage() {
           return;
         }
 
+        // Verificar se tem senha admin configurada
+        if (!profile.admin_2fa_enabled) {
+          toast.error("Senha administrativa não configurada", {
+            description: "Configure sua senha administrativa primeiro.",
+          });
+          router.push("/admin/setup-password");
+          return;
+        }
+
+        // Para rotas admin gerais, não precisamos verificar cookies admin
+        // Apenas para dashboard que precisa da sessão especial
         setIsAdmin(true);
+        setHasAdminSession(!!adminSessionCookie && isAdminCookie);
+
+        console.log("✅ [CriarAgente] Permissões verificadas:", {
+          isAdmin: true,
+          hasAdminSession,
+          profile: profile.full_name,
+        });
       } catch (error) {
         console.error("💥 Erro na verificação de autenticação:", error);
         toast.error("Erro de autenticação");
@@ -141,7 +188,7 @@ export default function CriarAgentePage() {
     };
 
     checkAuth();
-  }, [router, supabase]);
+  }, [router, supabase, hasAdminSession]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -149,7 +196,6 @@ export default function CriarAgentePage() {
   };
 
   const handleAvatarChange = (avatarUrl: string | null) => {
-    // Converter null para undefined para o FileUpload
     setFormData({ avatar_url: avatarUrl || undefined });
   };
 
@@ -398,9 +444,17 @@ export default function CriarAgentePage() {
             <p className="text-gray-600 text-lg mb-2">
               Preencha os dados para cadastrar um novo agente no sistema
             </p>
-            <div className="flex items-center text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200 w-fit">
-              <RiShieldKeyholeLine className="w-4 h-4 mr-2" />
-              <span>Usuário autenticado como administrador</span>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex items-center text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
+                <RiShieldCheckLine className="w-4 h-4 mr-2" />
+                <span>Usuário autenticado como administrador</span>
+              </div>
+              {hasAdminSession && (
+                <div className="flex items-center text-sm text-purple-600 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
+                  <RiShieldKeyholeLine className="w-4 h-4 mr-2" />
+                  <span>Sessão administrativa ativa</span>
+                </div>
+              )}
             </div>
           </div>
 

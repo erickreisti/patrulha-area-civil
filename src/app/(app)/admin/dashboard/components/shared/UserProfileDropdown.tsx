@@ -132,7 +132,7 @@ export function UserProfileDropdown() {
 
         <DropdownMenuSeparator />
 
-        {/* Menu simplificado - apenas 3 opções */}
+        {/* Menu simplificado */}
         <div className="p-1">
           <DropdownMenuItem
             onClick={() => handleNavigate("/perfil")}

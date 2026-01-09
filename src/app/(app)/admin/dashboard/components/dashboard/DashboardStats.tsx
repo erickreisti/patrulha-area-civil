@@ -1,10 +1,8 @@
-// src/app/admin/dashboard/components/dashboard/DashboardStats.tsx
 "use client";
 
 import { motion } from "framer-motion";
 import { StatCard } from "./StatCard";
-import { QuickActions } from "../dashboard/QuickActions";
-import { RecentActivities } from "../dashboard/RecentActivities";
+import { RecentActivities } from "./RecentActivities";
 import {
   RiGroupLine,
   RiShieldUserLine,
@@ -37,7 +35,7 @@ interface DashboardStatsProps {
   };
   loading: boolean;
   navigateTo: (path: string) => void;
-  profile: {
+  profile?: {
     full_name?: string | null;
     matricula?: string | null;
   } | null;
@@ -55,7 +53,7 @@ export function DashboardStats({
       : 0;
 
   return (
-    <>
+    <div className="space-y-6">
       {/* Grid Principal de Estatísticas */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -141,26 +139,17 @@ export function DashboardStats({
         />
       </motion.div>
 
-      {/* Atalhos Rápidos e Atividades Recentes */}
+      {/* Atividades Recentes */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="grid grid-cols-1 lg:grid-cols-3 gap-6"
       >
-        {/* Atalhos Rápidos */}
-        <div className="lg:col-span-2">
-          <QuickActions navigateTo={navigateTo} />
-        </div>
-
-        {/* Atividades Recentes */}
-        <div className="lg:col-span-1">
-          <RecentActivities
-            activities={dashboardData.recentActivities}
-            loading={loading}
-          />
-        </div>
+        <RecentActivities
+          activities={dashboardData.recentActivities}
+          loading={loading}
+        />
       </motion.div>
-    </>
+    </div>
   );
 }

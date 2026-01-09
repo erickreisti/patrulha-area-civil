@@ -19,7 +19,7 @@ export default function LogoHeader({ compact, className }: LogoHeaderProps) {
       <Link
         href="/"
         className={cn(
-          "flex items-center space-x-3 hover:opacity-90 transition-opacity group",
+          "flex items-center space-x-2 hover:opacity-90 transition-opacity",
           className
         )}
         aria-label="Ir para o início"
@@ -30,9 +30,8 @@ export default function LogoHeader({ compact, className }: LogoHeaderProps) {
             alt={altText}
             fill
             sizes="(max-width: 768px) 40px, 40px"
-            className="object-contain drop-shadow-sm group-hover:drop-shadow-md transition-all"
+            className="object-contain"
             priority
-            quality={90} // Aumentei a qualidade
           />
         </div>
         <div className="flex flex-col">
@@ -49,7 +48,7 @@ export default function LogoHeader({ compact, className }: LogoHeaderProps) {
     <div className={cn("flex flex-col items-center", className)}>
       <Link
         href="/"
-        className="flex items-center justify-center mb-3 hover:opacity-90 transition-opacity group"
+        className="flex items-center justify-center mb-2 hover:opacity-90 transition-opacity"
         aria-label="Ir para o início"
       >
         <div className="relative h-16 w-16 md:h-20 md:w-20 flex-shrink-0">
@@ -58,9 +57,8 @@ export default function LogoHeader({ compact, className }: LogoHeaderProps) {
             alt={altText}
             fill
             sizes="(max-width: 768px) 64px, 80px"
-            className="object-contain drop-shadow-sm group-hover:drop-shadow-md transition-all"
+            className="object-contain"
             priority
-            quality={95} // Qualidade máxima
           />
         </div>
       </Link>
