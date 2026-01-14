@@ -29,13 +29,12 @@ import {
   RiMailLine,
   RiAlertLine,
   RiSettingsLine,
-  RiShieldKeyholeLine,
-  RiEyeLine,
-  RiEyeOffLine,
-  RiCheckLine,
 } from "react-icons/ri";
 import type { Profile } from "@/lib/supabase/types";
 import { Spinner } from "@/components/ui/spinner";
+
+// ✅ IMPORTAR O COMPONENTE SEPARADO
+import { AdminAuthModal } from "@/app/(app)/admin/dashboard/components/layout/AdminAuthModal";
 
 // ========== TIPOS ==========
 interface CertificationInfo {
@@ -151,246 +150,6 @@ const InactiveAgentDialog = ({
     </DialogContent>
   </Dialog>
 );
-
-// Modal de Autenticação Admin
-const AdminAuthModal = ({
-  isOpen,
-  onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) => {
-  const [adminPassword, setAdminPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [countdown, setCountdown] = useState(3);
-
-  const { user, profile, verifyAdminAccess } = useAuthStore();
-
-  useEffect(() => {
-    if (isOpen) {
-      setAdminPassword("");
-      setError("");
-      setSuccessMessage("");
-      setShowPassword(false);
-      setLoading(false);
-      setCountdown(3);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (successMessage && countdown > 0) {
-      interval = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [successMessage, countdown]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!user || !profile) {
-      setError("Usuário não autenticado");
-      return;
-    }
-
-    if (!adminPassword.trim()) {
-      setError("Digite a senha de administrador");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    setSuccessMessage("");
-
-    try {
-      if (!profile.admin_2fa_enabled) {
-        setError("Configure sua senha administrativa primeiro");
-        setLoading(false);
-        return;
-      }
-
-      const result = await verifyAdminAccess(adminPassword);
-
-      if (result.success) {
-        setSuccessMessage(result.message || "Autenticação bem-sucedida!");
-        setAdminPassword("");
-
-        const interval = setInterval(() => {
-          setCountdown((prev) => {
-            if (prev <= 1) {
-              clearInterval(interval);
-              window.location.href = "/admin/dashboard";
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-      } else {
-        setError(result.error || "Senha de administrador incorreta");
-      }
-    } catch (err) {
-      console.error("❌ [AdminModal] Erro:", err);
-      setError("Erro na autenticação. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md w-[95vw] max-w-[400px] mx-auto bg-white border-2 border-navy/20 shadow-2xl rounded-xl">
-        <DialogHeader className="px-4 pt-4 pb-2">
-          <div className="flex items-center justify-center mb-3">
-            <div className="bg-navy/10 p-2.5 rounded-full">
-              <RiShieldKeyholeLine className="w-6 h-6 text-navy" />
-            </div>
-          </div>
-
-          <DialogTitle className="text-center text-lg font-bold text-navy font-roboto">
-            AUTENTICAÇÃO ADMINISTRATIVA
-          </DialogTitle>
-
-          <DialogDescription className="text-center text-slate-700 mt-1 text-sm font-roboto">
-            Acesso restrito ao Painel Administrativo
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4 px-4 py-2">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2 font-roboto">
-              Senha Administrativa
-            </label>
-
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={adminPassword}
-                onChange={(e) => {
-                  setAdminPassword(e.target.value);
-                  setError("");
-                  setSuccessMessage("");
-                }}
-                placeholder="Digite sua senha administrativa"
-                disabled={loading || !!successMessage}
-                className={`w-full px-3 py-2 border rounded-lg text-lg transition-all duration-200 pr-10 ${
-                  error
-                    ? "border-error focus:ring-error"
-                    : successMessage
-                    ? "border-green-500 focus:ring-green-500"
-                    : "border-slate-300 focus:border-navy focus:ring-navy/20"
-                }`}
-                autoFocus
-              />
-
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
-                disabled={loading || !!successMessage}
-              >
-                {showPassword ? (
-                  <RiEyeOffLine className="w-5 h-5" />
-                ) : (
-                  <RiEyeLine className="w-5 h-5" />
-                )}
-              </button>
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 mt-2 text-error text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200">
-                <RiErrorWarningLine className="w-4 h-4 flex-shrink-0" />
-                <span className="font-roboto">{error}</span>
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="flex items-center gap-2 mt-2 text-green-600 text-sm animate-in fade-in-0 slide-in-from-top-1 duration-200">
-                <RiCheckLine className="w-4 h-4 flex-shrink-0" />
-                <span className="font-roboto">
-                  {successMessage} Redirecionando em {countdown}s...
-                </span>
-                <Spinner className="w-4 h-4 animate-spin" />
-              </div>
-            )}
-
-            {profile?.admin_2fa_enabled === false && (
-              <div className="mt-2 text-warning text-xs bg-warning/10 p-2 rounded-lg">
-                <p className="font-medium flex items-center gap-1">
-                  <RiErrorWarningLine className="w-3 h-3" />
-                  Configure sua senha administrativa primeiro
-                </p>
-                <p className="text-warning/80 text-[10px] mt-1">
-                  Acesse &quot;Configurar Senha Admin&quot; no seu perfil
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 pt-2">
-            <button
-              type="submit"
-              disabled={
-                loading ||
-                !!successMessage ||
-                profile?.admin_2fa_enabled === false
-              }
-              className={`flex-1 py-2 px-4 rounded-lg transition-all duration-200 font-roboto ${
-                successMessage
-                  ? "bg-green-600 hover:bg-green-700 cursor-wait text-white"
-                  : profile?.admin_2fa_enabled === false
-                  ? "bg-gray-400 cursor-not-allowed text-white"
-                  : "bg-navy hover:bg-navy/90 text-white"
-              }`}
-            >
-              {loading ? (
-                <>
-                  <Spinner className="w-4 h-4 mr-2 animate-spin inline" />
-                  Verificando...
-                </>
-              ) : successMessage ? (
-                `Redirecionando... (${countdown})`
-              ) : profile?.admin_2fa_enabled === false ? (
-                "Configure a senha primeiro"
-              ) : (
-                "Acessar Painel Admin"
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={loading || !!successMessage}
-              className="flex-1 py-2 px-4 border border-slate-300 text-slate-700 hover:bg-slate-50 font-roboto transition-colors duration-200 rounded-lg"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
-
-        <div className="text-center px-4 pb-3">
-          <p className="text-[10px] text-slate-500 font-roboto">
-            Sessão administrativa válida por 2 horas
-          </p>
-          {profile?.role === "admin" && profile?.admin_2fa_enabled && (
-            <p className="text-green-600 text-[10px] mt-1 font-roboto">
-              ✅ Senha administrativa configurada
-            </p>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
 
 // ========== FUNÇÕES AUXILIARES ==========
 const BaseLayout = ({ children }: { children: React.ReactNode }) => (
@@ -694,8 +453,6 @@ export default function AgentPerfil() {
   const certificationInfo = getCertificationInfo(profile);
   const labelClass = `${labelFontSize} font-medium text-slate-500 uppercase tracking-wide block font-roboto mb-1`;
   const mainContentClass = `${contentFontSize} font-bold text-slate-800 leading-tight font-roboto text-center break-words px-1 uppercase`;
-  const secondaryContentClass = `${secondaryContentFontSize} font-bold text-slate-800 font-mono text-center tracking-wide break-all px-1`;
-
   const graduationClass = `${contentFontSize} font-bold text-error font-roboto break-words text-center leading-tight uppercase`;
   const bloodTypeClass = `${contentFontSize} font-bold text-error font-roboto text-center leading-tight uppercase`;
   const certificationClass = `${secondaryContentFontSize} font-bold font-roboto ${certificationInfo.className} text-center leading-tight`;
@@ -707,6 +464,7 @@ export default function AgentPerfil() {
         onClose={() => setShowInactiveDialog(false)}
       />
 
+      {/* ✅ AGORA USANDO O COMPONENTE SEPARADO */}
       <AdminAuthModal
         isOpen={showAdminAuthModal}
         onClose={() => setShowAdminAuthModal(false)}
@@ -780,6 +538,14 @@ export default function AgentPerfil() {
                   </p>
                 </div>
 
+                {/* ALTERAÇÃO AQUI: Matrícula agora usa a mesma classe do nome */}
+                <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
+                  <label className={labelClass}>Matrícula</label>
+                  <p className={mainContentClass}>
+                    {formatMatriculaWithUF(profile.matricula, profile.uf)}
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-3 mb-3 items-stretch">
                   <div className="flex flex-col space-y-2">
                     <div className="border border-slate-200 rounded-lg p-2 bg-white flex-1">
@@ -844,13 +610,6 @@ export default function AgentPerfil() {
                       )}
                     </div>
                   </div>
-                </div>
-
-                <div className="mb-3 border border-slate-200 rounded-lg p-2 bg-slate-50/50">
-                  <label className={labelClass}>Matrícula</label>
-                  <p className={secondaryContentClass}>
-                    {formatMatriculaWithUF(profile.matricula, profile.uf)}
-                  </p>
                 </div>
 
                 <div className="mb-3">

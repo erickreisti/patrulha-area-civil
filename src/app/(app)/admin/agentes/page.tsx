@@ -1,7 +1,7 @@
 // src/app/(app)/admin/agentes/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,9 +24,21 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
   RiUserLine,
@@ -45,9 +57,12 @@ import {
   RiCalendarLine,
   RiDropLine,
   RiDashboardLine,
+  RiAlertLine,
+  RiFilterLine,
+  RiCloseLine,
 } from "react-icons/ri";
 
-// IMPORT DO STORE CORRIGIDO
+// IMPORT DO STORE CORRETO
 import { useAgentsList } from "@/lib/stores/useAgentesStore";
 
 // Componente de estatísticas
@@ -83,9 +98,9 @@ const StatCard = ({
       transition={{ duration: 0.5, delay: delay * 0.1 }}
       className="h-full"
     >
-      <Card className="h-full border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm relative overflow-hidden">
+      <Card className="h-full border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm relative overflow-hidden group hover:shadow-xl transition-all duration-300">
         <div
-          className={`absolute inset-0 bg-gradient-to-br ${colorClasses[color]} opacity-5`}
+          className={`absolute inset-0 bg-gradient-to-br ${colorClasses[color]} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}
         />
         <CardContent className="p-6 relative z-10">
           <div className="flex items-center justify-between">
@@ -94,14 +109,20 @@ const StatCard = ({
               {loading ? (
                 <Skeleton className="h-8 w-16 mb-1 bg-gray-200" />
               ) : (
-                <p className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
+                <motion.p
+                  key={value}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200 }}
+                  className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1"
+                >
                   {value}
-                </p>
+                </motion.p>
               )}
               <p className="text-xs text-gray-500">{description}</p>
             </div>
             <div
-              className={`p-3 rounded-full bg-gradient-to-br ${colorClasses[color]} text-white shadow-lg`}
+              className={`p-3 rounded-full bg-gradient-to-br ${colorClasses[color]} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}
             >
               {icon}
             </div>
@@ -127,22 +148,22 @@ const ImageWithFallback = ({
   if (!src || imageError) {
     return (
       <div
-        className={`${className} rounded-full flex items-center justify-center bg-gray-200 border-2 border-gray-300`}
+        className={`${className} rounded-full flex items-center justify-center bg-gradient-to-br from-gray-200 to-gray-300 border-2 border-gray-300 group-hover:border-blue-500 transition-colors duration-300`}
       >
-        <RiUserLine className="w-8 h-8 text-gray-400" />
+        <RiUserLine className="w-8 h-8 text-gray-400 group-hover:text-blue-400 transition-colors duration-300" />
       </div>
     );
   }
 
   return (
     <div
-      className={`${className} rounded-full overflow-hidden relative bg-gray-200 border-2 border-gray-300`}
+      className={`${className} rounded-full overflow-hidden relative bg-gray-200 border-2 border-gray-300 group-hover:border-blue-500 transition-colors duration-300`}
     >
       <Image
         src={src}
         alt={alt}
         fill
-        className="object-cover"
+        className="object-cover group-hover:scale-110 transition-transform duration-300"
         sizes="64px"
         onError={() => setImageError(true)}
       />
@@ -150,10 +171,151 @@ const ImageWithFallback = ({
   );
 };
 
+// Tipos para filtros
+interface FiltersType {
+  search: string;
+  role: "all" | "admin" | "agent";
+  status: "all" | "active" | "inactive";
+  graduacao?: string;
+  tipo_sanguineo?: string;
+  sortBy?: string;
+}
+
+// Componente de filtros avançados
+const AdvancedFilters = ({
+  filters,
+  setFilters,
+}: {
+  filters: FiltersType;
+  setFilters: (filters: FiltersType) => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleFilterChange = (key: keyof FiltersType, value: string) => {
+    setFilters({ ...filters, [key]: value });
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      search: "",
+      role: "all",
+      status: "all",
+      graduacao: "all",
+      tipo_sanguineo: "all",
+      sortBy: "created_at",
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+      >
+        <RiFilterLine className="w-4 h-4" />
+        {isOpen ? "Ocultar filtros avançados" : "Mostrar filtros avançados"}
+      </Button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg border">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Graduação
+                </label>
+                <Select
+                  value={filters.graduacao || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange("graduacao", value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todas as graduações" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as graduações</SelectItem>
+                    <SelectItem value="Tenente">Tenente</SelectItem>
+                    <SelectItem value="Capitão">Capitão</SelectItem>
+                    <SelectItem value="Major">Major</SelectItem>
+                    <SelectItem value="Coronel">Coronel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Tipo Sanguíneo
+                </label>
+                <Select
+                  value={filters.tipo_sanguineo || "all"}
+                  onValueChange={(value) =>
+                    handleFilterChange("tipo_sanguineo", value)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os tipos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os tipos</SelectItem>
+                    <SelectItem value="A+">A+</SelectItem>
+                    <SelectItem value="A-">A-</SelectItem>
+                    <SelectItem value="B+">B+</SelectItem>
+                    <SelectItem value="B-">B-</SelectItem>
+                    <SelectItem value="AB+">AB+</SelectItem>
+                    <SelectItem value="AB-">AB-</SelectItem>
+                    <SelectItem value="O+">O+</SelectItem>
+                    <SelectItem value="O-">O-</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Ordenar por
+                </label>
+                <Select
+                  value={filters.sortBy || "created_at"}
+                  onValueChange={(value) => handleFilterChange("sortBy", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ordenar por" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="created_at">Data de criação</SelectItem>
+                    <SelectItem value="full_name">Nome</SelectItem>
+                    <SelectItem value="matricula">Matrícula</SelectItem>
+                    <SelectItem value="graduacao">Graduação</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="md:col-span-3 flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                  <RiCloseLine className="w-4 h-4 mr-2" />
+                  Limpar filtros
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 export default function AgentesPage() {
-  // Usando o hook simplificado
   const {
-    agents, // Agentes paginados
+    agents,
     loading,
     error,
     filters,
@@ -174,69 +336,163 @@ export default function AgentesPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    agentId: string | null;
+    agentName: string;
+  }>({ open: false, agentId: null, agentName: "" });
+  const [operationStatus, setOperationStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [lastOperation, setLastOperation] = useState<string>("");
+
+  // Ref para detectar mudanças na lista
+  const prevAgentsCount = useRef(0);
+
+  // Configurar beforeunload para prevenir navegação durante operações
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (operationStatus === "loading") {
+        e.preventDefault();
+        e.returnValue =
+          "Há uma operação em andamento. Tem certeza que deseja sair?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [operationStatus]);
 
   // Marcar que estamos no cliente
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Carregar agentes e estatísticas no início (apenas no cliente)
-  useEffect(() => {
+  // Carregar agentes e estatísticas no início
+  const loadInitialData = useCallback(async () => {
     if (isClient) {
       console.log("🔄 [AgentesPage] Iniciando carregamento...");
-      fetchAgents();
-      fetchAgentsStats().then(() => {
+      setOperationStatus("loading");
+      try {
+        await Promise.all([fetchAgents(), fetchAgentsStats()]);
+        setOperationStatus("success");
         setStatsLoaded(true);
-      });
+      } catch (err) {
+        console.error("Erro ao carregar dados:", err);
+        setOperationStatus("error");
+      }
     }
-  }, [fetchAgents, fetchAgentsStats, isClient]);
+  }, [isClient, fetchAgents, fetchAgentsStats]);
 
-  // Debug para verificar dados
   useEffect(() => {
-    if (isClient && !loading && statsLoaded) {
-      console.log("🔍 [AgentesPage] Dados carregados:", {
-        agentsCount: agents.length,
-        filteredAgentsCount: filteredAgents.length,
-        agentsStats,
-        loading,
-        page: pagination.page,
-        totalPages: pagination.totalPages,
-      });
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Monitorar mudanças nos agentes para animações
+  useEffect(() => {
+    if (
+      agents.length !== prevAgentsCount.current &&
+      prevAgentsCount.current > 0
+    ) {
+      const diff = agents.length - prevAgentsCount.current;
+      if (diff > 0) {
+        toast.success(`✅ ${diff} novo(s) agente(s) carregado(s)`);
+      } else if (diff < 0) {
+        toast.info(`📝 ${Math.abs(diff)} agente(s) removido(s)`);
+      }
     }
-  }, [
-    agents,
-    filteredAgents,
-    agentsStats,
-    loading,
-    pagination,
-    isClient,
-    statsLoaded,
-  ]);
+    prevAgentsCount.current = agents.length;
+  }, [agents.length]);
 
   // Função para buscar agentes
   const handleFetchAgents = useCallback(async () => {
     try {
       setRefreshing(true);
+      setOperationStatus("loading");
+      setLastOperation("atualizar_lista");
+
       await Promise.all([fetchAgents(), fetchAgentsStats()]);
-      toast.success("Lista de agentes atualizada");
+
+      setOperationStatus("success");
+      toast.success("Lista de agentes atualizada", {
+        icon: <RiRefreshLine className="w-5 h-5 text-green-500" />,
+      });
     } catch (err) {
+      setOperationStatus("error");
       console.error("Erro ao atualizar agentes:", err);
-      toast.error("Erro ao atualizar agentes");
+      toast.error("Erro ao atualizar agentes", {
+        description: "Tente novamente em alguns instantes",
+      });
     } finally {
       setRefreshing(false);
     }
   }, [fetchAgents, fetchAgentsStats]);
 
-  // Função para excluir agente
-  const handleDeleteAgent = async (agentId: string, agentName: string) => {
-    if (!confirm(`Tem certeza que deseja excluir o agente "${agentName}"?`)) {
-      return;
+  // Tratar erros
+  useEffect(() => {
+    if (error) {
+      setOperationStatus("error");
+      toast.error(error, {
+        duration: 5000,
+        action: {
+          label: "Tentar novamente",
+          onClick: () => handleFetchAgents(),
+        },
+      });
+      clearError();
     }
+  }, [error, clearError, handleFetchAgents]);
 
-    const result = await deleteAgent(agentId);
+  // Função para alternar status
+  const handleToggleStatus = async (
+    agentId: string,
+    currentStatus: boolean,
+    agentName: string
+  ) => {
+    setOperationStatus("loading");
+    setLastOperation("alternar_status");
+
+    const result = await toggleAgentStatus(agentId);
     if (result.success) {
-      toast.success(`Agente ${agentName} excluído com sucesso`);
+      setOperationStatus("success");
+      toast.success(
+        `Agente ${agentName} ${
+          currentStatus ? "desativado" : "ativado"
+        } com sucesso`,
+        {
+          icon: currentStatus ? <RiEyeOffLine /> : <RiEyeLine />,
+          duration: 3000,
+        }
+      );
     } else {
+      setOperationStatus("error");
+      toast.error(result.error || "Erro ao alterar status");
+    }
+  };
+
+  // Função para excluir agente
+  const handleDeleteAgent = async () => {
+    if (!deleteDialog.agentId) return;
+
+    setOperationStatus("loading");
+    setLastOperation("excluir_agente");
+
+    const result = await deleteAgent(deleteDialog.agentId);
+    if (result.success) {
+      setOperationStatus("success");
+      setDeleteDialog({ open: false, agentId: null, agentName: "" });
+      toast.success(`Agente ${deleteDialog.agentName} excluído com sucesso`, {
+        duration: 4000,
+        action: {
+          label: "Desfazer",
+          onClick: () => {
+            toast.info("Funcionalidade de desfazer não implementada");
+          },
+        },
+      });
+    } else {
+      setOperationStatus("error");
       toast.error(result.error || "Erro ao excluir agente");
     }
   };
@@ -272,14 +528,6 @@ export default function AgentesPage() {
     pagination.page,
   ]);
 
-  // Tratar erros
-  useEffect(() => {
-    if (error) {
-      toast.error(error);
-      clearError();
-    }
-  }, [error, clearError]);
-
   // Se ainda não está no cliente, mostrar loading
   if (!isClient || (loading && agents.length === 0)) {
     return (
@@ -298,10 +546,19 @@ export default function AgentesPage() {
       <div className="container mx-auto px-4">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <motion.h1
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-3xl font-bold text-gray-800 mb-2"
+          >
             GERENCIAR AGENTES
-          </h1>
-          <p className="text-gray-600">
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="text-gray-600"
+          >
             Gerencie todos os agentes da Patrulha Aérea Civil
             <span className="block text-sm text-gray-500 mt-1">
               Total de agentes no sistema:{" "}
@@ -313,14 +570,34 @@ export default function AgentesPage() {
                 </span>
               )}
             </span>
-          </p>
+          </motion.p>
+
+          {/* Status da operação atual */}
+          {operationStatus === "loading" && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4"
+            >
+              <Alert className="bg-blue-50 border-blue-200">
+                <Spinner className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="ml-2 text-blue-700">
+                  {lastOperation === "excluir_agente" && "Excluindo agente..."}
+                  {lastOperation === "alternar_status" && "Alterando status..."}
+                  {lastOperation === "atualizar_lista" &&
+                    "Atualizando lista..."}
+                  {!lastOperation && "Processando operação..."}
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
         </div>
 
         {/* Botões de Ação */}
         <div className="flex flex-wrap gap-3 mb-8">
           <Button
             onClick={handleFetchAgents}
-            disabled={refreshing || loading}
+            disabled={refreshing || loading || operationStatus === "loading"}
             variant="outline"
             className="flex items-center gap-2"
           >
@@ -331,7 +608,10 @@ export default function AgentesPage() {
           </Button>
 
           <Link href="/admin/agentes/criar">
-            <Button className="bg-green-600 hover:bg-green-700 text-white">
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={operationStatus === "loading"}
+            >
               <RiUserAddLine className="w-4 h-4 mr-2" />
               Novo Agente
             </Button>
@@ -339,7 +619,11 @@ export default function AgentesPage() {
 
           {navigationButtons.map((button) => (
             <Link key={button.href} href={button.href}>
-              <Button variant="outline" className={button.className}>
+              <Button
+                variant="outline"
+                className={button.className}
+                disabled={operationStatus === "loading"}
+              >
                 <button.icon className="w-4 h-4 mr-2" />
                 {button.label}
               </Button>
@@ -405,7 +689,7 @@ export default function AgentesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div className="md:col-span-2">
                 <div className="relative">
                   <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -413,8 +697,11 @@ export default function AgentesPage() {
                     type="text"
                     placeholder="Buscar por matrícula, nome ou email..."
                     value={filters.search}
-                    onChange={(e) => setFilters({ search: e.target.value })}
+                    onChange={(e) =>
+                      setFilters({ ...filters, search: e.target.value })
+                    }
                     className="pl-10"
+                    disabled={operationStatus === "loading"}
                   />
                 </div>
               </div>
@@ -422,8 +709,9 @@ export default function AgentesPage() {
               <Select
                 value={filters.role}
                 onValueChange={(value: "all" | "admin" | "agent") =>
-                  setFilters({ role: value })
+                  setFilters({ ...filters, role: value })
                 }
+                disabled={operationStatus === "loading"}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Todos os tipos" />
@@ -438,8 +726,9 @@ export default function AgentesPage() {
               <Select
                 value={filters.status}
                 onValueChange={(value: "all" | "active" | "inactive") =>
-                  setFilters({ status: value })
+                  setFilters({ ...filters, status: value })
                 }
+                disabled={operationStatus === "loading"}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Todos os status" />
@@ -451,6 +740,9 @@ export default function AgentesPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Filtros Avançados */}
+            <AdvancedFilters filters={filters} setFilters={setFilters} />
 
             <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 pt-6 border-t">
               <div className="text-sm text-gray-600">
@@ -535,159 +827,237 @@ export default function AgentesPage() {
             ) : (
               <>
                 <div className="space-y-4 mb-6">
-                  {agents.map((agent) => {
-                    const certStatus = getCertificationStatus(
-                      agent.validade_certificacao
-                    );
+                  <AnimatePresence>
+                    {agents.map((agent, index) => {
+                      const certStatus = getCertificationStatus(
+                        agent.validade_certificacao
+                      );
 
-                    return (
-                      <div
-                        key={agent.id}
-                        className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-4 flex-1">
-                            <ImageWithFallback
-                              src={agent.avatar_url}
-                              alt={agent.full_name || "Agente"}
-                              className="w-16 h-16"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-2">
-                                <h3 className="font-semibold text-gray-800 truncate">
-                                  {agent.full_name || "Nome não informado"}
-                                </h3>
-                                <Badge
+                      return (
+                        <motion.div
+                          key={agent.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                          className="group"
+                        >
+                          <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors hover:shadow-md">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-4 flex-1">
+                                <ImageWithFallback
+                                  src={agent.avatar_url}
+                                  alt={agent.full_name || "Agente"}
+                                  className="w-16 h-16"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <h3 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
+                                      {agent.full_name || "Nome não informado"}
+                                    </h3>
+                                    <Badge
+                                      className={
+                                        agent.status
+                                          ? "bg-green-100 text-green-800 group-hover:bg-green-200"
+                                          : "bg-red-100 text-red-800 group-hover:bg-red-200"
+                                      }
+                                    >
+                                      {agent.status ? "✅ ATIVO" : "❌ INATIVO"}
+                                    </Badge>
+                                    <Badge
+                                      className={
+                                        agent.role === "admin"
+                                          ? "bg-purple-100 text-purple-800 group-hover:bg-purple-200"
+                                          : "bg-blue-100 text-blue-800 group-hover:bg-blue-200"
+                                      }
+                                    >
+                                      {agent.role === "admin"
+                                        ? "ADMIN"
+                                        : "AGENTE"}
+                                    </Badge>
+                                  </div>
+                                  <div className="space-y-1 text-sm text-gray-600">
+                                    <div className="flex items-center gap-2">
+                                      <RiIdCardLine className="w-3 h-3" />
+                                      <span className="font-mono group-hover:text-blue-500 transition-colors">
+                                        {agent.matricula}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <RiMailLine className="w-3 h-3" />
+                                      <span className="group-hover:text-blue-500 transition-colors">
+                                        {agent.email}
+                                      </span>
+                                    </div>
+                                    {agent.graduacao && (
+                                      <div className="flex items-center gap-2">
+                                        <RiShieldKeyholeLine className="w-3 h-3" />
+                                        <span>{agent.graduacao}</span>
+                                      </div>
+                                    )}
+                                    {agent.tipo_sanguineo && (
+                                      <div className="flex items-center gap-2">
+                                        <RiDropLine className="w-3 h-3" />
+                                        <span>
+                                          Tipo Sanguíneo: {agent.tipo_sanguineo}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {agent.validade_certificacao && (
+                                      <div className="flex items-center gap-2">
+                                        <RiCalendarLine className="w-3 h-3" />
+                                        <span>
+                                          Certificação:{" "}
+                                          {formatDate(
+                                            agent.validade_certificacao
+                                          )}{" "}
+                                          <Badge
+                                            variant="outline"
+                                            className={`ml-2 text-xs ${
+                                              certStatus.color === "green"
+                                                ? "bg-green-50 text-green-700"
+                                                : certStatus.color === "yellow"
+                                                ? "bg-yellow-50 text-yellow-700"
+                                                : certStatus.color === "red"
+                                                ? "bg-red-50 text-red-700"
+                                                : "bg-gray-50 text-gray-700"
+                                            }`}
+                                          >
+                                            {certStatus.status === "valida" &&
+                                              "✅ Válida"}
+                                            {certStatus.status ===
+                                              "proximo-vencimento" &&
+                                              "⚠️ Próximo"}
+                                            {certStatus.status === "expirada" &&
+                                              "❌ Expirada"}
+                                            {certStatus.status ===
+                                              "nao-informada" &&
+                                              "ℹ️ Não informada"}
+                                          </Badge>
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 ml-4">
+                                <Link href={`/admin/agentes/${agent.id}`}>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
+                                    disabled={operationStatus === "loading"}
+                                  >
+                                    <RiEditLine className="w-3 h-3 mr-1" />
+                                    Editar
+                                  </Button>
+                                </Link>
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleToggleStatus(
+                                      agent.id,
+                                      agent.status,
+                                      agent.full_name || "Agente"
+                                    )
+                                  }
                                   className={
                                     agent.status
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-red-100 text-red-800"
+                                      ? "border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white transition-colors"
+                                      : "border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors"
+                                  }
+                                  disabled={operationStatus === "loading"}
+                                >
+                                  {agent.status ? (
+                                    <>
+                                      <RiEyeOffLine className="w-3 h-3 mr-1" />
+                                      Desativar
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RiEyeLine className="w-3 h-3 mr-1" />
+                                      Ativar
+                                    </>
+                                  )}
+                                </Button>
+
+                                <AlertDialog
+                                  open={
+                                    deleteDialog.open &&
+                                    deleteDialog.agentId === agent.id
+                                  }
+                                  onOpenChange={(open) =>
+                                    setDeleteDialog({
+                                      open,
+                                      agentId: open ? agent.id : null,
+                                      agentName: agent.full_name || "Agente",
+                                    })
                                   }
                                 >
-                                  {agent.status ? "✅ ATIVO" : "❌ INATIVO"}
-                                </Badge>
-                                <Badge
-                                  className={
-                                    agent.role === "admin"
-                                      ? "bg-purple-100 text-purple-800"
-                                      : "bg-blue-100 text-blue-800"
-                                  }
-                                >
-                                  {agent.role === "admin" ? "ADMIN" : "AGENTE"}
-                                </Badge>
-                              </div>
-                              <div className="space-y-1 text-sm text-gray-600">
-                                <div className="flex items-center gap-2">
-                                  <RiIdCardLine className="w-3 h-3" />
-                                  <span className="font-mono">
-                                    {agent.matricula}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <RiMailLine className="w-3 h-3" />
-                                  <span>{agent.email}</span>
-                                </div>
-                                {agent.graduacao && (
-                                  <div className="flex items-center gap-2">
-                                    <RiShieldKeyholeLine className="w-3 h-3" />
-                                    <span>{agent.graduacao}</span>
-                                  </div>
-                                )}
-                                {agent.tipo_sanguineo && (
-                                  <div className="flex items-center gap-2">
-                                    <RiDropLine className="w-3 h-3" />
-                                    <span>
-                                      Tipo Sanguíneo: {agent.tipo_sanguineo}
-                                    </span>
-                                  </div>
-                                )}
-                                {agent.validade_certificacao && (
-                                  <div className="flex items-center gap-2">
-                                    <RiCalendarLine className="w-3 h-3" />
-                                    <span>
-                                      Certificação:{" "}
-                                      {formatDate(agent.validade_certificacao)}{" "}
-                                      <Badge
-                                        variant="outline"
-                                        className={`ml-2 text-xs ${
-                                          certStatus.color === "green"
-                                            ? "bg-green-50 text-green-700"
-                                            : certStatus.color === "yellow"
-                                            ? "bg-yellow-50 text-yellow-700"
-                                            : certStatus.color === "red"
-                                            ? "bg-red-50 text-red-700"
-                                            : "bg-gray-50 text-gray-700"
-                                        }`}
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-colors"
+                                      disabled={operationStatus === "loading"}
+                                    >
+                                      <RiDeleteBinLine className="w-3 h-3 mr-1" />
+                                      Excluir
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                                        <RiAlertLine className="w-5 h-5" />
+                                        Confirmar exclusão
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tem certeza que deseja excluir
+                                        permanentemente o agente{" "}
+                                        <strong>
+                                          {agent.full_name || "Agente"}
+                                        </strong>{" "}
+                                        (Matrícula: {agent.matricula})?
+                                        <br />
+                                        <br />
+                                        <span className="text-red-500 font-semibold">
+                                          ⚠️ Esta ação não pode ser desfeita!
+                                        </span>
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel
+                                        disabled={operationStatus === "loading"}
                                       >
-                                        {certStatus.status === "valida" &&
-                                          "✅ Válida"}
-                                        {certStatus.status ===
-                                          "proximo-vencimento" && "⚠️ Próximo"}
-                                        {certStatus.status === "expirada" &&
-                                          "❌ Expirada"}
-                                        {certStatus.status ===
-                                          "nao-informada" && "ℹ️ Não informada"}
-                                      </Badge>
-                                    </span>
-                                  </div>
-                                )}
+                                        Cancelar
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={handleDeleteAgent}
+                                        disabled={operationStatus === "loading"}
+                                        className="bg-red-600 hover:bg-red-700 text-white"
+                                      >
+                                        {operationStatus === "loading" &&
+                                        lastOperation === "excluir_agente" ? (
+                                          <>
+                                            <Spinner className="w-4 h-4 mr-2" />
+                                            Excluindo...
+                                          </>
+                                        ) : (
+                                          "Sim, excluir permanentemente"
+                                        )}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
                               </div>
                             </div>
                           </div>
-                          <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 ml-4">
-                            <Link href={`/admin/agentes/${agent.id}`}>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="border-blue-600 text-blue-600"
-                              >
-                                <RiEditLine className="w-3 h-3 mr-1" />
-                                Editar
-                              </Button>
-                            </Link>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => toggleAgentStatus(agent.id)}
-                              className={
-                                agent.status
-                                  ? "border-yellow-600 text-yellow-600"
-                                  : "border-green-600 text-green-600"
-                              }
-                            >
-                              {agent.status ? (
-                                <>
-                                  <RiEyeOffLine className="w-3 h-3 mr-1" />
-                                  Desativar
-                                </>
-                              ) : (
-                                <>
-                                  <RiEyeLine className="w-3 h-3 mr-1" />
-                                  Ativar
-                                </>
-                              )}
-                            </Button>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                handleDeleteAgent(
-                                  agent.id,
-                                  agent.full_name || "Agente"
-                                )
-                              }
-                              className="text-red-600 border-red-600"
-                            >
-                              <RiDeleteBinLine className="w-3 h-3 mr-1" />
-                              Excluir
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
                 </div>
 
                 {/* Paginação */}
@@ -708,9 +1078,10 @@ export default function AgentesPage() {
                               setPagination({ page: pagination.page - 1 })
                             }
                             className={
-                              pagination.page === 1
+                              pagination.page === 1 ||
+                              operationStatus === "loading"
                                 ? "pointer-events-none opacity-50"
-                                : "cursor-pointer"
+                                : "cursor-pointer hover:bg-gray-100"
                             }
                           />
                         </PaginationItem>
@@ -730,7 +1101,11 @@ export default function AgentesPage() {
                                     setPagination({ page: pageNum })
                                   }
                                   isActive={pagination.page === pageNum}
-                                  className="cursor-pointer"
+                                  className={`cursor-pointer ${
+                                    operationStatus === "loading"
+                                      ? "pointer-events-none opacity-50"
+                                      : ""
+                                  }`}
                                 >
                                   {pageNum}
                                 </PaginationLink>
@@ -757,9 +1132,10 @@ export default function AgentesPage() {
                               setPagination({ page: pagination.page + 1 })
                             }
                             className={
-                              pagination.page === pagination.totalPages
+                              pagination.page === pagination.totalPages ||
+                              operationStatus === "loading"
                                 ? "pointer-events-none opacity-50"
-                                : "cursor-pointer"
+                                : "cursor-pointer hover:bg-gray-100"
                             }
                           />
                         </PaginationItem>

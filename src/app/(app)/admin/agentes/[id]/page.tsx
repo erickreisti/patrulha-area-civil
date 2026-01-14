@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,7 +44,6 @@ import { ptBR } from "date-fns/locale";
 import {
   RiUserLine,
   RiIdCardLine,
-  RiMailLine,
   RiArrowLeftLine,
   RiSaveLine,
   RiDeleteBinLine,
@@ -83,10 +82,8 @@ interface AgentUpdateData {
 
 export default function EditarAgentePage() {
   const params = useParams();
-  const router = useRouter();
   const agentId = params.id as string;
 
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
@@ -258,10 +255,9 @@ export default function EditarAgentePage() {
       if (result.success) {
         toast.success("Alterações salvas com sucesso!");
         setHasUnsavedChanges(false);
-        setAvatarFile(null);
 
         // Recarregar a página para mostrar dados atualizados
-        router.refresh();
+        window.location.reload();
       } else {
         throw new Error(result.error || "Erro ao atualizar agente");
       }
@@ -290,8 +286,7 @@ export default function EditarAgentePage() {
         toast.success("Agente excluído!", { id: toastId });
         setDeleteDialogOpen(false);
         setTimeout(() => {
-          router.push("/admin/agentes");
-          router.refresh();
+          window.location.href = "/admin/agentes";
         }, 1500);
       } else {
         throw new Error(result.error);
@@ -394,11 +389,6 @@ export default function EditarAgentePage() {
                   <AlertDescription className="text-yellow-800 text-base ml-3">
                     <strong>⚠️ Você tem alterações não salvas.</strong> Clique
                     em &quot;Salvar Alterações&quot; para aplicar as mudanças.
-                    {avatarFile && (
-                      <span className="block mt-2 font-semibold text-yellow-900">
-                        📸 Nova foto será enviada ao salvar
-                      </span>
-                    )}
                   </AlertDescription>
                 </Alert>
               </motion.div>
@@ -536,11 +526,11 @@ export default function EditarAgentePage() {
                         htmlFor="email"
                         className="text-base font-semibold text-gray-700 flex items-center"
                       >
-                        <RiMailLine className="w-5 h-5 mr-2 text-navy-500" />
+                        <RiIdCardLine className="w-5 h-5 mr-2 text-navy-500" />
                         Email *
                       </Label>
                       <div className="relative">
-                        <RiMailLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                        <RiIdCardLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <Input
                           type="email"
                           name="email"

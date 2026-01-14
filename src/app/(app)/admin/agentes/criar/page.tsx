@@ -1,7 +1,7 @@
 // src/app/(app)/admin/agentes/criar/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -41,9 +42,13 @@ import {
   RiHomeLine,
   RiArrowDownSLine,
   RiDashboardLine,
+  RiAlertLine,
+  RiCheckLine,
+  RiErrorWarningLine,
+  RiCalendar2Line,
 } from "react-icons/ri";
 
-// IMPORT DO STORE - SIMPLES COMO A LISTAGEM
+// IMPORT DO STORE
 import {
   useAgentCreate,
   GRADUACOES,
@@ -61,10 +66,43 @@ const fadeInUp = {
   },
 };
 
+// Validações em tempo real
+const validateMatricula = (
+  matricula: string
+): { valid: boolean; error?: string } => {
+  if (!matricula) return { valid: false, error: "Matrícula é obrigatória" };
+  if (matricula.length !== 11)
+    return { valid: false, error: "Matrícula deve ter 11 dígitos" };
+  if (!/^\d+$/.test(matricula))
+    return { valid: false, error: "Apenas números são permitidos" };
+  return { valid: true };
+};
+
+const validateEmail = (email: string): { valid: boolean; error?: string } => {
+  if (!email) return { valid: false, error: "Email é obrigatório" };
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return { valid: false, error: "Email inválido" };
+  return { valid: true };
+};
+
+const validateFullName = (name: string): { valid: boolean; error?: string } => {
+  if (!name) return { valid: false, error: "Nome completo é obrigatório" };
+  if (name.length < 2)
+    return { valid: false, error: "Nome deve ter pelo menos 2 caracteres" };
+  if (name.length > 100) return { valid: false, error: "Nome muito longo" };
+  return { valid: true };
+};
+
 export default function CriarAgentePage() {
   const router = useRouter();
+  const [dateOpen, setDateOpen] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const formRef = useRef<HTMLFormElement>(null);
 
-  // USANDO O STORE - SEM VERIFICAÇÃO EXTRA
+  // USANDO O STORE
   const {
     saving,
     formData,
@@ -75,11 +113,71 @@ export default function CriarAgentePage() {
     generateMatricula,
   } = useAgentCreate();
 
-  const [dateOpen, setDateOpen] = useState(false);
+  // Configurar beforeunload para prevenir navegação durante operações
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (submitStatus === "loading" || saving) {
+        e.preventDefault();
+        e.returnValue =
+          "Há uma operação em andamento. Tem certeza que deseja sair?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [submitStatus, saving]);
+
+  // Limpar erros quando o usuário começa a digitar
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (Object.keys(fieldErrors).length > 0) {
+        setFieldErrors({});
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [fieldErrors]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ [name]: value });
+
+    // Validação em tempo real
+    if (name === "matricula") {
+      const validation = validateMatricula(value);
+      if (!validation.valid) {
+        setFieldErrors((prev) => ({ ...prev, matricula: validation.error! }));
+      } else {
+        setFieldErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.matricula;
+          return newErrors;
+        });
+      }
+    } else if (name === "email") {
+      const validation = validateEmail(value);
+      if (!validation.valid) {
+        setFieldErrors((prev) => ({ ...prev, email: validation.error! }));
+      } else {
+        setFieldErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.email;
+          return newErrors;
+        });
+      }
+    } else if (name === "full_name") {
+      const validation = validateFullName(value);
+      if (!validation.valid) {
+        setFieldErrors((prev) => ({ ...prev, full_name: validation.error! }));
+      } else {
+        setFieldErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.full_name;
+          return newErrors;
+        });
+      }
+    }
   };
 
   const handleAvatarChange = (avatarUrl: string | null) => {
@@ -108,13 +206,43 @@ export default function CriarAgentePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validações do formulário
+    // Validações em tempo real antes de enviar
+    const validations = [
+      {
+        field: "matricula",
+        value: formData.matricula || "",
+        validator: validateMatricula,
+      },
+      { field: "email", value: formData.email || "", validator: validateEmail },
+      {
+        field: "full_name",
+        value: formData.full_name || "",
+        validator: validateFullName,
+      },
+    ];
+
+    const newErrors: Record<string, string> = {};
+    validations.forEach(({ field, value, validator }) => {
+      const validation = validator(value);
+      if (!validation.valid && validation.error) {
+        newErrors[field] = validation.error;
+      }
+    });
+
+    if (Object.keys(newErrors).length > 0) {
+      setFieldErrors(newErrors);
+      Object.values(newErrors).forEach((error) => toast.error(error));
+      return;
+    }
+
+    // Validações do formulário do store
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
       validationErrors.forEach((error) => toast.error(error));
       return;
     }
 
+    setSubmitStatus("loading");
     const toastId = toast.loading(
       `Cadastrando agente ${formData.full_name}...`,
       {
@@ -136,6 +264,7 @@ export default function CriarAgentePage() {
       });
 
       if (result.success) {
+        setSubmitStatus("success");
         toast.success("✅ Agente criado com sucesso!", {
           id: toastId,
           description: `O agente ${formData.full_name} foi cadastrado no sistema com sucesso.`,
@@ -151,6 +280,7 @@ export default function CriarAgentePage() {
 
         // Limpar formulário
         resetFormData();
+        setFieldErrors({});
 
         // Redirecionar após 3 segundos
         setTimeout(() => {
@@ -161,6 +291,7 @@ export default function CriarAgentePage() {
         throw new Error(result.error || "Erro ao criar agente");
       }
     } catch (err: unknown) {
+      setSubmitStatus("error");
       console.error("💥 Erro completo:", err);
       const errorMessage =
         err instanceof Error
@@ -174,6 +305,9 @@ export default function CriarAgentePage() {
       });
     }
   };
+
+  // Determinar se está carregando (melhoria de lógica)
+  const isLoading = submitStatus === "loading" || saving;
 
   // Botões de navegação
   const navigationButtons = [
@@ -204,13 +338,16 @@ export default function CriarAgentePage() {
   const currentAvatarUrl = formData.avatar_url || undefined;
 
   // Loading durante salvamento
-  if (saving) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4">
           <div className="text-center py-16">
-            <Spinner className="w-8 h-8 mx-auto mb-4 text-navy-600" />
+            <Spinner className="w-8 h-8 mx-auto mb-4 text-navy-600 animate-spin" />
             <p className="text-gray-600">Criando novo agente...</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Por favor, não feche esta página
+            </p>
           </div>
         </div>
       </div>
@@ -237,6 +374,39 @@ export default function CriarAgentePage() {
             </p>
           </div>
 
+          {/* Status da operação */}
+          {submitStatus === "success" && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <Alert className="bg-green-50 border-green-200 rounded-xl p-4">
+                <RiCheckLine className="h-5 w-5 text-green-600" />
+                <AlertDescription className="ml-3 text-green-800">
+                  <strong>✅ Agente criado com sucesso!</strong> Redirecionando
+                  para a lista de agentes...
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+
+          {submitStatus === "error" && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <Alert className="bg-red-50 border-red-200 rounded-xl p-4">
+                <RiErrorWarningLine className="h-5 w-5 text-red-600" />
+                <AlertDescription className="ml-3 text-red-800">
+                  <strong>❌ Erro ao criar agente.</strong> Tente novamente ou
+                  verifique os dados.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+
           {/* Botões de Navegação */}
           <div className="flex flex-wrap gap-3">
             {navigationButtons.map((button, index) => (
@@ -252,6 +422,7 @@ export default function CriarAgentePage() {
                   <Button
                     variant="outline"
                     className={`transition-all duration-300 ${button.className} h-11 px-4`}
+                    disabled={isLoading}
                   >
                     <button.icon className="w-4 h-4 mr-2" />
                     {button.label}
@@ -285,7 +456,11 @@ export default function CriarAgentePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-8">
-                  <form onSubmit={handleSubmit} className="space-y-8">
+                  <form
+                    ref={formRef}
+                    onSubmit={handleSubmit}
+                    className="space-y-8"
+                  >
                     {/* Upload de Avatar */}
                     <motion.div variants={fadeInUp} className="space-y-4">
                       <Label className="text-base font-semibold text-gray-700 flex items-center">
@@ -329,9 +504,23 @@ export default function CriarAgentePage() {
                             placeholder="00000000000"
                             maxLength={11}
                             required
-                            className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
-                            disabled={saving}
+                            className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                              fieldErrors.matricula
+                                ? "border-red-500 focus:ring-red-200"
+                                : "focus:ring-blue-500 border-gray-300"
+                            }`}
+                            disabled={isLoading}
                           />
+                          {fieldErrors.matricula && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                            >
+                              <RiAlertLine className="w-3 h-3" />
+                              {fieldErrors.matricula}
+                            </motion.p>
+                          )}
                         </div>
                         <motion.div
                           whileHover={{ scale: 1.05 }}
@@ -342,7 +531,7 @@ export default function CriarAgentePage() {
                             onClick={generateMatricula}
                             variant="outline"
                             className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300 h-14 px-5"
-                            disabled={saving}
+                            disabled={isLoading}
                           >
                             <RiAddLine className="w-5 h-5 mr-2" />
                             Gerar
@@ -377,9 +566,23 @@ export default function CriarAgentePage() {
                           onChange={handleInputChange}
                           placeholder="Nome completo do agente"
                           required
-                          className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
-                          disabled={saving}
+                          className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                            fieldErrors.full_name
+                              ? "border-red-500 focus:ring-red-200"
+                              : "focus:ring-blue-500 border-gray-300"
+                          }`}
+                          disabled={isLoading}
                         />
+                        {fieldErrors.full_name && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                          >
+                            <RiAlertLine className="w-3 h-3" />
+                            {fieldErrors.full_name}
+                          </motion.p>
+                        )}
                       </div>
                     </motion.div>
 
@@ -406,9 +609,23 @@ export default function CriarAgentePage() {
                           onChange={handleInputChange}
                           placeholder="agente@pac.org.br"
                           required
-                          className="pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 focus:ring-blue-500 border-2 rounded-xl"
-                          disabled={saving}
+                          className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                            fieldErrors.email
+                              ? "border-red-500 focus:ring-red-200"
+                              : "focus:ring-blue-500 border-gray-300"
+                          }`}
+                          disabled={isLoading}
                         />
+                        {fieldErrors.email && (
+                          <motion.p
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                          >
+                            <RiAlertLine className="w-3 h-3" />
+                            {fieldErrors.email}
+                          </motion.p>
+                        )}
                       </div>
                     </motion.div>
 
@@ -431,7 +648,7 @@ export default function CriarAgentePage() {
                           onValueChange={(value) =>
                             setFormData({ graduacao: value })
                           }
-                          disabled={saving}
+                          disabled={isLoading}
                         >
                           <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione uma graduação" />
@@ -463,7 +680,7 @@ export default function CriarAgentePage() {
                           onValueChange={(value) =>
                             setFormData({ tipo_sanguineo: value })
                           }
-                          disabled={saving}
+                          disabled={isLoading}
                         >
                           <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo sanguíneo" />
@@ -495,10 +712,11 @@ export default function CriarAgentePage() {
                             <Button
                               variant="outline"
                               className="w-full h-14 justify-between text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
-                              disabled={saving}
+                              disabled={isLoading}
+                              type="button"
                             >
                               <div className="flex items-center">
-                                <RiArrowDownSLine className="w-5 h-5 mr-3 text-navy-500" />
+                                <RiCalendar2Line className="w-5 h-5 mr-3 text-navy-500" />
                                 {formData.validade_certificacao
                                   ? formatDate(formData.validade_certificacao)
                                   : "Selecionar data"}
@@ -533,6 +751,7 @@ export default function CriarAgentePage() {
                               size="sm"
                               onClick={() => handleDateSelect(undefined)}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-3 rounded-lg"
+                              disabled={isLoading}
                             >
                               Limpar
                             </Button>
@@ -557,7 +776,7 @@ export default function CriarAgentePage() {
                           onValueChange={(value: "agent" | "admin") =>
                             setFormData({ role: value })
                           }
-                          disabled={saving}
+                          disabled={isLoading}
                         >
                           <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
                             <SelectValue placeholder="Selecione o tipo" />
@@ -593,10 +812,10 @@ export default function CriarAgentePage() {
                       >
                         <Button
                           type="submit"
-                          disabled={saving}
+                          disabled={isLoading}
                           className="w-full bg-green-600 hover:bg-green-700 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
                         >
-                          {saving ? (
+                          {isLoading ? (
                             <>
                               <Spinner className="w-5 h-5 mr-3" />
                               Cadastrando...
@@ -620,7 +839,7 @@ export default function CriarAgentePage() {
                             type="button"
                             variant="outline"
                             className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-4 h-14 text-lg transition-all duration-300 rounded-xl"
-                            disabled={saving}
+                            disabled={isLoading}
                           >
                             <RiArrowLeftLine className="w-5 h-5 mr-3" />
                             Cancelar
