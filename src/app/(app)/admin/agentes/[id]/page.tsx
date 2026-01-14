@@ -1,9 +1,8 @@
-// app/admin/agentes/[id]/page.tsx - COMPLETA
+// src/app/(app)/admin/agentes/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,16 +52,22 @@ import {
   RiCloseLine,
   RiAlertLine,
   RiHomeLine,
-  RiEditLine,
-  RiLockLine,
   RiShieldUserLine,
   RiCalendar2Line,
   RiCheckLine,
   RiErrorWarningLine,
+  RiDashboardLine,
 } from "react-icons/ri";
 
-// IMPORT DO STORE
-import { useAgentEdit, GRADUACOES, TIPOS_SANGUINEOS } from "@/lib/stores";
+// IMPORT DO STORE CORRETO - SEM VERIFICAÇÃO EXTRA
+import {
+  useAgentEdit,
+  GRADUACOES,
+  TIPOS_SANGUINEOS,
+} from "@/lib/stores/useAgentesStore";
+
+// Importar diretamente para exclusão
+import { deleteAgent } from "@/app/actions/admin/agents/agents";
 
 interface AgentUpdateData {
   full_name?: string;
@@ -76,53 +81,6 @@ interface AgentUpdateData {
   status?: boolean;
 }
 
-const usePermissions = () => {
-  const [currentUser, setCurrentUser] = useState<{
-    id: string;
-    role: "admin" | "agent";
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const supabase = createClient();
-
-  useEffect(() => {
-    const checkCurrentUser = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session?.user) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("role")
-            .eq("id", session.user.id)
-            .single();
-
-          if (profile) {
-            setCurrentUser({
-              id: session.user.id,
-              role: profile.role,
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao verificar permissões:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkCurrentUser();
-  }, [supabase]);
-
-  return {
-    loading,
-    currentUserRole: currentUser?.role || "agent",
-    currentUserId: currentUser?.id || "",
-  };
-};
-
 export default function EditarAgentePage() {
   const params = useParams();
   const router = useRouter();
@@ -132,12 +90,8 @@ export default function EditarAgentePage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
 
-  const { loading: permissionsLoading, currentUserId } = usePermissions();
-
-  // USANDO O STORE
+  // USANDO O HOOK CORRETO - SIMPLES COMO A LISTAGEM
   const {
     agent,
     loading,
@@ -150,88 +104,12 @@ export default function EditarAgentePage() {
     validateForm,
   } = useAgentEdit(agentId);
 
-  const isEditingOwnProfile = currentUserId === agentId;
-
-  // Verificar autenticação e permissões
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        setAuthLoading(true);
-        const supabase = createClient();
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          toast.error("Sessão expirada", {
-            description: "Faça login novamente para acessar esta página.",
-          });
-          router.push("/login");
-          return;
-        }
-
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, status, admin_2fa_enabled")
-          .eq("id", session.user.id)
-          .single();
-
-        if (!profile) {
-          toast.error("Perfil não encontrado");
-          router.push("/login");
-          return;
-        }
-
-        if (profile.role !== "admin" && !isEditingOwnProfile) {
-          toast.error("Acesso restrito", {
-            description: "Apenas administradores podem editar outros agentes.",
-          });
-          router.push("/perfil");
-          return;
-        }
-
-        if (!profile.status) {
-          toast.error("Conta inativa", {
-            description:
-              "Sua conta está inativa. Entre em contato com o administrador.",
-          });
-          router.push("/login");
-          return;
-        }
-
-        if (profile.role === "admin" && !profile.admin_2fa_enabled) {
-          toast.error("Senha administrativa não configurada", {
-            description: "Configure sua senha administrativa primeiro.",
-          });
-          router.push("/admin/setup-password");
-          return;
-        }
-
-        setIsAdmin(profile.role === "admin");
-      } catch (error) {
-        console.error("Erro na verificação de autenticação:", error);
-        toast.error("Erro de autenticação");
-        router.push("/login");
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router, isEditingOwnProfile]);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData({ [name]: value });
   };
 
   const handleSwitchChange = (checked: boolean) => {
-    if (!isAdmin) {
-      toast.error("Apenas administradores podem alterar o status");
-      return;
-    }
-
     setFormData({ status: checked });
     toast.info(
       checked
@@ -244,11 +122,6 @@ export default function EditarAgentePage() {
   };
 
   const handleRoleChange = (value: "agent" | "admin") => {
-    if (!isAdmin) {
-      toast.error("Apenas administradores podem alterar o tipo de usuário");
-      return;
-    }
-
     setFormData({ role: value });
     toast.info(
       value === "admin"
@@ -268,18 +141,7 @@ export default function EditarAgentePage() {
     setFormData({ tipo_sanguineo: value });
   };
 
-  const handleFileSelected = async (file: File | null) => {
-    setAvatarFile(file);
-
-    if (file) {
-      toast.info("Foto selecionada - será enviada ao salvar", {
-        description: "Clique em 'Salvar Alterações' para enviar a foto",
-        duration: 4000,
-      });
-    }
-  };
-
-  const handleAvatarUrlChange = async (avatarUrl: string | null) => {
+  const handleAvatarUrlChange = (avatarUrl: string | null) => {
     setFormData({ avatar_url: avatarUrl || "" });
   };
 
@@ -385,15 +247,11 @@ export default function EditarAgentePage() {
         tipo_sanguineo: formData.tipo_sanguineo || null,
         validade_certificacao: formData.validade_certificacao || null,
         avatar_url: formData.avatar_url || null,
+        matricula: formData.matricula || "",
+        email: formData.email || "",
+        role: formData.role || "agent",
+        status: formData.status ?? true,
       };
-
-      // Apenas admin pode alterar esses campos
-      if (isAdmin) {
-        updateData.matricula = formData.matricula || "";
-        updateData.email = formData.email || "";
-        updateData.role = formData.role || "agent";
-        updateData.status = formData.status ?? true;
-      }
 
       const result = await updateAgent(updateData);
 
@@ -401,6 +259,9 @@ export default function EditarAgentePage() {
         toast.success("Alterações salvas com sucesso!");
         setHasUnsavedChanges(false);
         setAvatarFile(null);
+
+        // Recarregar a página para mostrar dados atualizados
+        router.refresh();
       } else {
         throw new Error(result.error || "Erro ao atualizar agente");
       }
@@ -419,23 +280,11 @@ export default function EditarAgentePage() {
   const handleHardDelete = async () => {
     if (!agent) return;
 
-    if (!isAdmin) {
-      toast.error("Apenas administradores podem excluir agentes");
-      return;
-    }
-
-    if (isEditingOwnProfile) {
-      toast.error("Administradores não podem se excluir");
-      return;
-    }
-
     setIsDeleting(true);
     const toastId = toast.loading("Excluindo agente...");
 
     try {
-      // Importar a função deleteAgent diretamente
-      const agentsModule = await import("@/app/actions/admin/agents/agents");
-      const result = await agentsModule.deleteAgent(agentId);
+      const result = await deleteAgent(agentId);
 
       if (result.success) {
         toast.success("Agente excluído!", { id: toastId });
@@ -447,18 +296,20 @@ export default function EditarAgentePage() {
       } else {
         throw new Error(result.error);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Erro ao excluir:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Erro desconhecido";
       toast.error("Falha na exclusão", {
         id: toastId,
-        description: err instanceof Error ? err.message : "Erro desconhecido",
+        description: errorMessage,
       });
     } finally {
       setIsDeleting(false);
     }
   };
 
-  if (authLoading || loading || permissionsLoading) {
+  if (loading || !agent) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
         <div className="container mx-auto px-4 max-w-7xl">
@@ -466,37 +317,6 @@ export default function EditarAgentePage() {
             <Spinner className="w-8 h-8 mx-auto mb-4 text-navy-600" />
             <p className="text-gray-600">Carregando dados do agente...</p>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!agent) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-        <div className="container mx-auto px-4 max-w-7xl">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-center py-16"
-          >
-            <RiUserLine className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              Agente Não Encontrado
-            </h2>
-            <p className="text-gray-600 mb-6">
-              O agente que você está tentando editar não existe ou foi removido.
-            </p>
-            <Link href={isAdmin ? "/admin/agentes" : "/perfil"}>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-300 h-12 px-6">
-                <RiArrowLeftLine className="w-5 h-5 mr-2" />
-                {isAdmin
-                  ? "Voltar para Lista de Agentes"
-                  : "Voltar ao Meu Perfil"}
-              </Button>
-            </Link>
-          </motion.div>
         </div>
       </div>
     );
@@ -519,40 +339,27 @@ export default function EditarAgentePage() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
               <div className="space-y-3">
                 <h1 className="text-3xl font-bold text-gray-800 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-                  {isEditingOwnProfile ? "EDITAR MEU PERFIL" : "EDITAR AGENTE"}
+                  EDITAR AGENTE
                 </h1>
                 <p className="text-gray-600 text-lg">
-                  {isEditingOwnProfile ? (
-                    <>
-                      Editando seu próprio perfil • Matrícula:{" "}
-                      <strong className="text-navy-700">
-                        {agent.matricula}
-                      </strong>
-                    </>
-                  ) : (
-                    <>
-                      Editando:{" "}
-                      <strong className="text-navy-700">
-                        {agent.full_name || "Agente"}
-                      </strong>{" "}
-                      • Matrícula:{" "}
-                      <strong className="text-navy-700">
-                        {agent.matricula}
-                      </strong>
-                    </>
-                  )}
+                  Editando:{" "}
+                  <strong className="text-navy-700">
+                    {agent.full_name || "Agente"}
+                  </strong>{" "}
+                  • Matrícula:{" "}
+                  <strong className="text-navy-700">{agent.matricula}</strong>
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
                 <Badge
                   className={
-                    isAdmin
+                    agent.role === "admin"
                       ? "bg-purple-500 text-white text-sm py-2 px-4 rounded-full"
                       : "bg-blue-500 text-white text-sm py-2 px-4 rounded-full"
                   }
                 >
-                  {isAdmin ? (
+                  {agent.role === "admin" ? (
                     <>
                       <RiShieldUserLine className="w-4 h-4 mr-2" /> ADMIN
                     </>
@@ -563,11 +370,15 @@ export default function EditarAgentePage() {
                   )}
                 </Badge>
 
-                {isEditingOwnProfile && (
-                  <Badge className="bg-green-500 text-white text-sm py-2 px-4 rounded-full">
-                    <RiEditLine className="w-4 h-4 mr-2" /> MEU PERFIL
-                  </Badge>
-                )}
+                <Badge
+                  className={
+                    agent.status
+                      ? "bg-green-500 text-white text-sm py-2 px-4 rounded-full"
+                      : "bg-red-500 text-white text-sm py-2 px-4 rounded-full"
+                  }
+                >
+                  {agent.status ? "✅ ATIVO" : "❌ INATIVO"}
+                </Badge>
               </div>
             </div>
 
@@ -596,15 +407,26 @@ export default function EditarAgentePage() {
 
           {/* Botões de Navegação */}
           <div className="flex flex-wrap gap-3 mb-8">
-            <Link href={isAdmin ? "/admin/agentes" : "/perfil"}>
+            <Link href="/admin/agentes">
               <Button
                 variant="outline"
                 className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-300 h-12 px-5 rounded-xl"
               >
                 <RiArrowLeftLine className="w-5 h-5 mr-2" />
-                {isAdmin ? "Voltar para Lista" : "Voltar ao Perfil"}
+                Voltar para Lista
               </Button>
             </Link>
+
+            <Link href="/admin/dashboard">
+              <Button
+                variant="outline"
+                className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white transition-all duration-300 h-12 px-5 rounded-xl"
+              >
+                <RiDashboardLine className="w-5 h-5 mr-2" />
+                Dashboard
+              </Button>
+            </Link>
+
             <Link href="/">
               <Button
                 variant="outline"
@@ -629,9 +451,7 @@ export default function EditarAgentePage() {
                 <CardHeader className="border-b border-gray-200 pb-6 px-8 pt-8">
                   <CardTitle className="flex items-center text-2xl text-gray-800">
                     <RiUserLine className="w-6 h-6 mr-3 text-navy-600" />
-                    {isEditingOwnProfile
-                      ? "Editar Meu Perfil"
-                      : "Editar Dados do Agente"}
+                    Editar Dados do Agente
                     {hasUnsavedChanges && (
                       <Badge
                         variant="outline"
@@ -649,33 +469,14 @@ export default function EditarAgentePage() {
                       <Label className="text-base font-semibold text-gray-700 flex items-center mb-3">
                         <RiUserLine className="w-5 h-5 mr-2 text-navy-500" />
                         Foto do Agente
-                        {avatarFile && (
-                          <Badge className="ml-3 bg-blue-100 text-blue-800 text-sm py-1 px-3">
-                            Nova foto selecionada
-                          </Badge>
-                        )}
                       </Label>
                       <FileUpload
                         type="avatar"
                         onFileChange={handleAvatarUrlChange}
-                        onFileSelected={handleFileSelected}
                         currentFile={currentAvatarUrl}
                         className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-500 transition-all duration-300"
                         userId={agent.matricula}
-                        autoUpload={false}
                       />
-                      {avatarFile && (
-                        <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
-                          <p className="text-sm text-blue-700">
-                            📸 <strong>Nova foto selecionada:</strong>{" "}
-                            {avatarFile.name}
-                            <span className="block text-xs text-blue-600 mt-1">
-                              Será enviada quando você clicar em &quot;Salvar
-                              Alterações&quot;
-                            </span>
-                          </p>
-                        </div>
-                      )}
                     </div>
 
                     {/* Matrícula */}
@@ -700,18 +501,9 @@ export default function EditarAgentePage() {
                           placeholder="Número da matrícula"
                           className="pl-12 text-lg py-3 h-14 font-mono border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                           required
-                          disabled={saving || !isAdmin}
-                          readOnly={!isAdmin}
+                          disabled={saving}
                         />
                       </div>
-                      {!isAdmin && (
-                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <p className="text-sm text-yellow-700">
-                            <RiAlertLine className="inline w-4 h-4 mr-1" />
-                            Apenas administradores podem alterar a matrícula
-                          </p>
-                        </div>
-                      )}
                     </div>
 
                     {/* Nome Completo */}
@@ -757,19 +549,9 @@ export default function EditarAgentePage() {
                           placeholder="email@exemplo.com"
                           className="pl-12 text-lg py-3 h-14 border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                           required
-                          disabled={saving || !isAdmin}
-                          readOnly={!isAdmin}
+                          disabled={saving}
                         />
                       </div>
-                      {!isAdmin && (
-                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <p className="text-sm text-yellow-700">
-                            <RiAlertLine className="inline w-4 h-4 mr-1" />
-                            Para alterar o email, entre em contato com um
-                            administrador
-                          </p>
-                        </div>
-                      )}
                     </div>
 
                     {/* Graduação e Tipo Sanguíneo */}
@@ -864,15 +646,6 @@ export default function EditarAgentePage() {
                               initialFocus
                               locale={ptBR}
                               className="rounded-xl border shadow-2xl"
-                              disabled={(date) => {
-                                const today = new Date();
-                                const todayStart = new Date(
-                                  today.getFullYear(),
-                                  today.getMonth(),
-                                  today.getDate()
-                                );
-                                return date < todayStart;
-                              }}
                             />
                           </PopoverContent>
                         </Popover>
@@ -904,7 +677,7 @@ export default function EditarAgentePage() {
                         <Select
                           value={formData.role || "agent"}
                           onValueChange={handleRoleChange}
-                          disabled={saving || !isAdmin}
+                          disabled={saving}
                         >
                           <SelectTrigger className="h-14 text-base border-2 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
                             <SelectValue placeholder="Selecione o tipo" />
@@ -924,15 +697,6 @@ export default function EditarAgentePage() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
-                        {!isAdmin && (
-                          <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                            <p className="text-sm text-gray-600">
-                              <RiLockLine className="inline w-4 h-4 mr-1" />
-                              Apenas administradores podem alterar o tipo de
-                              usuário
-                            </p>
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -945,18 +709,10 @@ export default function EditarAgentePage() {
                         <Switch
                           checked={formData.status ?? true}
                           onCheckedChange={handleSwitchChange}
-                          disabled={saving || !isAdmin}
+                          disabled={saving}
                           className="scale-110"
                         />
                       </div>
-                      {!isAdmin && (
-                        <div className="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                          <p className="text-sm text-gray-600">
-                            <RiLockLine className="inline w-4 h-4 mr-1" />
-                            Apenas administradores podem alterar o status
-                          </p>
-                        </div>
-                      )}
                     </div>
 
                     {/* Botões de Ação */}
@@ -982,10 +738,7 @@ export default function EditarAgentePage() {
                           )}
                         </Button>
 
-                        <Link
-                          href={isAdmin ? "/admin/agentes" : "/perfil"}
-                          className="flex-1"
-                        >
+                        <Link href="/admin/agentes" className="flex-1">
                           <Button
                             type="button"
                             variant="outline"
@@ -1000,124 +753,121 @@ export default function EditarAgentePage() {
                     </div>
 
                     {/* Zona de Perigo (Apenas Admin) */}
-                    {isAdmin && !isEditingOwnProfile && (
-                      <div className="pt-8 border-t border-red-200 mt-10">
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-                          <Label className="text-base font-semibold text-red-700 mb-4 flex items-center">
-                            <RiAlertLine className="w-5 h-5 mr-2" />
-                            ⚠️ Zona de Perigo
-                          </Label>
+                    <div className="pt-8 border-t border-red-200 mt-10">
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+                        <Label className="text-base font-semibold text-red-700 mb-4 flex items-center">
+                          <RiAlertLine className="w-5 h-5 mr-2" />
+                          ⚠️ Zona de Perigo
+                        </Label>
 
-                          <AlertDialog
-                            open={deleteDialogOpen}
-                            onOpenChange={setDeleteDialogOpen}
-                          >
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full border-red-700 text-red-700 hover:bg-red-700 hover:text-white py-3 h-12 transition-colors duration-300"
-                                size="lg"
-                                disabled={isDeleting}
-                              >
-                                <RiDeleteBinLine className="w-5 h-5 mr-2" />
-                                {isDeleting
-                                  ? "Excluindo..."
-                                  : "Excluir Permanentemente"}
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
-                              <AlertDialogHeader className="pb-4">
-                                <AlertDialogTitle className="text-red-600 text-2xl flex items-center">
-                                  <RiAlertLine className="w-6 h-6 mr-2" />
-                                  🚨 EXCLUSÃO PERMANENTE
-                                </AlertDialogTitle>
-                                <AlertDialogDescription asChild>
-                                  <div className="space-y-4 text-base">
-                                    <div className="font-semibold text-gray-900">
-                                      Tem certeza que deseja excluir
-                                      permanentemente este agente?
+                        <AlertDialog
+                          open={deleteDialogOpen}
+                          onOpenChange={setDeleteDialogOpen}
+                        >
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full border-red-700 text-red-700 hover:bg-red-700 hover:text-white py-3 h-12 transition-colors duration-300"
+                              size="lg"
+                              disabled={isDeleting}
+                            >
+                              <RiDeleteBinLine className="w-5 h-5 mr-2" />
+                              {isDeleting
+                                ? "Excluindo..."
+                                : "Excluir Permanentemente"}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
+                            <AlertDialogHeader className="pb-4">
+                              <AlertDialogTitle className="text-red-600 text-2xl flex items-center">
+                                <RiAlertLine className="w-6 h-6 mr-2" />
+                                🚨 EXCLUSÃO PERMANENTE
+                              </AlertDialogTitle>
+                              <AlertDialogDescription asChild>
+                                <div className="space-y-4 text-base">
+                                  <div className="font-semibold text-gray-900">
+                                    Tem certeza que deseja excluir
+                                    permanentemente este agente?
+                                  </div>
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+                                    <div>
+                                      <strong>Nome:</strong>{" "}
+                                      {agent.full_name || "Agente sem nome"}
                                     </div>
-                                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
-                                      <div>
-                                        <strong>Nome:</strong>{" "}
-                                        {agent.full_name || "Agente sem nome"}
-                                      </div>
-                                      <div>
-                                        <strong>Matrícula:</strong>{" "}
-                                        {agent.matricula}
-                                      </div>
-                                      <div>
-                                        <strong>Email:</strong> {agent.email}
-                                      </div>
+                                    <div>
+                                      <strong>Matrícula:</strong>{" "}
+                                      {agent.matricula}
                                     </div>
-                                    <div className="text-red-600 font-bold text-lg">
-                                      ⚠️ ESTA AÇÃO NÃO PODE SER DESFEITA!
-                                    </div>
-                                    <div className="text-gray-600 space-y-2">
-                                      <div className="flex items-start">
-                                        <span className="mr-2">•</span>
-                                        <span>
-                                          O agente será removido do sistema de
-                                          autenticação
-                                        </span>
-                                      </div>
-                                      <div className="flex items-start">
-                                        <span className="mr-2">•</span>
-                                        <span>
-                                          O perfil será excluído do banco de
-                                          dados
-                                        </span>
-                                      </div>
-                                      <div className="flex items-start">
-                                        <span className="mr-2">•</span>
-                                        <span>
-                                          Todos os dados relacionados serão
-                                          apagados
-                                        </span>
-                                      </div>
-                                      <div className="flex items-start">
-                                        <span className="mr-2">•</span>
-                                        <span>
-                                          O avatar será removido do storage
-                                        </span>
-                                      </div>
+                                    <div>
+                                      <strong>Email:</strong> {agent.email}
                                     </div>
                                   </div>
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter className="pt-4">
-                                <AlertDialogCancel
-                                  disabled={isDeleting}
-                                  className="h-11 rounded-lg"
-                                >
-                                  Cancelar
-                                </AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={handleHardDelete}
-                                  disabled={isDeleting}
-                                  className="bg-red-600 hover:bg-red-700 text-white h-11 rounded-lg"
-                                >
-                                  {isDeleting ? (
-                                    <>
-                                      <Spinner className="w-5 h-5 mr-2" />
-                                      Excluindo...
-                                    </>
-                                  ) : (
-                                    "Sim, excluir permanentemente"
-                                  )}
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  <div className="text-red-600 font-bold text-lg">
+                                    ⚠️ ESTA AÇÃO NÃO PODE SER DESFEITA!
+                                  </div>
+                                  <div className="text-gray-600 space-y-2">
+                                    <div className="flex items-start">
+                                      <span className="mr-2">•</span>
+                                      <span>
+                                        O agente será removido do sistema de
+                                        autenticação
+                                      </span>
+                                    </div>
+                                    <div className="flex items-start">
+                                      <span className="mr-2">•</span>
+                                      <span>
+                                        O perfil será excluído do banco de dados
+                                      </span>
+                                    </div>
+                                    <div className="flex items-start">
+                                      <span className="mr-2">•</span>
+                                      <span>
+                                        Todos os dados relacionados serão
+                                        apagados
+                                      </span>
+                                    </div>
+                                    <div className="flex items-start">
+                                      <span className="mr-2">•</span>
+                                      <span>
+                                        O avatar será removido do storage
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="pt-4">
+                              <AlertDialogCancel
+                                disabled={isDeleting}
+                                className="h-11 rounded-lg"
+                              >
+                                Cancelar
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={handleHardDelete}
+                                disabled={isDeleting}
+                                className="bg-red-600 hover:bg-red-700 text-white h-11 rounded-lg"
+                              >
+                                {isDeleting ? (
+                                  <>
+                                    <Spinner className="w-5 h-5 mr-2" />
+                                    Excluindo...
+                                  </>
+                                ) : (
+                                  "Sim, excluir permanentemente"
+                                )}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
 
-                          <p className="text-sm text-red-600 mt-3">
-                            Esta ação não pode ser desfeita. O agente será
-                            removido permanentemente do sistema.
-                          </p>
-                        </div>
+                        <p className="text-sm text-red-600 mt-3">
+                          Esta ação não pode ser desfeita. O agente será
+                          removido permanentemente do sistema.
+                        </p>
                       </div>
-                    )}
+                    </div>
                   </form>
                 </CardContent>
               </Card>

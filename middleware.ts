@@ -18,24 +18,23 @@ const PUBLIC_ROUTES = [
   "/galeria",
 ] as const;
 
-// Rotas que requerem permissão de admin
+// Rotas que requerem permissão de admin (qualquer rota dentro de /admin)
 const ADMIN_ROUTES = [
   "/admin",
-  "/admin/dashboard",
-  "/admin/agentes",
-  "/admin/noticias",
-  "/admin/galeria",
-  "/admin/atividades",
-  "/admin/setup-password",
+  "/admin/*", // Captura todas as sub-rotas de /admin
 ] as const;
 
-// Rotas que requerem SESSÃO ADMIN ATIVA (2ª camada)
+// Rotas que requerem SESSÃO ADMIN ATIVA (2ª camada) - especificas
 const ADMIN_SESSION_ROUTES = [
   "/admin/dashboard",
   "/admin/agentes",
+  "/admin/agentes/*",
   "/admin/noticias",
+  "/admin/noticias/*",
   "/admin/galeria",
+  "/admin/galeria/*",
   "/admin/atividades",
+  "/admin/atividades/*",
 ] as const;
 
 // Rota de perfil do agente
@@ -48,25 +47,6 @@ export async function middleware(request: NextRequest) {
   console.log(
     `\n🔍 [Middleware ${requestId}] Iniciando para rota: ${pathname}`
   );
-  console.log(`📝 [Middleware ${requestId}] URL completa: ${request.url}`);
-
-  // DEBUG detalhado dos cookies
-  const allCookies = request.cookies.getAll();
-  console.log(
-    `🍪 [Middleware ${requestId}] Cookies disponíveis (${allCookies.length}):`
-  );
-  allCookies.forEach((cookie, index) => {
-    console.log(
-      `  ${index + 1}. ${cookie.name}: ${
-        cookie.value ? "✓ COM VALOR" : "✗ SEM VALOR"
-      }`
-    );
-    if (cookie.name === "admin_session" || cookie.name === "is_admin") {
-      console.log(
-        `     Valor (primeiros 50 chars): ${cookie.value?.substring(0, 50)}...`
-      );
-    }
-  });
 
   // Ignorar arquivos estáticos e rotas da API
   if (
@@ -82,8 +62,6 @@ export async function middleware(request: NextRequest) {
   const response = NextResponse.next();
 
   try {
-    console.log(`🔧 [Middleware ${requestId}] Criando cliente Supabase...`);
-
     // ============================================
     // CONFIGURAÇÃO DO CLIENTE SUPABASE
     // ============================================
@@ -93,18 +71,12 @@ export async function middleware(request: NextRequest) {
       {
         cookies: {
           getAll() {
-            const cookies = request.cookies.getAll();
-            console.log(
-              `🍪 [Supabase ${requestId}] Cookies para Supabase: ${cookies
-                .map((c) => c.name)
-                .join(", ")}`
-            );
-            return cookies;
+            return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) => {
               console.log(
-                `📝 [Supabase ${requestId}] Configurando cookie: ${name}`
+                `📝 [Middleware ${requestId}] Configurando cookie: ${name}`
               );
               response.cookies.set({
                 name,
@@ -137,11 +109,6 @@ export async function middleware(request: NextRequest) {
     const userId = session?.user?.id;
     console.log(
       `👤 [Middleware ${requestId}] Usuário ID: ${userId || "NÃO AUTENTICADO"}`
-    );
-    console.log(
-      `👤 [Middleware ${requestId}] Email do usuário: ${
-        session?.user?.email || "NÃO DISPONÍVEL"
-      }`
     );
 
     // ============================================
@@ -190,7 +157,7 @@ export async function middleware(request: NextRequest) {
     console.log(`📋 [Middleware ${requestId}] Buscando perfil do usuário...`);
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("role, status, admin_2fa_enabled, full_name, email, matricula")
+      .select("role, status, admin_2fa_enabled, full_name")
       .eq("id", userId)
       .single();
 
@@ -207,8 +174,6 @@ export async function middleware(request: NextRequest) {
 
     console.log(`📋 [Middleware ${requestId}] Perfil encontrado:`, {
       nome: profile.full_name,
-      email: profile.email,
-      matricula: profile.matricula,
       role: profile.role,
       status: profile.status,
       admin_2fa_enabled: profile.admin_2fa_enabled,
@@ -217,9 +182,13 @@ export async function middleware(request: NextRequest) {
     // ============================================
     // CASO 4: VERIFICAR SE É ROTA ADMIN
     // ============================================
-    const isAdminRoute = ADMIN_ROUTES.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`)
-    );
+    const isAdminRoute = ADMIN_ROUTES.some((route) => {
+      if (route.endsWith("/*")) {
+        const baseRoute = route.slice(0, -2);
+        return pathname === baseRoute || pathname.startsWith(`${baseRoute}/`);
+      }
+      return pathname === route || pathname.startsWith(`${route}/`);
+    });
 
     console.log(
       `📊 [Middleware ${requestId}] É rota admin? ${
@@ -307,9 +276,13 @@ export async function middleware(request: NextRequest) {
     // ============================================
     // CASO 7: VERIFICAR SESSÃO ADMIN (2ª CAMADA)
     // ============================================
-    const requiresAdminSession = ADMIN_SESSION_ROUTES.some(
-      (route) => pathname === route || pathname.startsWith(`${route}/`)
-    );
+    const requiresAdminSession = ADMIN_SESSION_ROUTES.some((route) => {
+      if (route.endsWith("/*")) {
+        const baseRoute = route.slice(0, -2);
+        return pathname === baseRoute || pathname.startsWith(`${baseRoute}/`);
+      }
+      return pathname === route || pathname.startsWith(`${route}/`);
+    });
 
     console.log(
       `📊 [Middleware ${requestId}] Requer sessão admin? ${
@@ -322,22 +295,9 @@ export async function middleware(request: NextRequest) {
         `🔐 [Middleware ${requestId}] Verificando sessão admin (2ª camada)...`
       );
 
-      // Verificar cookies de sessão admin com DEBUG detalhado
+      // Verificar cookies de sessão admin
       const adminSessionCookie = request.cookies.get("admin_session");
       const isAdminCookie = request.cookies.get("is_admin");
-
-      console.log(`🍪 [Middleware ${requestId}] Cookie admin_session:`, {
-        existe: !!adminSessionCookie,
-        temValor: !!adminSessionCookie?.value,
-        tamanho: adminSessionCookie?.value?.length || 0,
-        valorPreview: adminSessionCookie?.value?.substring(0, 100) || "N/A",
-      });
-
-      console.log(`🍪 [Middleware ${requestId}] Cookie is_admin:`, {
-        existe: !!isAdminCookie,
-        valor: isAdminCookie?.value,
-        éTrue: isAdminCookie?.value === "true",
-      });
 
       // Se não tem cookies admin válidos, redireciona para perfil
       if (
@@ -346,34 +306,17 @@ export async function middleware(request: NextRequest) {
         isAdminCookie.value !== "true"
       ) {
         console.log(`❌ [Middleware ${requestId}] FALTAM COOKIES ADMIN!`);
-        console.log(`   - Tem admin_session? ${!!adminSessionCookie}`);
-        console.log(`   - Tem is_admin? ${!!isAdminCookie}`);
-        console.log(
-          `   - is_admin é "true"? ${isAdminCookie?.value === "true"}`
-        );
         console.log(`🔄 [Middleware ${requestId}] Redirecionando para /perfil`);
         return NextResponse.redirect(new URL(AGENT_PROFILE_ROUTE, request.url));
       }
 
       // Verificar se sessão admin expirou
       try {
-        console.log(
-          `📅 [Middleware ${requestId}] Verificando expiração da sessão...`
-        );
         const sessionData = JSON.parse(adminSessionCookie.value);
 
         if (sessionData.expiresAt) {
           const expiresAt = new Date(sessionData.expiresAt);
           const now = new Date();
-          const diffMs = expiresAt.getTime() - now.getTime();
-          const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-          console.log(`📅 [Middleware ${requestId}] Sessão admin:`, {
-            expiraEm: expiresAt.toISOString(),
-            agora: now.toISOString(),
-            minutosRestantes: diffMinutes,
-            expirada: expiresAt < now,
-          });
 
           if (expiresAt < now) {
             console.log(`❌ [Middleware ${requestId}] Sessão admin EXPIRADA!`);
@@ -387,10 +330,6 @@ export async function middleware(request: NextRequest) {
               new URL(AGENT_PROFILE_ROUTE, request.url)
             );
           }
-        } else {
-          console.log(
-            `⚠️ [Middleware ${requestId}] Sessão sem data de expiração`
-          );
         }
 
         console.log(
@@ -401,9 +340,6 @@ export async function middleware(request: NextRequest) {
         console.error(
           `❌ [Middleware ${requestId}] Erro ao parsear cookie admin:`,
           error
-        );
-        console.log(
-          `🔄 [Middleware ${requestId}] Redirecionando para /perfil (cookie inválido)`
         );
         // Limpar cookies inválidos
         response.cookies.delete("admin_session");
@@ -421,14 +357,7 @@ export async function middleware(request: NextRequest) {
     return response;
   } catch (error) {
     console.error(`❌ [Middleware ${requestId}] ERRO CRÍTICO:`, error);
-    console.log(
-      `🔄 [Middleware ${requestId}] Redirecionando para login por segurança`
-    );
     return NextResponse.redirect(new URL("/login", request.url));
-  } finally {
-    console.log(
-      `🏁 [Middleware ${requestId}] Processamento finalizado para: ${pathname}\n`
-    );
   }
 }
 

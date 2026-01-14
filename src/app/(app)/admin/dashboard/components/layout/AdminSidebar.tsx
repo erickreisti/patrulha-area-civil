@@ -19,7 +19,6 @@ import {
   RiListUnordered,
   RiFolderLine,
   RiSettingsLine,
-  RiCalendarLine,
   RiShieldLine,
   RiBarChart2Line,
 } from "react-icons/ri";
@@ -68,11 +67,6 @@ const navigation: NavigationItem[] = [
         href: "/admin/agentes",
         icon: RiListUnordered,
       },
-      {
-        name: "Estatísticas",
-        href: "/admin/agentes/estatisticas",
-        icon: RiBarChart2Line,
-      },
     ],
   },
   {
@@ -90,11 +84,6 @@ const navigation: NavigationItem[] = [
         name: "Listar Notícias",
         href: "/admin/noticias",
         icon: RiListUnordered,
-      },
-      {
-        name: "Calendário",
-        href: "/admin/noticias/calendario",
-        icon: RiCalendarLine,
       },
     ],
   },

@@ -1,436 +1,165 @@
+// src/lib/stores/useActivitiesStore.ts - VERSÃO FINAL COMPLETA
 "use client";
 
 import { create } from "zustand";
-import { createClient } from "@/lib/supabase/client";
-import type { RealtimeChannel } from "@supabase/supabase-js";
-import {
-  getRecentActivitiesForDashboard,
-  getActivitiesStats,
-  createSystemActivity,
-  type ActivityWithUser,
-  type CreateActivityData,
-} from "@/app/actions/admin/activities";
-import {
-  getDashboardStats,
-  type DashboardStats,
-  type DashboardResponse,
-} from "@/app/actions/admin/dashboard/dashboard";
 
-export interface ActivityStats {
-  total: number;
-  topTypes: Array<{ type: string; count: number }>;
-  timeframe: string;
-}
+// Tipos importados das server actions
+import type { ActivityWithUser } from "@/app/actions/admin/activities";
 
-interface ActivitiesStoreState {
-  // Dados
-  recentActivities: ActivityWithUser[];
-  stats: ActivityStats | null;
-  dashboardStats: DashboardStats | null;
-
+interface ActivitiesStore {
   // Estado
-  loadingRecent: boolean;
-  loadingStats: boolean;
-  loadingDashboard: boolean;
+  activities: ActivityWithUser[];
+  loading: boolean;
   error: string | null;
-  realtimeConnected: boolean;
 
-  // Canal Real-time
-  realtimeChannel: RealtimeChannel | null;
+  // Filtros
+  filters: {
+    search: string;
+    action_type: string;
+    date_range: string;
+  };
+
+  // Paginação
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 
   // Ações
-  fetchRecentActivities: () => Promise<void>;
-  fetchStats: (timeframe?: "day" | "week" | "month") => Promise<void>;
-  fetchDashboardStats: () => Promise<DashboardStats | null>;
-  createActivity: (data: CreateActivityData) => Promise<void>;
-
-  // Real-time Actions
-  setupRealtime: () => Promise<boolean>;
-  cleanupRealtime: () => Promise<void>;
+  fetchActivities: () => Promise<void>;
+  setFilters: (filters: Partial<ActivitiesStore["filters"]>) => void;
+  setPage: (page: number) => void;
+  clearError: () => void;
 }
 
-// Estado inicial
-const initialState: Omit<
-  ActivitiesStoreState,
-  | "fetchRecentActivities"
-  | "fetchStats"
-  | "fetchDashboardStats"
-  | "createActivity"
-  | "setupRealtime"
-  | "cleanupRealtime"
-> = {
-  recentActivities: [],
-  stats: null,
-  dashboardStats: null,
-  loadingRecent: false,
-  loadingStats: false,
-  loadingDashboard: false,
+// Criação do store
+export const useActivitiesStore = create<ActivitiesStore>((set, get) => ({
+  // Estado inicial
+  activities: [],
+  loading: false,
   error: null,
-  realtimeConnected: false,
-  realtimeChannel: null,
-};
 
-export const useActivitiesStore = create<ActivitiesStoreState>((set, get) => ({
-  ...initialState,
+  filters: {
+    search: "",
+    action_type: "all",
+    date_range: "all",
+  },
 
-  // ATUALIZADO: Usar getDashboardStats corretamente
-  fetchDashboardStats: async () => {
-    set({ loadingDashboard: true, error: null });
+  pagination: {
+    page: 1,
+    limit: 15,
+    total: 0,
+    totalPages: 1,
+  },
 
+  // Buscar atividades usando server action
+  fetchActivities: async () => {
     try {
-      console.log("🔍 [ActivitiesStore] Buscando dados do dashboard...");
-      const result: DashboardResponse = await getDashboardStats();
+      console.log("🔄 [useActivitiesStore] Buscando atividades...");
+      set({ loading: true, error: null });
+
+      const { filters, pagination } = get();
+
+      // Importar server action dinamicamente
+      const { getAllActivities } = await import(
+        "@/app/actions/admin/activities"
+      );
+
+      // Chamar server action com filtros
+      const result = await getAllActivities(
+        {
+          search: filters.search || undefined,
+          action_type:
+            filters.action_type !== "all" ? filters.action_type : undefined,
+          date_range:
+            filters.date_range !== "all" ? filters.date_range : undefined,
+        },
+        {
+          page: pagination.page,
+          limit: pagination.limit,
+        }
+      );
 
       if (result.success && result.data) {
         console.log(
-          "✅ [ActivitiesStore] Dados do dashboard carregados com sucesso"
+          `✅ [useActivitiesStore] ${result.data.length} atividades carregadas`
         );
 
         set({
-          dashboardStats: result.data,
-          loadingDashboard: false,
-        });
-
-        return result.data;
-      } else {
-        console.warn(
-          "⚠️ [ActivitiesStore] Erro ao buscar dados do dashboard:",
-          result.error
-        );
-
-        set({
-          loadingDashboard: false,
-          error: result.error || "Não foi possível carregar dados do dashboard",
-        });
-
-        return null;
-      }
-    } catch (error) {
-      console.error(
-        "❌ [ActivitiesStore] Erro ao buscar dados do dashboard:",
-        error
-      );
-
-      set({
-        loadingDashboard: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao buscar dados do dashboard",
-      });
-
-      return null;
-    }
-  },
-
-  // ATIVIDADES RECENTES PARA DASHBOARD
-  fetchRecentActivities: async () => {
-    set({ loadingRecent: true, error: null });
-
-    try {
-      console.log("🔍 [ActivitiesStore] Buscando atividades recentes...");
-      const result = await getRecentActivitiesForDashboard();
-
-      if (result.success) {
-        console.log(
-          `✅ [ActivitiesStore] ${result.data.length} atividades carregadas`
-        );
-        set({
-          recentActivities: result.data,
-          loadingRecent: false,
-        });
-      } else {
-        console.warn(
-          "⚠️ [ActivitiesStore] Erro ao buscar atividades:",
-          result.error
-        );
-        // Não lançar erro, apenas mostrar lista vazia
-        set({
-          recentActivities: [],
-          loadingRecent: false,
-          error: result.error || "Não foi possível carregar atividades",
-        });
-      }
-    } catch (error) {
-      console.error(
-        "❌ [ActivitiesStore] Erro ao buscar atividades recentes:",
-        error
-      );
-      set({
-        loadingRecent: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao buscar atividades recentes",
-      });
-    }
-  },
-
-  // ESTATÍSTICAS DE ATIVIDADES
-  fetchStats: async (timeframe = "week") => {
-    set({ loadingStats: true, error: null });
-
-    try {
-      console.log("🔍 [ActivitiesStore] Buscando estatísticas...");
-      const result = await getActivitiesStats(timeframe);
-
-      if (result.success) {
-        console.log(
-          `✅ [ActivitiesStore] Estatísticas carregadas: ${result.data.total} atividades`
-        );
-        set({
-          stats: result.data,
-          loadingStats: false,
-        });
-      } else {
-        console.warn(
-          "⚠️ [ActivitiesStore] Erro ao buscar estatísticas:",
-          result.error
-        );
-        // Não lançar erro, apenas definir estatísticas vazias
-        set({
-          stats: {
-            total: 0,
-            topTypes: [],
-            timeframe,
+          activities: result.data,
+          pagination: {
+            ...pagination,
+            total: result.pagination?.total || 0,
+            totalPages: result.pagination?.totalPages || 1,
           },
-          loadingStats: false,
-          error: result.error || "Não foi possível carregar estatísticas",
+          loading: false,
         });
+      } else {
+        throw new Error(result.error || "Erro ao buscar atividades");
       }
     } catch (error) {
-      console.error("❌ [ActivitiesStore] Erro ao buscar estatísticas:", error);
+      console.error("❌ [useActivitiesStore] Erro:", error);
+
       set({
-        loadingStats: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao buscar estatísticas",
+        error: error instanceof Error ? error.message : "Erro desconhecido",
+        loading: false,
+        activities: [],
       });
     }
   },
 
-  // CRIAR NOVA ATIVIDADE
-  createActivity: async (data: CreateActivityData) => {
+  // Atualizar filtros
+  setFilters: (newFilters) => {
+    set((state) => ({
+      filters: { ...state.filters, ...newFilters },
+      pagination: { ...state.pagination, page: 1 }, // Resetar página
+    }));
+
+    // Buscar atividades com novos filtros
+    get().fetchActivities();
+  },
+
+  // Atualizar página
+  setPage: (page) => {
+    set((state) => ({
+      pagination: { ...state.pagination, page },
+    }));
+
+    // Buscar atividades da nova página
+    get().fetchActivities();
+  },
+
+  // Limpar erro
+  clearError: () => {
     set({ error: null });
-
-    try {
-      console.log("🔍 [ActivitiesStore] Criando atividade...");
-      const result = await createSystemActivity(data);
-
-      if (!result.success) {
-        console.warn(
-          "⚠️ [ActivitiesStore] Erro ao criar atividade:",
-          result.error
-        );
-        throw new Error(result.error || "Erro ao criar atividade");
-      }
-
-      console.log("✅ [ActivitiesStore] Atividade criada com sucesso");
-
-      // Atualizar estatísticas (não aguardar erro)
-      get()
-        .fetchStats()
-        .catch((error) => {
-          console.warn(
-            "⚠️ [ActivitiesStore] Erro ao atualizar estatísticas:",
-            error
-          );
-        });
-
-      // Atualizar atividades recentes (não aguardar erro)
-      get()
-        .fetchRecentActivities()
-        .catch((error) => {
-          console.warn(
-            "⚠️ [ActivitiesStore] Erro ao atualizar atividades:",
-            error
-          );
-        });
-    } catch (error) {
-      console.error("❌ [ActivitiesStore] Erro ao criar atividade:", error);
-      set({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar atividade",
-      });
-    }
-  },
-
-  // CONFIGURAR CONEXÃO REAL-TIME
-  setupRealtime: async () => {
-    try {
-      console.log("🔍 [ActivitiesStore] Configurando real-time...");
-
-      // Limpar canal existente
-      await get().cleanupRealtime();
-
-      const supabase = createClient();
-
-      // Verificar se usuário está autenticado
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        console.warn(
-          "⚠️ [ActivitiesStore] Usuário não autenticado para real-time"
-        );
-        set({ realtimeConnected: false });
-        return false;
-      }
-
-      console.log(`🔍 [ActivitiesStore] Usuário autenticado: ${user.id}`);
-
-      // Verificar se é admin
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role, status")
-        .eq("id", user.id)
-        .single();
-
-      if (
-        profileError ||
-        !profile ||
-        profile.role !== "admin" ||
-        !profile.status
-      ) {
-        console.warn(
-          "⚠️ [ActivitiesStore] Usuário não tem permissão para real-time"
-        );
-        set({ realtimeConnected: false });
-        return false;
-      }
-
-      console.log(
-        "✅ [ActivitiesStore] Usuário é admin, configurando canal real-time..."
-      );
-
-      // Criar canal real-time
-      const channel = supabase
-        .channel("system-activities-channel")
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "system_activities",
-          },
-          async () => {
-            console.log(
-              "🔔 [ActivitiesStore] Nova atividade recebida via real-time"
-            );
-
-            // Atualizar atividades recentes (não aguardar erro)
-            get()
-              .fetchRecentActivities()
-              .catch((error) => {
-                console.warn(
-                  "⚠️ [ActivitiesStore] Erro ao atualizar atividades via real-time:",
-                  error
-                );
-              });
-
-            // Atualizar estatísticas (não aguardar erro)
-            get()
-              .fetchStats()
-              .catch((error) => {
-                console.warn(
-                  "⚠️ [ActivitiesStore] Erro ao atualizar estatísticas via real-time:",
-                  error
-                );
-              });
-          }
-        )
-        .subscribe((status) => {
-          console.log(
-            `📡 [ActivitiesStore] Status do canal real-time: ${status}`
-          );
-          set({
-            realtimeConnected: status === "SUBSCRIBED",
-          });
-
-          if (status === "SUBSCRIBED") {
-            console.log(
-              "✅ [ActivitiesStore] Canal real-time conectado com sucesso"
-            );
-          } else if (status === "CHANNEL_ERROR") {
-            console.error("❌ [ActivitiesStore] Erro no canal real-time");
-          }
-        });
-
-      set({ realtimeChannel: channel });
-      return true;
-    } catch (error) {
-      console.error(
-        "❌ [ActivitiesStore] Erro ao configurar real-time:",
-        error
-      );
-      set({
-        realtimeConnected: false,
-        error: "Erro na conexão real-time",
-      });
-      return false;
-    }
-  },
-
-  // LIMPAR CONEXÃO REAL-TIME
-  cleanupRealtime: async () => {
-    const { realtimeChannel } = get();
-
-    if (realtimeChannel) {
-      try {
-        console.log("🔍 [ActivitiesStore] Removendo canal real-time...");
-        const supabase = createClient();
-        await supabase.removeChannel(realtimeChannel);
-        console.log(
-          "✅ [ActivitiesStore] Canal real-time removido com sucesso"
-        );
-      } catch (error) {
-        console.error(
-          "❌ [ActivitiesStore] Erro ao remover canal real-time:",
-          error
-        );
-      }
-    }
-
-    set({
-      realtimeChannel: null,
-      realtimeConnected: false,
-    });
   },
 }));
 
-// Hook personalizado para Dashboard - ATUALIZADO
-export const useDashboardActivities = () => {
+// Hook simplificado para uso nos componentes
+export function useActivitiesList() {
   const {
-    recentActivities,
-    loadingRecent,
-    fetchRecentActivities,
-    stats,
-    loadingStats,
-    fetchStats,
-    dashboardStats,
-    loadingDashboard,
-    fetchDashboardStats,
+    activities,
+    loading,
     error,
-    setupRealtime,
-    cleanupRealtime,
-    realtimeConnected,
+    filters,
+    pagination,
+    fetchActivities,
+    setFilters,
+    setPage,
+    clearError,
   } = useActivitiesStore();
 
   return {
-    recentActivities,
-    loadingRecent,
-    fetchRecentActivities,
-    stats,
-    loadingStats,
-    fetchStats,
-    dashboardStats,
-    loadingDashboard,
-    fetchDashboardStats,
+    activities,
+    loading,
     error,
-    setupRealtime,
-    cleanupRealtime,
-    realtimeConnected,
+    filters,
+    pagination,
+    fetchActivities,
+    setFilters,
+    setPage,
+    clearError,
   };
-};
+}

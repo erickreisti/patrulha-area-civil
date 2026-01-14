@@ -1,10 +1,8 @@
-// app/admin/agentes/criar/page.tsx
+// src/app/(app)/admin/agentes/criar/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import type { Session } from "@supabase/supabase-js";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,17 +38,17 @@ import {
   RiAddLine,
   RiInformationLine,
   RiImageLine,
-  RiBarChartLine,
   RiHomeLine,
   RiArrowDownSLine,
-  RiEditLine,
-  RiErrorWarningLine,
-  RiAlertLine,
-  RiShieldCheckLine,
+  RiDashboardLine,
 } from "react-icons/ri";
 
-// IMPORT DO STORE
-import { useAgentCreate, GRADUACOES, TIPOS_SANGUINEOS } from "@/lib/stores";
+// IMPORT DO STORE - SIMPLES COMO A LISTAGEM
+import {
+  useAgentCreate,
+  GRADUACOES,
+  TIPOS_SANGUINEOS,
+} from "@/lib/stores/useAgentesStore";
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -65,14 +63,8 @@ const fadeInUp = {
 
 export default function CriarAgentePage() {
   const router = useRouter();
-  const supabase = createClient();
-  const [authLoading, setAuthLoading] = useState(true);
-  const [dateOpen, setDateOpen] = useState(false);
-  const [currentSession, setCurrentSession] = useState<Session | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [hasAdminSession, setHasAdminSession] = useState(false);
 
-  // USANDO O STORE
+  // USANDO O STORE - SEM VERIFICAÇÃO EXTRA
   const {
     saving,
     formData,
@@ -83,112 +75,7 @@ export default function CriarAgentePage() {
     generateMatricula,
   } = useAgentCreate();
 
-  // Verificar autenticação e permissões
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        setAuthLoading(true);
-
-        // Primeiro, verificar cookies admin
-        const adminSessionCookie = document.cookie
-          .split("; ")
-          .find((row) => row.startsWith("admin_session="))
-          ?.split("=")[1];
-
-        const isAdminCookie =
-          document.cookie
-            .split("; ")
-            .find((row) => row.startsWith("is_admin="))
-            ?.split("=")[1] === "true";
-
-        console.log("🔐 [CriarAgente] Verificando cookies admin:", {
-          hasAdminSession: !!adminSessionCookie,
-          hasIsAdmin: isAdminCookie,
-        });
-
-        // Verificar sessão Supabase
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          console.log("❌ [CriarAgente] Nenhuma sessão encontrada");
-          toast.error("Sessão expirada", {
-            description: "Faça login novamente para acessar esta página.",
-          });
-          router.push("/login");
-          return;
-        }
-
-        setCurrentSession(session);
-
-        // Verificar perfil do usuário
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("role, full_name, status, admin_2fa_enabled")
-          .eq("id", session.user.id)
-          .single();
-
-        if (error) {
-          console.error("❌ Erro ao buscar perfil:", error);
-          toast.error("Erro ao verificar permissões");
-          router.push("/login");
-          return;
-        }
-
-        console.log("👤 [CriarAgente] Perfil encontrado:", {
-          role: profile?.role,
-          status: profile?.status,
-          admin_2fa_enabled: profile?.admin_2fa_enabled,
-        });
-
-        if (!profile || profile.role !== "admin") {
-          toast.error("Acesso restrito", {
-            description: "Apenas administradores podem criar agentes.",
-          });
-          router.push("/perfil");
-          return;
-        }
-
-        if (!profile.status) {
-          toast.error("Conta inativa", {
-            description:
-              "Sua conta está inativa. Entre em contato com o administrador.",
-          });
-          router.push("/login");
-          return;
-        }
-
-        // Verificar se tem senha admin configurada
-        if (!profile.admin_2fa_enabled) {
-          toast.error("Senha administrativa não configurada", {
-            description: "Configure sua senha administrativa primeiro.",
-          });
-          router.push("/admin/setup-password");
-          return;
-        }
-
-        // Para rotas admin gerais, não precisamos verificar cookies admin
-        // Apenas para dashboard que precisa da sessão especial
-        setIsAdmin(true);
-        setHasAdminSession(!!adminSessionCookie && isAdminCookie);
-
-        console.log("✅ [CriarAgente] Permissões verificadas:", {
-          isAdmin: true,
-          hasAdminSession,
-          profile: profile.full_name,
-        });
-      } catch (error) {
-        console.error("💥 Erro na verificação de autenticação:", error);
-        toast.error("Erro de autenticação");
-        router.push("/login");
-      } finally {
-        setAuthLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, [router, supabase, hasAdminSession]);
+  const [dateOpen, setDateOpen] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -221,22 +108,7 @@ export default function CriarAgentePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!currentSession) {
-      toast.error("Sessão expirada", {
-        description: "Faça login novamente para continuar.",
-      });
-      router.push("/login");
-      return;
-    }
-
-    if (!isAdmin) {
-      toast.error("Acesso negado", {
-        description: "Apenas administradores podem criar agentes.",
-      });
-      return;
-    }
-
-    // Validações
+    // Validações do formulário
     const validationErrors = validateForm();
     if (validationErrors.length > 0) {
       validationErrors.forEach((error) => toast.error(error));
@@ -299,7 +171,6 @@ export default function CriarAgentePage() {
         id: toastId,
         description: errorMessage,
         duration: 6000,
-        icon: <RiErrorWarningLine className="w-5 h-5 text-red-500" />,
       });
     }
   };
@@ -315,17 +186,10 @@ export default function CriarAgentePage() {
     },
     {
       href: "/admin/dashboard",
-      icon: RiBarChartLine,
+      icon: RiDashboardLine,
       label: "Dashboard",
       className:
         "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/perfil",
-      icon: RiEditLine,
-      label: "Meu Perfil",
-      className:
-        "border-green-600 text-green-600 hover:bg-green-600 hover:text-white",
     },
     {
       href: "/",
@@ -339,80 +203,7 @@ export default function CriarAgentePage() {
   // Converter null para undefined para o FileUpload
   const currentAvatarUrl = formData.avatar_url || undefined;
 
-  // Loading durante verificação de autenticação
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-        <div className="container mx-auto px-4">
-          <div className="text-center py-16">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto mb-4"
-            />
-            <p className="text-gray-600">Verificando permissões...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Se não for admin, mostrar mensagem
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="max-w-2xl mx-auto"
-          >
-            <Card className="border-0 shadow-lg">
-              <CardHeader className="border-b border-red-200">
-                <CardTitle className="flex items-center text-xl text-gray-800">
-                  <RiAlertLine className="w-6 h-6 mr-2 text-red-500" />
-                  Acesso Restrito
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 text-center">
-                <div className="mb-4">
-                  <RiShieldKeyholeLine className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Permissão Insuficiente
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Apenas administradores podem criar novos agentes no sistema.
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  {navigationButtons.map((button, index) => (
-                    <motion.div
-                      key={button.href}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Link href={button.href}>
-                        <Button
-                          variant="outline"
-                          className={`transition-all duration-300 ${button.className}`}
-                        >
-                          <button.icon className="w-4 h-4 mr-2" />
-                          {button.label}
-                        </Button>
-                      </Link>
-                    </motion.div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      </div>
-    );
-  }
-
-  // Loading skeleton durante criação
+  // Loading durante salvamento
   if (saving) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
@@ -444,18 +235,6 @@ export default function CriarAgentePage() {
             <p className="text-gray-600 text-lg mb-2">
               Preencha os dados para cadastrar um novo agente no sistema
             </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              <div className="flex items-center text-sm text-green-600 bg-green-50 px-3 py-2 rounded-lg border border-green-200">
-                <RiShieldCheckLine className="w-4 h-4 mr-2" />
-                <span>Usuário autenticado como administrador</span>
-              </div>
-              {hasAdminSession && (
-                <div className="flex items-center text-sm text-purple-600 bg-purple-50 px-3 py-2 rounded-lg border border-purple-200">
-                  <RiShieldKeyholeLine className="w-4 h-4 mr-2" />
-                  <span>Sessão administrativa ativa</span>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Botões de Navegação */}

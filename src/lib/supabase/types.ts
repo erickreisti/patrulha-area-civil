@@ -2,6 +2,7 @@
 
 import { UserRole, Json } from "@/lib/types/shared";
 import { User as SupabaseUser } from "@supabase/supabase-js";
+export type { Json };
 
 /**
  * Tipos do banco de dados Supabase

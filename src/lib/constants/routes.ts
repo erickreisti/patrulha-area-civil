@@ -1,4 +1,3 @@
-// src/lib/config/routes.ts
 export const ROUTES = {
   PUBLIC: [
     "/",
@@ -16,6 +15,8 @@ export const ROUTES = {
     BASE: "/admin",
     DASHBOARD: "/admin/dashboard",
     AGENTS: "/admin/agentes",
+    AGENTS_CREATE: "/admin/agentes/criar",
+    AGENTS_EDIT: "/admin/agentes/:id",
     NEWS: "/admin/noticias",
     GALLERY: "/admin/galeria",
     ACTIVITIES: "/admin/atividades",
@@ -26,9 +27,13 @@ export const ROUTES = {
   ADMIN_SESSION_REQUIRED: [
     "/admin/dashboard",
     "/admin/agentes",
+    "/admin/agentes/*",
     "/admin/noticias",
+    "/admin/noticias/*",
     "/admin/galeria",
+    "/admin/galeria/*",
     "/admin/atividades",
+    "/admin/atividades/*",
   ] as const,
 
   AGENT: {
@@ -46,16 +51,18 @@ export const ROUTES = {
 
 // Helper para verificar se uma rota é admin
 export const isAdminRoute = (pathname: string): boolean => {
-  return Object.values(ROUTES.ADMIN).some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  return pathname.startsWith("/admin");
 };
 
 // Helper para verificar se uma rota requer sessão admin
 export const requiresAdminSession = (pathname: string): boolean => {
-  return ROUTES.ADMIN_SESSION_REQUIRED.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
-  );
+  return ROUTES.ADMIN_SESSION_REQUIRED.some((route) => {
+    if (route.endsWith("/*")) {
+      const baseRoute = route.slice(0, -2);
+      return pathname === baseRoute || pathname.startsWith(`${baseRoute}/`);
+    }
+    return pathname === route || pathname.startsWith(`${route}/`);
+  });
 };
 
 // Helper para verificar se uma rota é pública
