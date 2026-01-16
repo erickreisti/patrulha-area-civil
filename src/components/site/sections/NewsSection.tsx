@@ -1,3 +1,4 @@
+// @/components/site/sections/NewsSection.tsx corrigido
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import {
   RiNewspaperLine,
   RiErrorWarningLine,
   RiEyeLine,
+  RiExternalLinkLine,
 } from "react-icons/ri";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -76,7 +78,16 @@ interface NewsCardProps {
 }
 
 const NewsCard = ({ noticia, index }: NewsCardProps) => {
-  const hasImage = noticia.imagem && noticia.imagem !== "";
+  const [imageError, setImageError] = useState(false);
+  const hasImage = noticia.imagem && noticia.imagem !== "" && !imageError;
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
   return (
     <motion.div
@@ -86,14 +97,25 @@ const NewsCard = ({ noticia, index }: NewsCardProps) => {
       viewport={{ once: true, margin: "-100px" }}
       className="h-full"
     >
-      <Card className="border-slate-200 bg-white hover:shadow-xl transition-all duration-300 group h-full flex flex-col hover:scale-[1.02] overflow-hidden">
-        {hasImage && (
+      <Card className="border-slate-200 bg-white hover:shadow-xl transition-all duration-300 group h-full flex flex-col hover:scale-[1.02] overflow-hidden relative">
+        {/* Badge de Destaque */}
+        {noticia.destaque && (
+          <div className="absolute top-3 right-3 z-20">
+            <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-0 text-xs">
+              <RiNewspaperLine className="w-3 h-3 mr-1" />
+              Destaque
+            </Badge>
+          </div>
+        )}
+
+        {hasImage ? (
           <div className="relative h-40 sm:h-48 lg:h-56 overflow-hidden">
             <div
               className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
               style={{ backgroundImage: `url('${noticia.imagem}')` }}
+              onError={() => setImageError(true)}
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/20 to-transparent" />
             <div className="absolute top-3 left-3">
               <Badge
                 variant="secondary"
@@ -103,73 +125,96 @@ const NewsCard = ({ noticia, index }: NewsCardProps) => {
               </Badge>
             </div>
           </div>
+        ) : (
+          <div className="h-40 sm:h-48 lg:h-56 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+            <RiNewspaperLine className="w-16 h-16 text-slate-300" />
+          </div>
         )}
 
         <CardHeader
-          className={`pb-3 sm:pb-4 flex-1 ${!hasImage ? "pt-6" : ""}`}
+          className={cn("pb-3 sm:pb-4 flex-1", hasImage ? "pt-4" : "pt-6")}
         >
-          {!hasImage && (
-            <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-2">
+          <div className="flex items-center justify-between mb-2 sm:mb-3 flex-wrap gap-2">
+            {!hasImage && (
               <Badge
                 variant="secondary"
                 className="bg-navy/10 text-navy hover:bg-navy/20 border-0 font-roboto text-xs sm:text-sm"
               >
                 {noticia.categoria || "Geral"}
               </Badge>
-              <div className="flex items-center text-slate-500 text-xs sm:text-sm font-roboto">
-                <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
-                {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </div>
+            )}
+            <div
+              className={cn(
+                "flex items-center font-roboto text-xs sm:text-sm",
+                hasImage ? "text-slate-200" : "text-slate-500"
+              )}
+            >
+              <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
+              {formatDate(noticia.data_publicacao)}
+              <span className="mx-2">•</span>
+              <RiEyeLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+              {noticia.views} visualizações
             </div>
-          )}
+          </div>
 
           <CardTitle
             className={cn(
-              "text-slate-800 font-bold leading-tight line-clamp-2",
+              "font-bold leading-tight line-clamp-2",
               "text-base sm:text-lg lg:text-xl",
-              hasImage ? "text-white relative z-10" : ""
+              hasImage ? "text-white" : "text-slate-800"
             )}
           >
             {noticia.titulo}
           </CardTitle>
-
-          {hasImage && (
-            <div className="flex items-center text-slate-200 text-xs sm:text-sm font-roboto mt-2">
-              <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
-              {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
-            </div>
-          )}
         </CardHeader>
 
         <CardContent className="space-y-3 sm:space-y-4 flex-1">
           <CardDescription
             className={cn(
-              "text-slate-600 font-roboto leading-relaxed line-clamp-3",
-              "text-xs sm:text-sm lg:text-base"
+              "font-roboto leading-relaxed line-clamp-3",
+              "text-xs sm:text-sm lg:text-base",
+              hasImage ? "text-slate-200" : "text-slate-600"
             )}
           >
             {noticia.resumo || "Leia mais sobre esta notícia..."}
           </CardDescription>
 
           {noticia.autor && (
-            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-navy/10 flex items-center justify-center">
-                <RiEyeLine className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-navy" />
+            <div
+              className={cn(
+                "flex items-center gap-2 pt-2 border-t",
+                hasImage ? "border-slate-700/30" : "border-slate-100"
+              )}
+            >
+              <div
+                className={cn(
+                  "w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center",
+                  hasImage ? "bg-white/20" : "bg-navy/10"
+                )}
+              >
+                <RiExternalLinkLine
+                  className={cn(
+                    "w-3 h-3 sm:w-3.5 sm:h-3.5",
+                    hasImage ? "text-white" : "text-navy"
+                  )}
+                />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-700 font-medium truncate">
+                <p
+                  className={cn(
+                    "text-xs font-medium truncate",
+                    hasImage ? "text-slate-200" : "text-slate-700"
+                  )}
+                >
                   Por: {noticia.autor.full_name || "Autor"}
                 </p>
                 {noticia.autor.graduacao && (
-                  <p className="text-[10px] text-slate-500 truncate">
+                  <p
+                    className={cn(
+                      "text-[10px] truncate",
+                      hasImage ? "text-slate-300" : "text-slate-500"
+                    )}
+                  >
                     {noticia.autor.graduacao}
                   </p>
                 )}
@@ -179,8 +224,13 @@ const NewsCard = ({ noticia, index }: NewsCardProps) => {
 
           <div className="mt-auto pt-3 sm:pt-4">
             <Button
-              variant="link"
-              className="p-0 h-auto text-navy hover:text-navy-700 font-roboto flex items-center gap-1 group text-xs sm:text-sm touch-optimize w-full justify-start"
+              variant={hasImage ? "secondary" : "link"}
+              className={cn(
+                "font-roboto flex items-center gap-1 text-xs sm:text-sm touch-optimize w-full justify-start p-0 h-auto",
+                hasImage
+                  ? "text-white hover:text-white bg-white/20 hover:bg-white/30"
+                  : "text-navy hover:text-navy-700"
+              )}
               asChild
             >
               <Link href={`/noticias/${noticia.slug}`}>
@@ -202,16 +252,30 @@ interface NewsGridProps {
 const NewsGrid = ({ noticias }: NewsGridProps) => {
   if (noticias.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-slate-500">Nenhuma notícia para exibir</p>
-      </div>
+      <motion.div
+        className="text-center py-12"
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        viewport={{ once: true, margin: "-100px" }}
+      >
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 max-w-md mx-auto">
+          <RiNewspaperLine className="w-16 h-16 text-slate-400 mx-auto mb-4" />
+          <h3 className="text-slate-800 font-bold text-xl mb-2">
+            Nenhuma notícia disponível
+          </h3>
+          <p className="text-slate-600 mb-4">
+            Em breve teremos novidades para compartilhar.
+          </p>
+        </div>
+      </motion.div>
     );
   }
 
   return (
     <div
       className={cn(
-        "grid gap-3 sm:gap-4 lg:gap-6 max-w-6xl mx-auto mb-8 sm:mb-12 lg:mb-16",
+        "grid gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto mb-8 sm:mb-12 lg:mb-16",
         "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
       )}
     >
@@ -236,7 +300,7 @@ const CTAButton = () => {
         asChild
         className={cn(
           "bg-navy hover:bg-navy-700 text-white font-bold rounded-xl transition-all duration-300 hover:scale-105 shadow-lg hover:shadow-xl",
-          "px-4 sm:px-6 lg:px-8 py-2 sm:py-3 lg:py-4",
+          "px-6 sm:px-8 lg:px-10 py-3 sm:py-4 lg:py-5",
           "text-sm sm:text-base lg:text-lg touch-optimize active:scale-95",
           "group"
         )}
@@ -254,31 +318,33 @@ const CTAButton = () => {
   );
 };
 
+// CORREÇÃO: Criar nosso próprio Skeleton sem usar o componente da UI
 const SkeletonLoader = () => (
   <div
     className={cn(
-      "grid gap-3 sm:gap-4 lg:gap-6 max-w-6xl mx-auto mb-8 sm:mb-12 lg:mb-16",
+      "grid gap-4 sm:gap-6 lg:gap-8 max-w-6xl mx-auto mb-8 sm:mb-12 lg:mb-16",
       "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
     )}
   >
     {[1, 2, 3].map((i) => (
       <Card
         key={i}
-        className="border-slate-200 bg-white animate-pulse h-64 sm:h-72 lg:h-80"
+        className="border-slate-200 bg-white animate-pulse overflow-hidden"
       >
-        <div className="h-40 sm:h-48 bg-slate-200" />
-        <CardHeader className="pb-3 sm:pb-4">
-          <div className="flex justify-between items-center mb-2 sm:mb-3">
-            <div className="h-4 sm:h-5 bg-slate-200 rounded w-1/4"></div>
-            <div className="h-3 sm:h-4 bg-slate-200 rounded w-1/3"></div>
+        <div className="h-40 sm:h-48 lg:h-56 bg-slate-200" />
+        <CardHeader className="pb-3 sm:pb-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <div className="h-4 sm:h-5 bg-slate-200 rounded w-20"></div>
+            <div className="h-3 sm:h-4 bg-slate-200 rounded w-24"></div>
           </div>
-          <div className="h-5 sm:h-6 bg-slate-200 rounded mb-2"></div>
-          <div className="h-4 sm:h-5 bg-slate-200 rounded"></div>
+          <div className="h-5 sm:h-6 bg-slate-200 rounded mb-2 w-3/4"></div>
+          <div className="h-4 sm:h-5 bg-slate-200 rounded w-1/2"></div>
         </CardHeader>
-        <CardContent>
-          <div className="h-3 sm:h-4 bg-slate-200 rounded mb-2"></div>
-          <div className="h-3 sm:h-4 bg-slate-200 rounded w-3/4"></div>
-          <div className="mt-4 h-3 sm:h-4 bg-slate-200 rounded w-1/4"></div>
+        <CardContent className="space-y-3">
+          <div className="h-3 sm:h-4 bg-slate-200 rounded w-full"></div>
+          <div className="h-3 sm:h-4 bg-slate-200 rounded w-5/6"></div>
+          <div className="h-3 sm:h-4 bg-slate-200 rounded w-4/6"></div>
+          <div className="mt-4 h-3 sm:h-4 bg-slate-200 rounded w-24"></div>
         </CardContent>
       </Card>
     ))}
@@ -308,35 +374,12 @@ const ErrorState = ({
       {onRetry && (
         <Button
           variant="outline"
-          className="border-red-300 text-red-700 hover:bg-red-50"
+          className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
           onClick={onRetry}
         >
           Tentar novamente
         </Button>
       )}
-    </div>
-  </motion.div>
-);
-
-const EmptyState = () => (
-  <motion.div
-    className="text-center py-8 sm:py-12"
-    initial={{ opacity: 0 }}
-    whileInView={{ opacity: 1 }}
-    transition={{ duration: 0.5 }}
-    viewport={{ once: true, margin: "-100px" }}
-  >
-    <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 sm:p-8 max-w-md mx-auto">
-      <RiNewspaperLine className="w-12 h-12 sm:w-16 sm:h-16 text-slate-400 mx-auto mb-4" />
-      <h3 className="text-slate-800 font-bold text-lg sm:text-xl mb-2">
-        Nenhuma notícia disponível
-      </h3>
-      <p className="text-slate-600 text-sm sm:text-base mb-4">
-        Em breve teremos novidades para compartilhar.
-      </p>
-      <Button variant="outline" asChild>
-        <Link href="/noticias">Ver todas as notícias</Link>
-      </Button>
     </div>
   </motion.div>
 );
@@ -377,13 +420,11 @@ export function NewsSection() {
           <SkeletonLoader />
         ) : error ? (
           <ErrorState error={error} onRetry={fetchNoticias} />
-        ) : noticias.length > 0 ? (
+        ) : (
           <>
             <NewsGrid noticias={noticias} />
-            <CTAButton />
+            {noticias.length > 0 && <CTAButton />}
           </>
-        ) : (
-          <EmptyState />
         )}
       </div>
     </section>

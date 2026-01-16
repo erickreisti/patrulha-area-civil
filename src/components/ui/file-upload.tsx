@@ -1,3 +1,4 @@
+// FileUpload.tsx corrigido
 "use client";
 
 import React, { useState, useRef, useCallback } from "react";
@@ -9,16 +10,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "./avatar";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "sonner";
 import {
-  FaUpload,
-  FaTimes,
-  FaFile,
-  FaImage,
-  FaVideo,
-  FaUser,
-  FaCheck,
-  FaExclamationCircle,
-  FaSpinner,
-} from "react-icons/fa";
+  RiUploadLine,
+  RiCloseLine,
+  RiFileLine,
+  RiImageLine,
+  RiVideoLine,
+  RiUserLine,
+  RiCheckLine,
+  RiAlertLine,
+  RiLoaderLine,
+} from "react-icons/ri";
 
 type UploadType = "avatar" | "image" | "video" | "file" | "media";
 type UploadStatus = "pending" | "uploading" | "completed" | "error";
@@ -498,20 +499,20 @@ export function FileUpload({
 
   const getFileIcon = (file: File) => {
     if (file.type.startsWith("image/"))
-      return <FaImage className="w-4 h-4 text-blue-600" />;
+      return <RiImageLine className="w-4 h-4 text-blue-600" />;
     if (file.type.startsWith("video/"))
-      return <FaVideo className="w-4 h-4 text-purple-600" />;
-    return <FaFile className="w-4 h-4 text-gray-600" />;
+      return <RiVideoLine className="w-4 h-4 text-purple-600" />;
+    return <RiFileLine className="w-4 h-4 text-gray-600" />;
   };
 
   const getStatusIcon = (file: UploadFile) => {
     switch (file.status) {
       case "completed":
-        return <FaCheck className="w-4 h-4 text-green-600" />;
+        return <RiCheckLine className="w-4 h-4 text-green-600" />;
       case "error":
-        return <FaExclamationCircle className="w-4 h-4 text-red-600" />;
+        return <RiAlertLine className="w-4 h-4 text-red-600" />;
       case "uploading":
-        return <FaSpinner className="w-4 h-4 text-blue-600 animate-spin" />;
+        return <RiLoaderLine className="w-4 h-4 text-blue-600 animate-spin" />;
       default:
         return null;
     }
@@ -553,7 +554,7 @@ export function FileUpload({
               }}
             />
             <AvatarFallback className="bg-navy text-white text-lg font-semibold">
-              <FaUser className="w-8 h-8" />
+              <RiUserLine className="w-8 h-8" />
             </AvatarFallback>
           </Avatar>
 
@@ -584,12 +585,12 @@ export function FileUpload({
               )}
               {isCompleted && autoUpload && (
                 <div className="absolute -top-1 -right-1 bg-green-500 rounded-full p-1">
-                  <FaCheck className="w-3 h-3 text-white" />
+                  <RiCheckLine className="w-3 h-3 text-white" />
                 </div>
               )}
               {hasError && (
                 <div className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1">
-                  <FaExclamationCircle className="w-3 h-3 text-white" />
+                  <RiAlertLine className="w-3 h-3 text-white" />
                 </div>
               )}
             </>
@@ -616,9 +617,9 @@ export function FileUpload({
               className="border-navy text-navy hover:bg-navy hover:text-white"
             >
               {isUploading ? (
-                <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
+                <RiLoaderLine className="w-4 h-4 mr-2 animate-spin" />
               ) : (
-                <FaUpload className="w-4 h-4 mr-2" />
+                <RiUploadLine className="w-4 h-4 mr-2" />
               )}
               {isUploading
                 ? "Enviando..."
@@ -636,7 +637,7 @@ export function FileUpload({
                 disabled={isUploading}
                 className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
               >
-                <FaTimes className="w-4 h-4 mr-2" />
+                <RiCloseLine className="w-4 h-4 mr-2" />
                 Remover
               </Button>
             )}
@@ -718,7 +719,7 @@ export function FileUpload({
                   hasFiles ? "bg-blue-100" : "bg-gray-100"
                 )}
               >
-                <FaUpload
+                <RiUploadLine
                   className={cn(
                     "w-6 h-6",
                     hasFiles ? "text-blue-600" : "text-gray-400"
@@ -859,7 +860,7 @@ export function FileUpload({
                     disabled={isUploading}
                     className="flex-shrink-0 ml-2 text-gray-400 hover:text-red-600"
                   >
-                    <FaTimes className="w-4 h-4" />
+                    <RiCloseLine className="w-4 h-4" />
                   </Button>
                 </div>
               </Card>
@@ -871,7 +872,7 @@ export function FileUpload({
               <div className="text-sm text-gray-600">
                 {isUploading ? (
                   <div className="flex items-center space-x-2">
-                    <FaSpinner className="w-4 h-4 animate-spin text-blue-600" />
+                    <RiLoaderLine className="w-4 h-4 animate-spin text-blue-600" />
                     <span>Enviando arquivos...</span>
                   </div>
                 ) : (
@@ -901,7 +902,7 @@ export function FileUpload({
                 >
                   {isUploading ? (
                     <>
-                      <FaSpinner className="w-4 h-4 mr-2 animate-spin" />
+                      <RiLoaderLine className="w-4 h-4 mr-2 animate-spin" />
                       Enviando...
                     </>
                   ) : (

@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -14,7 +13,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
@@ -38,32 +48,13 @@ import {
   RiRefreshLine,
   RiImageLine,
   RiExternalLinkLine,
+  RiAlertLine,
 } from "react-icons/ri";
 
-// Tipos do Supabase
-import type { Database } from "@/lib/supabase/types";
-type NoticiaRow = Database["public"]["Tables"]["noticias"]["Row"];
-type NoticiaStatus = NoticiaRow["status"];
-type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+// Import do store
+import { useNoticias, type NoticiaStatus } from "@/lib/stores/useNoticiasStore";
 
-interface NoticiaWithAutor extends Omit<NoticiaRow, "autor_id"> {
-  autor?: {
-    full_name: ProfileRow["full_name"];
-    graduacao: ProfileRow["graduacao"];
-    avatar_url: ProfileRow["avatar_url"];
-  } | null;
-}
-
-interface StatCardProps {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  description: string;
-  color: "blue" | "green" | "purple" | "amber" | "gray";
-  delay: number;
-  loading?: boolean;
-}
-
+// Componente de estatísticas
 const StatCard = ({
   title,
   value,
@@ -72,13 +63,22 @@ const StatCard = ({
   color = "blue",
   delay,
   loading = false,
-}: StatCardProps) => {
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  description: string;
+  color?: "blue" | "green" | "purple" | "amber" | "gray" | "red";
+  delay: number;
+  loading?: boolean;
+}) => {
   const colorClasses = {
     blue: "from-blue-500 to-blue-600",
     green: "from-green-500 to-green-600",
     purple: "from-purple-500 to-purple-600",
     amber: "from-amber-500 to-amber-600",
     gray: "from-gray-500 to-gray-600",
+    red: "from-red-500 to-red-600",
   };
 
   return (
@@ -86,42 +86,36 @@ const StatCard = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: delay * 0.1 }}
-      whileHover={{ scale: 1.02 }}
       className="h-full"
     >
       <Card className="h-full border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm relative overflow-hidden group hover:shadow-xl transition-all duration-300">
         <div
-          className={`absolute inset-0 bg-gradient-to-br ${colorClasses[color]} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}
+          className={`absolute inset-0 bg-gradient-to-br ${colorClasses[color]} opacity-5 group-hover:opacity-10 transition-opacity duration-300`}
         />
         <CardContent className="p-6 relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-600 mb-1 transition-colors duration-300">
-                {title}
-              </p>
+              <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
               {loading ? (
                 <Skeleton className="h-8 w-16 mb-1 bg-gray-200" />
               ) : (
                 <motion.p
-                  className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1"
+                  key={value}
                   initial={{ scale: 0.8 }}
                   animate={{ scale: 1 }}
-                  transition={{ duration: 0.3, delay: delay * 0.1 + 0.2 }}
+                  transition={{ type: "spring", stiffness: 200 }}
+                  className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1"
                 >
                   {value}
                 </motion.p>
               )}
-              <p className="text-xs text-gray-500 transition-colors duration-300">
-                {description}
-              </p>
+              <p className="text-xs text-gray-500">{description}</p>
             </div>
-            <motion.div
-              className={`p-3 rounded-full bg-gradient-to-br ${colorClasses[color]} text-white shadow-lg group-hover:shadow-xl transition-all duration-300`}
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              transition={{ type: "spring", stiffness: 300 }}
+            <div
+              className={`p-3 rounded-full bg-gradient-to-br ${colorClasses[color]} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}
             >
               {icon}
-            </motion.div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -129,6 +123,7 @@ const StatCard = ({
   );
 };
 
+// Componente de placeholder para imagem
 const ImageWithFallback = ({
   src,
   alt,
@@ -158,260 +153,177 @@ const ImageWithFallback = ({
         src={src}
         alt={alt}
         fill
-        sizes="(max-width: 768px) 64px, 64px"
         className="object-cover"
+        sizes="64px"
         onError={() => setImageError(true)}
-        priority={false}
-        loading="lazy"
       />
     </div>
   );
 };
 
-const CATEGORIAS = [
-  "Operações",
-  "Treinamento",
-  "Cooperação",
-  "Projetos Sociais",
-  "Equipamentos",
-  "Eventos",
-  "Comunicação",
-];
-
 export default function NoticiasPage() {
-  const [noticias, setNoticias] = useState<NoticiaWithAutor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<NoticiaStatus | "all">(
-    "all"
-  );
-  const [filterCategoria, setFilterCategoria] = useState<string>("all");
-  const [filterDestaque, setFilterDestaque] = useState<
-    "all" | "destaque" | "normal"
-  >("all");
+  const {
+    // Dados
+    stats,
+    categoriasDisponiveis,
 
-  const supabase = createClient();
-  const adminClient = createAdminClient();
+    // Estados
+    loadingLista,
+    loadingStats,
+    saving,
+    error,
 
-  const fetchNoticias = useCallback(async () => {
-    try {
-      setLoading(true);
-      setRefreshing(true);
-      console.log("🔄 Buscando notícias do banco...");
+    // Filtros
+    filtros,
+    totalCount,
+    paginatedNoticias,
+    totalPages,
 
-      // Usar adminClient para bypass RLS se necessário
-      const client = adminClient || supabase;
+    // Setters
+    setSearchTerm,
+    setCategoria,
+    setSortBy,
+    setSortOrder,
+    setItemsPerPage,
+    setCurrentPage,
+    setStatus,
+    setDestaque,
+    clearFilters,
 
-      const { data, error } = await client
-        .from("noticias")
-        .select(
-          `
-          *,
-          autor:profiles!noticias_autor_id_fkey(full_name, graduacao, avatar_url)
-        `
-        )
-        .order("created_at", { ascending: false });
+    // Ações
+    fetchNoticias,
+    fetchStats,
+    fetchCategorias,
+    toggleStatus,
+    toggleDestaque,
+    deletarNoticia,
 
-      if (error) {
-        console.error("❌ Erro ao buscar notícias:", error);
-        throw error;
-      }
+    // Utilitários
+    formatDate,
+    getStatusColor,
+    getStatusText,
+  } = useNoticias();
 
-      console.log(`✅ ${data?.length || 0} notícias carregadas`);
-      setNoticias(data || []);
-    } catch (error) {
-      console.error("❌ Erro ao buscar notícias:", error);
-      toast.error("Erro ao carregar notícias");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [supabase, adminClient]);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    open: boolean;
+    noticiaId: string | null;
+    noticiaTitulo: string;
+  }>({ open: false, noticiaId: null, noticiaTitulo: "" });
+  const [isClient, setIsClient] = useState(false);
 
+  // Inicializar no cliente (com setTimeout para evitar cascading renders)
   useEffect(() => {
-    fetchNoticias();
-  }, [fetchNoticias]);
+    const timer = setTimeout(() => {
+      setIsClient(true);
+    }, 0);
 
-  const filteredNoticias = noticias.filter((noticia) => {
-    const matchesSearch =
-      noticia.titulo.toLowerCase().includes(search.toLowerCase()) ||
-      (noticia.resumo &&
-        noticia.resumo.toLowerCase().includes(search.toLowerCase())) ||
-      (noticia.conteudo &&
-        noticia.conteudo.toLowerCase().includes(search.toLowerCase()));
+    return () => clearTimeout(timer);
+  }, []);
 
-    const matchesStatus =
-      filterStatus === "all" || noticia.status === filterStatus;
-    const matchesCategoria =
-      filterCategoria === "all" || noticia.categoria === filterCategoria;
-    const matchesDestaque =
-      filterDestaque === "all" ||
-      (filterDestaque === "destaque" && noticia.destaque) ||
-      (filterDestaque === "normal" && !noticia.destaque);
+  // Carregar dados iniciais
+  useEffect(() => {
+    if (isClient) {
+      fetchNoticias();
+      fetchStats();
+      fetchCategorias();
+    }
+  }, [isClient, fetchNoticias, fetchStats, fetchCategorias]);
 
-    return (
-      matchesSearch && matchesStatus && matchesCategoria && matchesDestaque
-    );
-  });
+  // Tratar erros
+  useEffect(() => {
+    if (error) {
+      toast.error(error, {
+        duration: 5000,
+        action: {
+          label: "Tentar novamente",
+          onClick: () => {
+            fetchNoticias();
+            fetchStats();
+          },
+        },
+      });
+    }
+  }, [error, fetchNoticias, fetchStats]);
 
-  const toggleNoticiaStatus = async (
-    noticiaId: string,
+  // Handler para deletar notícia
+  const handleDeleteNoticia = async () => {
+    if (!deleteDialog.noticiaId) return;
+
+    const result = await deletarNoticia(deleteDialog.noticiaId);
+
+    if (result.success) {
+      toast.success("Notícia excluída com sucesso");
+      setDeleteDialog({ open: false, noticiaId: null, noticiaTitulo: "" });
+    } else {
+      toast.error(result.error || "Erro ao excluir notícia");
+    }
+  };
+
+  // Handler para alternar status
+  const handleToggleStatus = async (
+    id: string,
     currentStatus: NoticiaStatus
   ) => {
-    try {
-      let newStatus: NoticiaStatus;
-      if (currentStatus === "rascunho") {
-        newStatus = "publicado";
-      } else if (currentStatus === "publicado") {
-        newStatus = "arquivado";
-      } else {
-        newStatus = "publicado";
-      }
+    const result = await toggleStatus(id, currentStatus);
 
-      const client = adminClient || supabase;
-      const { error } = await client
-        .from("noticias")
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", noticiaId);
-
-      if (error) throw error;
-
-      setNoticias((prev) =>
-        prev.map((noticia) =>
-          noticia.id === noticiaId
-            ? {
-                ...noticia,
-                status: newStatus,
-                updated_at: new Date().toISOString(),
-              }
-            : noticia
-        )
-      );
-
-      toast.success(`Status alterado para ${newStatus}`);
-    } catch (error) {
-      console.error("❌ Erro ao alterar status:", error);
-      toast.error("Erro ao alterar status da notícia");
-    }
-  };
-
-  const toggleDestaque = async (
-    noticiaId: string,
-    currentDestaque: boolean
-  ) => {
-    try {
-      const client = adminClient || supabase;
-      const { error } = await client
-        .from("noticias")
-        .update({
-          destaque: !currentDestaque,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", noticiaId);
-
-      if (error) throw error;
-
-      setNoticias((prev) =>
-        prev.map((noticia) =>
-          noticia.id === noticiaId
-            ? {
-                ...noticia,
-                destaque: !currentDestaque,
-                updated_at: new Date().toISOString(),
-              }
-            : noticia
-        )
-      );
-
+    if (result.success) {
       toast.success(
-        !currentDestaque ? "Notícia destacada" : "Destaque removido"
+        `Notícia ${
+          currentStatus === "rascunho"
+            ? "publicada"
+            : currentStatus === "publicado"
+            ? "arquivada"
+            : "publicada"
+        }`
       );
-    } catch (error) {
-      console.error("❌ Erro ao alterar destaque:", error);
-      toast.error("Erro ao alterar destaque da notícia");
+    } else {
+      toast.error(result.error || "Erro ao alterar status");
     }
   };
 
-  const deleteNoticia = async (noticiaId: string) => {
-    if (
-      !confirm(
-        "Tem certeza que deseja excluir esta notícia? Esta ação não pode ser desfeita."
-      )
-    ) {
-      return;
-    }
+  // Handler para alternar destaque
+  const handleToggleDestaque = async (id: string, currentDestaque: boolean) => {
+    const result = await toggleDestaque(id, currentDestaque);
 
-    try {
-      const client = adminClient || supabase;
-      const { error } = await client
-        .from("noticias")
-        .delete()
-        .eq("id", noticiaId);
-
-      if (error) throw error;
-
-      setNoticias((prev) => prev.filter((noticia) => noticia.id !== noticiaId));
-      toast.success("Notícia excluída com sucesso");
-    } catch (error) {
-      console.error("❌ Erro ao excluir notícia:", error);
-      toast.error("Erro ao excluir notícia");
+    if (result.success) {
+      toast.success(
+        currentDestaque ? "Destaque removido" : "Notícia destacada"
+      );
+    } else {
+      toast.error(result.error || "Erro ao alterar destaque");
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR");
-  };
+  // Loading durante SSR
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-center items-center h-64">
+            <Spinner className="w-8 h-8" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const stats = {
-    total: noticias.length,
-    rascunho: noticias.filter((n) => n.status === "rascunho").length,
-    publicado: noticias.filter((n) => n.status === "publicado").length,
-    arquivado: noticias.filter((n) => n.status === "arquivado").length,
-    destaque: noticias.filter((n) => n.destaque).length,
-  };
-
-  const getStatusBadge = (status: NoticiaStatus) => {
-    const variants = {
-      rascunho: "bg-yellow-500 text-white",
-      publicado: "bg-green-500 text-white",
-      arquivado: "bg-gray-500 text-white",
-    };
-    return variants[status];
-  };
-
-  const getStatusText = (status: NoticiaStatus) => {
-    const texts = {
-      rascunho: "RASCUNHO",
-      publicado: "PUBLICADO",
-      arquivado: "ARQUIVADO",
-    };
-    return texts[status];
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
+  // Botões de navegação
+  const navigationButtons = [
+    {
+      href: "/admin/dashboard",
+      icon: RiBarChartLine,
+      label: "Dashboard",
+      className:
+        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
     },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-      },
+    {
+      href: "/",
+      icon: RiHomeLine,
+      label: "Voltar ao Site",
+      className:
+        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
     },
-  };
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
@@ -431,7 +343,7 @@ export default function NoticiasPage() {
           </p>
         </motion.div>
 
-        {/* Botões */}
+        {/* Botões de Ação */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -442,34 +354,26 @@ export default function NoticiasPage() {
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Button
               onClick={() => {
-                setRefreshing(true);
                 fetchNoticias();
+                fetchStats();
               }}
-              disabled={refreshing}
+              disabled={loadingLista || loadingStats}
               variant="outline"
-              className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
+              className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50"
             >
-              <motion.div
-                animate={{ rotate: refreshing ? 360 : 0 }}
-                transition={{
-                  duration: 1,
-                  repeat: refreshing ? Infinity : 0,
-                }}
-              >
-                <RiRefreshLine
-                  className={`w-4 h-4 ${
-                    refreshing ? "text-blue-600" : "text-gray-600"
-                  }`}
-                />
-              </motion.div>
-              {refreshing ? "Atualizando..." : "Atualizar Lista"}
+              <RiRefreshLine
+                className={`w-4 h-4 ${
+                  loadingLista || loadingStats ? "animate-spin" : ""
+                }`}
+              />
+              {loadingLista || loadingStats ? "Atualizando..." : "Atualizar"}
             </Button>
           </motion.div>
 
           {/* Botão Nova Notícia */}
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <Link href="/admin/noticias/criar">
-              <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
+              <Button className="bg-green-600 hover:bg-green-700 text-white">
                 <RiAddLine className="w-4 h-4 mr-2" />
                 Nova Notícia
               </Button>
@@ -477,29 +381,7 @@ export default function NoticiasPage() {
           </motion.div>
 
           {/* Botões de Navegação */}
-          {[
-            {
-              href: "/admin/dashboard",
-              icon: RiBarChartLine,
-              label: "Dashboard",
-              className:
-                "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-            },
-            {
-              href: "/perfil",
-              icon: RiUserLine,
-              label: "Meu Perfil",
-              className:
-                "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
-            },
-            {
-              href: "/",
-              icon: RiHomeLine,
-              label: "Voltar ao Site",
-              className:
-                "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-            },
-          ].map((button, index) => (
+          {navigationButtons.map((button, index) => (
             <motion.div
               key={button.href}
               initial={{ opacity: 0, x: 20 }}
@@ -522,7 +404,7 @@ export default function NoticiasPage() {
         </motion.div>
 
         {/* Estatísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
           <StatCard
             title="Total"
             value={stats.total}
@@ -530,7 +412,16 @@ export default function NoticiasPage() {
             description="Notícias no sistema"
             color="blue"
             delay={0}
-            loading={loading}
+            loading={loadingStats}
+          />
+          <StatCard
+            title="Publicadas"
+            value={stats.published}
+            icon={<RiEyeLine className="w-6 h-6" />}
+            description="Disponíveis no site"
+            color="green"
+            delay={1}
+            loading={loadingStats}
           />
           <StatCard
             title="Rascunho"
@@ -538,35 +429,35 @@ export default function NoticiasPage() {
             icon={<RiEyeOffLine className="w-6 h-6" />}
             description="Aguardando publicação"
             color="amber"
-            delay={1}
-            loading={loading}
-          />
-          <StatCard
-            title="Publicado"
-            value={stats.publicado}
-            icon={<RiEyeLine className="w-6 h-6" />}
-            description="Disponíveis no site"
-            color="green"
             delay={2}
-            loading={loading}
+            loading={loadingStats}
           />
           <StatCard
-            title="Arquivado"
+            title="Arquivadas"
             value={stats.arquivado}
             icon={<RiArchiveLine className="w-6 h-6" />}
             description="Notícias antigas"
             color="gray"
             delay={3}
-            loading={loading}
+            loading={loadingStats}
           />
           <StatCard
             title="Destaque"
-            value={stats.destaque}
+            value={stats.featured}
             icon={<RiStarFill className="w-6 h-6" />}
             description="Em destaque"
             color="purple"
             delay={4}
-            loading={loading}
+            loading={loadingStats}
+          />
+          <StatCard
+            title="Recentes"
+            value={stats.recent}
+            icon={<RiCalendarLine className="w-6 h-6" />}
+            description="Últimos 7 dias"
+            color="blue"
+            delay={5}
+            loading={loadingStats}
           />
         </div>
 
@@ -576,7 +467,7 @@ export default function NoticiasPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
-          <Card className="border-0 shadow-lg mb-8 transition-all duration-300 hover:shadow-xl">
+          <Card className="border-0 shadow-lg mb-8 hover:shadow-xl transition-all duration-300">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-gray-800">
                 <RiSearchLine className="w-5 h-5 text-navy-600" />
@@ -587,25 +478,27 @@ export default function NoticiasPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="md:col-span-2">
                   <div className="relative">
-                    <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4 transition-colors duration-300" />
+                    <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <Input
                       type="text"
                       placeholder="Buscar por título, resumo ou conteúdo..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="pl-10 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={filtros.searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                      disabled={loadingLista}
                     />
                   </div>
                 </div>
 
                 <div>
                   <Select
-                    value={filterStatus}
+                    value={filtros.status}
                     onValueChange={(value: NoticiaStatus | "all") =>
-                      setFilterStatus(value)
+                      setStatus(value)
                     }
+                    disabled={loadingLista}
                   >
-                    <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                    <SelectTrigger>
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -619,17 +512,17 @@ export default function NoticiasPage() {
 
                 <div>
                   <Select
-                    value={filterCategoria}
-                    onValueChange={setFilterCategoria}
+                    value={filtros.categoria}
+                    onValueChange={setCategoria}
+                    disabled={loadingLista}
                   >
-                    <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                    <SelectTrigger>
                       <SelectValue placeholder="Categoria" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todas categorias</SelectItem>
-                      {CATEGORIAS.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
+                      {categoriasDisponiveis.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -637,15 +530,16 @@ export default function NoticiasPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 mt-6 pt-6 border-t border-gray-200">
-                <div className="flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                <div>
                   <Select
-                    value={filterDestaque}
+                    value={filtros.destaque}
                     onValueChange={(value: "all" | "destaque" | "normal") =>
-                      setFilterDestaque(value)
+                      setDestaque(value)
                     }
+                    disabled={loadingLista}
                   >
-                    <SelectTrigger className="transition-all duration-300 hover:border-blue-500">
+                    <SelectTrigger>
                       <SelectValue placeholder="Destaque" />
                     </SelectTrigger>
                     <SelectContent>
@@ -656,104 +550,162 @@ export default function NoticiasPage() {
                   </Select>
                 </div>
 
-                <div className="flex-1 text-right">
-                  <span className="text-sm text-gray-600 transition-colors duration-300">
-                    {filteredNoticias.length} notícias encontradas
-                  </span>
+                <div>
+                  <Select
+                    value={filtros.sortBy}
+                    onValueChange={(
+                      value:
+                        | "data_publicacao"
+                        | "created_at"
+                        | "views"
+                        | "titulo"
+                    ) => setSortBy(value)}
+                    disabled={loadingLista}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ordenar por" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="data_publicacao">
+                        Data de publicação
+                      </SelectItem>
+                      <SelectItem value="created_at">
+                        Data de criação
+                      </SelectItem>
+                      <SelectItem value="views">Visualizações</SelectItem>
+                      <SelectItem value="titulo">Título</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Select
+                    value={filtros.sortOrder}
+                    onValueChange={(value: "asc" | "desc") =>
+                      setSortOrder(value)
+                    }
+                    disabled={loadingLista}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Ordem" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desc">Decrescente</SelectItem>
+                      <SelectItem value="asc">Crescente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 pt-6 border-t">
+                <div className="text-sm text-gray-600">
+                  Mostrando <strong>{paginatedNoticias.length}</strong> de{" "}
+                  <strong>{totalCount}</strong> notícias
+                  {totalPages > 1 && (
+                    <span>
+                      {" "}
+                      (Página <strong>{filtros.currentPage}</strong> de{" "}
+                      <strong>{totalPages}</strong>)
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Select
+                    value={filtros.itemsPerPage.toString()}
+                    onValueChange={(value) => setItemsPerPage(parseInt(value))}
+                    disabled={loadingLista}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="10">10 por página</SelectItem>
+                      <SelectItem value="20">20 por página</SelectItem>
+                      <SelectItem value="50">50 por página</SelectItem>
+                      <SelectItem value="100">100 por página</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant="outline"
+                    onClick={clearFilters}
+                    disabled={loadingLista}
+                  >
+                    Limpar Filtros
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Tabela de Notícias */}
+        {/* Lista de Notícias */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
-          <Card className="border-0 shadow-lg transition-all duration-300 hover:shadow-xl">
+          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
             <CardHeader>
               <CardTitle className="flex items-center text-gray-800">
                 <RiNewspaperLine className="w-5 h-5 mr-2 text-navy-600" />
-                Lista de Notícias ({filteredNoticias.length})
+                Lista de Notícias ({totalCount})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
+              {loadingLista ? (
                 <div className="space-y-4">
                   {[...Array(5)].map((_, i) => (
-                    <motion.div
+                    <div
                       key={i}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5, delay: i * 0.1 }}
+                      className="flex items-center space-x-4 p-4 border rounded-lg"
                     >
-                      <div className="flex items-center space-x-4 p-4 border rounded-lg">
-                        <Skeleton className="h-12 w-12 rounded-lg bg-gray-200" />
-                        <div className="space-y-2 flex-1">
-                          <Skeleton className="h-4 w-[250px] bg-gray-200" />
-                          <Skeleton className="h-4 w-[200px] bg-gray-200" />
-                        </div>
+                      <Skeleton className="h-12 w-12 rounded-lg" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-[250px]" />
+                        <Skeleton className="h-4 w-[200px]" />
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
                 </div>
-              ) : filteredNoticias.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.5 }}
-                  className="text-center py-12"
-                >
+              ) : paginatedNoticias.length === 0 ? (
+                <div className="text-center py-12">
                   <RiNewspaperLine className="w-20 h-20 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-600 mb-4">
-                    {noticias.length === 0
+                    {totalCount === 0
                       ? "Nenhuma notícia cadastrada no sistema"
                       : "Nenhuma notícia encontrada com os filtros aplicados"}
                   </p>
-                  {noticias.length === 0 && (
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Link href="/admin/noticias/criar">
-                        <Button className="bg-green-600 hover:bg-green-700 text-white transition-colors duration-300">
-                          <RiAddLine className="w-4 h-4 mr-2" />
-                          Criar Primeira Notícia
-                        </Button>
-                      </Link>
-                    </motion.div>
+                  {totalCount === 0 && (
+                    <Link href="/admin/noticias/criar">
+                      <Button className="bg-green-600 hover:bg-green-700 text-white">
+                        <RiAddLine className="w-4 h-4 mr-2" />
+                        Criar Primeira Notícia
+                      </Button>
+                    </Link>
                   )}
-                </motion.div>
+                </div>
               ) : (
-                <motion.div
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                  className="space-y-4"
-                >
-                  <AnimatePresence>
-                    {filteredNoticias.map((noticia) => (
-                      <motion.div
-                        key={noticia.id}
-                        variants={itemVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="hidden"
-                        whileHover={{
-                          backgroundColor: "rgba(0, 0, 0, 0.02)",
-                        }}
-                        className="border border-gray-200 rounded-lg transition-colors duration-300"
-                      >
-                        <Card className="border-0 shadow-none">
-                          <CardContent className="p-4">
+                <>
+                  <div className="space-y-4 mb-6">
+                    <AnimatePresence>
+                      {paginatedNoticias.map((noticia, index) => (
+                        <motion.div
+                          key={noticia.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                          className="group"
+                        >
+                          <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors hover:shadow-md">
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-4 flex-1">
                                 <ImageWithFallback
                                   src={noticia.imagem}
                                   alt={noticia.titulo}
-                                  className="w-16 h-16 flex-shrink-0"
+                                  className="w-16 h-16"
                                 />
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-2">
@@ -768,11 +720,11 @@ export default function NoticiasPage() {
                                         <RiStarFill className="w-4 h-4 text-yellow-500 flex-shrink-0" />
                                       </motion.div>
                                     )}
-                                    <h3 className="font-semibold text-gray-800 truncate">
+                                    <h3 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
                                       {noticia.titulo}
                                     </h3>
                                     <Badge
-                                      className={getStatusBadge(noticia.status)}
+                                      className={getStatusColor(noticia.status)}
                                     >
                                       {getStatusText(noticia.status)}
                                     </Badge>
@@ -794,17 +746,23 @@ export default function NoticiasPage() {
                                         {formatDate(noticia.data_publicacao)}
                                       </span>
                                     </div>
-                                    <Badge
-                                      variant="secondary"
-                                      className="bg-blue-100 text-blue-700 transition-colors duration-300"
-                                    >
-                                      {noticia.categoria}
-                                    </Badge>
+                                    {noticia.categoria && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="bg-blue-100 text-blue-700"
+                                      >
+                                        {noticia.categoria}
+                                      </Badge>
+                                    )}
                                     <div className="flex items-center gap-1">
                                       <RiExternalLinkLine className="w-3 h-3" />
-                                      <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 font-mono transition-colors duration-300">
+                                      <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 font-mono">
                                         /{noticia.slug}
                                       </code>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <RiEyeLine className="w-3 h-3" />
+                                      <span>{noticia.views} visualizações</span>
                                     </div>
                                   </div>
                                 </div>
@@ -818,7 +776,8 @@ export default function NoticiasPage() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white transition-colors duration-300"
+                                      className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                                      disabled={saving}
                                     >
                                       <RiEditLine className="w-3 h-3 mr-1" />
                                       Editar
@@ -834,12 +793,13 @@ export default function NoticiasPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>
-                                      toggleNoticiaStatus(
+                                      handleToggleStatus(
                                         noticia.id,
                                         noticia.status
                                       )
                                     }
-                                    className="w-full sm:w-auto border-green-600 text-green-600 hover:bg-green-600 hover:text-white transition-colors duration-300"
+                                    className="w-full sm:w-auto border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
+                                    disabled={saving}
                                   >
                                     {noticia.status === "rascunho" ? (
                                       <RiRocketLine className="w-3 h-3 mr-1" />
@@ -864,12 +824,13 @@ export default function NoticiasPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() =>
-                                      toggleDestaque(
+                                      handleToggleDestaque(
                                         noticia.id,
                                         noticia.destaque
                                       )
                                     }
-                                    className="w-full sm:w-auto border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white transition-colors duration-300"
+                                    className="w-full sm:w-auto border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white"
+                                    disabled={saving}
                                   >
                                     {noticia.destaque ? (
                                       <RiStarLine className="w-3 h-3 mr-1" />
@@ -884,24 +845,148 @@ export default function NoticiasPage() {
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
                                 >
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => deleteNoticia(noticia.id)}
-                                    className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white transition-colors duration-300"
+                                  <AlertDialog
+                                    open={
+                                      deleteDialog.open &&
+                                      deleteDialog.noticiaId === noticia.id
+                                    }
+                                    onOpenChange={(open) =>
+                                      setDeleteDialog({
+                                        open,
+                                        noticiaId: open ? noticia.id : null,
+                                        noticiaTitulo: noticia.titulo,
+                                      })
+                                    }
                                   >
-                                    <RiDeleteBinLine className="w-3 h-3 mr-1" />
-                                    Excluir
-                                  </Button>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
+                                        disabled={saving}
+                                      >
+                                        <RiDeleteBinLine className="w-3 h-3 mr-1" />
+                                        Excluir
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                                          <RiAlertLine className="w-5 h-5" />
+                                          Confirmar exclusão
+                                        </AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                          Tem certeza que deseja excluir
+                                          permanentemente a notícia{" "}
+                                          <strong>
+                                            &quot;{noticia.titulo}&quot;
+                                          </strong>
+                                          ?
+                                          <br />
+                                          <br />
+                                          <span className="text-red-500 font-semibold">
+                                            ⚠️ Esta ação não pode ser desfeita!
+                                          </span>
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter>
+                                        <AlertDialogCancel disabled={saving}>
+                                          Cancelar
+                                        </AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={handleDeleteNoticia}
+                                          disabled={saving}
+                                          className="bg-red-600 hover:bg-red-700 text-white"
+                                        >
+                                          {saving ? (
+                                            <>
+                                              <Spinner className="w-4 h-4 mr-2" />
+                                              Excluindo...
+                                            </>
+                                          ) : (
+                                            "Sim, excluir permanentemente"
+                                          )}
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 </motion.div>
                               </div>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </motion.div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Paginação */}
+                  {totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t">
+                      <div className="text-sm text-gray-600">
+                        Página <strong>{filtros.currentPage}</strong> de{" "}
+                        <strong>{totalPages}</strong>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            setCurrentPage(Math.max(1, filtros.currentPage - 1))
+                          }
+                          disabled={filtros.currentPage === 1 || loadingLista}
+                        >
+                          Anterior
+                        </Button>
+
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              pageNum = i + 1;
+                            } else if (filtros.currentPage <= 3) {
+                              pageNum = i + 1;
+                            } else if (filtros.currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              pageNum = filtros.currentPage - 2 + i;
+                            }
+
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={
+                                  filtros.currentPage === pageNum
+                                    ? "default"
+                                    : "outline"
+                                }
+                                onClick={() => setCurrentPage(pageNum)}
+                                disabled={loadingLista}
+                                className="min-w-[40px]"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          }
+                        )}
+
+                        <Button
+                          variant="outline"
+                          onClick={() =>
+                            setCurrentPage(
+                              Math.min(totalPages, filtros.currentPage + 1)
+                            )
+                          }
+                          disabled={
+                            filtros.currentPage === totalPages || loadingLista
+                          }
+                        >
+                          Próxima
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>

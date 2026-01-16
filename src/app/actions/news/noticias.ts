@@ -1,12 +1,148 @@
+// @/app/actions/news/noticias.ts
 "use server";
 
-import { createServerClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import type { Database } from "@/lib/supabase/types";
+import { z, ZodIssue } from "zod";
+import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
 
-type Noticia = Database["public"]["Tables"]["noticias"]["Row"];
+// ============================================
+// SCHEMAS DE VALIDAÇÃO ZOD
+// ============================================
 
-// Interface padronizada para respostas
+const BaseNoticiaSchema = z.object({
+  titulo: z
+    .string()
+    .min(3, "Título deve ter pelo menos 3 caracteres")
+    .max(200, "Título não pode exceder 200 caracteres")
+    .transform((val) => val.trim()),
+
+  slug: z
+    .string()
+    .min(3, "Slug deve ter pelo menos 3 caracteres")
+    .max(100, "Slug não pode exceder 100 caracteres")
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Slug deve conter apenas letras minúsculas, números e hífens"
+    )
+    .transform((val) => val.trim().toLowerCase()),
+
+  conteudo: z
+    .string()
+    .min(10, "Conteúdo deve ter pelo menos 10 caracteres")
+    .max(10000, "Conteúdo não pode exceder 10.000 caracteres")
+    .transform((val) => val.trim()),
+
+  resumo: z
+    .string()
+    .min(10, "Resumo deve ter pelo menos 10 caracteres")
+    .max(300, "Resumo não pode exceder 300 caracteres")
+    .transform((val) => val.trim()),
+
+  imagem: z.string().url("URL da imagem inválida").nullable().optional(),
+  categoria: z.string().max(50).nullable().optional(),
+
+  destaque: z.boolean().default(false),
+
+  data_publicacao: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data deve estar no formato YYYY-MM-DD")
+    .default(() => new Date().toISOString().split("T")[0]),
+
+  status: z.enum(["rascunho", "publicado", "arquivado"]).default("rascunho"),
+});
+
+const CreateNoticiaSchema = BaseNoticiaSchema;
+const UpdateNoticiaSchema = BaseNoticiaSchema.partial().extend({
+  id: z.string().uuid("ID inválido"),
+});
+
+const DeleteNoticiaSchema = z.object({
+  id: z.string().uuid("ID inválido"),
+});
+
+const ListNoticiasSchema = z.object({
+  search: z.string().optional(),
+  categoria: z.string().optional(),
+  status: z.enum(["rascunho", "publicado", "arquivado", "all"]).default("all"),
+  page: z.number().min(1).default(1),
+  limit: z.number().min(1).max(100).default(20),
+  destaque: z.enum(["all", "destaque", "normal"]).default("all"),
+  sortBy: z
+    .enum(["data_publicacao", "created_at", "views", "titulo"])
+    .default("data_publicacao"),
+  sortOrder: z.enum(["asc", "desc"]).default("desc"),
+});
+
+// ============================================
+// TYPES
+// ============================================
+
+export type CreateNoticiaInput = z.infer<typeof CreateNoticiaSchema>;
+export type UpdateNoticiaInput = z.infer<typeof UpdateNoticiaSchema>;
+export type ListNoticiasInput = z.infer<typeof ListNoticiasSchema>;
+
+export type Noticia = {
+  id: string;
+  titulo: string;
+  slug: string;
+  conteudo: string;
+  resumo: string | null;
+  imagem: string | null;
+  categoria: string | null;
+  autor_id: string | null;
+  destaque: boolean;
+  data_publicacao: string;
+  status: "rascunho" | "publicado" | "arquivado";
+  created_at: string;
+  updated_at: string;
+  views: number;
+  autor?: {
+    full_name: string | null;
+    avatar_url: string | null;
+    graduacao: string | null;
+    matricula: string | null;
+  } | null;
+};
+
+export type NoticiaLista = {
+  id: string;
+  titulo: string;
+  slug: string;
+  resumo: string | null;
+  categoria: string | null;
+  data_publicacao: string;
+  status: "rascunho" | "publicado" | "arquivado";
+  imagem: string | null;
+  views: number;
+  destaque: boolean;
+  created_at: string;
+  autor: {
+    full_name: string | null;
+    avatar_url: string | null;
+    graduacao: string | null;
+  } | null;
+};
+
+export type NoticiaComAutor = Noticia & {
+  autor: {
+    full_name: string | null;
+    avatar_url: string | null;
+    graduacao: string | null;
+    matricula: string | null;
+  } | null;
+};
+
+export type NewsStats = {
+  total: number;
+  published: number;
+  recent: number;
+  featured: number;
+  rascunho: number;
+  arquivado: number;
+  canViewStats: boolean;
+};
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -23,92 +159,424 @@ export interface ApiResponse<T> {
   };
 }
 
-// Interfaces específicas para as actions
-export interface GetNewsOptions {
-  limit?: number;
-  page?: number;
-  category?: string;
-  featured?: boolean;
-  search?: string;
-}
-
-export interface NoticiaInsertData {
-  titulo: string;
-  slug: string;
-  conteudo: string;
-  resumo?: string;
-  imagem?: string;
-  categoria?: string;
-  autor_id?: string;
-  destaque?: boolean;
-  data_publicacao?: string;
-  status?: "rascunho" | "publicado" | "arquivado";
-}
-
-export interface NoticiaUpdateData {
-  titulo?: string;
-  slug?: string;
-  conteudo?: string;
-  resumo?: string;
-  imagem?: string;
-  categoria?: string;
-  destaque?: boolean;
-  data_publicacao?: string;
-  status?: "rascunho" | "publicado" | "arquivado";
-}
-
-// Tipos para as queries
-export interface NoticiaLista {
+// Tipos para os dados retornados do Supabase
+type SupabaseNoticia = {
   id: string;
   titulo: string;
   slug: string;
+  conteudo: string;
   resumo: string | null;
+  imagem: string | null;
   categoria: string | null;
+  autor_id: string | null;
+  destaque: boolean;
   data_publicacao: string;
   status: "rascunho" | "publicado" | "arquivado";
-  imagem: string | null;
+  created_at: string;
+  updated_at: string;
   views: number;
-  destaque: boolean;
-  autor: {
-    full_name: string | null;
-    avatar_url: string | null;
-    graduacao: string | null;
-  } | null;
+};
+
+type SupabaseAutor = {
+  full_name: string | null;
+  avatar_url: string | null;
+  graduacao: string | null;
+  matricula: string | null;
+};
+
+type SupabaseAutorLista = {
+  full_name: string | null;
+  avatar_url: string | null;
+  graduacao: string | null;
+};
+
+// Tipo para dados do Supabase com autor como array
+type SupabaseNoticiaWithAutor = SupabaseNoticia & {
+  autor: SupabaseAutor[] | null;
+};
+
+type SupabaseNoticiaListaWithAutor = Omit<
+  SupabaseNoticia,
+  "conteudo" | "autor_id" | "updated_at"
+> & {
+  autor: SupabaseAutorLista[] | null;
+};
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+async function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    }
+  );
 }
 
-export interface NoticiaComAutor extends Noticia {
-  autor: {
-    full_name: string | null;
-    avatar_url: string | null;
-    graduacao: string | null;
-    matricula: string | null;
-  } | null;
+async function verifyAdminSession(): Promise<{
+  success: boolean;
+  userId?: string;
+  error?: string;
+}> {
+  try {
+    const cookieStore = await cookies();
+    const isAdminCookie = cookieStore.get("is_admin")?.value === "true";
+
+    if (!isAdminCookie) {
+      return { success: false, error: "admin_session_required" };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: "admin_session_invalid" };
+  }
 }
 
-export interface NewsStats {
-  total: number;
-  published: number;
-  recent: number;
-  featured: number;
-  canViewStats: boolean;
+// Função para converter dados do Supabase para nosso tipo NoticiaLista
+function convertToNoticiaLista(
+  data: SupabaseNoticiaListaWithAutor
+): NoticiaLista {
+  return {
+    id: data.id,
+    titulo: data.titulo,
+    slug: data.slug,
+    resumo: data.resumo,
+    categoria: data.categoria,
+    data_publicacao: data.data_publicacao,
+    status: data.status,
+    imagem: data.imagem,
+    views: data.views,
+    destaque: data.destaque,
+    created_at: data.created_at,
+    autor:
+      data.autor && Array.isArray(data.autor) && data.autor.length > 0
+        ? {
+            full_name: data.autor[0].full_name,
+            avatar_url: data.autor[0].avatar_url,
+            graduacao: data.autor[0].graduacao,
+          }
+        : null,
+  };
 }
 
-// Função para notícias filtradas
+// Função para converter dados do Supabase para nosso tipo NoticiaComAutor
+function convertToNoticiaComAutor(
+  data: SupabaseNoticiaWithAutor
+): NoticiaComAutor {
+  return {
+    id: data.id,
+    titulo: data.titulo,
+    slug: data.slug,
+    conteudo: data.conteudo,
+    resumo: data.resumo,
+    imagem: data.imagem,
+    categoria: data.categoria,
+    autor_id: data.autor_id,
+    destaque: data.destaque,
+    data_publicacao: data.data_publicacao,
+    status: data.status,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    views: data.views,
+    autor:
+      data.autor && Array.isArray(data.autor) && data.autor.length > 0
+        ? {
+            full_name: data.autor[0].full_name,
+            avatar_url: data.autor[0].avatar_url,
+            graduacao: data.autor[0].graduacao,
+            matricula: data.autor[0].matricula,
+          }
+        : null,
+  };
+}
+
+// ============================================
+// CRUD OPERATIONS
+// ============================================
+
+/**
+ * Criar nova notícia
+ */
+export async function criarNoticia(
+  input: CreateNoticiaInput
+): Promise<ApiResponse<NoticiaComAutor>> {
+  try {
+    console.log("🔍 [criarNoticia] Iniciando...");
+
+    // Verificar sessão admin
+    const session = await verifyAdminSession();
+    if (!session.success) {
+      return { success: false, error: session.error };
+    }
+
+    // Validar entrada
+    const validated = CreateNoticiaSchema.parse(input);
+
+    // Usar admin client
+    const adminClient = await getAdminClient();
+
+    // Verificar slug único
+    const { data: existingSlug } = await adminClient
+      .from("noticias")
+      .select("id")
+      .eq("slug", validated.slug)
+      .maybeSingle();
+
+    if (existingSlug) {
+      throw new Error("Já existe uma notícia com este slug. Altere o título.");
+    }
+
+    // Criar notícia
+    const noticiaData = {
+      ...validated,
+      autor_id: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      views: 0,
+    };
+
+    const { data: newNoticia, error } = await adminClient
+      .from("noticias")
+      .insert(noticiaData)
+      .select(
+        `
+        *,
+        autor:profiles!noticias_autor_id_fkey(
+          full_name,
+          avatar_url,
+          graduacao,
+          matricula
+        )
+      `
+      )
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao criar notícia: ${error.message}`);
+    }
+
+    // Revalidar cache
+    revalidatePath("/noticias");
+    revalidatePath("/admin/noticias");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      data: convertToNoticiaComAutor(newNoticia as SupabaseNoticiaWithAutor),
+    };
+  } catch (error) {
+    console.error("❌ Erro em criarNoticia:", error);
+
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error:
+          "Erro de validação: " +
+          error.issues.map((e: ZodIssue) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro ao criar notícia",
+    };
+  }
+}
+
+/**
+ * Atualizar notícia
+ */
+export async function atualizarNoticia(
+  id: string,
+  input: Partial<UpdateNoticiaInput>
+): Promise<ApiResponse<NoticiaComAutor>> {
+  try {
+    console.log("🔍 [atualizarNoticia] Atualizando notícia:", id);
+
+    // Verificar sessão admin
+    const session = await verifyAdminSession();
+    if (!session.success) {
+      return { success: false, error: session.error };
+    }
+
+    // Validar entrada
+    const validated = UpdateNoticiaSchema.partial().parse({ id, ...input });
+
+    // Usar admin client
+    const adminClient = await getAdminClient();
+
+    // Buscar notícia atual
+    const { data: currentNoticia } = await adminClient
+      .from("noticias")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (!currentNoticia) {
+      throw new Error("Notícia não encontrada.");
+    }
+
+    // Verificar slug único (se alterar slug)
+    if (validated.slug && validated.slug !== currentNoticia.slug) {
+      const { data: existingSlug } = await adminClient
+        .from("noticias")
+        .select("id")
+        .eq("slug", validated.slug)
+        .neq("id", id)
+        .maybeSingle();
+
+      if (existingSlug) {
+        throw new Error(
+          "Já existe outra notícia com este slug. Altere o título."
+        );
+      }
+    }
+
+    // Atualizar notícia
+    const updateData = {
+      ...validated,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data: updatedNoticia, error } = await adminClient
+      .from("noticias")
+      .update(updateData)
+      .eq("id", id)
+      .select(
+        `
+        *,
+        autor:profiles!noticias_autor_id_fkey(
+          full_name,
+          avatar_url,
+          graduacao,
+          matricula
+        )
+      `
+      )
+      .single();
+
+    if (error) {
+      throw new Error(`Erro ao atualizar notícia: ${error.message}`);
+    }
+
+    // Revalidar cache
+    revalidatePath("/noticias");
+    revalidatePath(`/noticias/${updatedNoticia.slug}`);
+    revalidatePath("/admin/noticias");
+    revalidatePath("/");
+
+    return {
+      success: true,
+      data: convertToNoticiaComAutor(
+        updatedNoticia as SupabaseNoticiaWithAutor
+      ),
+    };
+  } catch (error) {
+    console.error("❌ Erro em atualizarNoticia:", error);
+
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error:
+          "Erro de validação: " +
+          error.issues.map((e: ZodIssue) => e.message).join(", "),
+      };
+    }
+
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Erro ao atualizar notícia",
+    };
+  }
+}
+
+/**
+ * Deletar notícia
+ */
+export async function deletarNoticia(id: string): Promise<ApiResponse<void>> {
+  try {
+    console.log("🔍 [deletarNoticia] Excluindo notícia:", id);
+
+    // Verificar sessão admin
+    const session = await verifyAdminSession();
+    if (!session.success) {
+      return { success: false, error: session.error };
+    }
+
+    // Validar
+    const validated = DeleteNoticiaSchema.parse({ id });
+
+    // Usar admin client
+    const adminClient = await getAdminClient();
+
+    // Deletar notícia
+    const { error } = await adminClient
+      .from("noticias")
+      .delete()
+      .eq("id", validated.id);
+
+    if (error) {
+      throw new Error(`Erro ao excluir notícia: ${error.message}`);
+    }
+
+    // Revalidar cache
+    revalidatePath("/noticias");
+    revalidatePath("/admin/noticias");
+    revalidatePath("/");
+
+    return {
+      success: true,
+    };
+  } catch (error) {
+    console.error("❌ Erro em deletarNoticia:", error);
+
+    if (error instanceof z.ZodError) {
+      return {
+        success: false,
+        error: "Erro de validação",
+      };
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erro ao excluir notícia",
+    };
+  }
+}
+
+/**
+ * Listar notícias
+ */
 export async function getNews(
-  options: GetNewsOptions = {}
+  options: Partial<ListNoticiasInput> = {}
 ): Promise<ApiResponse<NoticiaLista[]>> {
   try {
-    const supabase = await createServerClient();
+    // Usar admin client
+    const adminClient = await getAdminClient();
 
+    // Validar filtros
+    const validatedFilters = ListNoticiasSchema.parse(options);
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const { limit = 6, page = 1, category, featured, search } = options;
+      search,
+      categoria,
+      status,
+      destaque,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    } = validatedFilters;
     const offset = (page - 1) * limit;
 
-    // Construir query base
-    let query = supabase
+    // Construir query
+    let query = adminClient
       .from("noticias")
       .select(
         `
@@ -122,32 +590,34 @@ export async function getNews(
         imagem,
         views,
         destaque,
+        created_at,
         autor:profiles!noticias_autor_id_fkey(
           full_name,
           avatar_url,
           graduacao
         )
-        `,
+      `,
         { count: "exact" }
       )
-      .order("data_publicacao", { ascending: false });
-
-    // Usuários não autenticados só veem publicadas
-    if (!session) {
-      query = query.eq("status", "publicado");
-    }
+      .order(sortBy, { ascending: sortOrder === "asc" });
 
     // Aplicar filtros
-    if (category) {
-      query = query.eq("categoria", category);
+    if (search && search.trim()) {
+      query = query.or(
+        `titulo.ilike.%${search}%,resumo.ilike.%${search}%,conteudo.ilike.%${search}%`
+      );
     }
 
-    if (featured !== undefined) {
-      query = query.eq("destaque", featured);
+    if (categoria && categoria !== "all") {
+      query = query.eq("categoria", categoria);
     }
 
-    if (search) {
-      query = query.or(`titulo.ilike.%${search}%,resumo.ilike.%${search}%`);
+    if (status !== "all") {
+      query = query.eq("status", status);
+    }
+
+    if (destaque !== "all") {
+      query = query.eq("destaque", destaque === "destaque");
     }
 
     // Paginação
@@ -160,22 +630,23 @@ export async function getNews(
       throw new Error(`Erro ao buscar notícias: ${error.message}`);
     }
 
+    // Converter dados para o tipo correto
+    const noticias: NoticiaLista[] = (data || []).map((item) =>
+      convertToNoticiaLista(item as SupabaseNoticiaListaWithAutor)
+    );
+
     return {
       success: true,
-      data: data || [],
+      data: noticias,
       pagination: {
         page,
         limit,
         total: count || 0,
         totalPages: Math.ceil((count || 0) / limit),
       },
-      metadata: {
-        isAuthenticated: !!session,
-        canEdit: session?.user ? true : false,
-      },
     };
   } catch (error) {
-    console.error("Erro em getNews:", error);
+    console.error("❌ Erro em getNews:", error);
 
     return {
       success: false,
@@ -183,66 +654,43 @@ export async function getNews(
       data: [],
       pagination: {
         page: options.page || 1,
-        limit: options.limit || 6,
+        limit: options.limit || 20,
         total: 0,
         totalPages: 0,
-      },
-      metadata: {
-        isAuthenticated: false,
-        canEdit: false,
       },
     };
   }
 }
 
-// Função específica para a home page
-export async function getHomeNews(
-  limit: number = 3
-): Promise<ApiResponse<NoticiaLista[]>> {
-  return getNews({
-    limit,
-  });
-}
-
-// Função para notícias em destaque
-export async function getFeaturedNews(
-  limit: number = 6
-): Promise<ApiResponse<NoticiaLista[]>> {
-  return getNews({
-    limit,
-    featured: true,
-  });
-}
-
-// Função para uma notícia específica
-export async function getNewsBySlug(
-  slug: string
+/**
+ * Buscar notícia por ID ou Slug
+ */
+export async function getNoticiaById(
+  idOrSlug: string
 ): Promise<ApiResponse<NoticiaComAutor>> {
   try {
-    const supabase = await createServerClient();
+    // Usar admin client
+    const adminClient = await getAdminClient();
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        idOrSlug
+      );
 
-    let query = supabase
-      .from("noticias")
-      .select(
-        `
-        *,
-        autor:profiles!noticias_autor_id_fkey(
-          full_name,
-          avatar_url,
-          graduacao,
-          matricula
-        )
-        `
+    let query = adminClient.from("noticias").select(`
+      *,
+      autor:profiles!noticias_autor_id_fkey(
+        full_name,
+        avatar_url,
+        graduacao,
+        matricula
       )
-      .eq("slug", slug);
+    `);
 
-    // Usuários não autenticados só veem publicadas
-    if (!session) {
-      query = query.eq("status", "publicado");
+    if (isUuid) {
+      query = query.eq("id", idOrSlug);
+    } else {
+      query = query.eq("slug", idOrSlug);
     }
 
     const { data, error } = await query.maybeSingle();
@@ -260,18 +708,17 @@ export async function getNewsBySlug(
 
     // Incrementar visualizações
     const currentViews = data.views || 0;
-    await supabase
+    await adminClient
       .from("noticias")
       .update({ views: currentViews + 1 })
       .eq("id", data.id);
 
     return {
       success: true,
-      data,
+      data: convertToNoticiaComAutor(data as SupabaseNoticiaWithAutor),
     };
   } catch (error) {
-    console.error("Erro em getNewsBySlug:", error);
-
+    console.error("❌ Erro em getNoticiaById:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Erro ao buscar notícia",
@@ -279,129 +726,58 @@ export async function getNewsBySlug(
   }
 }
 
-// Função para buscar notícias por categoria
-export async function getNewsByCategory(
-  category: string,
-  limit: number = 6
-): Promise<ApiResponse<NoticiaLista[]>> {
-  return getNews({
-    limit,
-    category,
-  });
-}
-
-// Função para buscar notícias mais recentes
-export async function getLatestNews(
-  limit: number = 6
-): Promise<ApiResponse<NoticiaLista[]>> {
-  return getNews({
-    limit,
-  });
-}
-
-// Função para buscar notícias relacionadas
-export async function getRelatedNews(
-  currentSlug: string,
-  category: string,
-  limit: number = 3
-): Promise<ApiResponse<NoticiaLista[]>> {
-  try {
-    const supabase = await createServerClient();
-
-    const { data, error } = await supabase
-      .from("noticias")
-      .select(
-        `
-        id,
-        titulo,
-        slug,
-        resumo,
-        categoria,
-        data_publicacao,
-        status,
-        imagem,
-        views,
-        destaque,
-        autor:profiles!noticias_autor_id_fkey(
-          full_name,
-          avatar_url,
-          graduacao
-        )
-        `
-      )
-      .eq("categoria", category)
-      .eq("status", "publicado")
-      .neq("slug", currentSlug)
-      .order("data_publicacao", { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      throw new Error(`Erro ao buscar notícias relacionadas: ${error.message}`);
-    }
-
-    return {
-      success: true,
-      data: data || [],
-    };
-  } catch (error) {
-    console.error("Erro em getRelatedNews:", error);
-    return {
-      success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Erro ao buscar notícias relacionadas",
-      data: [],
-    };
-  }
-}
-
-// Função para buscar estatísticas de notícias
+/**
+ * Obter estatísticas de notícias
+ */
 export async function getNewsStats(): Promise<ApiResponse<NewsStats>> {
   try {
-    const supabase = await createServerClient();
+    // Usar admin client
+    const adminClient = await getAdminClient();
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const [totalPromise, publishedPromise, featuredPromise, recentPromise] =
-      await Promise.allSettled([
-        supabase.from("noticias").select("*", { count: "exact", head: true }),
-        supabase
-          .from("noticias")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "publicado"),
-        supabase
-          .from("noticias")
-          .select("*", { count: "exact", head: true })
-          .eq("destaque", true)
-          .eq("status", "publicado"),
-        supabase
-          .from("noticias")
-          .select("*", { count: "exact", head: true })
-          .eq("status", "publicado")
-          .gte(
-            "data_publicacao",
-            new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-          ),
-      ]);
-
-    const getCount = (
-      result: PromiseSettledResult<{ count: number | null }>
-    ): number => {
-      if (result.status === "fulfilled") {
-        return result.value.count || 0;
-      }
-      return 0;
-    };
+    const [
+      totalResult,
+      publishedResult,
+      rascunhoResult,
+      arquivadoResult,
+      featuredResult,
+      recentResult,
+    ] = await Promise.all([
+      adminClient.from("noticias").select("id", { count: "exact", head: true }),
+      adminClient
+        .from("noticias")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "publicado"),
+      adminClient
+        .from("noticias")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "rascunho"),
+      adminClient
+        .from("noticias")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "arquivado"),
+      adminClient
+        .from("noticias")
+        .select("id", { count: "exact", head: true })
+        .eq("destaque", true)
+        .eq("status", "publicado"),
+      adminClient
+        .from("noticias")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "publicado")
+        .gte(
+          "created_at",
+          new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+        ),
+    ]);
 
     const stats: NewsStats = {
-      total: getCount(totalPromise),
-      published: getCount(publishedPromise),
-      featured: getCount(featuredPromise),
-      recent: getCount(recentPromise),
-      canViewStats: !!session?.user,
+      total: totalResult.count || 0,
+      published: publishedResult.count || 0,
+      rascunho: rascunhoResult.count || 0,
+      arquivado: arquivadoResult.count || 0,
+      featured: featuredResult.count || 0,
+      recent: recentResult.count || 0,
+      canViewStats: true,
     };
 
     return {
@@ -409,8 +785,7 @@ export async function getNewsStats(): Promise<ApiResponse<NewsStats>> {
       data: stats,
     };
   } catch (error) {
-    console.error("Erro em getNewsStats:", error);
-
+    console.error("❌ Erro em getNewsStats:", error);
     return {
       success: false,
       error:
@@ -418,6 +793,8 @@ export async function getNewsStats(): Promise<ApiResponse<NewsStats>> {
       data: {
         total: 0,
         published: 0,
+        rascunho: 0,
+        arquivado: 0,
         featured: 0,
         recent: 0,
         canViewStats: false,
@@ -426,236 +803,78 @@ export async function getNewsStats(): Promise<ApiResponse<NewsStats>> {
   }
 }
 
-// ==================== ADMIN ====================
+// ============================================
+// FUNÇÕES DE CONVENIÊNCIA
+// ============================================
 
-export async function criarNoticia(
-  dados: NoticiaInsertData
-): Promise<ApiResponse<NoticiaComAutor>> {
+/**
+ * Publicar notícia
+ */
+export async function publicarNoticia(id: string): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createServerClient();
-
-    // Verificar se é admin
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error("Não autorizado");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      throw new Error("Apenas administradores podem criar notícias");
-    }
-
-    const noticiaData = {
-      ...dados,
-      autor_id: user.user.id,
-      data_publicacao:
-        dados.data_publicacao || new Date().toISOString().split("T")[0],
-      status: dados.status || "rascunho",
-      destaque: dados.destaque || false,
-      views: 0,
-    };
-
-    const { data, error } = await supabase
-      .from("noticias")
-      .insert(noticiaData)
-      .select(
-        `
-        *,
-        autor:profiles!noticias_autor_id_fkey(
-          full_name,
-          avatar_url,
-          graduacao,
-          matricula
-        )
-        `
-      )
-      .single();
-
-    if (error) throw error;
-
-    // Registrar atividade
-    await supabase.from("system_activities").insert({
-      user_id: user.user.id,
-      action_type: "news_created",
-      description: `Notícia "${data.titulo}" criada`,
-      resource_type: "noticia",
-      resource_id: data.id,
-      metadata: {
-        titulo: data.titulo,
-        slug: data.slug,
-        status: data.status,
-      },
+    await atualizarNoticia(id, {
+      status: "publicado",
+      data_publicacao: new Date().toISOString().split("T")[0],
     });
-
-    // Revalidar cache
-    revalidatePath("/noticias");
-    revalidatePath("/");
-
-    return {
-      success: true,
-      data,
-    };
+    return { success: true };
   } catch (error) {
-    console.error("Erro ao criar notícia:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Erro ao criar notícia",
-    };
-  }
-}
-
-export async function atualizarNoticia(
-  noticiaId: string,
-  dados: NoticiaUpdateData
-): Promise<ApiResponse<NoticiaComAutor>> {
-  try {
-    const supabase = await createServerClient();
-
-    // Verificar se é admin
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error("Não autorizado");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      throw new Error("Apenas administradores podem atualizar notícias");
-    }
-
-    const updateData = {
-      ...dados,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { data, error } = await supabase
-      .from("noticias")
-      .update(updateData)
-      .eq("id", noticiaId)
-      .select(
-        `
-        *,
-        autor:profiles!noticias_autor_id_fkey(
-          full_name,
-          avatar_url,
-          graduacao,
-          matricula
-        )
-        `
-      )
-      .single();
-
-    if (error) throw error;
-
-    // Registrar atividade
-    await supabase.from("system_activities").insert({
-      user_id: user.user.id,
-      action_type: "news_updated",
-      description: `Notícia "${data.titulo}" atualizada`,
-      resource_type: "noticia",
-      resource_id: data.id,
-      metadata: {
-        titulo: data.titulo,
-        slug: data.slug,
-        status: data.status,
-        destaque: data.destaque,
-      },
-    });
-
-    // Revalidar cache
-    revalidatePath("/noticias");
-    revalidatePath(`/noticias/${data.slug}`);
-    revalidatePath("/");
-
-    return {
-      success: true,
-      data,
-    };
-  } catch (error) {
-    console.error("Erro ao atualizar notícia:", error);
     return {
       success: false,
       error:
-        error instanceof Error ? error.message : "Erro ao atualizar notícia",
+        error instanceof Error ? error.message : "Erro ao publicar notícia",
     };
   }
 }
 
-export async function deletarNoticia(
-  noticiaId: string
-): Promise<ApiResponse<void>> {
+/**
+ * Arquivar notícia
+ */
+export async function arquivarNoticia(id: string): Promise<ApiResponse<void>> {
   try {
-    const supabase = await createServerClient();
-
-    // Verificar se é admin
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error("Não autorizado");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      throw new Error("Apenas administradores podem deletar notícias");
-    }
-
-    // Primeiro buscar dados da notícia para o log
-    const { data: noticia } = await supabase
-      .from("noticias")
-      .select("titulo")
-      .eq("id", noticiaId)
-      .single();
-
-    // Deletar notícia
-    const { error } = await supabase
-      .from("noticias")
-      .delete()
-      .eq("id", noticiaId);
-
-    if (error) throw error;
-
-    // Registrar atividade
-    if (noticia) {
-      await supabase.from("system_activities").insert({
-        user_id: user.user.id,
-        action_type: "news_deleted",
-        description: `Notícia "${noticia.titulo}" deletada`,
-        resource_type: "noticia",
-        resource_id: noticiaId,
-      });
-    }
-
-    // Revalidar cache
-    revalidatePath("/noticias");
-    revalidatePath("/");
-
-    return {
-      success: true,
-    };
+    await atualizarNoticia(id, {
+      status: "arquivado",
+    });
+    return { success: true };
   } catch (error) {
-    console.error("Erro ao deletar notícia:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Erro ao deletar notícia",
+      error:
+        error instanceof Error ? error.message : "Erro ao arquivar notícia",
     };
   }
 }
 
-// Função para obter categorias disponíveis
+/**
+ * Alternar destaque
+ */
+export async function toggleDestaque(
+  id: string,
+  currentDestaque: boolean
+): Promise<ApiResponse<void>> {
+  try {
+    await atualizarNoticia(id, {
+      destaque: !currentDestaque,
+    });
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        error instanceof Error ? error.message : "Erro ao alternar destaque",
+    };
+  }
+}
+
+/**
+ * Buscar categorias disponíveis
+ */
 export async function getCategoriasNoticias(): Promise<
   ApiResponse<Array<{ value: string; label: string }>>
 > {
   try {
-    const supabase = await createServerClient();
+    const adminClient = await getAdminClient();
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("noticias")
       .select("categoria")
       .eq("status", "publicado")
@@ -681,17 +900,110 @@ export async function getCategoriasNoticias(): Promise<
     // Ordenar alfabeticamente
     categorias.sort((a, b) => a.label.localeCompare(b.label));
 
+    // Adicionar "Todas" como primeira opção
+    categorias.unshift({ value: "all", label: "Todas categorias" });
+
     return {
       success: true,
       data: categorias,
     };
   } catch (error) {
-    console.error("Erro em getCategoriasNoticias:", error);
+    console.error("❌ Erro em getCategoriasNoticias:", error);
     return {
       success: false,
       error:
         error instanceof Error ? error.message : "Erro ao buscar categorias",
       data: [],
     };
+  }
+}
+
+/**
+ * Buscar notícias mais recentes (para home page)
+ */
+export async function getLatestNews(
+  limit: number = 3
+): Promise<ApiResponse<NoticiaLista[]>> {
+  try {
+    // Usar admin client
+    const adminClient = await getAdminClient();
+
+    const { data, error } = await adminClient
+      .from("noticias")
+      .select(
+        `
+        id,
+        titulo,
+        slug,
+        resumo,
+        categoria,
+        data_publicacao,
+        status,
+        imagem,
+        views,
+        destaque,
+        created_at,
+        autor:profiles!noticias_autor_id_fkey(
+          full_name,
+          avatar_url,
+          graduacao
+        )
+      `
+      )
+      .eq("status", "publicado")
+      .order("data_publicacao", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`Erro ao buscar notícias recentes: ${error.message}`);
+    }
+
+    // Converter dados para o tipo correto
+    const noticias: NoticiaLista[] = (data || []).map((item) =>
+      convertToNoticiaLista(item as SupabaseNoticiaListaWithAutor)
+    );
+
+    return {
+      success: true,
+      data: noticias,
+    };
+  } catch (error) {
+    console.error("❌ Erro em getLatestNews:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Erro ao buscar notícias recentes",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Validar slug único
+ */
+export async function validateSlug(
+  slug: string,
+  excludeId?: string
+): Promise<boolean> {
+  try {
+    const adminClient = await getAdminClient();
+
+    let query = adminClient
+      .from("noticias")
+      .select("id")
+      .eq("slug", slug.toLowerCase());
+
+    if (excludeId) {
+      query = query.neq("id", excludeId);
+    }
+
+    const { data } = await query.maybeSingle();
+    return !data; // Disponível se não encontrar
+  } catch (error) {
+    console.error("❌ Erro em validateSlug:", error);
+    return false;
   }
 }

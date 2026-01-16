@@ -1,16 +1,15 @@
+// src/app/(app)/admin/noticias/criar/page.tsx
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -18,30 +17,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { FileUpload } from "@/components/ui/file-upload";
+import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import {
-  RiNewspaperFill,
-  RiSaveFill,
-  RiArrowLeftFill,
-  RiCalendarFill,
-  RiImageFill,
-  RiBarChartFill,
-  RiHomeFill,
-  RiCloseFill,
-  RiLink,
-  RiCheckFill,
-  RiAlertFill,
+  RiNewspaperLine,
+  RiSaveLine,
+  RiCloseLine,
+  RiArrowLeftLine,
+  RiCalendarLine,
+  RiImageLine,
+  RiBarChartLine,
+  RiHomeLine,
+  RiCheckLine,
+  RiAlertLine,
+  RiExternalLinkLine,
   RiStarFill,
-  RiUploadCloudFill,
-  RiDeleteBinFill,
-  RiEyeLine,
 } from "react-icons/ri";
 
-// Tipos do Supabase
-import type { Database } from "@/lib/supabase/types";
-type NoticiaStatus = Database["public"]["Tables"]["noticias"]["Row"]["status"];
+// Import do store
+import { useNoticiaCreate } from "@/lib/stores/useNoticiasStore";
 
 const CATEGORIAS = [
   "Operações",
@@ -53,540 +51,215 @@ const CATEGORIAS = [
   "Comunicação",
 ];
 
-// Componente de Upload de Imagem
-function ImageUploadSection({
-  onImageUpload,
-  currentImage,
-  onImageRemove,
-}: {
-  onImageUpload: (url: string) => void;
-  currentImage?: string | null;
-  onImageRemove: () => void;
-}) {
-  const [uploading, setUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(
-    currentImage || null
-  );
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.5,
+    },
+  },
+};
 
-  const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+// Função auxiliar para criar um evento simulado
+const createInputChangeEvent = (
+  name: string,
+  value: string | boolean | Date
+): React.ChangeEvent<HTMLInputElement> => {
+  const event = {
+    target: {
+      name,
+      value:
+        typeof value === "boolean" || value instanceof Date
+          ? value.toString()
+          : value,
+    },
+    currentTarget: {
+      name,
+      value:
+        typeof value === "boolean" || value instanceof Date
+          ? value.toString()
+          : value,
+    },
+    bubbles: true,
+    cancelable: true,
+    defaultPrevented: false,
+    eventPhase: 3,
+    isTrusted: false,
+    nativeEvent: {} as Event,
+    persist: () => {},
+    isDefaultPrevented: () => false,
+    isPropagationStopped: () => false,
+    preventDefault: () => {},
+    stopPropagation: () => {},
+    timeStamp: Date.now(),
+    type: "change",
+  } as React.ChangeEvent<HTMLInputElement>;
 
-    if (!file.type.startsWith("image/")) {
-      alert("Por favor, selecione apenas arquivos de imagem.");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert("A imagem deve ter no máximo 5MB.");
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const objectUrl = URL.createObjectURL(file);
-      setPreviewUrl(objectUrl);
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("type", "image");
-
-      console.log("🔄 Enviando imagem para upload...");
-
-      const response = await fetch("/api/upload/general", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Erro no upload");
-      }
-
-      const result = await response.json();
-      console.log("✅ Upload realizado:", result.url);
-
-      onImageUpload(result.url);
-      URL.revokeObjectURL(objectUrl);
-      setPreviewUrl(result.url);
-    } catch (error: unknown) {
-      console.error("❌ Erro no upload:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Erro ao fazer upload da imagem"
-      );
-
-      setPreviewUrl(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleRemoveImage = () => {
-    setPreviewUrl(null);
-    onImageRemove();
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  return (
-    <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center text-gray-800">
-          <RiImageFill className="w-4 h-4 mr-2 text-blue-600" />
-          Imagem de Capa
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {previewUrl && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative group"
-          >
-            <div className="relative w-full h-48 rounded-lg overflow-hidden border-2 border-gray-200">
-              <Image
-                src={previewUrl}
-                alt="Preview da imagem"
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 400px"
-              />
-              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleRemoveImage}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                >
-                  <RiDeleteBinFill className="w-4 h-4 mr-1" />
-                  Remover
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        <div
-          className={`
-            border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 cursor-pointer
-            ${
-              previewUrl
-                ? "border-green-500 bg-green-50"
-                : "border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-            }
-            ${uploading ? "opacity-50 cursor-not-allowed" : ""}
-          `}
-          onClick={() => !uploading && fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            onChange={handleFileSelect}
-            className="hidden"
-            disabled={uploading}
-          />
-
-          {uploading ? (
-            <div className="space-y-2">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              >
-                <RiUploadCloudFill className="w-8 h-8 text-blue-500 mx-auto mb-2" />
-              </motion.div>
-              <p className="text-sm text-blue-600 font-medium">
-                Enviando imagem...
-              </p>
-            </div>
-          ) : previewUrl ? (
-            <div className="space-y-2">
-              <RiCheckFill className="w-8 h-8 text-green-500 mx-auto mb-2" />
-              <p className="text-sm text-green-600 font-medium">
-                Imagem selecionada
-              </p>
-              <p className="text-xs text-gray-500">
-                Clique para alterar ou arraste uma nova imagem
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <RiImageFill className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600">
-                Clique para selecionar ou arraste uma imagem
-              </p>
-              <p className="text-xs text-gray-500">
-                JPG, PNG, WEBP ou GIF • Máximo 5MB
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-          <p className="text-xs text-gray-600 text-center">
-            <strong>Dica:</strong> Use imagens com proporção 16:9 para melhor
-            visualização
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+  return event;
+};
 
 export default function CriarNoticiaPage() {
   const router = useRouter();
-  const supabase = createClient();
-  const adminClient = createAdminClient();
+  const {
+    formData,
+    errors,
+    saving,
+    handleInputChange,
+    handleSubmit,
+    resetForm,
+  } = useNoticiaCreate();
 
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    titulo: "",
-    slug: "",
-    conteudo: "",
-    resumo: "",
-    imagem: null as string | null,
-    categoria: "Operações",
-    destaque: false,
-    data_publicacao: new Date().toISOString().split("T")[0],
-    status: "rascunho" as NoticiaStatus,
-  });
-  const [errors, setErrors] = useState<string[]>([]);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
 
-  const fadeInUp = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-      },
-    },
-  };
-
-  const generateSlug = (text: string) => {
-    return text
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "")
-      .substring(0, 100);
-  };
-
-  const handleTituloChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const titulo = e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      titulo,
-      slug: generateSlug(titulo),
-    }));
-  };
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleImageUpload = (imageUrl: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      imagem: imageUrl,
-    }));
-  };
-
-  const handleImageRemove = () => {
-    setFormData((prev) => ({
-      ...prev,
-      imagem: null,
-    }));
-  };
-
-  const validateForm = (): string[] => {
-    const errors: string[] = [];
-
-    if (!formData.titulo.trim()) {
-      errors.push("Título é obrigatório");
-    }
-
-    if (!formData.slug.trim()) {
-      errors.push("Slug é obrigatório");
-    }
-
-    if (!formData.resumo.trim()) {
-      errors.push("Resumo é obrigatório");
-    }
-
-    if (!formData.conteudo.trim()) {
-      errors.push("Conteúdo é obrigatório");
-    }
-
-    if (formData.slug.length < 3) {
-      errors.push("Slug deve ter pelo menos 3 caracteres");
-    }
-
-    const slugRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-    if (!slugRegex.test(formData.slug)) {
-      errors.push(
-        "Slug deve conter apenas letras minúsculas, números e hífens"
-      );
-    }
-
-    return errors;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrors([]);
-
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      setErrors(validationErrors);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const client = adminClient || supabase;
-
-      // Verificar slug único
-      const { data: existingSlug, error: slugError } = await client
-        .from("noticias")
-        .select("id")
-        .eq("slug", formData.slug)
-        .single();
-
-      if (slugError) {
-        if (slugError.code === "406" || slugError.message?.includes("406")) {
-          console.log("⚠️ Warning de headers ignorado, continuando...");
-        } else if (slugError.code === "PGRST116") {
-          console.log("✅ Slug disponível");
-        } else {
-          console.error("❌ Erro ao verificar slug:", slugError);
-          throw slugError;
-        }
-      }
-
-      if (existingSlug && !slugError) {
-        setErrors(["Já existe outra notícia com este slug. Altere o título."]);
-        setLoading(false);
-        return;
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        setErrors(["Usuário não autenticado"]);
-        setLoading(false);
-        return;
-      }
-
-      console.log("🔄 Criando nova notícia...", formData);
-
-      const { error } = await client.from("noticias").insert([
-        {
-          titulo: formData.titulo.trim(),
-          slug: formData.slug.trim(),
-          conteudo: formData.conteudo.trim(),
-          resumo: formData.resumo.trim(),
-          imagem: formData.imagem,
-          categoria: formData.categoria,
-          autor_id: user.id,
-          destaque: formData.destaque,
-          data_publicacao: formData.data_publicacao,
-          status: formData.status,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]);
-
-      if (error) {
-        console.error("❌ Erro ao criar notícia:", error);
-        throw error;
-      }
-
-      console.log("✅ Notícia criada com sucesso!");
-      setShowSuccess(true);
-
-      setTimeout(() => {
-        setShowSuccess(false);
-        router.push("/admin/noticias");
-      }, 1500);
-    } catch (error: unknown) {
-      console.error("❌ Erro ao criar notícia:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      setErrors([`Erro ao criar notícia: ${errorMessage}`]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Botões de navegação abaixo do header
+  // Botões de navegação
   const navigationButtons = [
     {
       href: "/admin/noticias",
-      icon: RiArrowLeftFill,
-      label: "Voltar para Notícias",
+      icon: RiArrowLeftLine,
+      label: "Voltar para Lista",
       className:
         "border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white",
     },
     {
       href: "/admin/dashboard",
-      icon: RiBarChartFill,
+      icon: RiBarChartLine,
       label: "Dashboard",
       className:
         "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
     },
     {
       href: "/",
-      icon: RiHomeFill,
+      icon: RiHomeLine,
       label: "Voltar ao Site",
       className:
         "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
     },
   ];
 
+  const handleImageUpload = (imageUrl: string | null) => {
+    const event = createInputChangeEvent("imagem", imageUrl || "");
+    handleInputChange(event);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitStatus("loading");
+
+    const result = await handleSubmit();
+
+    if (result.success) {
+      setSubmitStatus("success");
+      toast.success("Notícia criada com sucesso!");
+
+      // Redirecionar após 2 segundos
+      setTimeout(() => {
+        router.push("/admin/noticias");
+      }, 2000);
+    } else {
+      setSubmitStatus("error");
+      toast.error(result.error || "Erro ao criar notícia");
+    }
+  };
+
+  // Função para lidar com mudanças no Switch
+  const handleSwitchChange = (checked: boolean) => {
+    const event = createInputChangeEvent("destaque", checked);
+    handleInputChange(event);
+  };
+
+  // Função para lidar com mudanças no Select
+  const handleSelectChange = (name: string, value: string) => {
+    const event = createInputChangeEvent(name, value);
+    handleInputChange(event);
+  };
+
+  // Função para lidar com mudanças na data
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleInputChange(e);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="mb-6"
+          className="mb-8"
         >
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
-            NOVA NOTÍCIA
-          </h1>
-          <p className="text-gray-600">
-            Crie uma nova notícia para o site da Patrulha Aérea Civil
-          </p>
-        </motion.div>
+          {/* Título */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-3 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+              CRIAR NOVA NOTÍCIA
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Preencha os dados para criar uma nova notícia no site
+            </p>
+          </div>
 
-        {/* Botões */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="flex flex-wrap gap-3 mb-8"
-        >
-          {/* Botão para ver notícias */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link href="/admin/noticias">
-              <Button
-                variant="outline"
-                className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors duration-300"
-              >
-                <RiEyeLine className="w-4 h-4" />
-                Ver Todas Notícias
-              </Button>
-            </Link>
-          </motion.div>
+          {/* Status da operação */}
+          {submitStatus === "success" && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <Alert className="bg-green-50 border-green-200 rounded-xl p-4">
+                <RiCheckLine className="h-5 w-5 text-green-600" />
+                <AlertDescription className="ml-3 text-green-800">
+                  <strong>✅ Notícia criada com sucesso!</strong>{" "}
+                  Redirecionando...
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
+
+          {submitStatus === "error" && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <Alert className="bg-red-50 border-red-200 rounded-xl p-4">
+                <RiAlertLine className="h-5 w-5 text-red-600" />
+                <AlertDescription className="ml-3 text-red-800">
+                  <strong>❌ Erro ao criar notícia.</strong> Verifique os dados
+                  e tente novamente.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
 
           {/* Botões de Navegação */}
-          {navigationButtons.map((button, index) => (
-            <motion.div
-              key={button.href}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link href={button.href}>
-                <Button
-                  variant="outline"
-                  className={`transition-all duration-300 ${button.className}`}
-                >
-                  <button.icon className="w-4 h-4 mr-2" />
-                  {button.label}
-                </Button>
-              </Link>
-            </motion.div>
-          ))}
+          <div className="flex flex-wrap gap-3">
+            {navigationButtons.map((button, index) => (
+              <motion.div
+                key={button.href}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Link href={button.href}>
+                  <Button
+                    variant="outline"
+                    className={`transition-all duration-300 ${button.className} h-11 px-4`}
+                    disabled={saving}
+                  >
+                    <button.icon className="w-4 h-4 mr-2" />
+                    {button.label}
+                  </Button>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
         </motion.div>
-
-        {/* Alertas */}
-        <div className="space-y-4 mb-6">
-          {errors.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <Card className="border-0 shadow-lg bg-gradient-to-r from-red-50 to-orange-50 border-l-4 border-red-400">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <motion.div
-                      animate={{ scale: [1, 1.1, 1] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                    >
-                      <RiAlertFill className="w-5 h-5 text-red-500" />
-                    </motion.div>
-                    <div>
-                      <p className="font-medium text-red-800">
-                        Erros no formulário
-                      </p>
-                      <div className="text-sm text-red-600">
-                        {errors.map((error, index) => (
-                          <p key={index}>• {error}</p>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-
-          {showSuccess && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <Card className="border-0 shadow-lg bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-green-400">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 0.5, repeat: 3 }}
-                    >
-                      <RiCheckFill className="w-5 h-5 text-green-500" />
-                    </motion.div>
-                    <div>
-                      <p className="font-medium text-green-800">Sucesso!</p>
-                      <p className="text-sm text-green-600">
-                        Notícia criada com sucesso. Redirecionando...
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
-        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Formulário Principal */}
@@ -597,33 +270,80 @@ export default function CriarNoticiaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.2 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="flex items-center text-xl text-gray-800">
-                    <RiNewspaperFill className="w-5 h-5 mr-2 text-navy-600" />
-                    Criar Nova Notícia
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="border-b border-gray-200 pb-6">
+                  <CardTitle className="flex items-center text-2xl text-gray-800">
+                    <RiNewspaperLine className="w-6 h-6 mr-3 text-navy-600" />
+                    Dados da Notícia
+                    <Badge
+                      variant="outline"
+                      className="ml-3 bg-green-100 text-green-800 border-green-300 text-sm py-1 px-3"
+                    >
+                      Novo Cadastro
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <form onSubmit={handleSubmit} className="space-y-6">
+                <CardContent className="p-8">
+                  <form onSubmit={handleFormSubmit} className="space-y-8">
+                    {/* Upload de Imagem */}
+                    <motion.div variants={fadeInUp} className="space-y-4">
+                      <Label className="text-base font-semibold text-gray-700 flex items-center">
+                        <RiImageLine className="w-5 h-5 mr-2 text-navy-500" />
+                        Imagem da Notícia
+                      </Label>
+                      <FileUpload
+                        type="image"
+                        onFileChange={handleImageUpload}
+                        currentFile={formData.imagem || undefined}
+                        className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-500 transition-all duration-300"
+                      />
+                      {errors.imagem && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                        >
+                          <RiAlertLine className="w-3 h-3" />
+                          {errors.imagem}
+                        </motion.p>
+                      )}
+                    </motion.div>
+
                     {/* Título */}
-                    <motion.div variants={fadeInUp} className="space-y-2">
+                    <motion.div variants={fadeInUp} className="space-y-3">
                       <Label
                         htmlFor="titulo"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiNewspaperLine className="w-5 h-5 mr-2 text-navy-500" />
                         Título da Notícia *
                       </Label>
                       <Input
                         id="titulo"
+                        type="text"
                         name="titulo"
                         value={formData.titulo}
-                        onChange={handleTituloChange}
+                        onChange={handleInputChange}
                         placeholder="Digite o título da notícia..."
-                        className="w-full text-lg py-3 transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         required
+                        className={`text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                          errors.titulo
+                            ? "border-red-500 focus:ring-red-200"
+                            : "focus:ring-blue-500 border-gray-300"
+                        }`}
+                        disabled={saving}
                       />
-                      <p className="text-xs text-gray-500 transition-colors duration-300">
+                      {errors.titulo && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                        >
+                          <RiAlertLine className="w-3 h-3" />
+                          {errors.titulo}
+                        </motion.p>
+                      )}
+                      <p className="text-sm text-gray-500">
                         {formData.titulo.length}/200 caracteres
                       </p>
                     </motion.div>
@@ -632,45 +352,59 @@ export default function CriarNoticiaPage() {
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.1 }}
-                      className="space-y-2"
+                      className="space-y-3"
                     >
                       <Label
                         htmlFor="slug"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700 flex items-center"
                       >
+                        <RiExternalLinkLine className="w-5 h-5 mr-2 text-navy-500" />
                         Slug (URL) *
                       </Label>
                       <div className="flex items-center">
-                        <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm transition-colors duration-300">
-                          <RiLink className="w-3 h-3" />
+                        <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm">
+                          /noticias/
                         </span>
                         <Input
                           id="slug"
+                          type="text"
                           name="slug"
                           value={formData.slug}
                           onChange={handleInputChange}
                           placeholder="slug-da-noticia"
-                          className="flex-1 rounded-l-none transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                           required
+                          className={`flex-1 rounded-l-none text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 border-l-0 rounded-xl ${
+                            errors.slug
+                              ? "border-red-500 focus:ring-red-200"
+                              : "focus:ring-blue-500 border-gray-300"
+                          }`}
+                          disabled={saving}
                         />
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 transition-colors duration-300">
-                        <RiLink className="w-3 h-3" />
-                        <span>
-                          URL: https://pac.com.br/noticias/{formData.slug}
-                        </span>
-                      </div>
+                      {errors.slug && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                        >
+                          <RiAlertLine className="w-3 h-3" />
+                          {errors.slug}
+                        </motion.p>
+                      )}
+                      <p className="text-sm text-gray-500">
+                        URL: https://pac.org.br/noticias/{formData.slug}
+                      </p>
                     </motion.div>
 
                     {/* Resumo */}
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.2 }}
-                      className="space-y-2"
+                      className="space-y-3"
                     >
                       <Label
                         htmlFor="resumo"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700"
                       >
                         Resumo *
                       </Label>
@@ -681,10 +415,25 @@ export default function CriarNoticiaPage() {
                         onChange={handleInputChange}
                         placeholder="Digite um resumo breve da notícia..."
                         rows={3}
-                        className="w-full resize-none transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         required
+                        className={`text-lg transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                          errors.resumo
+                            ? "border-red-500 focus:ring-red-200"
+                            : "focus:ring-blue-500 border-gray-300"
+                        }`}
+                        disabled={saving}
                       />
-                      <p className="text-xs text-gray-500 transition-colors duration-300">
+                      {errors.resumo && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                        >
+                          <RiAlertLine className="w-3 h-3" />
+                          {errors.resumo}
+                        </motion.p>
+                      )}
+                      <p className="text-sm text-gray-500">
                         {formData.resumo.length}/300 caracteres
                       </p>
                     </motion.div>
@@ -693,11 +442,11 @@ export default function CriarNoticiaPage() {
                     <motion.div
                       variants={fadeInUp}
                       transition={{ delay: 0.3 }}
-                      className="space-y-2"
+                      className="space-y-3"
                     >
                       <Label
                         htmlFor="conteudo"
-                        className="text-sm font-semibold text-gray-700"
+                        className="text-base font-semibold text-gray-700"
                       >
                         Conteúdo Completo *
                       </Label>
@@ -708,19 +457,169 @@ export default function CriarNoticiaPage() {
                         onChange={handleInputChange}
                         placeholder="Digite o conteúdo completo da notícia..."
                         rows={12}
-                        className="w-full resize-none font-mono text-sm transition-all duration-300 focus:ring-2 focus:ring-blue-500"
                         required
+                        className={`font-mono text-lg transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                          errors.conteudo
+                            ? "border-red-500 focus:ring-red-200"
+                            : "focus:ring-blue-500 border-gray-300"
+                        }`}
+                        disabled={saving}
                       />
-                      <p className="text-xs text-gray-500 transition-colors duration-300">
+                      {errors.conteudo && (
+                        <motion.p
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                        >
+                          <RiAlertLine className="w-3 h-3" />
+                          {errors.conteudo}
+                        </motion.p>
+                      )}
+                      <p className="text-sm text-gray-500">
                         {formData.conteudo.length} caracteres
                       </p>
                     </motion.div>
 
+                    {/* Categoria e Data */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Categoria */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.4 }}
+                        className="space-y-3"
+                      >
+                        <Label
+                          htmlFor="categoria"
+                          className="text-base font-semibold text-gray-700"
+                        >
+                          Categoria
+                        </Label>
+                        <Select
+                          value={formData.categoria}
+                          onValueChange={(value) =>
+                            handleSelectChange("categoria", value)
+                          }
+                          disabled={saving}
+                        >
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                            <SelectValue placeholder="Selecione uma categoria" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CATEGORIAS.map((categoria) => (
+                              <SelectItem key={categoria} value={categoria}>
+                                {categoria}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </motion.div>
+
+                      {/* Data de Publicação */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.5 }}
+                        className="space-y-3"
+                      >
+                        <Label
+                          htmlFor="data_publicacao"
+                          className="text-base font-semibold text-gray-700 flex items-center"
+                        >
+                          <RiCalendarLine className="w-5 h-5 mr-2 text-navy-500" />
+                          Data de Publicação
+                        </Label>
+                        <Input
+                          id="data_publicacao"
+                          type="date"
+                          name="data_publicacao"
+                          value={formData.data_publicacao}
+                          onChange={handleDateChange}
+                          className="text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl focus:ring-blue-500 border-gray-300"
+                          disabled={saving}
+                        />
+                      </motion.div>
+                    </div>
+
+                    {/* Status e Destaque */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Status */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.6 }}
+                        className="space-y-3"
+                      >
+                        <Label
+                          htmlFor="status"
+                          className="text-base font-semibold text-gray-700"
+                        >
+                          Status
+                        </Label>
+                        <Select
+                          value={formData.status}
+                          onValueChange={(value) =>
+                            handleSelectChange("status", value)
+                          }
+                          disabled={saving}
+                        >
+                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                            <SelectValue placeholder="Selecione o status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem
+                              value="rascunho"
+                              className="text-base py-3"
+                            >
+                              Rascunho
+                            </SelectItem>
+                            <SelectItem
+                              value="publicado"
+                              className="text-base py-3"
+                            >
+                              Publicado
+                            </SelectItem>
+                            <SelectItem
+                              value="arquivado"
+                              className="text-base py-3"
+                            >
+                              Arquivado
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </motion.div>
+
+                      {/* Destaque */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.7 }}
+                        className="space-y-3"
+                      >
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
+                          <div>
+                            <Label
+                              htmlFor="destaque"
+                              className="text-base font-semibold text-gray-700 cursor-pointer flex items-center"
+                            >
+                              <RiStarFill className="w-5 h-5 mr-2 text-yellow-500" />
+                              Notícia em Destaque
+                            </Label>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Destaque esta notícia no site principal
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.destaque}
+                            onCheckedChange={handleSwitchChange}
+                            disabled={saving}
+                            className="scale-110"
+                          />
+                        </div>
+                      </motion.div>
+                    </div>
+
                     {/* Botões de Ação */}
                     <motion.div
                       variants={fadeInUp}
-                      transition={{ delay: 0.5 }}
-                      className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200"
+                      transition={{ delay: 0.9 }}
+                      className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-200 mt-8"
                     >
                       <motion.div
                         whileHover={{ scale: 1.02 }}
@@ -729,22 +628,17 @@ export default function CriarNoticiaPage() {
                       >
                         <Button
                           type="submit"
-                          disabled={loading}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={saving}
+                          className="w-full bg-green-600 hover:bg-green-700 text-white py-4 h-14 text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-lg hover:shadow-xl"
                         >
-                          {loading ? (
+                          {saving ? (
                             <>
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity }}
-                              >
-                                <RiSaveFill className="w-4 h-4 mr-2" />
-                              </motion.div>
+                              <Spinner className="w-5 h-5 mr-3" />
                               Criando...
                             </>
                           ) : (
                             <>
-                              <RiSaveFill className="w-4 h-4 mr-2" />
+                              <RiSaveLine className="w-5 h-5 mr-3" />
                               Criar Notícia
                             </>
                           )}
@@ -758,13 +652,32 @@ export default function CriarNoticiaPage() {
                       >
                         <Button
                           type="button"
-                          onClick={() => router.push("/admin/noticias")}
                           variant="outline"
-                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3 transition-all duration-300"
+                          onClick={resetForm}
+                          className="w-full border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white py-4 h-14 text-lg transition-all duration-300 rounded-xl"
+                          disabled={saving}
                         >
-                          <RiCloseFill className="w-4 h-4 mr-2" />
-                          Cancelar
+                          <RiCloseLine className="w-5 h-5 mr-3" />
+                          Limpar Formulário
                         </Button>
+                      </motion.div>
+
+                      <motion.div
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex-1"
+                      >
+                        <Link href="/admin/noticias">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-4 h-14 text-lg transition-all duration-300 rounded-xl"
+                            disabled={saving}
+                          >
+                            <RiArrowLeftLine className="w-5 h-5 mr-3" />
+                            Cancelar
+                          </Button>
+                        </Link>
                       </motion.div>
                     </motion.div>
                   </form>
@@ -773,128 +686,50 @@ export default function CriarNoticiaPage() {
             </motion.div>
           </div>
 
-          {/* Sidebar - Configurações */}
-          <div className="space-y-6">
-            {/* Componente de Upload de Imagem */}
-            <ImageUploadSection
-              onImageUpload={handleImageUpload}
-              currentImage={formData.imagem}
-              onImageRemove={handleImageRemove}
-            />
-
-            {/* Configurações de Publicação */}
+          {/* Sidebar - Informações */}
+          <div className="space-y-8">
+            {/* Informações Importantes */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={fadeInUp}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.3 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center text-gray-800">
-                    <RiCalendarFill className="w-4 h-4 mr-2 text-blue-600" />
-                    Publicação
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center text-xl text-gray-800">
+                    <RiAlertLine className="w-6 h-6 mr-3 text-navy-600" />
+                    Informações Importantes
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Data de Publicação */}
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="data_publicacao"
-                      className="text-sm font-semibold text-gray-700"
-                    >
-                      Data de Publicação
-                    </Label>
-                    <Input
-                      id="data_publicacao"
-                      name="data_publicacao"
-                      type="date"
-                      value={formData.data_publicacao}
-                      onChange={handleInputChange}
-                      className="w-full transition-all duration-300 focus:ring-2 focus:ring-blue-500"
-                    />
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <RiNewspaperLine className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      O título deve ser claro e objetivo, com no máximo 200
+                      caracteres
+                    </p>
                   </div>
-
-                  {/* Status */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-700">
-                      Status
-                    </Label>
-                    <Select
-                      value={formData.status}
-                      onValueChange={(value: NoticiaStatus) =>
-                        setFormData((prev) => ({ ...prev, status: value }))
-                      }
-                    >
-                      <SelectTrigger className="transition-all duration-300 hover:border-blue-500 focus:ring-blue-500">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="rascunho">Rascunho</SelectItem>
-                        <SelectItem value="publicado">Publicado</SelectItem>
-                        <SelectItem value="arquivado">Arquivado</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <RiExternalLinkLine className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      O slug será usado na URL da notícia. Use apenas letras
+                      minúsculas, números e hífens
+                    </p>
                   </div>
-
-                  {/* Destaque */}
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border transition-all duration-300 hover:bg-gray-100 hover:shadow-sm">
-                    <div>
-                      <Label
-                        htmlFor="destaque"
-                        className="text-sm font-semibold text-gray-700 cursor-pointer"
-                      >
-                        Notícia em Destaque
-                      </Label>
-                      <p className="text-xs text-gray-500">
-                        {formData.destaque
-                          ? "⭐ Destacada no site"
-                          : "Listagem normal"}
-                      </p>
-                    </div>
-                    <Switch
-                      id="destaque"
-                      checked={formData.destaque}
-                      onCheckedChange={(checked) =>
-                        setFormData((prev) => ({ ...prev, destaque: checked }))
-                      }
-                    />
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <RiStarFill className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      Notícias em destaque aparecem na página principal do site
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Categoria */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.5 }}
-            >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg text-gray-800">
-                    Categoria
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Select
-                    value={formData.categoria}
-                    onValueChange={(value) =>
-                      setFormData((prev) => ({ ...prev, categoria: value }))
-                    }
-                  >
-                    <SelectTrigger className="transition-all duration-300 hover:border-blue-500 focus:ring-blue-500">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CATEGORIAS.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <RiImageLine className="w-5 h-5 text-blue-300 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      A imagem de capa é opcional mas recomendada para melhor
+                      visualização
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -904,73 +739,68 @@ export default function CriarNoticiaPage() {
               initial="hidden"
               animate="visible"
               variants={fadeInUp}
-              transition={{ delay: 0.6 }}
+              transition={{ delay: 0.4 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardHeader>
-                  <CardTitle className="text-lg text-gray-800">
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-xl text-gray-800">
                     Preview Rápido
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-sm space-y-2 text-gray-600">
-                    <div className="flex justify-between">
-                      <span>Título:</span>
-                      <span className="font-medium">
+                <CardContent className="space-y-4">
+                  <div className="space-y-3 text-gray-700">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Título:</span>
+                      <span className="font-bold text-right max-w-[120px] truncate text-navy-600">
                         {formData.titulo || "Não definido"}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Slug:</span>
-                      <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Slug:</span>
+                      <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 font-mono">
                         {formData.slug || "Não definido"}
                       </code>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Categoria:</span>
-                      <Badge
-                        variant="secondary"
-                        className="bg-blue-100 text-blue-700"
-                      >
-                        {formData.categoria}
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Categoria:</span>
+                      <Badge className="bg-blue-100 text-blue-700 text-sm py-1 px-2">
+                        {formData.categoria || "Não definida"}
                       </Badge>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Status:</span>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Status:</span>
                       <Badge
                         className={
-                          formData.status === "rascunho"
-                            ? "bg-yellow-500 text-white"
-                            : formData.status === "publicado"
-                            ? "bg-green-500 text-white"
-                            : "bg-gray-500 text-white"
+                          formData.status === "publicado"
+                            ? "bg-green-500 text-white text-sm py-1 px-3"
+                            : formData.status === "rascunho"
+                            ? "bg-yellow-500 text-white text-sm py-1 px-3"
+                            : "bg-gray-500 text-white text-sm py-1 px-3"
                         }
                       >
-                        {formData.status.toUpperCase()}
+                        {formData.status
+                          ? formData.status.toUpperCase()
+                          : "NÃO DEFINIDO"}
                       </Badge>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Imagem:</span>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="font-medium">Destaque:</span>
                       <Badge
-                        variant={formData.imagem ? "default" : "secondary"}
                         className={
-                          formData.imagem
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-700"
+                          formData.destaque
+                            ? "bg-yellow-500 text-white text-sm py-1 px-3"
+                            : "bg-gray-400 text-white text-sm py-1 px-3"
                         }
                       >
-                        {formData.imagem ? "✓ Definida" : "Não definida"}
+                        {formData.destaque ? (
+                          <>
+                            <RiStarFill className="w-3 h-3 mr-1" /> SIM
+                          </>
+                        ) : (
+                          "NÃO"
+                        )}
                       </Badge>
                     </div>
-                    {formData.destaque && (
-                      <div className="flex justify-between">
-                        <span>Destaque:</span>
-                        <Badge className="bg-yellow-500 text-white animate-pulse">
-                          <RiStarFill className="w-3 h-3 mr-1" />
-                          DESTAQUE
-                        </Badge>
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
