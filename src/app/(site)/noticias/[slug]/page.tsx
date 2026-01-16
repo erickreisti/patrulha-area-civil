@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { notFound, useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,6 @@ interface PageProps {
 }
 
 export default function NoticiaPage({ params }: PageProps) {
-  const { slug } = use(params);
   const router = useRouter();
 
   // Usar o store de notícias
@@ -44,8 +43,16 @@ export default function NoticiaPage({ params }: PageProps) {
     clearNoticiasRelacionadas,
   } = useNoticiasStore();
 
+  const [slug, setSlug] = useState<string>("");
   const [imageError, setImageError] = useState(false);
   const [notFoundError, setNotFoundError] = useState(false);
+
+  // Carregar parâmetros
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      setSlug(resolvedParams.slug);
+    });
+  }, [params]);
 
   // Função para corrigir URL da imagem
   const getImageUrl = (url: string | null | undefined) => {
@@ -116,6 +123,8 @@ export default function NoticiaPage({ params }: PageProps) {
   // Carregar notícia e relacionadas
   useEffect(() => {
     let isMounted = true;
+
+    if (!slug) return;
 
     const loadNoticia = async () => {
       try {

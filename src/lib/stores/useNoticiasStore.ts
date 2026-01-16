@@ -25,7 +25,15 @@ export type {
 } from "@/app/actions/news/noticias";
 
 // Tipos do store
-export type SortBy = "data_publicacao" | "created_at" | "views" | "titulo";
+export type SortBy =
+  | "data_publicacao"
+  | "created_at"
+  | "views"
+  | "titulo"
+  | "recent"
+  | "oldest"
+  | "destaque"
+  | "popular";
 export type NoticiaStatus = "rascunho" | "publicado" | "arquivado";
 
 interface NoticiasFiltros {
@@ -144,7 +152,7 @@ const initialValues = {
   filtros: {
     searchTerm: "",
     categoria: "all",
-    sortBy: "data_publicacao" as SortBy,
+    sortBy: "recent" as SortBy,
     sortOrder: "desc" as "asc" | "desc",
     itemsPerPage: 20,
     currentPage: 1,

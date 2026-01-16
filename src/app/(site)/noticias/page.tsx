@@ -1,5 +1,3 @@
-// src/app/(site)/noticias/page.tsx
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -47,12 +45,18 @@ import {
   RiMailLine,
   RiNotificationLine,
   RiStackLine,
-  RiSortDesc,
-  RiFireLine,
+  RiSparklingFill,
+  RiListOrdered,
+  RiGridFill,
+  RiCheckLine,
 } from "react-icons/ri";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNoticiasStore, NoticiaLista } from "@/lib/stores/useNoticiasStore";
+import {
+  useNoticiasStore,
+  NoticiaLista,
+  SortBy,
+} from "@/lib/stores/useNoticiasStore";
 import { getNews, getNewsStats } from "@/app/actions/news/noticias";
 
 // ==================== CONFIGURAÇÕES ====================
@@ -65,11 +69,15 @@ const ITEMS_PER_PAGE_OPTIONS = [
 ];
 
 const SORT_OPTIONS = [
-  { value: "recent", label: "Mais Recentes", icon: RiSortDesc },
-  { value: "oldest", label: "Mais Antigas", icon: RiSortAsc },
+  { value: "recent", label: "Mais Recentes", icon: RiSparklingFill },
+  { value: "oldest", label: "Mais Antigas", icon: RiCalendarLine },
+  { value: "titulo", label: "Nome A-Z", icon: RiListOrdered },
+  { value: "popular", label: "Mais Populares", icon: RiGridFill },
   { value: "destaque", label: "Em Destaque", icon: RiStarFill },
-  { value: "popular", label: "Mais Populares", icon: RiFireLine },
 ];
+
+// Número fixo de skeletons para SSR
+const DEFAULT_ITEMS_PER_PAGE = 6;
 
 // ==================== COMPONENTE PRINCIPAL ====================
 export default function NoticiasPage() {
@@ -98,66 +106,65 @@ export default function NoticiasPage() {
 
   // Estado local para busca com debounce
   const [localSearch, setLocalSearch] = useState(filtros.searchTerm);
+  const isClient = typeof window !== "undefined";
   const debounceTimer = useRef<NodeJS.Timeout>();
-
-  // Função para ordenar notícias
-  const sortNoticias = useCallback(
-    (noticiasList: NoticiaLista[], sortBy: string) => {
-      if (sortBy === "recent") {
-        return [...noticiasList].sort(
-          (a, b) =>
-            new Date(b.data_publicacao).getTime() -
-            new Date(a.data_publicacao).getTime()
-        );
-      } else if (sortBy === "oldest") {
-        return [...noticiasList].sort(
-          (a, b) =>
-            new Date(a.data_publicacao).getTime() -
-            new Date(b.data_publicacao).getTime()
-        );
-      } else if (sortBy === "destaque") {
-        return [...noticiasList].sort(
-          (a, b) =>
-            (b.destaque ? 1 : 0) - (a.destaque ? 1 : 0) ||
-            new Date(b.data_publicacao).getTime() -
-              new Date(a.data_publicacao).getTime()
-        );
-      } else if (sortBy === "popular") {
-        return [...noticiasList].sort(
-          (a, b) =>
-            (b.views || 0) - (a.views || 0) ||
-            new Date(b.data_publicacao).getTime() -
-              new Date(a.data_publicacao).getTime()
-        );
-      }
-      return noticiasList;
-    },
-    []
-  );
 
   // Função para buscar notícias
   const fetchNoticias = useCallback(async () => {
     setLoadingLista(true);
     try {
+      // Converter sortBy para o formato esperado pela API
+      let apiSortBy:
+        | "data_publicacao"
+        | "titulo"
+        | "views"
+        | "created_at"
+        | "destaque";
+      let sortOrder: "asc" | "desc" = "desc";
+
+      switch (filtros.sortBy) {
+        case "recent":
+          apiSortBy = "data_publicacao";
+          sortOrder = "desc";
+          break;
+        case "oldest":
+          apiSortBy = "data_publicacao";
+          sortOrder = "asc";
+          break;
+        case "titulo":
+          apiSortBy = "titulo";
+          sortOrder = "asc";
+          break;
+        case "popular":
+          apiSortBy = "views";
+          sortOrder = "desc";
+          break;
+        case "destaque":
+          apiSortBy = "destaque";
+          sortOrder = "desc";
+          break;
+        default:
+          apiSortBy = "data_publicacao";
+          sortOrder = "desc";
+      }
+
       const options = {
         limit: filtros.itemsPerPage,
         page: filtros.currentPage,
         search: filtros.searchTerm || undefined,
-        category: filtros.categoria !== "all" ? filtros.categoria : undefined,
-        featured: filtros.sortBy === "destaque" ? true : undefined,
+        categoria: filtros.categoria !== "all" ? filtros.categoria : undefined,
+        destaque:
+          filtros.sortBy === "destaque"
+            ? "destaque"
+            : ("all" as "destaque" | "all" | "normal"),
+        sortBy: apiSortBy,
+        sortOrder: sortOrder,
       };
 
       const result = await getNews(options);
 
       if (result.success && result.data) {
-        let sortedNoticias = result.data;
-
-        // Ordenar localmente se necessário
-        if (filtros.sortBy === "popular" || filtros.sortBy === "oldest") {
-          sortedNoticias = sortNoticias(result.data, filtros.sortBy);
-        }
-
-        setNoticias(sortedNoticias);
+        setNoticias(result.data);
         setTotalCount(result.pagination?.total || 0);
 
         // Extrair categorias únicas das notícias
@@ -201,7 +208,6 @@ export default function NoticiasPage() {
     setCategoriasDisponiveis,
     setTotalCount,
     setLoadingLista,
-    sortNoticias,
   ]);
 
   // Função para buscar estatísticas
@@ -273,8 +279,37 @@ export default function NoticiasPage() {
     return url;
   };
 
-  // Loading Skeleton
-  if (loadingLista && noticias.length === 0) {
+  // Handlers para filtros
+  const handleCategoriaChange = (value: string) => {
+    setCategoria(value);
+    setCurrentPage(1);
+  };
+
+  const handleSortChange = (value: string) => {
+    setSortBy(value as SortBy);
+    setCurrentPage(1);
+  };
+
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(Number(value));
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = useCallback(
+    (page: number) => {
+      setCurrentPage(page);
+    },
+    [setCurrentPage]
+  );
+
+  // Encontrar o label da opção de ordenação atual
+  const getCurrentSortLabel = () => {
+    const option = SORT_OPTIONS.find((opt) => opt.value === filtros.sortBy);
+    return option ? option.label : "Ordenar por";
+  };
+
+  // Loading inicial (usando número fixo de skeletons para SSR)
+  if (!isClient) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
         <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -282,9 +317,8 @@ export default function NoticiasPage() {
             <Skeleton className="h-10 sm:h-12 w-48 sm:w-64 mx-auto mb-3 sm:mb-4" />
             <Skeleton className="h-5 sm:h-6 w-80 sm:w-96 mx-auto" />
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-            {Array.from({ length: filtros.itemsPerPage }).map((_, i) => (
+            {Array.from({ length: DEFAULT_ITEMS_PER_PAGE }).map((_, i) => (
               <Card key={i} className="border-0 shadow-lg">
                 <CardHeader className="pb-3 sm:pb-4">
                   <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
@@ -305,7 +339,7 @@ export default function NoticiasPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-16 pb-16 sm:pb-20 lg:pb-24 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20 lg:pb-24 overflow-hidden">
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
         <div className="absolute top-0 left-0 w-48 h-48 sm:w-60 sm:h-60 lg:w-72 lg:h-72 bg-blue-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-indigo-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
@@ -341,22 +375,43 @@ export default function NoticiasPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.6 }}
-              className="grid grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-2xl mx-auto mt-8 sm:mt-10 lg:mt-12"
+              className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 max-w-3xl mx-auto mt-8 sm:mt-10 lg:mt-12"
             >
-              {[
-                { value: stats.total, label: "Total" },
-                { value: stats.published, label: "Publicadas" },
-                { value: stats.featured, label: "Em Destaque" },
-              ].map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-                    {stat.value}
-                  </div>
-                  <div className="text-blue-200 text-xs sm:text-sm font-medium">
-                    {stat.label}
-                  </div>
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+                  {stats.total}
                 </div>
-              ))}
+                <div className="text-blue-200 text-xs sm:text-sm font-medium flex items-center justify-center gap-1">
+                  <RiNewspaperLine className="w-3 h-3" />
+                  Total
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+                  {stats.published}
+                </div>
+                <div className="text-blue-200 text-xs sm:text-sm font-medium flex items-center justify-center gap-1">
+                  <RiEyeLine className="w-3 h-3" />
+                  Publicadas
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+                  {stats.featured}
+                </div>
+                <div className="text-blue-200 text-xs sm:text-sm font-medium flex items-center justify-center gap-1">
+                  <RiStarFill className="w-3 h-3" />
+                  Destaques
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+                  {stats.recent}
+                </div>
+                <div className="text-blue-200 text-xs sm:text-sm font-medium flex items-center justify-center gap-1">
+                  <RiSparklingFill className="w-3 h-3" />7 dias
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         </div>
@@ -379,10 +434,7 @@ export default function NoticiasPage() {
                 />
                 {localSearch && (
                   <button
-                    onClick={() => {
-                      setLocalSearch("");
-                      setSearchTerm("");
-                    }}
+                    onClick={() => setLocalSearch("")}
                     className="absolute right-3 sm:right-4 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors w-4 h-4 flex items-center justify-center"
                   >
                     ✕
@@ -397,15 +449,20 @@ export default function NoticiasPage() {
               <div className="min-w-[200px]">
                 <Select
                   value={filtros.categoria}
-                  onValueChange={(value) => {
-                    setCategoria(value);
-                    setCurrentPage(1);
-                  }}
+                  onValueChange={handleCategoriaChange}
                 >
                   <SelectTrigger className="w-full sm:w-48 lg:w-64 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                     <div className="flex items-center">
                       <RiFilterLine className="w-4 h-4 mr-2 text-slate-500" />
-                      <SelectValue placeholder="Filtrar por categoria" />
+                      <SelectValue placeholder="Todas categorias">
+                        <span className="text-slate-700">
+                          {filtros.categoria === "all"
+                            ? "Todas categorias"
+                            : categoriasDisponiveis.find(
+                                (c) => c.value === filtros.categoria
+                              )?.label || filtros.categoria}
+                        </span>
+                      </SelectValue>
                     </div>
                   </SelectTrigger>
                   <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
@@ -424,34 +481,33 @@ export default function NoticiasPage() {
 
               {/* Sort */}
               <div className="min-w-[180px]">
-                <Select
-                  value={filtros.sortBy}
-                  onValueChange={(
-                    value: "recent" | "oldest" | "destaque" | "popular"
-                  ) => {
-                    setSortBy(value);
-                    setCurrentPage(1);
-                  }}
-                >
+                <Select value={filtros.sortBy} onValueChange={handleSortChange}>
                   <SelectTrigger className="w-full sm:w-40 lg:w-48 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                     <div className="flex items-center">
                       <RiSortAsc className="w-4 h-4 mr-2 text-slate-500" />
-                      <SelectValue placeholder="Ordenar por" />
+                      <SelectValue placeholder="Ordenar por">
+                        <span className="text-slate-700">
+                          {getCurrentSortLabel()}
+                        </span>
+                      </SelectValue>
                     </div>
                   </SelectTrigger>
                   <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
-                    {SORT_OPTIONS.map((option) => (
-                      <SelectItem
-                        key={option.value}
-                        value={option.value}
-                        className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
-                      >
-                        <div className="flex items-center">
-                          <option.icon className="w-4 h-4 mr-2" />
-                          {option.label}
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {SORT_OPTIONS.map((option) => {
+                      const Icon = option.icon;
+                      return (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          className="cursor-pointer hover:bg-slate-50 focus:bg-slate-50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Icon className="w-4 h-4" />
+                            <span>{option.label}</span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -460,16 +516,15 @@ export default function NoticiasPage() {
               <div className="min-w-[160px]">
                 <Select
                   value={filtros.itemsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setItemsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
+                  onValueChange={handleItemsPerPageChange}
                 >
                   <SelectTrigger className="w-full sm:w-36 lg:w-40 border-2 border-slate-200 focus:border-navy-500 focus:ring-2 focus:ring-navy-500/20 rounded-xl py-2.5 sm:py-3 bg-white/50 backdrop-blur-sm text-sm sm:text-base">
                     <SelectValue
                       placeholder={`${filtros.itemsPerPage} por página`}
                     >
-                      {filtros.itemsPerPage} por página
+                      <span className="text-slate-700">
+                        {filtros.itemsPerPage} por página
+                      </span>
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="z-[9999] bg-white shadow-xl border-slate-200">
@@ -500,7 +555,7 @@ export default function NoticiasPage() {
                 >
                   Busca: &quot;{filtros.searchTerm}&quot;
                   <button
-                    onClick={() => setSearchTerm("")}
+                    onClick={() => setLocalSearch("")}
                     className="ml-1 hover:text-blue-900 w-3 h-3 flex items-center justify-center"
                   >
                     ✕
@@ -513,13 +568,11 @@ export default function NoticiasPage() {
                   className="flex items-center gap-1 bg-green-50 border-green-200 text-green-700"
                 >
                   <RiFilterLine className="w-3 h-3" />
-                  {
-                    categoriasDisponiveis.find(
-                      (c) => c.value === filtros.categoria
-                    )?.label
-                  }
+                  {categoriasDisponiveis.find(
+                    (c) => c.value === filtros.categoria
+                  )?.label || filtros.categoria}
                   <button
-                    onClick={() => setCategoria("all")}
+                    onClick={() => handleCategoriaChange("all")}
                     className="ml-1 hover:text-green-900 w-3 h-3 flex items-center justify-center"
                   >
                     ✕
@@ -536,7 +589,7 @@ export default function NoticiasPage() {
                     (option) => option.value === filtros.sortBy
                   )?.label || filtros.sortBy}
                   <button
-                    onClick={() => setSortBy("recent")}
+                    onClick={() => handleSortChange("recent")}
                     className="ml-1 hover:text-purple-900 w-3 h-3 flex items-center justify-center"
                   >
                     ✕
@@ -594,7 +647,7 @@ export default function NoticiasPage() {
           <AnimatePresence mode="wait">
             {loadingLista ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                {Array.from({ length: filtros.itemsPerPage }).map((_, i) => (
+                {Array.from({ length: DEFAULT_ITEMS_PER_PAGE }).map((_, i) => (
                   <Card key={i} className="border-0 shadow-lg">
                     <CardHeader className="pb-3 sm:pb-4">
                       <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
@@ -608,31 +661,96 @@ export default function NoticiasPage() {
                 ))}
               </div>
             ) : noticias.length > 0 ? (
-              <motion.div
-                key={`grid-${filtros.currentPage}-${filtros.categoria}-${filtros.searchTerm}-${filtros.itemsPerPage}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12"
-              >
-                {noticias.map((noticia, index) => (
-                  <motion.div
-                    key={noticia.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <NewsCard
-                      noticia={noticia}
-                      formatAuthorName={formatAuthorName}
-                      getImageUrl={getImageUrl}
-                      isFirst={index === 0}
-                      router={router}
-                    />
-                  </motion.div>
-                ))}
-              </motion.div>
+              <>
+                <motion.div
+                  key={`grid-${filtros.sortBy}-${filtros.categoria}-${filtros.currentPage}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12"
+                >
+                  {noticias.map((noticia, index) => (
+                    <motion.div
+                      key={noticia.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <NewsCard
+                        noticia={noticia}
+                        formatAuthorName={formatAuthorName}
+                        getImageUrl={getImageUrl}
+                        isFirst={index === 0}
+                        router={router}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+
+                {/* Paginação */}
+                {totalPages > 1 && (
+                  <Pagination className="mb-8 sm:mb-12">
+                    <PaginationContent className="flex-wrap">
+                      <PaginationItem>
+                        <PaginationPrevious
+                          onClick={() =>
+                            handlePageChange(
+                              Math.max(filtros.currentPage - 1, 1)
+                            )
+                          }
+                          className={
+                            filtros.currentPage === 1
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(
+                          (page) =>
+                            page === 1 ||
+                            page === totalPages ||
+                            Math.abs(page - filtros.currentPage) <= 1
+                        )
+                        .map((page, index, array) => (
+                          <div key={page} className="flex items-center">
+                            {index > 0 && page - array[index - 1] > 1 && (
+                              <PaginationItem>
+                                <PaginationEllipsis />
+                              </PaginationItem>
+                            )}
+                            <PaginationItem>
+                              <PaginationLink
+                                onClick={() => handlePageChange(page)}
+                                isActive={filtros.currentPage === page}
+                                className="cursor-pointer"
+                              >
+                                {page}
+                              </PaginationLink>
+                            </PaginationItem>
+                          </div>
+                        ))}
+
+                      <PaginationItem>
+                        <PaginationNext
+                          onClick={() =>
+                            handlePageChange(
+                              Math.min(filtros.currentPage + 1, totalPages)
+                            )
+                          }
+                          className={
+                            filtros.currentPage === totalPages
+                              ? "pointer-events-none opacity-50"
+                              : "cursor-pointer"
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                )}
+              </>
             ) : (
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -652,108 +770,19 @@ export default function NoticiasPage() {
                   filtros.categoria !== "all" ||
                   filtros.sortBy !== "recent") && (
                   <Button
+                    variant="outline"
                     onClick={() => {
                       clearFilters();
                       setLocalSearch("");
                     }}
-                    variant="outline"
-                    className="mt-4"
+                    className="mt-4 sm:mt-6"
                   >
-                    Limpar todos os filtros
+                    Limpar Filtros
                   </Button>
                 )}
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Paginação */}
-          {totalPages > 1 && (
-            <Pagination className="mb-8 sm:mb-12">
-              <PaginationContent className="flex-wrap">
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() =>
-                      setCurrentPage(Math.max(filtros.currentPage - 1, 1))
-                    }
-                    className={
-                      filtros.currentPage === 1
-                        ? "pointer-events-none opacity-50"
-                        : "cursor-pointer"
-                    }
-                  />
-                </PaginationItem>
-
-                {/* Primeira página */}
-                <PaginationItem>
-                  <PaginationLink
-                    onClick={() => setCurrentPage(1)}
-                    isActive={filtros.currentPage === 1}
-                    className="cursor-pointer"
-                  >
-                    1
-                  </PaginationLink>
-                </PaginationItem>
-
-                {/* Elipsis após primeira página */}
-                {filtros.currentPage > 3 && (
-                  <PaginationItem>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                )}
-
-                {/* Páginas do meio */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((page) => page > 1 && page < totalPages)
-                  .filter((page) => Math.abs(page - filtros.currentPage) <= 1)
-                  .map((page) => (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        onClick={() => setCurrentPage(page)}
-                        isActive={filtros.currentPage === page}
-                        className="cursor-pointer"
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-
-                {/* Elipsis antes da última página */}
-                {filtros.currentPage < totalPages - 2 && (
-                  <PaginationItem>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                )}
-
-                {/* Última página */}
-                {totalPages > 1 && (
-                  <PaginationItem>
-                    <PaginationLink
-                      onClick={() => setCurrentPage(totalPages)}
-                      isActive={filtros.currentPage === totalPages}
-                      className="cursor-pointer"
-                    >
-                      {totalPages}
-                    </PaginationLink>
-                  </PaginationItem>
-                )}
-
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() =>
-                      setCurrentPage(
-                        Math.min(filtros.currentPage + 1, totalPages)
-                      )
-                    }
-                    className={
-                      filtros.currentPage === totalPages
-                        ? "pointer-events-none opacity-50"
-                        : "cursor-pointer"
-                    }
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
         </div>
       </section>
 
@@ -818,6 +847,7 @@ function NewsCard({
 }: NewsCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const isClient = typeof window !== "undefined";
 
   const readingTime = Math.ceil((noticia.resumo?.length || 0) / 1000);
   const isPublished = noticia.status === "publicado";
@@ -842,6 +872,24 @@ function NewsCard({
     handleCardClick();
   };
 
+  if (!isClient) {
+    return (
+      <Card className="group border-2 border-slate-200/60 bg-white/60 backdrop-blur-sm shadow-lg h-full flex flex-col">
+        <div className="relative h-40 sm:h-44 lg:h-48 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
+          <Skeleton className="w-full h-full" />
+        </div>
+        <CardHeader className="pb-3 sm:pb-4 flex-grow px-4 sm:px-6">
+          <Skeleton className="h-5 w-3/4 mb-2" />
+          <Skeleton className="h-4 w-full mb-1" />
+          <Skeleton className="h-4 w-2/3" />
+        </CardHeader>
+        <CardContent className="pt-0 mt-auto px-4 sm:px-6">
+          <Skeleton className="h-4 w-1/2" />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card
       className="group border-2 border-slate-200/60 hover:border-navy-300/50 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden h-full flex flex-col cursor-pointer"
@@ -852,7 +900,7 @@ function NewsCard({
         {imageUrl && !imageError ? (
           <>
             {!imageLoaded && (
-              <div className="absolute inset-0 bg-slate-200 animate-pulse" />
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-200 to-slate-300 animate-pulse" />
             )}
             <Image
               src={imageUrl}
@@ -869,19 +917,19 @@ function NewsCard({
             />
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-400">
-            <RiNewspaperLine className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12" />
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center p-4">
+            <RiNewspaperLine className="h-12 w-12 text-slate-400 mb-3" />
+            <p className="text-slate-500 text-xs text-center">
+              Imagem não disponível
+            </p>
           </div>
         )}
-
-        {/* Overlay com badges */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         <div className="absolute top-2 left-2 sm:top-3 sm:left-3 flex flex-wrap gap-1.5 sm:gap-2">
           {/* Status Badge */}
           <Badge
             variant={isPublished ? "default" : "secondary"}
-            className="backdrop-blur-sm text-xs"
+            className="backdrop-blur-sm text-xs border-0"
           >
             {isPublished ? (
               <RiEyeLine className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
@@ -893,7 +941,7 @@ function NewsCard({
 
           {/* Destaque Badge */}
           {noticia.destaque && (
-            <Badge className="bg-amber-500 hover:bg-amber-600 text-white backdrop-blur-sm text-xs">
+            <Badge className="backdrop-blur-sm bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs border-0">
               <RiStarFill className="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-1" />
               Destaque
             </Badge>
@@ -928,7 +976,11 @@ function NewsCard({
             <div className="flex items-center">
               <RiCalendarLine className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
               <span className="text-xs">
-                {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR")}
+                {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
               </span>
             </div>
           </div>
@@ -944,10 +996,22 @@ function NewsCard({
           onClick={handleButtonClick}
           variant="outline"
           size="sm"
-          className="w-full border-navy-200 text-navy-700 hover:bg-navy-600 hover:text-white hover:border-navy-600 transition-all duration-300 group/btn text-xs sm:text-sm"
+          className={`w-full border-navy-200 text-navy-700 hover:bg-navy-600 hover:text-white hover:border-navy-600 transition-all duration-300 group/btn text-xs sm:text-sm ${
+            !isPublished ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+          disabled={!isPublished}
         >
-          Ler Notícia
-          <RiArrowRightLine className="w-3 h-3 sm:w-4 sm:h-4 ml-1.5 sm:ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
+          {!isPublished ? (
+            <>
+              <RiCheckLine className="w-3 h-3 mr-1.5" />
+              Indisponível
+            </>
+          ) : (
+            <>
+              Ler Notícia
+              <RiArrowRightLine className="w-3 h-3 sm:w-4 sm:h-4 ml-1.5 sm:ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
+            </>
+          )}
         </Button>
       </CardContent>
     </Card>

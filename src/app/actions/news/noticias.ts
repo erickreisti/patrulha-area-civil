@@ -1,4 +1,3 @@
-// @/app/actions/news/noticias.ts
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -69,7 +68,16 @@ const ListNoticiasSchema = z.object({
   limit: z.number().min(1).max(100).default(20),
   destaque: z.enum(["all", "destaque", "normal"]).default("all"),
   sortBy: z
-    .enum(["data_publicacao", "created_at", "views", "titulo"])
+    .enum([
+      "data_publicacao",
+      "created_at",
+      "views",
+      "titulo",
+      "recent",
+      "oldest",
+      "destaque",
+      "popular",
+    ])
     .default("data_publicacao"),
   sortOrder: z.enum(["asc", "desc"]).default("desc"),
 });
@@ -576,10 +584,8 @@ export async function getNews(
     const offset = (page - 1) * limit;
 
     // Construir query
-    let query = adminClient
-      .from("noticias")
-      .select(
-        `
+    let query = adminClient.from("noticias").select(
+      `
         id,
         titulo,
         slug,
@@ -597,9 +603,29 @@ export async function getNews(
           graduacao
         )
       `,
-        { count: "exact" }
-      )
-      .order(sortBy, { ascending: sortOrder === "asc" });
+      { count: "exact" }
+    );
+
+    // Aplicar ordenação baseada no sortBy
+    if (sortBy === "recent" || sortBy === "data_publicacao") {
+      query = query.order("data_publicacao", {
+        ascending: sortOrder === "asc",
+      });
+    } else if (sortBy === "popular") {
+      query = query.order("views", { ascending: sortOrder === "asc" });
+    } else if (sortBy === "oldest") {
+      query = query.order("created_at", { ascending: true });
+    } else if (sortBy === "destaque") {
+      query = query
+        .order("destaque", { ascending: false })
+        .order("data_publicacao", { ascending: false });
+    } else if (sortBy === "titulo") {
+      query = query.order("titulo", { ascending: sortOrder === "asc" });
+    } else if (sortBy === "created_at") {
+      query = query.order("created_at", { ascending: sortOrder === "asc" });
+    } else {
+      query = query.order("data_publicacao", { ascending: false });
+    }
 
     // Aplicar filtros
     if (search && search.trim()) {
@@ -722,6 +748,82 @@ export async function getNoticiaById(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Erro ao buscar notícia",
+    };
+  }
+}
+
+/**
+ * Buscar notícia por slug (alias para getNoticiaById)
+ */
+export async function getNewsBySlug(
+  slug: string
+): Promise<ApiResponse<NoticiaComAutor>> {
+  return await getNoticiaById(slug);
+}
+
+/**
+ * Buscar notícias por categoria
+ */
+export async function getNewsByCategory(
+  category: string,
+  limit: number = 3
+): Promise<ApiResponse<NoticiaLista[]>> {
+  try {
+    // Usar admin client
+    const adminClient = await getAdminClient();
+
+    const { data, error } = await adminClient
+      .from("noticias")
+      .select(
+        `
+        id,
+        titulo,
+        slug,
+        resumo,
+        categoria,
+        data_publicacao,
+        status,
+        imagem,
+        views,
+        destaque,
+        created_at,
+        autor:profiles!noticias_autor_id_fkey(
+          full_name,
+          avatar_url,
+          graduacao
+        )
+      `
+      )
+      .eq("categoria", category)
+      .eq("status", "publicado")
+      .order("data_publicacao", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(
+        `Erro ao buscar notícias por categoria: ${error.message}`
+      );
+    }
+
+    // Converter dados para o tipo correto
+    const noticias: NoticiaLista[] = (data || []).map((item) =>
+      convertToNoticiaLista(item as SupabaseNoticiaListaWithAutor)
+    );
+
+    return {
+      success: true,
+      data: noticias,
+    };
+  } catch (error) {
+    console.error("❌ Erro em getNewsByCategory:", error);
+    return {
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Erro ao buscar notícias por categoria",
+      data: [],
     };
   }
 }
