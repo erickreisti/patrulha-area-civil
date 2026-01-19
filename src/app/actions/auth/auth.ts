@@ -4,7 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { z } from "zod";
 import type { Session, User } from "@supabase/supabase-js";
 import type { Profile, Database } from "@/lib/supabase/types";

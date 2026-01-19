@@ -1,7 +1,8 @@
+// src/app/(app)/login/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { toast } from "sonner";
 import {
@@ -19,7 +20,6 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const { isAuthenticated, loginWithServerAction, initialize } = useAuthStore();
 
@@ -36,7 +36,7 @@ export default function LoginPage() {
     init();
   }, [initialize]);
 
-  // ✅ CORREÇÃO: Redirecionar TODOS os agentes autenticados para /perfil
+  // ✅ CORREÇÃO: Removido useSearchParams não utilizado
   useEffect(() => {
     if (!isInitialized) {
       console.log("⏳ [LoginPage] Aguardando inicialização...");
@@ -48,17 +48,14 @@ export default function LoginPage() {
         "✅ [LoginPage] Usuário autenticado, redirecionando para /perfil"
       );
 
-      // Obter redirect URL dos parâmetros de busca
-      const redirectTo = searchParams.get("redirect") || "/perfil";
-
       // Pequeno delay para garantir que o estado foi atualizado
       const timer = setTimeout(() => {
-        router.replace(redirectTo);
+        router.replace("/perfil");
       }, 500);
 
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, router, isInitialized, searchParams]);
+  }, [isAuthenticated, router, isInitialized]);
 
   // Carregar matrícula salva
   useEffect(() => {
@@ -113,7 +110,6 @@ export default function LoginPage() {
         );
 
         // O redirecionamento será tratado pelo useEffect acima
-        // Não redirecionamos manualmente aqui para evitar race conditions
       } else {
         const errorMessage = result?.error?.toLowerCase() || "";
         let finalMessage = result?.error || "Erro ao fazer login";
