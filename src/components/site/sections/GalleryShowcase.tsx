@@ -19,6 +19,8 @@ import {
   RiImageLine,
   RiFolderLine,
   RiCameraOffLine,
+  RiImage2Line,
+  RiVideoAddLine,
 } from "react-icons/ri";
 
 // Action & Types
@@ -51,6 +53,27 @@ const SectionHeader = () => (
   </motion.div>
 );
 
+const PlaceholderMedia = ({ tipo }: { tipo: "fotos" | "videos" }) => (
+  <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center gap-3 p-4">
+    <div className="relative">
+      <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+        {tipo === "fotos" ? (
+          <RiImage2Line className="w-8 h-8 text-gray-400" />
+        ) : (
+          <RiVideoAddLine className="w-8 h-8 text-gray-400" />
+        )}
+      </div>
+      <RiCameraOffLine className="w-6 h-6 text-gray-500 absolute -bottom-1 -right-1 bg-gray-100 rounded-full p-1 shadow-sm" />
+    </div>
+    <div className="text-center">
+      <span className="text-xs uppercase tracking-widest text-gray-500 font-bold block mb-1">
+        Sem {tipo === "fotos" ? "Fotos" : "Vídeos"}
+      </span>
+      <span className="text-[10px] text-gray-400">Em breve disponível</span>
+    </div>
+  </div>
+);
+
 const GalleryCard = ({
   categoria,
   index,
@@ -58,8 +81,28 @@ const GalleryCard = ({
   categoria: CategoriaShowcase;
   index: number;
 }) => {
+  const [imageError, setImageError] = useState(false);
   const IconTipo = categoria.tipo === "fotos" ? RiImageLine : RiVideoLine;
   const isDisabled = !categoria.itens_count || categoria.arquivada;
+
+  // Função para obter URL da imagem
+  const getImageUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+
+    if (url.startsWith("http")) return url;
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const bucket = "galerias";
+
+    if (url.includes(bucket)) {
+      return `${supabaseUrl}/storage/v1/object/public/${url}`;
+    } else {
+      return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
+    }
+  };
+
+  const imageUrl = categoria.capa_url ? getImageUrl(categoria.capa_url) : null;
+  const hasImage = !!imageUrl && !imageError;
 
   return (
     <motion.div
@@ -70,28 +113,22 @@ const GalleryCard = ({
       className="h-full"
     >
       <Card className="border-gray-200 bg-white overflow-hidden hover:shadow-xl transition-all duration-300 group h-full flex flex-col hover:scale-[1.02]">
-        <div className="h-32 sm:h-40 lg:h-48 bg-gray-100 relative overflow-hidden flex items-center justify-center">
-          {categoria.capa_url ? (
+        <div className="h-32 sm:h-40 lg:h-48 relative overflow-hidden">
+          {hasImage ? (
             <>
               <Image
-                src={categoria.capa_url}
+                src={imageUrl}
                 alt={categoria.nome}
                 fill
                 className="object-cover transition-transform duration-700 group-hover:scale-110"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                onError={() => setImageError(true)}
+                priority={index < 2}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
             </>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center gap-2">
-              <div className="relative">
-                <IconTipo className="w-12 h-12 text-gray-300" />
-                <RiCameraOffLine className="w-5 h-5 text-gray-400 absolute -bottom-1 -right-1 bg-gray-100 rounded-full" />
-              </div>
-              <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
-                Sem Mídia
-              </span>
-            </div>
+            <PlaceholderMedia tipo={categoria.tipo} />
           )}
 
           <div className="absolute top-3 right-3 z-10">
@@ -100,33 +137,48 @@ const GalleryCard = ({
               {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
             </span>
           </div>
+
+          {/* Contador de itens */}
+          {categoria.itens_count > 0 && (
+            <div className="absolute bottom-3 left-3 z-10">
+              <span className="bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
+                {categoria.itens_count}{" "}
+                {categoria.tipo === "fotos" ? "fotos" : "vídeos"}
+              </span>
+            </div>
+          )}
         </div>
 
         <CardContent className="p-4 sm:p-5 lg:p-6 flex-1 flex flex-col">
-          <h3 className="font-bold text-gray-800 text-sm sm:text-base lg:text-lg leading-tight line-clamp-1 group-hover:text-pac-primary transition-colors mb-2">
-            {categoria.nome}
-          </h3>
+          <div className="flex-1">
+            <h3 className="font-bold text-gray-800 text-sm sm:text-base lg:text-lg leading-tight line-clamp-1 group-hover:text-pac-primary transition-colors mb-2">
+              {categoria.nome}
+            </h3>
 
-          {categoria.descricao && (
-            <p className="text-gray-600 text-xs sm:text-sm mb-4 line-clamp-2 flex-1">
-              {categoria.descricao}
-            </p>
-          )}
+            {categoria.descricao && (
+              <p className="text-gray-600 text-xs sm:text-sm line-clamp-2">
+                {categoria.descricao}
+              </p>
+            )}
+          </div>
 
-          <div className="w-full mt-auto pt-2">
+          <div className="w-full mt-4 pt-2 border-t border-gray-100">
             <Button
               variant="outline"
               size="sm"
               className={cn(
                 "w-full border-pac-primary text-pac-primary hover:bg-pac-primary hover:text-white font-semibold text-xs sm:text-sm transition-all",
                 isDisabled &&
-                  "opacity-50 cursor-not-allowed bg-gray-50 text-gray-400",
+                  "opacity-50 cursor-not-allowed bg-gray-50 text-gray-400 hover:bg-gray-50 hover:text-gray-400 border-gray-200",
               )}
               disabled={isDisabled}
               asChild={!isDisabled}
             >
               {isDisabled ? (
-                <span>{categoria.arquivada ? "Arquivada" : "Em breve"}</span>
+                <span className="flex items-center justify-center gap-1">
+                  <RiCameraOffLine className="w-3 h-3" />
+                  {categoria.arquivada ? "Arquivada" : "Em breve"}
+                </span>
               ) : (
                 <Link href={`/galeria/${categoria.slug}`}>
                   <RiEyeLine className="w-4 h-4 mr-2" /> Visualizar Galeria
@@ -156,7 +208,7 @@ export function GalleryShowcase() {
         throw new Error(result.error || "Falha ao carregar");
       }
     } catch (err) {
-      console.error("Erro no showcase da galeria:", err); // ✅ Resolvido: Logando o erro real
+      console.error("Erro no showcase da galeria:", err);
       setError("Não foi possível carregar os destaques no momento.");
     } finally {
       setLoading(false);
@@ -169,10 +221,15 @@ export function GalleryShowcase() {
 
   if (loading)
     return (
-      <section className="py-20 container mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-80 bg-gray-100 animate-pulse rounded-xl" />
-        ))}
+      <section className="py-20 container mx-auto px-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-80 bg-gray-100 animate-pulse rounded-xl"
+            />
+          ))}
+        </div>
       </section>
     );
 
@@ -181,7 +238,6 @@ export function GalleryShowcase() {
       <div className="container mx-auto px-4 sm:px-8">
         <SectionHeader />
 
-        {/* ✅ Resolvido: Exibindo erro visualmente se ele existir */}
         {error ? (
           <div className="text-center py-10">
             <p className="text-red-500 mb-4">{error}</p>
