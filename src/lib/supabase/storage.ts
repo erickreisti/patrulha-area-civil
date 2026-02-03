@@ -1,102 +1,133 @@
-// Importe TUDO de constants/upload.ts - ele já tem todas as definições
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   STORAGE_BUCKETS,
   UPLOAD_CONFIGS,
-  type StorageBucket,
-  type UploadConfig,
-  UPLOAD_PATHS,
-  UPLOAD_DIMENSIONS,
+  validateFile,
+  generateSafeFileName,
+  extractFilePathFromUrl,
+  type MediaType,
+  type ValidationResult,
+  type UploadConfig, // Importar o tipo
 } from "@/lib/constants/upload";
 
-// Re-export TUDO para manter compatibilidade
-export { STORAGE_BUCKETS, UPLOAD_CONFIGS, UPLOAD_PATHS, UPLOAD_DIMENSIONS };
-export type { StorageBucket, UploadConfig };
+// ==================== TIPOS ====================
 
-// Agora adicione APENAS as funções que não existem em constants/upload.ts
-export function validateUpload(
+export interface UploadResult {
+  success: boolean;
+  data?: {
+    url: string;
+    path: string;
+    fileName: string;
+    mediaType: MediaType;
+  };
+  error?: string;
+}
+
+// ==================== FUNÇÕES PRINCIPAIS ====================
+
+/**
+ * Função unificada de upload
+ */
+export async function uploadFile(
   file: File,
-  bucket: StorageBucket
-): { isValid: boolean; error?: string } {
-  const config = UPLOAD_CONFIGS[bucket];
+  bucketId: string,
+  options?: { folder?: string; upsert?: boolean },
+): Promise<UploadResult> {
+  try {
+    const supabaseAdmin = createAdminClient();
+    const folder = options?.folder || "";
+    const fileName = generateSafeFileName(file.name);
+    const filePath = folder ? `${folder}/${fileName}` : fileName;
 
-  // Verificar se o arquivo existe
-  if (!file) {
-    return { isValid: false, error: "Nenhum arquivo selecionado" };
-  }
+    const arrayBuffer = await file.arrayBuffer();
+    const fileBuffer = new Uint8Array(arrayBuffer);
 
-  // Tamanho
-  if (file.size > config.maxSize) {
-    const maxSizeMB = config.maxSize / 1024 / 1024;
-    const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucketId)
+      .upload(filePath, fileBuffer, {
+        contentType: file.type,
+        cacheControl: "3600",
+        upsert: options?.upsert ?? false,
+      });
+
+    if (error) throw error;
+
+    const {
+      data: { publicUrl },
+    } = supabaseAdmin.storage.from(bucketId).getPublicUrl(data.path);
+
+    const mediaType: MediaType = file.type.startsWith("video/")
+      ? "video"
+      : file.type.startsWith("image/")
+        ? "image"
+        : "document";
+
     return {
-      isValid: false,
-      error: `Arquivo muito grande: ${fileSizeMB}MB. Máximo permitido: ${maxSizeMB}MB`,
+      success: true,
+      data: {
+        url: publicUrl,
+        path: data.path,
+        fileName: fileName,
+        mediaType,
+      },
+    };
+  } catch (error: unknown) {
+    console.error("Erro uploadFile:", error);
+    const message = error instanceof Error ? error.message : "Falha no upload";
+    return {
+      success: false,
+      error: message,
     };
   }
-
-  // Tipo MIME
-  if (!config.allowedMimeTypes.includes(file.type)) {
-    const allowedTypes = config.allowedMimeTypes
-      .map((t: string) => t.split("/")[1])
-      .join(", ");
-    return {
-      isValid: false,
-      error: `Tipo de arquivo não permitido: ${file.type}. Tipos permitidos: ${allowedTypes}`,
-    };
-  }
-
-  // Extensão
-  const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
-  if (extension && !config.allowedExtensions.includes(extension)) {
-    return {
-      isValid: false,
-      error: `Extensão não permitida: ${extension}. Extensões permitidas: ${config.allowedExtensions.join(
-        ", "
-      )}`,
-    };
-  }
-
-  // Nome do arquivo (segurança)
-  const fileName = file.name.toLowerCase();
-  const forbiddenPatterns = [
-    /\.\.\//, // Path traversal
-    /\.php$/,
-    /\.exe$/,
-    /\.sh$/,
-    /\.bat$/,
-    /\.cmd$/,
-    /<script>/i,
-  ];
-
-  for (const pattern of forbiddenPatterns) {
-    if (pattern.test(fileName)) {
-      return {
-        isValid: false,
-        error: "Nome de arquivo não permitido por questões de segurança",
-      };
-    }
-  }
-
-  return { isValid: true };
 }
 
-export function getBucketName(bucket: StorageBucket): string {
-  return STORAGE_BUCKETS[bucket];
+/**
+ * Validação simplificada por tipo
+ */
+export function validateUploadByType(
+  file: File,
+  type: "image" | "video" | "document",
+): ValidationResult {
+  // CORREÇÃO: Tipagem explícita para evitar erro de inferência de tupla
+  let config: UploadConfig;
+
+  if (type === "image") {
+    config = UPLOAD_CONFIGS.GALERIA_FOTOS;
+  } else if (type === "video") {
+    config = UPLOAD_CONFIGS.GALERIA_VIDEOS;
+  } else if (type === "document") {
+    config = UPLOAD_CONFIGS.DOCUMENTOS;
+  } else {
+    // Fallback seguro
+    config = UPLOAD_CONFIGS.NOTICIAS;
+  }
+
+  return validateFile(file, config);
 }
 
-export function generateSafeFilename(originalName: string): string {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 15);
-  const extension = originalName.split(".").pop()?.toLowerCase() || "";
+/**
+ * Deletar arquivo por URL
+ */
+export async function deleteFileByUrl(url: string) {
+  try {
+    const { bucket, path } = extractFilePathFromUrl(url);
+    if (!bucket || !path) return { success: false, error: "URL inválida" };
 
-  // Remover caracteres especiais do nome base
-  const baseName = originalName
-    .split(".")
-    .slice(0, -1)
-    .join(".")
-    .replace(/[^a-zA-Z0-9-_]/g, "_")
-    .toLowerCase()
-    .substring(0, 50);
+    const supabaseAdmin = createAdminClient();
+    const { error } = await supabaseAdmin.storage.from(bucket).remove([path]);
 
-  return `${baseName}_${timestamp}_${random}.${extension}`;
+    if (error) throw error;
+    return { success: true };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return { success: false, error: message };
+  }
 }
+
+export {
+  extractFilePathFromUrl,
+  generateSafeFileName,
+  STORAGE_BUCKETS,
+  UPLOAD_CONFIGS,
+};

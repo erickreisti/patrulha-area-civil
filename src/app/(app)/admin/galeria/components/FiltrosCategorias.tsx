@@ -12,35 +12,33 @@ import {
 } from "@/components/ui/select";
 import { motion } from "framer-motion";
 import { RiFilterFill, RiSearchFill, RiCloseLine } from "react-icons/ri";
-import type { Categoria } from "@/app/actions/gallery";
 
-interface FiltrosItensProps {
+// Definindo a interface dos filtros baseada no que usamos na page
+interface FiltrosCategoriasProps {
   filtros: {
     busca: string;
-    categoria: string;
     tipo: string;
     status: string;
+    arquivada: string;
   };
   onFiltroChange: (
-    key: "busca" | "categoria" | "tipo" | "status",
+    key: "busca" | "tipo" | "status" | "arquivada",
     value: string,
   ) => void;
   onAplicarFiltros: () => void;
   onLimparFiltros: () => void;
-  categorias: Categoria[];
-  itensCount: number;
-  totalItens: number;
+  categoriasCount: number;
+  totalCategorias: number;
 }
 
-export function FiltrosItens({
+export function FiltrosCategorias({
   filtros,
   onFiltroChange,
   onAplicarFiltros,
   onLimparFiltros,
-  categorias,
-  itensCount,
-  totalItens,
-}: FiltrosItensProps) {
+  categoriasCount,
+  totalCategorias,
+}: FiltrosCategoriasProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -51,20 +49,20 @@ export function FiltrosItens({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-gray-800">
             <RiFilterFill className="w-5 h-5 text-navy-600" />
-            Filtros e Busca
+            Filtros e Busca - Categorias
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Campo de Busca */}
-            <div className="lg:col-span-1">
+            <div className="md:col-span-1">
               <label className="text-sm font-medium text-gray-700 mb-1 block">
                 Buscar
               </label>
               <div className="relative">
                 <RiSearchFill className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="Título..."
+                  placeholder="Nome..."
                   value={filtros.busca}
                   onChange={(e) => onFiltroChange("busca", e.target.value)}
                   className="pl-10"
@@ -72,33 +70,10 @@ export function FiltrosItens({
               </div>
             </div>
 
-            {/* Select de Categoria */}
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
-                Categoria
-              </label>
-              <Select
-                value={filtros.categoria}
-                onValueChange={(value) => onFiltroChange("categoria", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas</SelectItem>
-                  {categorias.map((categoria) => (
-                    <SelectItem key={categoria.id} value={categoria.id}>
-                      {categoria.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Select de Tipo */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1 block">
-                Mídia
+                Tipo
               </label>
               <Select
                 value={filtros.tipo}
@@ -109,8 +84,8 @@ export function FiltrosItens({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="foto">Fotos</SelectItem>
-                  <SelectItem value="video">Vídeos</SelectItem>
+                  <SelectItem value="fotos">Fotos</SelectItem>
+                  <SelectItem value="videos">Vídeos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -131,6 +106,26 @@ export function FiltrosItens({
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="ativo">Ativos</SelectItem>
                   <SelectItem value="inativo">Inativos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Select de Arquivada */}
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-1 block">
+                Arquivadas
+              </label>
+              <Select
+                value={filtros.arquivada}
+                onValueChange={(value) => onFiltroChange("arquivada", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="false">Não Arquivadas</SelectItem>
+                  <SelectItem value="true">Arquivadas</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -157,9 +152,10 @@ export function FiltrosItens({
 
             <div className="text-sm text-gray-500 ml-auto">
               Exibindo{" "}
-              <span className="font-bold text-gray-900">{itensCount}</span> de{" "}
-              <span className="font-bold text-gray-900">{totalItens}</span>{" "}
-              itens
+              <span className="font-bold text-gray-900">{categoriasCount}</span>{" "}
+              de{" "}
+              <span className="font-bold text-gray-900">{totalCategorias}</span>{" "}
+              categorias
             </div>
           </div>
         </CardContent>

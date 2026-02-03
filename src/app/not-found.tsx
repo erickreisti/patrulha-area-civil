@@ -1,4 +1,3 @@
-// src/app/not-found.tsx
 "use client";
 
 import Link from "next/link";
@@ -56,7 +55,7 @@ export default function NotFound() {
               <div className="text-left">
                 <div className="flex items-center gap-3 mb-1">
                   <FaHelicopter className="h-7 w-7 text-[#1A2873]" />
-                  <h1 className="font-bebas text-4xl bg-gradient-to-r from-[#1A2873] via-[#2A3A99] to-[#1A2873] bg-clip-text text-transparent tracking-wider uppercase leading-none">
+                  <h1 className="font-extrabold text-4xl bg-gradient-to-r from-[#1A2873] via-[#2A3A99] to-[#1A2873] bg-clip-text text-transparent tracking-tight uppercase leading-none">
                     PATRULHA AÉREA CIVIL
                   </h1>
                 </div>
@@ -111,7 +110,7 @@ export default function NotFound() {
 
             {/* Error Message */}
             <motion.h1
-              className="text-5xl lg:text-6xl font-bold text-black mb-6 font-bebas uppercase tracking-tight"
+              className="text-5xl lg:text-6xl font-extrabold text-black mb-6 uppercase tracking-tight"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.4 }}
@@ -183,7 +182,8 @@ export default function NotFound() {
             <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 p-8">
               <div className="flex items-center gap-3 mb-6">
                 <FaCompass className="h-6 w-6 text-[#1A2873]" />
-                <h3 className="text-2xl font-bold text-gray-900 font-bebas uppercase tracking-wide">
+                {/* CORRIGIDO AQUI: Removido 'font-bold' redundante */}
+                <h3 className="text-2xl text-gray-900 font-extrabold uppercase tracking-tight">
                   AÇÕES RECOMENDADAS
                 </h3>
               </div>
@@ -331,7 +331,11 @@ export default function NotFound() {
                     label: "Galeria",
                     color: "text-[#1A2873]",
                   },
-                  { href: "/equipe", label: "Equipe", color: "text-[#1A2873]" },
+                  {
+                    href: "/equipe",
+                    label: "Equipe",
+                    color: "text-[#1A2873]",
+                  },
                   {
                     href: "/transparencia",
                     label: "Transparência",

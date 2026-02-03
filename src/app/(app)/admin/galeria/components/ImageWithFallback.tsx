@@ -2,45 +2,79 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { RiImageFill, RiVideoFill } from "react-icons/ri";
+import { RiImageLine, RiVideoLine } from "react-icons/ri";
+import { cn } from "@/lib/utils/cn";
 
 interface ImageWithFallbackProps {
   src: string | null;
   alt: string;
   tipo: "foto" | "video";
+  className?: string;
+  fill?: boolean;
+  width?: number;
+  height?: number;
 }
 
-export function ImageWithFallback({ src, alt, tipo }: ImageWithFallbackProps) {
-  const [imageError, setImageError] = useState(false);
+export function ImageWithFallback({
+  src,
+  alt,
+  tipo,
+  className,
+  fill = false,
+  width = 48,
+  height = 48,
+}: ImageWithFallbackProps) {
+  const [error, setError] = useState(false);
 
-  if (tipo === "video" || !src) {
+  // Classes base para o container
+  const containerClasses = cn(
+    "relative overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200",
+    !fill && `w-[${width}px] h-[${height}px]`,
+    className,
+  );
+
+  // Renderizar ícone de vídeo se for vídeo e não tiver thumbnail (ou se der erro)
+  if (tipo === "video" && (!src || error)) {
     return (
-      <div className="w-12 h-12 rounded flex items-center justify-center bg-purple-100">
-        <RiVideoFill className="w-6 h-6 text-purple-500" />
+      <div className={cn(containerClasses, "bg-purple-50 border-purple-100")}>
+        <RiVideoLine className="w-1/2 h-1/2 text-purple-400" />
       </div>
     );
   }
 
-  if (imageError) {
+  // Renderizar ícone de erro/fallback para imagem
+  if (!src || error) {
     return (
-      <div className="w-12 h-12 rounded bg-gray-200 flex items-center justify-center">
-        <RiImageFill className="w-5 h-5 text-gray-400" />
+      <div className={containerClasses}>
+        <RiImageLine className="w-1/2 h-1/2 text-gray-400" />
       </div>
     );
   }
 
   return (
-    <div className="w-12 h-12 rounded overflow-hidden relative bg-gray-200">
+    <div
+      className={containerClasses}
+      style={!fill ? { width, height } : undefined}
+    >
       <Image
         src={src}
         alt={alt}
-        width={48}
-        height={48}
-        className="w-full h-full object-cover"
-        onError={() => setImageError(true)}
+        className="object-cover w-full h-full"
+        onError={() => setError(true)}
+        fill={fill}
+        width={!fill ? width : undefined}
+        height={!fill ? height : undefined}
+        sizes={fill ? "(max-width: 768px) 100vw, 33vw" : undefined}
         priority={false}
-        loading="lazy"
       />
+      {/* Overlay ícone de vídeo se for vídeo mas tiver imagem (thumbnail) */}
+      {tipo === "video" && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+          <div className="bg-white/80 p-1 rounded-full backdrop-blur-sm">
+            <RiVideoLine className="w-4 h-4 text-purple-600" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

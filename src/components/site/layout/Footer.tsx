@@ -1,5 +1,3 @@
-// src/components/site/layout/Footer.tsx
-
 "use client";
 
 import Link from "next/link";
@@ -97,16 +95,17 @@ const BrandSection = () => {
           />
         </motion.div>
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl font-bold text-slate-800 font-bebas tracking-wide truncate">
+          {/* CORRIGIDO: Removido font-bold, mantido font-extrabold */}
+          <h2 className="text-lg sm:text-xl text-gray-800 font-extrabold uppercase tracking-tight truncate">
             Patrulha Aérea Civil
           </h2>
-          <p className="text-navy font-roboto font-medium text-xs sm:text-sm truncate">
+          <p className="text-pac-primary font-medium text-xs sm:text-sm truncate">
             COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
           </p>
         </div>
       </Link>
       <motion.p
-        className="text-slate-700 max-w-md font-roboto leading-relaxed text-xs sm:text-sm mt-2"
+        className="text-gray-700 max-w-md leading-relaxed text-xs sm:text-sm mt-2"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.2 }}
@@ -140,11 +139,11 @@ const SocialLinks = () => {
           target="_blank"
           rel="noopener noreferrer"
           className={cn(
-            "text-slate-700 transition-all duration-300 hover:scale-110",
-            "bg-slate-100 rounded-full p-1.5 sm:p-2 border border-slate-200",
+            "text-gray-700 transition-all duration-300 hover:scale-110",
+            "bg-gray-100 rounded-full p-1.5 sm:p-2 border border-gray-200",
             social.color,
             "hover:text-white",
-            "touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-navy/50"
+            "touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-pac-primary/50",
           )}
           title={social.label}
           aria-label={social.label}
@@ -185,12 +184,12 @@ const NavigationSection = () => {
           >
             <Link
               href={link.href}
-              className="text-slate-700 text-xs sm:text-sm font-medium py-1 sm:py-1.5 transition-all duration-300 uppercase tracking-wider font-roboto hover:text-navy hover:font-semibold block relative group/navlink w-fit touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+              className="text-gray-700 text-xs sm:text-sm font-medium py-1 sm:py-1.5 transition-all duration-300 uppercase tracking-wider hover:text-pac-primary hover:font-semibold block relative group/navlink w-fit touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
             >
               <span className="relative z-10 transition-colors duration-300">
                 {link.label}
               </span>
-              <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-navy transition-all duration-300 group-hover/navlink:w-full" />
+              <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-pac-primary transition-all duration-300 group-hover/navlink:w-full" />
             </Link>
           </motion.li>
         ))}
@@ -223,7 +222,8 @@ const SectionTitle = ({ title }: { title: string }) => {
   return (
     <motion.h3
       ref={ref}
-      className="text-base sm:text-lg font-bold text-slate-800 mb-2 sm:mb-3 font-bebas tracking-wide border-b border-navy pb-1 sm:pb-2"
+      // CORRIGIDO: Removido font-bold, mantido font-extrabold
+      className="text-base sm:text-lg text-gray-800 mb-2 sm:mb-3 font-extrabold uppercase tracking-tight border-b border-pac-primary pb-1 sm:pb-2"
       initial={{ opacity: 0, y: -10 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -240,7 +240,7 @@ const ContactInfo = () => {
   return (
     <ul
       ref={ref}
-      className="space-y-1.5 sm:space-y-2 text-slate-700 font-roboto text-xs sm:text-sm"
+      className="space-y-1.5 sm:space-y-2 text-gray-700 text-xs sm:text-sm"
     >
       <ContactItem
         icon={RiMailLine}
@@ -278,7 +278,7 @@ const ContactItem = ({
 }: ContactItemProps) => (
   <motion.li
     className={`flex items-start space-x-1.5 sm:space-x-2 transition-colors duration-300 ${
-      isEmergency ? "hover:text-alert" : "hover:text-navy"
+      isEmergency ? "hover:text-pac-alert" : "hover:text-pac-primary"
     }`}
     initial={{ opacity: 0, y: 10 }}
     whileInView={{ opacity: 1, y: 0 }}
@@ -287,12 +287,12 @@ const ContactItem = ({
   >
     <Icon
       className={`w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
-        isEmergency ? "text-alert" : "text-navy"
+        isEmergency ? "text-pac-alert" : "text-pac-primary"
       }`}
     />
     <span
       className={`text-xs sm:text-sm ${
-        isEmergency ? "font-semibold text-alert" : "text-slate-700"
+        isEmergency ? "font-semibold text-pac-alert" : "text-gray-700"
       }`}
     >
       {text}
@@ -312,7 +312,7 @@ const EmergencyButton = () => {
       viewport={{ once: true }}
     >
       <Button
-        className="w-full mt-2 sm:mt-3 bg-alert hover:bg-alert/90 text-white font-bold py-2 sm:py-2.5 transition-all duration-300 hover:scale-105 shadow font-roboto border-0 group/emergency relative overflow-hidden text-xs sm:text-sm touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+        className="w-full mt-2 sm:mt-3 bg-pac-alert hover:bg-pac-alert-dark text-white font-bold py-2 sm:py-2.5 transition-all duration-300 hover:scale-105 shadow border-0 group/emergency relative overflow-hidden text-xs sm:text-sm touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
         asChild
       >
         <Link
@@ -337,7 +337,7 @@ const BottomFooter = () => {
   return (
     <motion.div
       ref={ref}
-      className="border-t border-slate-200 mt-4 sm:mt-6 pt-3 sm:pt-4 flex flex-col md:flex-row justify-between items-center"
+      className="border-t border-gray-200 mt-4 sm:mt-6 pt-3 sm:pt-4 flex flex-col md:flex-row justify-between items-center"
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.2 }}
@@ -353,7 +353,7 @@ const BottomFooter = () => {
             style={{ width: "auto", height: "auto" }}
           />
         </div>
-        <p className="text-slate-700 text-xs font-roboto whitespace-nowrap">
+        <p className="text-gray-700 text-xs whitespace-nowrap">
           © {new Date().getFullYear()} Patrulha Aérea Civil. Todos os direitos
           reservados.
         </p>
@@ -388,7 +388,7 @@ const LegalLinks = () => {
             variant="ghost"
             size="sm"
             asChild
-            className="text-slate-700 hover:text-navy hover:bg-navy/10 text-xs font-roboto transition-all duration-300 h-7 sm:h-8 px-2 sm:px-3 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+            className="text-gray-700 hover:text-pac-primary hover:bg-pac-primary-pale text-xs transition-all duration-300 h-7 sm:h-8 px-2 sm:px-3 touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
           >
             <Link
               href={link.href}
@@ -410,7 +410,7 @@ export function Footer() {
   return (
     <footer
       ref={ref}
-      className="bg-white text-slate-700 border-t border-navy"
+      className="bg-white text-gray-700 border-t border-pac-primary"
       role="contentinfo"
     >
       <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
@@ -431,7 +431,7 @@ export function Footer() {
       {/* Accessibilidade - Skip to content */}
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-navy focus:text-white focus:px-4 focus:py-2 focus:rounded"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-pac-primary focus:text-white focus:px-4 focus:py-2 focus:rounded"
       >
         Pular para conteúdo principal
       </a>

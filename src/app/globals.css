@@ -74,7 +74,9 @@
 
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -145,4 +147,8 @@
   .text-balance {
     text-wrap: balance;
   }
+}
+
+body[data-radix-popper-content-wrapper] {
+  overflow: hidden !important;
 }

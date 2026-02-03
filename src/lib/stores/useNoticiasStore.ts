@@ -1,1088 +1,962 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { useShallow } from "zustand/react/shallow";
-import { useState, useEffect, useRef } from "react";
-import type {
-  NoticiaLista,
-  NoticiaComAutor,
-  NewsStats,
-  ApiResponse,
-  ListNoticiasInput,
-  CreateNoticiaInput,
-  UpdateNoticiaInput,
+import { useEffect, useCallback } from "react";
+import { devtools } from "zustand/middleware";
+import {
+  criarNoticia,
+  atualizarNoticia,
+  deletarNoticia,
+  getNoticiaById,
+  getNews,
+  getNewsStats,
+  getNewsCategories,
+  toggleStatus,
+  toggleDestaque,
+  type CreateNoticiaInput,
+  type UpdateNoticiaInput,
+  type NoticiaComAutor,
+  type NoticiaLista,
+  type ApiResponse,
+  type ListNoticiasInput,
+  type NewsStats,
 } from "@/app/actions/news/noticias";
 
-// Re-exportar tipos
-export type {
-  NoticiaLista,
-  NoticiaComAutor,
-  NewsStats,
-  ApiResponse,
-  CreateNoticiaInput,
-  UpdateNoticiaInput,
-} from "@/app/actions/news/noticias";
-
-// Tipos do store
+// ==================== TIPOS ====================
 export type SortBy =
-  | "data_publicacao"
-  | "created_at"
-  | "views"
-  | "titulo"
   | "recent"
   | "oldest"
+  | "popular"
   | "destaque"
-  | "popular";
-export type NoticiaStatus = "rascunho" | "publicado" | "arquivado";
+  | "titulo"
+  | "data_publicacao"
+  | "created_at"
+  | "views";
+export type StatusFilter = "all" | "rascunho" | "publicado" | "arquivado";
+export type DestaqueFilter = "all" | "destaque" | "normal";
+export type TipoMediaFilter = "all" | "imagem" | "video";
 
-interface NoticiasFiltros {
-  searchTerm: string;
+export interface NoticiasFiltros {
+  search: string;
   categoria: string;
+  status: StatusFilter;
+  destaque: DestaqueFilter;
+  tipo_media: TipoMediaFilter;
   sortBy: SortBy;
   sortOrder: "asc" | "desc";
-  itemsPerPage: number;
-  currentPage: number;
-  status: NoticiaStatus | "all";
-  destaque: "all" | "destaque" | "normal";
+  page: number;
+  limit: number;
 }
 
-interface NoticiasState {
-  // Estado
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+// Estado para edição
+interface EdicaoState {
+  noticiaEditando: NoticiaComAutor | null;
+  formDataEdit: UpdateNoticiaInput;
+  editando: boolean;
+  salvando: boolean;
+  errorEdicao: string | null;
+  hasUnsavedChanges: boolean;
+  mediaFile: File | null;
+  mediaType: "image" | "video" | null;
+}
+
+// Estado para criação
+interface CriacaoState {
+  formDataCriacao: CreateNoticiaInput;
+  criando: boolean;
+  errorCriacao: string | null;
+  hasUnsavedChangesCriacao: boolean;
+}
+
+interface NoticiasState extends EdicaoState, CriacaoState {
+  // Estados principais
   noticias: NoticiaLista[];
   noticiaDetalhe: NoticiaComAutor | null;
-  noticiasRelacionadas: NoticiaLista[];
-  categoriasDisponiveis: Array<{ value: string; label: string }>;
-  stats: NewsStats;
-
-  // Estados de loading
-  loadingLista: boolean;
+  loading: boolean;
   loadingDetalhe: boolean;
-  loadingRelacionadas: boolean;
   loadingStats: boolean;
-  saving: boolean;
   error: string | null;
+  filters: NoticiasFiltros;
+  pagination: Pagination;
+  stats: NewsStats;
+  categories: Array<{ value: string; label: string }>;
 
-  // Filtros e paginação
-  filtros: NoticiasFiltros;
+  // Estados para site público
+  noticiasRelacionadas: NoticiaLista[];
   totalCount: number;
 
-  // Ações
-  // Setters de filtros
-  setSearchTerm: (term: string) => void;
+  // Propriedades para filtros (compatibilidade com site público)
+  filtros: {
+    searchTerm: string;
+    categoria: string;
+    sortBy: SortBy;
+    itemsPerPage: number;
+    currentPage: number;
+  };
+
+  // ============ AÇÕES PRINCIPAIS ============
+  setFilters: (filters: Partial<NoticiasFiltros>) => void;
+  setSearch: (search: string) => void;
   setCategoria: (categoria: string) => void;
+  setStatus: (status: StatusFilter) => void;
+  setDestaque: (destaque: DestaqueFilter) => void;
+  setTipoMedia: (tipo_media: TipoMediaFilter) => void;
   setSortBy: (sortBy: SortBy) => void;
-  setSortOrder: (order: "asc" | "desc") => void;
-  setItemsPerPage: (itemsPerPage: number) => void;
-  setCurrentPage: (currentPage: number) => void;
-  setStatus: (status: NoticiaStatus | "all") => void;
-  setDestaque: (destaque: "all" | "destaque" | "normal") => void;
+  setSortOrder: (sortOrder: "asc" | "desc") => void;
+  setPage: (page: number) => void;
+  setLimit: (limit: number) => void;
   clearFilters: () => void;
 
-  // Data setters
-  setNoticias: (noticias: NoticiaLista[]) => void;
-  setNoticiaDetalhe: (noticia: NoticiaComAutor | null) => void;
+  // Ações para site público
+  setSearchTerm: (term: string) => void;
+  setCurrentPage: (page: number) => void;
+  setItemsPerPage: (limit: number) => void;
   setNoticiasRelacionadas: (noticias: NoticiaLista[]) => void;
-  setCategoriasDisponiveis: (
-    categorias: Array<{ value: string; label: string }>
-  ) => void;
-  setStats: (stats: NewsStats) => void;
-  setTotalCount: (count: number) => void;
 
-  // Loading setters
-  setLoadingLista: (loading: boolean) => void;
-  setLoadingDetalhe: (loading: boolean) => void;
-  setLoadingRelacionadas: (loading: boolean) => void;
-  setLoadingStats: (loading: boolean) => void;
-  setSaving: (saving: boolean) => void;
-  setError: (error: string | null) => void;
-
-  // Funções de limpeza
-  clearNoticiaDetalhe: () => void;
-  clearNoticiasRelacionadas: () => void;
-
-  // Ações de API
-  fetchNoticias: (filters?: Partial<ListNoticiasInput>) => Promise<void>;
+  // Ações - CRUD
+  fetchNoticias: () => Promise<void>;
   fetchNoticiaDetalhe: (idOrSlug: string) => Promise<void>;
   fetchStats: () => Promise<void>;
-  fetchCategorias: () => Promise<void>;
-
-  // Ações de CRUD
-  criarNoticia: (
-    data: CreateNoticiaInput
+  fetchCategories: () => Promise<void>;
+  criarNovaNoticia: (
+    data: CreateNoticiaInput,
   ) => Promise<ApiResponse<NoticiaComAutor>>;
   atualizarNoticia: (
     id: string,
-    data: Partial<UpdateNoticiaInput>
+    data: UpdateNoticiaInput,
   ) => Promise<ApiResponse<NoticiaComAutor>>;
-  deletarNoticia: (id: string) => Promise<ApiResponse<void>>;
-  toggleStatus: (
+  excluirNoticia: (id: string) => Promise<ApiResponse<void>>;
+  alternarStatus: (
     id: string,
-    currentStatus: NoticiaStatus
+    currentStatus: "rascunho" | "publicado" | "arquivado",
   ) => Promise<ApiResponse<void>>;
-  toggleDestaque: (
+  alternarDestaque: (
     id: string,
-    currentDestaque: boolean
+    currentDestaque: boolean,
   ) => Promise<ApiResponse<void>>;
+
+  // ============ AÇÕES PARA EDIÇÃO ============
+  iniciarEdicao: (idOrSlug: string) => Promise<void>;
+  cancelarEdicao: () => void;
+  setCampoEdicao: <K extends keyof UpdateNoticiaInput>(
+    campo: K,
+    valor: UpdateNoticiaInput[K],
+  ) => void;
+  setMediaEdicao: (arquivo: File | null, tipo: "image" | "video") => void;
+  setHasUnsavedChangesEdicao: (hasChanges: boolean) => void;
+  validarFormEdicao: () => string[];
+  salvarEdicao: () => Promise<ApiResponse<NoticiaComAutor>>;
+
+  // ============ AÇÕES PARA CRIAÇÃO ============
+  setCampoCriacao: <K extends keyof CreateNoticiaInput>(
+    campo: K,
+    valor: CreateNoticiaInput[K],
+  ) => void;
+  setHasUnsavedChangesCriacao: (hasChanges: boolean) => void;
+  resetarFormCriacao: () => void;
+  validarFormCriacao: () => string[];
+  gerarSlug: (titulo: string) => string;
 }
 
-// Valores iniciais
-const initialValues = {
-  noticias: [],
-  noticiaDetalhe: null,
-  noticiasRelacionadas: [],
-  categoriasDisponiveis: [{ value: "all", label: "Todas categorias" }],
-  stats: {
-    total: 0,
-    published: 0,
-    recent: 0,
-    featured: 0,
-    rascunho: 0,
-    arquivado: 0,
-    canViewStats: false,
-  },
-
-  loadingLista: false,
-  loadingDetalhe: false,
-  loadingRelacionadas: false,
-  loadingStats: false,
-  saving: false,
-  error: null,
-
-  filtros: {
-    searchTerm: "",
-    categoria: "all",
-    sortBy: "recent" as SortBy,
-    sortOrder: "desc" as "asc" | "desc",
-    itemsPerPage: 20,
-    currentPage: 1,
-    status: "all" as NoticiaStatus | "all",
-    destaque: "all" as "all" | "destaque" | "normal",
-  },
-  totalCount: 0,
+// Estado inicial
+const initialFilters: NoticiasFiltros = {
+  search: "",
+  categoria: "all",
+  status: "all",
+  destaque: "all",
+  tipo_media: "all",
+  sortBy: "recent",
+  sortOrder: "desc",
+  page: 1,
+  limit: 20,
 };
 
-// Criação do store
+const initialPagination: Pagination = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  totalPages: 0,
+};
+
+const initialStats: NewsStats = {
+  total: 0,
+  published: 0,
+  recent: 0,
+  featured: 0,
+  rascunho: 0,
+  arquivado: 0,
+  videos: 0,
+  imagens: 0,
+  canViewStats: true,
+};
+
+const initialFormDataEdit: UpdateNoticiaInput = {
+  titulo: "",
+  slug: "",
+  conteudo: "",
+  resumo: "",
+  media_url: "",
+  video_url: "",
+  thumbnail_url: "",
+  tipo_media: "imagem",
+  duracao_video: null,
+  categoria: "",
+  destaque: false,
+  data_publicacao: "",
+  status: "rascunho",
+};
+
+const initialFormDataCriacao: CreateNoticiaInput = {
+  titulo: "",
+  slug: "",
+  conteudo: "",
+  resumo: "",
+  media_url: "",
+  video_url: "",
+  thumbnail_url: "",
+  tipo_media: "imagem",
+  duracao_video: null,
+  categoria: "Operações",
+  destaque: false,
+  data_publicacao: new Date().toISOString().split("T")[0],
+  status: "rascunho",
+};
+
+// ============ STORE PRINCIPAL ============
 export const useNoticiasStore = create<NoticiasState>()(
-  persist(
-    (set, get) => ({
-      ...initialValues,
+  devtools((set, get) => ({
+    // ============ ESTADOS INICIAIS ============
+    noticias: [],
+    noticiaDetalhe: null,
+    loading: false,
+    loadingDetalhe: false,
+    loadingStats: false,
+    error: null,
+    filters: initialFilters,
+    pagination: initialPagination,
+    stats: initialStats,
+    categories: [],
+    noticiasRelacionadas: [],
+    totalCount: 0,
+    filtros: {
+      searchTerm: "",
+      categoria: "all",
+      sortBy: "recent",
+      itemsPerPage: 10,
+      currentPage: 1,
+    },
 
-      // Setters de filtros
-      setSearchTerm: (searchTerm: string) =>
-        set((state) => ({
-          filtros: { ...state.filtros, searchTerm, currentPage: 1 },
-        })),
+    // Estados para edição
+    noticiaEditando: null,
+    formDataEdit: initialFormDataEdit,
+    editando: false,
+    salvando: false,
+    errorEdicao: null,
+    hasUnsavedChanges: false,
+    mediaFile: null,
+    mediaType: null,
 
-      setCategoria: (categoria: string) =>
-        set((state) => ({
-          filtros: { ...state.filtros, categoria, currentPage: 1 },
-        })),
+    // Estados para criação
+    formDataCriacao: initialFormDataCriacao,
+    criando: false,
+    errorCriacao: null,
+    hasUnsavedChangesCriacao: false,
 
-      setSortBy: (sortBy: SortBy) =>
-        set((state) => ({
-          filtros: { ...state.filtros, sortBy, currentPage: 1 },
-        })),
+    // ============ FILTROS ============
+    setFilters: (newFilters) => {
+      set((state) => ({
+        filters: { ...state.filters, ...newFilters, page: 1 },
+        filtros: {
+          ...state.filtros,
+          searchTerm: newFilters.search || state.filtros.searchTerm,
+          categoria: newFilters.categoria || state.filtros.categoria,
+          sortBy: newFilters.sortBy || state.filtros.sortBy,
+          currentPage: 1,
+        },
+      }));
+    },
 
-      setSortOrder: (sortOrder: "asc" | "desc") =>
-        set((state) => ({
-          filtros: { ...state.filtros, sortOrder, currentPage: 1 },
-        })),
+    setSearch: (search) =>
+      set((state) => ({
+        filters: { ...state.filters, search, page: 1 },
+        filtros: { ...state.filtros, searchTerm: search, currentPage: 1 },
+      })),
 
-      setItemsPerPage: (itemsPerPage: number) =>
-        set((state) => ({
-          filtros: { ...state.filtros, itemsPerPage, currentPage: 1 },
-        })),
+    setCategoria: (categoria) =>
+      set((state) => ({
+        filters: { ...state.filters, categoria, page: 1 },
+        filtros: { ...state.filtros, categoria, currentPage: 1 },
+      })),
 
-      setCurrentPage: (currentPage: number) =>
-        set((state) => ({
-          filtros: { ...state.filtros, currentPage },
-        })),
+    setStatus: (status) =>
+      set((state) => ({ filters: { ...state.filters, status, page: 1 } })),
 
-      setStatus: (status: NoticiaStatus | "all") =>
-        set((state) => ({
-          filtros: { ...state.filtros, status, currentPage: 1 },
-        })),
+    setDestaque: (destaque) =>
+      set((state) => ({ filters: { ...state.filters, destaque, page: 1 } })),
 
-      setDestaque: (destaque: "all" | "destaque" | "normal") =>
-        set((state) => ({
-          filtros: { ...state.filtros, destaque, currentPage: 1 },
-        })),
+    setTipoMedia: (tipo_media) =>
+      set((state) => ({ filters: { ...state.filters, tipo_media, page: 1 } })),
 
-      clearFilters: () =>
-        set({
-          filtros: initialValues.filtros,
-        }),
+    setSortBy: (sortBy) =>
+      set((state) => ({
+        filters: { ...state.filters, sortBy, page: 1 },
+        filtros: { ...state.filtros, sortBy, currentPage: 1 },
+      })),
 
-      // Setters de dados
-      setNoticias: (noticias: NoticiaLista[]) => set({ noticias }),
+    setSortOrder: (sortOrder) =>
+      set((state) => ({ filters: { ...state.filters, sortOrder, page: 1 } })),
 
-      setNoticiaDetalhe: (noticiaDetalhe: NoticiaComAutor | null) =>
-        set({ noticiaDetalhe }),
+    setPage: (page) =>
+      set((state) => ({
+        filters: { ...state.filters, page },
+        filtros: { ...state.filtros, currentPage: page },
+      })),
 
-      setNoticiasRelacionadas: (noticiasRelacionadas: NoticiaLista[]) =>
-        set({ noticiasRelacionadas }),
+    setLimit: (limit) =>
+      set((state) => ({
+        filters: { ...state.filters, limit, page: 1 },
+        filtros: { ...state.filtros, itemsPerPage: limit, currentPage: 1 },
+      })),
 
-      setCategoriasDisponiveis: (
-        categoriasDisponiveis: Array<{ value: string; label: string }>
-      ) => set({ categoriasDisponiveis }),
+    clearFilters: () => {
+      set({
+        filters: initialFilters,
+        filtros: {
+          searchTerm: "",
+          categoria: "all",
+          sortBy: "recent",
+          itemsPerPage: 10,
+          currentPage: 1,
+        },
+      });
+    },
 
-      setStats: (stats: NewsStats) => set({ stats }),
+    // ============ AÇÕES SITE PÚBLICO ============
+    setSearchTerm: (searchTerm) =>
+      set((state) => ({
+        filters: { ...state.filters, search: searchTerm, page: 1 },
+        filtros: { ...state.filtros, searchTerm, currentPage: 1 },
+      })),
 
-      setTotalCount: (totalCount: number) => set({ totalCount }),
+    setCurrentPage: (currentPage) =>
+      set((state) => ({
+        filters: { ...state.filters, page: currentPage },
+        filtros: { ...state.filtros, currentPage },
+      })),
 
-      // Setters de loading
-      setLoadingLista: (loadingLista: boolean) => set({ loadingLista }),
+    setItemsPerPage: (itemsPerPage) =>
+      set((state) => ({
+        filters: { ...state.filters, limit: itemsPerPage, page: 1 },
+        filtros: { ...state.filtros, itemsPerPage, currentPage: 1 },
+      })),
 
-      setLoadingDetalhe: (loadingDetalhe: boolean) => set({ loadingDetalhe }),
+    setNoticiasRelacionadas: (noticiasRelacionadas) =>
+      set({ noticiasRelacionadas }),
 
-      setLoadingRelacionadas: (loadingRelacionadas: boolean) =>
-        set({ loadingRelacionadas }),
+    // ============ FETCH NOTÍCIAS ============
+    fetchNoticias: async () => {
+      set({ loading: true, error: null });
+      try {
+        const { filters } = get();
 
-      setLoadingStats: (loadingStats: boolean) => set({ loadingStats }),
+        const params: ListNoticiasInput = {
+          search: filters.search || undefined,
+          categoria:
+            filters.categoria === "all" ? undefined : filters.categoria,
+          status: filters.status === "all" ? undefined : filters.status,
+          destaque:
+            filters.destaque === "all"
+              ? undefined
+              : filters.destaque === "destaque",
+          tipo_media:
+            filters.tipo_media === "all" ? undefined : filters.tipo_media,
+          page: filters.page,
+          limit: filters.limit,
+          sortBy: filters.sortBy,
+          sortOrder: filters.sortOrder,
+        };
 
-      setSaving: (saving: boolean) => set({ saving }),
+        const result = await getNews(params);
 
-      setError: (error: string | null) => set({ error }),
-
-      // Funções de limpeza
-      clearNoticiaDetalhe: () => set({ noticiaDetalhe: null }),
-
-      clearNoticiasRelacionadas: () => set({ noticiasRelacionadas: [] }),
-
-      // Ações de API
-      fetchNoticias: async (filters?: Partial<ListNoticiasInput>) => {
-        try {
-          set({ loadingLista: true, error: null });
-
-          // Importar dinamicamente para evitar problemas de SSR
-          const { getNews } = await import("@/app/actions/news/noticias");
-
-          const { filtros } = get();
-          const mergedFilters = { ...filtros, ...filters };
-
-          const result = await getNews(mergedFilters);
-
-          if (result.success) {
-            set({
-              noticias: result.data || [],
-              totalCount: result.pagination?.total || 0,
-              loadingLista: false,
-            });
-          } else {
-            throw new Error(result.error || "Erro ao buscar notícias");
-          }
-        } catch (error) {
-          console.error("❌ Erro no fetchNoticias:", error);
+        if (result.success && result.data) {
           set({
-            error: error instanceof Error ? error.message : "Erro desconhecido",
-            loadingLista: false,
+            noticias: result.data,
+            totalCount: result.pagination?.total || 0,
+            pagination: {
+              page: result.pagination?.page || 1,
+              limit: result.pagination?.limit || 20,
+              total: result.pagination?.total || 0,
+              totalPages: result.pagination?.totalPages || 0,
+            },
+            loading: false,
+          });
+        } else {
+          set({
+            error: result.error || "Erro ao carregar notícias",
+            loading: false,
           });
         }
-      },
+      } catch (error) {
+        console.error("Erro ao buscar notícias:", error);
+        set({
+          error: error instanceof Error ? error.message : "Erro desconhecido",
+          loading: false,
+        });
+      }
+    },
 
-      fetchNoticiaDetalhe: async (idOrSlug: string) => {
-        try {
-          set({ loadingDetalhe: true, error: null });
+    // ============ FETCH DETALHE ============
+    fetchNoticiaDetalhe: async (idOrSlug: string) => {
+      set({ loadingDetalhe: true, error: null });
+      try {
+        const result = await getNoticiaById(idOrSlug);
 
-          const { getNoticiaById } = await import(
-            "@/app/actions/news/noticias"
-          );
-
-          const result = await getNoticiaById(idOrSlug);
-
-          if (result.success && result.data) {
-            set({ noticiaDetalhe: result.data, loadingDetalhe: false });
-          } else {
-            throw new Error(result.error || "Notícia não encontrada");
-          }
-        } catch (error) {
-          console.error("❌ Erro no fetchNoticiaDetalhe:", error);
+        if (result.success && result.data) {
           set({
-            error:
-              error instanceof Error ? error.message : "Erro ao buscar notícia",
+            noticiaDetalhe: result.data,
+            loadingDetalhe: false,
+          });
+        } else {
+          set({
+            error: result.error || "Notícia não encontrada",
             loadingDetalhe: false,
           });
         }
-      },
+      } catch (error) {
+        console.error("Erro ao buscar detalhe:", error);
+        set({
+          error: error instanceof Error ? error.message : "Erro desconhecido",
+          loadingDetalhe: false,
+        });
+      }
+    },
 
-      fetchStats: async () => {
-        try {
-          set({ loadingStats: true, error: null });
+    // ============ FETCH STATS ============
+    fetchStats: async () => {
+      set({ loadingStats: true });
+      try {
+        const result = await getNewsStats();
 
-          const { getNewsStats } = await import("@/app/actions/news/noticias");
-
-          const result = await getNewsStats();
-
-          if (result.success) {
-            set({
-              stats: result.data || initialValues.stats,
-              loadingStats: false,
-            });
-          } else {
-            throw new Error(result.error || "Erro ao buscar estatísticas");
-          }
-        } catch (error) {
-          console.error("❌ Erro no fetchStats:", error);
-          set({ loadingStats: false });
-        }
-      },
-
-      fetchCategorias: async () => {
-        try {
-          const { getCategoriasNoticias } = await import(
-            "@/app/actions/news/noticias"
-          );
-
-          const result = await getCategoriasNoticias();
-
-          if (result.success) {
-            set({
-              categoriasDisponiveis:
-                result.data || initialValues.categoriasDisponiveis,
-            });
-          }
-        } catch (error) {
-          console.error("❌ Erro no fetchCategorias:", error);
-        }
-      },
-
-      // Ações de CRUD
-      criarNoticia: async (
-        data: CreateNoticiaInput
-      ): Promise<ApiResponse<NoticiaComAutor>> => {
-        try {
-          set({ saving: true, error: null });
-
-          const { criarNoticia: criarNoticiaAction } = await import(
-            "@/app/actions/news/noticias"
-          );
-
-          const result = await criarNoticiaAction(data);
-
-          if (result.success) {
-            set({ saving: false });
-            // Recarregar notícias
-            await get().fetchNoticias();
-            await get().fetchStats();
-          } else {
-            throw new Error(result.error || "Erro ao criar notícia");
-          }
-
-          return result;
-        } catch (error) {
-          console.error("❌ Erro no criarNoticia:", error);
+        if (result.success && result.data) {
           set({
-            error:
-              error instanceof Error ? error.message : "Erro ao criar notícia",
-            saving: false,
+            stats: result.data,
+            loadingStats: false,
           });
+        } else {
+          set({
+            loadingStats: false,
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao buscar estatísticas:", error);
+        set({ loadingStats: false });
+      }
+    },
 
+    // ============ FETCH CATEGORIAS (OTIMIZADO) ============
+    fetchCategories: async () => {
+      try {
+        const defaultCategories = [
+          { value: "all", label: "Todas categorias" },
+          { value: "Operações", label: "Operações" },
+          { value: "Eventos", label: "Eventos" },
+          { value: "Treinamento", label: "Treinamento" },
+        ];
+
+        const result = await getNewsCategories();
+
+        if (result.success && result.data && result.data.length > 0) {
+          set({
+            categories: [
+              { value: "all", label: "Todas categorias" },
+              ...result.data,
+            ],
+          });
+        } else {
+          console.warn("Backend retornou categorias vazias, usando padrão.");
+          set({ categories: defaultCategories });
+        }
+      } catch (error) {
+        console.error("Erro crítico ao buscar categorias no store:", error);
+        set({
+          categories: [
+            { value: "all", label: "Todas categorias" },
+            { value: "Operações", label: "Operações" },
+            { value: "Eventos", label: "Eventos" },
+          ],
+        });
+      }
+    },
+
+    // ============ CRUD OPERATIONS ============
+    criarNovaNoticia: async (data: CreateNoticiaInput) => {
+      try {
+        set({ error: null });
+        const result = await criarNoticia(data);
+
+        if (result.success) {
+          get().fetchNoticias();
+          get().fetchStats();
+        }
+
+        return result;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro ao criar notícia";
+        set({ error: errorMessage });
+        return { success: false, error: errorMessage };
+      }
+    },
+
+    atualizarNoticia: async (id: string, data: UpdateNoticiaInput) => {
+      try {
+        set({ error: null });
+        const result = await atualizarNoticia(id, data);
+
+        if (result.success) {
+          if (get().noticiaDetalhe?.id === id) {
+            set({ noticiaDetalhe: result.data || null });
+          }
+          if (get().noticiaEditando?.id === id) {
+            set({ noticiaEditando: result.data || null });
+          }
+          get().fetchNoticias();
+        }
+
+        return result;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro ao atualizar notícia";
+        set({ error: errorMessage });
+        return { success: false, error: errorMessage };
+      }
+    },
+
+    excluirNoticia: async (id: string) => {
+      try {
+        set({ error: null });
+        const result = await deletarNoticia(id);
+
+        if (result.success) {
+          set((state) => ({
+            noticias: state.noticias.filter((n) => n.id !== id),
+          }));
+          get().fetchStats();
+        }
+
+        return result;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro ao excluir notícia";
+        set({ error: errorMessage });
+        return { success: false, error: errorMessage };
+      }
+    },
+
+    alternarStatus: async (
+      id: string,
+      currentStatus: "rascunho" | "publicado" | "arquivado",
+    ) => {
+      try {
+        const result = await toggleStatus(id, currentStatus);
+
+        if (result.success) {
+          get().fetchNoticias();
+          get().fetchStats();
+        }
+
+        return result;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro ao alterar status";
+        return { success: false, error: errorMessage };
+      }
+    },
+
+    alternarDestaque: async (id: string, currentDestaque: boolean) => {
+      try {
+        const result = await toggleDestaque(id, currentDestaque);
+
+        if (result.success) {
+          get().fetchNoticias();
+        }
+
+        return result;
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Erro ao alterar destaque";
+        return { success: false, error: errorMessage };
+      }
+    },
+
+    // ============ AÇÕES PARA EDIÇÃO ============
+    iniciarEdicao: async (idOrSlug: string) => {
+      set({ editando: true, errorEdicao: null });
+      try {
+        await get().fetchNoticiaDetalhe(idOrSlug);
+        const noticia = get().noticiaDetalhe;
+
+        if (noticia) {
+          set({
+            noticiaEditando: noticia,
+            formDataEdit: {
+              titulo: noticia.titulo || "",
+              slug: noticia.slug || "",
+              conteudo: noticia.conteudo || "",
+              resumo: noticia.resumo || "",
+              media_url: noticia.media_url || "",
+              video_url: noticia.video_url || "",
+              thumbnail_url: noticia.thumbnail_url || "",
+              tipo_media: noticia.tipo_media || "imagem",
+              duracao_video: noticia.duracao_video || null,
+              categoria: noticia.categoria || "",
+              destaque: noticia.destaque || false,
+              data_publicacao: noticia.data_publicacao || "",
+              status: noticia.status || "rascunho",
+            },
+            hasUnsavedChanges: false,
+            mediaFile: null,
+            mediaType: null,
+          });
+        } else {
+          set({ errorEdicao: "Notícia não encontrada" });
+        }
+      } catch (error) {
+        console.error("Erro ao iniciar edição:", error);
+        set({
+          errorEdicao:
+            error instanceof Error ? error.message : "Erro desconhecido",
+        });
+      } finally {
+        set({ editando: false });
+      }
+    },
+
+    cancelarEdicao: () => {
+      set({
+        noticiaEditando: null,
+        formDataEdit: initialFormDataEdit,
+        hasUnsavedChanges: false,
+        mediaFile: null,
+        mediaType: null,
+        errorEdicao: null,
+      });
+    },
+
+    setCampoEdicao: (campo, valor) => {
+      set((state) => ({
+        formDataEdit: { ...state.formDataEdit, [campo]: valor },
+        hasUnsavedChanges: true,
+      }));
+
+      if (campo === "titulo" && typeof valor === "string") {
+        const slug = get().gerarSlug(valor);
+        set((state) => ({
+          formDataEdit: { ...state.formDataEdit, slug },
+        }));
+      }
+    },
+
+    setMediaEdicao: (arquivo, tipo) => {
+      set({
+        mediaFile: arquivo,
+        mediaType: tipo,
+        hasUnsavedChanges: true,
+      });
+
+      if (tipo === "image") {
+        get().setCampoEdicao("tipo_media", "imagem");
+        get().setCampoEdicao("video_url", "");
+      } else {
+        get().setCampoEdicao("tipo_media", "video");
+        get().setCampoEdicao("media_url", "");
+      }
+    },
+
+    setHasUnsavedChangesEdicao: (hasChanges) => {
+      set({ hasUnsavedChanges: hasChanges });
+    },
+
+    validarFormEdicao: () => {
+      const { formDataEdit } = get();
+      const errors: string[] = [];
+
+      if (!formDataEdit.titulo?.trim()) errors.push("Título é obrigatório");
+      if (formDataEdit.titulo && formDataEdit.titulo.length < 3)
+        errors.push("Título deve ter pelo menos 3 caracteres");
+      if (!formDataEdit.slug?.trim()) errors.push("Slug é obrigatório");
+      if (
+        formDataEdit.slug &&
+        !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formDataEdit.slug)
+      ) {
+        errors.push(
+          "Slug deve conter apenas letras minúsculas, números e hífens",
+        );
+      }
+      if (!formDataEdit.conteudo?.trim()) errors.push("Conteúdo é obrigatório");
+      if (formDataEdit.conteudo && formDataEdit.conteudo.length < 10)
+        errors.push("Conteúdo deve ter pelo menos 10 caracteres");
+      if (!formDataEdit.resumo?.trim()) errors.push("Resumo é obrigatório");
+      if (formDataEdit.resumo && formDataEdit.resumo.length < 10)
+        errors.push("Resumo deve ter pelo menos 10 caracteres");
+
+      return errors;
+    },
+
+    salvarEdicao: async () => {
+      const { noticiaEditando, formDataEdit } = get();
+
+      if (!noticiaEditando) {
+        return { success: false, error: "Nenhuma notícia em edição" };
+      }
+
+      set({ salvando: true, errorEdicao: null });
+
+      try {
+        const errors = get().validarFormEdicao();
+        if (errors.length > 0) {
+          set({ salvando: false });
           return {
             success: false,
-            error:
-              error instanceof Error ? error.message : "Erro ao criar notícia",
+            error: `Erros de validação: ${errors.join(", ")}`,
           };
         }
-      },
 
-      atualizarNoticia: async (
-        id: string,
-        data: Partial<UpdateNoticiaInput>
-      ): Promise<ApiResponse<NoticiaComAutor>> => {
-        try {
-          set({ saving: true, error: null });
+        const result = await get().atualizarNoticia(
+          noticiaEditando.id,
+          formDataEdit,
+        );
 
-          const { atualizarNoticia: atualizarNoticiaAction } = await import(
-            "@/app/actions/news/noticias"
-          );
-
-          const result = await atualizarNoticiaAction(id, data);
-
-          if (result.success) {
-            set({ saving: false });
-            // Atualizar notícia na lista se existir
-            const { noticias } = get();
-            const updatedNoticias = noticias.map((noticia) =>
-              noticia.id === id ? { ...noticia, ...data } : noticia
-            );
-            set({ noticias: updatedNoticias });
-          } else {
-            throw new Error(result.error || "Erro ao atualizar notícia");
-          }
-
-          return result;
-        } catch (error) {
-          console.error("❌ Erro no atualizarNoticia:", error);
+        if (result.success) {
           set({
-            error:
-              error instanceof Error
-                ? error.message
-                : "Erro ao atualizar notícia",
-            saving: false,
+            salvando: false,
+            hasUnsavedChanges: false,
+            mediaFile: null,
+            mediaType: null,
           });
 
-          return {
-            success: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Erro ao atualizar notícia",
-          };
+          get().iniciarEdicao(noticiaEditando.id);
+        } else {
+          set({ salvando: false });
         }
-      },
 
-      deletarNoticia: async (id: string): Promise<ApiResponse<void>> => {
-        try {
-          set({ saving: true, error: null });
+        return result;
+      } catch (error) {
+        console.error("Erro ao salvar edição:", error);
+        set({
+          salvando: false,
+          errorEdicao:
+            error instanceof Error ? error.message : "Erro ao salvar",
+        });
 
-          const { deletarNoticia: deletarNoticiaAction } = await import(
-            "@/app/actions/news/noticias"
-          );
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Erro ao salvar",
+        };
+      }
+    },
 
-          const result = await deletarNoticiaAction(id);
+    // ============ AÇÕES PARA CRIAÇÃO ============
+    setCampoCriacao: (campo, valor) => {
+      set((state) => ({
+        formDataCriacao: { ...state.formDataCriacao, [campo]: valor },
+        hasUnsavedChangesCriacao: true,
+      }));
 
-          if (result.success) {
-            set({ saving: false });
-            // Remover notícia da lista
-            const { noticias } = get();
-            const filteredNoticias = noticias.filter(
-              (noticia) => noticia.id !== id
-            );
-            set({ noticias: filteredNoticias });
-            // Recarregar estatísticas
-            await get().fetchStats();
-          } else {
-            throw new Error(result.error || "Erro ao excluir notícia");
-          }
+      if (campo === "titulo" && typeof valor === "string") {
+        const slug = get().gerarSlug(valor);
+        set((state) => ({
+          formDataCriacao: { ...state.formDataCriacao, slug },
+        }));
+      }
+    },
 
-          return result;
-        } catch (error) {
-          console.error("❌ Erro no deletarNoticia:", error);
-          set({
-            error:
-              error instanceof Error
-                ? error.message
-                : "Erro ao excluir notícia",
-            saving: false,
-          });
+    setHasUnsavedChangesCriacao: (hasChanges) => {
+      set({ hasUnsavedChangesCriacao: hasChanges });
+    },
 
-          return {
-            success: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Erro ao excluir notícia",
-          };
-        }
-      },
+    resetarFormCriacao: () => {
+      set({
+        formDataCriacao: initialFormDataCriacao,
+        errorCriacao: null,
+        hasUnsavedChangesCriacao: false,
+      });
+    },
 
-      toggleStatus: async (
-        id: string,
-        currentStatus: NoticiaStatus
-      ): Promise<ApiResponse<void>> => {
-        try {
-          set({ saving: true, error: null });
+    validarFormCriacao: () => {
+      const { formDataCriacao } = get();
+      const errors: string[] = [];
 
-          const { publicarNoticia, arquivarNoticia } = await import(
-            "@/app/actions/news/noticias"
-          );
+      if (!formDataCriacao.titulo.trim()) errors.push("Título é obrigatório");
+      if (formDataCriacao.titulo.length < 3)
+        errors.push("Título deve ter pelo menos 3 caracteres");
+      if (!formDataCriacao.slug.trim()) errors.push("Slug é obrigatório");
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formDataCriacao.slug)) {
+        errors.push(
+          "Slug deve conter apenas letras minúsculas, números e hífens",
+        );
+      }
+      if (!formDataCriacao.conteudo.trim())
+        errors.push("Conteúdo é obrigatório");
+      if (formDataCriacao.conteudo.length < 10)
+        errors.push("Conteúdo deve ter pelo menos 10 caracteres");
+      if (!formDataCriacao.resumo?.trim()) errors.push("Resumo é obrigatório");
+      if ((formDataCriacao.resumo?.length || 0) < 10)
+        errors.push("Resumo deve ter pelo menos 10 caracteres");
 
-          let result: ApiResponse<void>;
-          if (currentStatus === "rascunho") {
-            result = await publicarNoticia(id);
-          } else if (currentStatus === "publicado") {
-            result = await arquivarNoticia(id);
-          } else {
-            result = await publicarNoticia(id);
-          }
+      return errors;
+    },
 
-          if (result.success) {
-            set({ saving: false });
-            // Recarregar notícias
-            await get().fetchNoticias();
-            await get().fetchStats();
-          } else {
-            throw new Error(result.error || "Erro ao alterar status");
-          }
-
-          return result;
-        } catch (error) {
-          console.error("❌ Erro no toggleStatus:", error);
-          set({
-            error:
-              error instanceof Error ? error.message : "Erro ao alterar status",
-            saving: false,
-          });
-
-          return {
-            success: false,
-            error:
-              error instanceof Error ? error.message : "Erro ao alterar status",
-          };
-        }
-      },
-
-      toggleDestaque: async (
-        id: string,
-        currentDestaque: boolean
-      ): Promise<ApiResponse<void>> => {
-        try {
-          set({ saving: true, error: null });
-
-          const { toggleDestaque: toggleDestaqueAction } = await import(
-            "@/app/actions/news/noticias"
-          );
-
-          const result = await toggleDestaqueAction(id, currentDestaque);
-
-          if (result.success) {
-            set({ saving: false });
-            // Atualizar notícia na lista
-            const { noticias } = get();
-            const updatedNoticias = noticias.map((noticia) =>
-              noticia.id === id
-                ? { ...noticia, destaque: !currentDestaque }
-                : noticia
-            );
-            set({ noticias: updatedNoticias });
-          } else {
-            throw new Error(result.error || "Erro ao alterar destaque");
-          }
-
-          return result;
-        } catch (error) {
-          console.error("❌ Erro no toggleDestaque:", error);
-          set({
-            error:
-              error instanceof Error
-                ? error.message
-                : "Erro ao alterar destaque",
-            saving: false,
-          });
-
-          return {
-            success: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Erro ao alterar destaque",
-          };
-        }
-      },
-    }),
-    {
-      name: "noticias-storage",
-      partialize: (state) => ({
-        filtros: state.filtros,
-        stats: state.stats,
-        categoriasDisponiveis: state.categoriasDisponiveis,
-      }),
-    }
-  )
+    gerarSlug: (titulo: string) => {
+      return titulo
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "")
+        .substring(0, 100);
+    },
+  })),
 );
 
-// Hook para uso nos componentes
+// ==================== HOOKS PÚBLICOS ====================
+
 export function useNoticias() {
-  const {
-    noticias,
-    noticiaDetalhe,
-    noticiasRelacionadas,
-    categoriasDisponiveis,
-    stats,
-    loadingLista,
-    loadingDetalhe,
-    loadingRelacionadas,
-    loadingStats,
-    saving,
-    error,
-    filtros,
-    totalCount,
+  const store = useNoticiasStore();
+  // Solução para o warning: extrair a função e colocá-la na dependência
+  const { fetchCategories, categories } = store;
 
-    // Setters
-    setSearchTerm,
-    setCategoria,
-    setSortBy,
-    setSortOrder,
-    setItemsPerPage,
-    setCurrentPage,
-    setStatus,
-    setDestaque,
-    clearFilters,
+  useEffect(() => {
+    // Só busca se a lista estiver vazia para evitar calls desnecessários
+    if (categories.length === 0) {
+      fetchCategories();
+    }
+  }, [fetchCategories, categories.length]);
 
-    // Data setters
-    setNoticias,
-    setNoticiaDetalhe,
-    setNoticiasRelacionadas,
-    setCategoriasDisponiveis,
-    setStats,
-    setTotalCount,
+  return store;
+}
 
-    // Loading setters
-    setLoadingLista,
-    setLoadingDetalhe,
-    setLoadingRelacionadas,
-    setLoadingStats,
-    setSaving,
-    setError,
+// Hook para site público (mais leve e focado em leitura)
+export function useNoticiasBasico() {
+  const store = useNoticiasStore();
+  const { fetchCategories, categories } = store;
 
-    // Funções de limpeza
-    clearNoticiaDetalhe,
-    clearNoticiasRelacionadas,
+  useEffect(() => {
+    if (categories.length === 0) {
+      fetchCategories();
+    }
+  }, [fetchCategories, categories.length]);
 
-    // Ações de API
-    fetchNoticias,
-    fetchNoticiaDetalhe,
-    fetchStats,
-    fetchCategorias,
+  return {
+    noticias: store.noticias,
+    loading: store.loading,
+    filtros: store.filtros,
+    totalCount: store.totalCount,
+    categoriasDisponiveis: store.categories,
+    stats: store.stats,
+    setFiltros: (filters: Partial<NoticiasFiltros>) =>
+      store.setFilters(filters),
+    setSearchTerm: store.setSearchTerm,
+    setCategoria: (categoria: string) => store.setCategoria(categoria),
+    setSortBy: (sortBy: SortBy) => store.setSortBy(sortBy),
+    setItemsPerPage: store.setItemsPerPage,
+    setCurrentPage: store.setCurrentPage,
+    clearFilters: store.clearFilters,
+    fetchNoticias: store.fetchNoticias,
+    fetchStats: store.fetchStats,
+  };
+}
 
-    // Ações de CRUD
-    criarNoticia,
-    atualizarNoticia,
-    deletarNoticia,
-    toggleStatus,
-    toggleDestaque,
-  } = useNoticiasStore(
-    useShallow((state) => ({
-      noticias: state.noticias,
-      noticiaDetalhe: state.noticiaDetalhe,
-      noticiasRelacionadas: state.noticiasRelacionadas,
-      categoriasDisponiveis: state.categoriasDisponiveis,
-      stats: state.stats,
-      loadingLista: state.loadingLista,
-      loadingDetalhe: state.loadingDetalhe,
-      loadingRelacionadas: state.loadingRelacionadas,
-      loadingStats: state.loadingStats,
-      saving: state.saving,
-      error: state.error,
-      filtros: state.filtros,
-      totalCount: state.totalCount,
+// Hook para criação (focado em formulário)
+export function useNoticiaCriacao() {
+  const store = useNoticiasStore(); // Correção: executar o hook
 
-      // Setters
-      setSearchTerm: state.setSearchTerm,
-      setCategoria: state.setCategoria,
-      setSortBy: state.setSortBy,
-      setSortOrder: state.setSortOrder,
-      setItemsPerPage: state.setItemsPerPage,
-      setCurrentPage: state.setCurrentPage,
-      setStatus: state.setStatus,
-      setDestaque: state.setDestaque,
-      clearFilters: state.clearFilters,
+  const handleInputChange = useCallback(
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) => {
+      const { name, value, type } = e.target;
 
-      // Data setters
-      setNoticias: state.setNoticias,
-      setNoticiaDetalhe: state.setNoticiaDetalhe,
-      setNoticiasRelacionadas: state.setNoticiasRelacionadas,
-      setCategoriasDisponiveis: state.setCategoriasDisponiveis,
-      setStats: state.setStats,
-      setTotalCount: state.setTotalCount,
+      let newValue: string | boolean | number;
+      if (type === "checkbox") {
+        newValue = (e.target as HTMLInputElement).checked;
+      } else if (type === "number") {
+        newValue = Number(value);
+      } else {
+        newValue = value;
+      }
 
-      // Loading setters
-      setLoadingLista: state.setLoadingLista,
-      setLoadingDetalhe: state.setLoadingDetalhe,
-      setLoadingRelacionadas: state.setLoadingRelacionadas,
-      setLoadingStats: state.setLoadingStats,
-      setSaving: state.setSaving,
-      setError: state.setError,
-
-      // Funções de limpeza
-      clearNoticiaDetalhe: state.clearNoticiaDetalhe,
-      clearNoticiasRelacionadas: state.clearNoticiasRelacionadas,
-
-      // Ações de API
-      fetchNoticias: state.fetchNoticias,
-      fetchNoticiaDetalhe: state.fetchNoticiaDetalhe,
-      fetchStats: state.fetchStats,
-      fetchCategorias: state.fetchCategorias,
-
-      // Ações de CRUD
-      criarNoticia: state.criarNoticia,
-      atualizarNoticia: state.atualizarNoticia,
-      deletarNoticia: state.deletarNoticia,
-      toggleStatus: state.toggleStatus,
-      toggleDestaque: state.toggleDestaque,
-    }))
+      store.setCampoCriacao(name as keyof CreateNoticiaInput, newValue);
+    },
+    [store],
   );
 
-  // Calcular notícias paginadas
-  const startIndex = (filtros.currentPage - 1) * filtros.itemsPerPage;
-  const paginatedNoticias = noticias.slice(
-    startIndex,
-    startIndex + filtros.itemsPerPage
-  );
+  const handleSubmit = useCallback(async () => {
+    const { formDataCriacao, criarNovaNoticia, validarFormCriacao } = store;
+    const errors = validarFormCriacao();
 
-  // Calcular total de páginas
-  const totalPages = Math.ceil(totalCount / filtros.itemsPerPage);
-
-  // Funções utilitárias
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-BR");
-  };
-
-  const getStatusColor = (status: NoticiaStatus) => {
-    switch (status) {
-      case "publicado":
-        return "bg-green-500 text-white";
-      case "rascunho":
-        return "bg-yellow-500 text-white";
-      case "arquivado":
-        return "bg-gray-500 text-white";
-      default:
-        return "bg-gray-500 text-white";
+    if (errors.length > 0) {
+      throw new Error(errors.join(", "));
     }
-  };
 
-  const getStatusText = (status: NoticiaStatus) => {
-    switch (status) {
-      case "publicado":
-        return "PUBLICADO";
-      case "rascunho":
-        return "RASCUNHO";
-      case "arquivado":
-        return "ARQUIVADO";
-      default:
-        return "DESCONHECIDO";
-    }
-  };
+    return await criarNovaNoticia(formDataCriacao);
+  }, [store]);
 
   return {
-    // Dados
-    noticias,
-    noticiaDetalhe,
-    noticiasRelacionadas,
-    categoriasDisponiveis,
-    stats,
-
-    // Estados
-    loadingLista,
-    loadingDetalhe,
-    loadingRelacionadas,
-    loadingStats,
-    saving,
-    error,
-
-    // Filtros e paginação
-    filtros,
-    totalCount,
-    paginatedNoticias,
-    totalPages,
-    startIndex,
-
-    // Setters
-    setSearchTerm,
-    setCategoria,
-    setSortBy,
-    setSortOrder,
-    setItemsPerPage,
-    setCurrentPage,
-    setStatus,
-    setDestaque,
-    clearFilters,
-
-    // Data setters
-    setNoticias,
-    setNoticiaDetalhe,
-    setNoticiasRelacionadas,
-    setCategoriasDisponiveis,
-    setStats,
-    setTotalCount,
-
-    // Loading setters
-    setLoadingLista,
-    setLoadingDetalhe,
-    setLoadingRelacionadas,
-    setLoadingStats,
-    setSaving,
-    setError,
-
-    // Funções de limpeza
-    clearNoticiaDetalhe,
-    clearNoticiasRelacionadas,
-
-    // Ações de API
-    fetchNoticias,
-    fetchNoticiaDetalhe,
-    fetchStats,
-    fetchCategorias,
-
-    // Ações de CRUD
-    criarNoticia,
-    atualizarNoticia,
-    deletarNoticia,
-    toggleStatus,
-    toggleDestaque,
-
-    // Utilitários
-    formatDate,
-    getStatusColor,
-    getStatusText,
-  };
-}
-
-// Hook para criação de notícias
-export function useNoticiaCreate() {
-  const [formData, setFormData] = useState({
-    titulo: "",
-    slug: "",
-    conteudo: "",
-    resumo: "",
-    imagem: null as string | null,
-    categoria: "Operações",
-    destaque: false,
-    data_publicacao: new Date().toISOString().split("T")[0],
-    status: "rascunho" as NoticiaStatus,
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const { saving, criarNoticia } = useNoticias();
-
-  const generateSlug = (text: string) => {
-    return text
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "")
-      .substring(0, 100);
-  };
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    // Gerar slug automaticamente se mudar o título
-    if (name === "titulo") {
-      setFormData((prev) => ({
-        ...prev,
-        slug: generateSlug(value),
-      }));
-    }
-
-    // Limpar erro do campo
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
+    formData: store.formDataCriacao,
+    criando: store.criando,
+    error: store.errorCriacao,
+    hasUnsavedChanges: store.hasUnsavedChangesCriacao,
+    setFormData: (data: Partial<CreateNoticiaInput>) => {
+      Object.entries(data).forEach(([key, value]) => {
+        store.setCampoCriacao(key as keyof CreateNoticiaInput, value);
       });
-    }
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.titulo.trim()) {
-      newErrors.titulo = "Título é obrigatório";
-    } else if (formData.titulo.length < 3) {
-      newErrors.titulo = "Título deve ter pelo menos 3 caracteres";
-    }
-
-    if (!formData.slug.trim()) {
-      newErrors.slug = "Slug é obrigatório";
-    } else if (formData.slug.length < 3) {
-      newErrors.slug = "Slug deve ter pelo menos 3 caracteres";
-    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formData.slug)) {
-      newErrors.slug =
-        "Slug deve conter apenas letras minúsculas, números e hífens";
-    }
-
-    if (!formData.resumo.trim()) {
-      newErrors.resumo = "Resumo é obrigatório";
-    } else if (formData.resumo.length < 10) {
-      newErrors.resumo = "Resumo deve ter pelo menos 10 caracteres";
-    }
-
-    if (!formData.conteudo.trim()) {
-      newErrors.conteudo = "Conteúdo é obrigatório";
-    } else if (formData.conteudo.length < 10) {
-      newErrors.conteudo = "Conteúdo deve ter pelo menos 10 caracteres";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (): Promise<ApiResponse<NoticiaComAutor>> => {
-    if (!validateForm()) {
-      return {
-        success: false,
-        error: "Erros de validação no formulário",
-      };
-    }
-
-    return await criarNoticia(formData);
-  };
-
-  const resetForm = () => {
-    setFormData({
-      titulo: "",
-      slug: "",
-      conteudo: "",
-      resumo: "",
-      imagem: null,
-      categoria: "Operações",
-      destaque: false,
-      data_publicacao: new Date().toISOString().split("T")[0],
-      status: "rascunho",
-    });
-    setErrors({});
-  };
-
-  return {
-    formData,
-    errors,
-    saving,
-    setFormData,
+    },
     handleInputChange,
-    validateForm,
     handleSubmit,
-    resetForm,
-    generateSlug,
+    validarForm: store.validarFormCriacao,
+    gerarSlug: store.gerarSlug,
+    resetarForm: store.resetarFormCriacao,
   };
 }
 
-// Hook para edição de notícias
-export function useNoticiaEdit(noticiaId: string) {
-  const [formData, setFormData] = useState<Partial<UpdateNoticiaInput>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const isInitialLoad = useRef(true);
+// Hook para edição (focado em formulário de edição)
+export function useNoticiaEdicao(idOrSlug?: string) {
+  const store = useNoticiasStore();
+  const { iniciarEdicao } = store;
 
-  const {
-    noticiaDetalhe,
-    loadingDetalhe,
-    saving,
-    fetchNoticiaDetalhe,
-    atualizarNoticia,
-  } = useNoticias();
-
-  // Carregar notícia
   useEffect(() => {
-    if (noticiaId) {
-      fetchNoticiaDetalhe(noticiaId);
+    if (idOrSlug) {
+      iniciarEdicao(idOrSlug);
     }
-  }, [noticiaId, fetchNoticiaDetalhe]);
-
-  // Inicializar formData quando noticiaDetalhe for carregado (com delay para evitar cascading renders)
-  useEffect(() => {
-    if (noticiaDetalhe && isInitialLoad.current) {
-      isInitialLoad.current = false;
-
-      // Usar setTimeout para evitar cascading renders
-      const timer = setTimeout(() => {
-        setFormData({
-          titulo: noticiaDetalhe.titulo,
-          slug: noticiaDetalhe.slug,
-          conteudo: noticiaDetalhe.conteudo,
-          resumo: noticiaDetalhe.resumo || "",
-          imagem: noticiaDetalhe.imagem,
-          categoria: noticiaDetalhe.categoria || "Operações",
-          destaque: noticiaDetalhe.destaque,
-          data_publicacao: noticiaDetalhe.data_publicacao,
-          status: noticiaDetalhe.status,
-        });
-        setHasUnsavedChanges(false);
-      }, 0);
-
-      return () => clearTimeout(timer);
-    }
-  }, [noticiaDetalhe]);
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    setHasUnsavedChanges(true);
-
-    // Gerar slug automaticamente se mudar o título
-    if (name === "titulo") {
-      setFormData((prev) => ({
-        ...prev,
-        slug: value
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)+/g, "")
-          .substring(0, 100),
-      }));
-    }
-
-    // Limpar erro do campo
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.titulo?.trim()) {
-      newErrors.titulo = "Título é obrigatório";
-    } else if (formData.titulo.length < 3) {
-      newErrors.titulo = "Título deve ter pelo menos 3 caracteres";
-    }
-
-    if (!formData.slug?.trim()) {
-      newErrors.slug = "Slug é obrigatório";
-    } else if (formData.slug.length < 3) {
-      newErrors.slug = "Slug deve ter pelo menos 3 caracteres";
-    } else if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(formData.slug)) {
-      newErrors.slug =
-        "Slug deve conter apenas letras minúsculas, números e hífens";
-    }
-
-    if (!formData.resumo?.trim()) {
-      newErrors.resumo = "Resumo é obrigatório";
-    } else if (formData.resumo.length < 10) {
-      newErrors.resumo = "Resumo deve ter pelo menos 10 caracteres";
-    }
-
-    if (!formData.conteudo?.trim()) {
-      newErrors.conteudo = "Conteúdo é obrigatório";
-    } else if (formData.conteudo.length < 10) {
-      newErrors.conteudo = "Conteúdo deve ter pelo menos 10 caracteres";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (): Promise<ApiResponse<NoticiaComAutor>> => {
-    if (!validateForm()) {
-      return {
-        success: false,
-        error: "Erros de validação no formulário",
-      };
-    }
-
-    return await atualizarNoticia(noticiaId, formData);
-  };
+  }, [idOrSlug, iniciarEdicao]); // Adicionado dependência correta
 
   return {
-    noticiaDetalhe,
-    loading: loadingDetalhe,
-    saving,
-    formData,
-    errors,
-    hasUnsavedChanges,
-    setFormData,
-    handleInputChange,
-    validateForm,
-    handleSubmit,
-    setHasUnsavedChanges,
+    noticia: store.noticiaEditando,
+    carregando: store.editando,
+    salvando: store.salvando,
+    error: store.errorEdicao,
+    formData: store.formDataEdit,
+    hasUnsavedChanges: store.hasUnsavedChanges,
+    mediaFile: store.mediaFile,
+    mediaType: store.mediaType,
+    setCampo: store.setCampoEdicao,
+    setMedia: store.setMediaEdicao,
+    setHasUnsavedChanges: store.setHasUnsavedChangesEdicao,
+    validarForm: store.validarFormEdicao,
+    salvar: store.salvarEdicao,
+    cancelar: store.cancelarEdicao,
   };
 }
+
+// Exportar tipos
+export type { NoticiaLista, NoticiaComAutor, NewsStats };

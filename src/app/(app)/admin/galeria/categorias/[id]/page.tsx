@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,303 +19,166 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion } from "framer-motion";
+
+// Icons
 import {
   RiArrowLeftLine,
   RiSaveLine,
   RiRefreshLine,
+  RiFolderLine,
   RiImageLine,
   RiVideoLine,
   RiAlertLine,
   RiCloseLine,
-  RiBarChartLine,
-  RiHomeLine,
-  RiUserLine,
-  RiFolderLine,
   RiCalendarLine,
   RiEyeLine,
   RiEyeOffLine,
   RiCheckLine,
+  RiArchiveLine,
 } from "react-icons/ri";
 
-interface CategoriaData {
-  id: string;
-  nome: string;
-  slug: string;
-  descricao: string | null;
-  tipo: "fotos" | "videos";
-  status: boolean;
-  ordem: number;
-  created_at: string;
-  updated_at: string;
-  arquivada: boolean;
-}
+// Actions & Store
+import { getCategoriaById, updateCategoria } from "@/app/actions/gallery";
+import { useAuthStore } from "@/lib/stores/useAuthStore";
 
+// Tipagem
 interface FormData {
+  id: string;
   nome: string;
   slug: string;
   descricao: string;
   tipo: "fotos" | "videos";
   status: boolean;
   ordem: number;
-}
-
-interface FormErrors {
-  nome?: string;
-  slug?: string;
-  ordem?: string;
+  arquivada: boolean;
+  created_at?: string;
+  updated_at?: string;
+  itens_count?: number;
 }
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5,
-    },
-  },
-};
-
-const slideIn = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.6,
-    },
-  },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 };
 
 export default function EditarCategoriaPage() {
   const params = useParams();
   const router = useRouter();
-  const supabase = createClient();
+  const { isAdmin, hasAdminSession } = useAuthStore();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [categoria, setCategoria] = useState<CategoriaData | null>(null);
   const [formData, setFormData] = useState<FormData>({
+    id: "",
     nome: "",
     slug: "",
     descricao: "",
     tipo: "fotos",
     status: true,
     ordem: 0,
+    arquivada: false,
   });
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
 
   const categoriaId = params.id as string;
 
+  // 1. Verificar Permissões e Carregar Dados
+  useEffect(() => {
+    if (isAdmin === false || !hasAdminSession) {
+      toast.error("Acesso negado.");
+      router.push("/admin/galeria/categorias");
+    }
+  }, [isAdmin, hasAdminSession, router]);
+
   const fetchCategoria = useCallback(async () => {
+    if (!categoriaId) return;
     try {
       setLoading(true);
+      const result = await getCategoriaById(categoriaId);
 
-      const { data, error: fetchError } = await supabase
-        .from("galeria_categorias")
-        .select("*")
-        .eq("id", categoriaId)
-        .single();
-
-      if (fetchError) {
-        throw fetchError;
-      }
-
-      if (data) {
-        setCategoria(data);
+      if (result.success && result.data) {
+        const data = result.data;
         setFormData({
-          nome: data.nome || "",
-          slug: data.slug || "",
+          id: data.id,
+          nome: data.nome,
+          slug: data.slug,
           descricao: data.descricao || "",
-          tipo: data.tipo || "fotos",
-          status: data.status ?? true,
-          ordem: data.ordem || 0,
+          tipo: data.tipo,
+          status: data.status,
+          ordem: data.ordem,
+          arquivada: data.arquivada,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          itens_count: data.itens_count,
         });
+      } else {
+        toast.error(result.error || "Categoria não encontrada");
+        router.push("/admin/galeria/categorias");
       }
     } catch (error) {
-      console.error("Erro ao carregar categoria:", error);
-      toast.error("Não foi possível carregar a categoria.");
+      console.error(error);
+      toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
-  }, [categoriaId, supabase]);
+  }, [categoriaId, router]);
 
   useEffect(() => {
-    if (categoriaId) {
-      fetchCategoria();
-    }
-  }, [categoriaId, fetchCategoria]);
+    if (hasAdminSession) fetchCategoria();
+  }, [fetchCategoria, hasAdminSession]);
 
-  const validateForm = (): boolean => {
-    const newErrors: FormErrors = {};
-
-    if (!formData.nome.trim()) {
-      newErrors.nome = "Nome é obrigatório";
-    } else if (formData.nome.length < 3) {
-      newErrors.nome = "Nome deve ter pelo menos 3 caracteres";
-    } else if (formData.nome.length > 100) {
-      newErrors.nome = "Nome não pode ter mais de 100 caracteres";
-    }
-
-    if (!formData.slug.trim()) {
-      newErrors.slug = "Slug é obrigatório";
-    } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
-      newErrors.slug =
-        "Slug deve conter apenas letras minúsculas, números e hífens";
-    } else if (formData.slug.length > 100) {
-      newErrors.slug = "Slug não pode ter mais de 100 caracteres";
-    }
-
-    if (formData.ordem < 0 || formData.ordem > 999) {
-      newErrors.ordem = "Ordem deve ser entre 0 e 999";
-    }
-
-    setFormErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // 2. Handlers Genéricos
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
+  const handleSwitchChange = (key: keyof FormData, checked: boolean) => {
+    setFormData((prev) => ({ ...prev, [key]: checked }));
+  };
+
+  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Normaliza slug (apenas letras minúsculas, números e hifens)
+    const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+    setFormData((prev) => ({ ...prev, slug: val }));
+  };
+
+  // 3. Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      toast.error("Por favor, corrija os erros no formulário.");
-      return;
+    if (!formData.nome.trim() || !formData.slug.trim()) {
+      return toast.error("Nome e Slug são obrigatórios");
     }
 
     try {
       setSaving(true);
+      const result = await updateCategoria(categoriaId, {
+        ...formData,
+        descricao: formData.descricao || null,
+      });
 
-      const { error: updateError } = await supabase
-        .from("galeria_categorias")
-        .update({
-          nome: formData.nome.trim(),
-          slug: formData.slug.trim().toLowerCase(),
-          descricao: formData.descricao.trim() || null,
-          tipo: formData.tipo,
-          status: formData.status,
-          ordem: formData.ordem,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", categoriaId)
-        .select()
-        .single();
-
-      if (updateError) {
-        throw updateError;
-      }
-
-      // Log da atividade
-      await supabase.from("system_activities").insert([
-        {
-          user_id: (await supabase.auth.getUser()).data.user?.id,
-          action_type: "update",
-          description: `Atualizou categoria: "${formData.nome}"`,
-          resource_type: "galeria_categoria",
-          resource_id: categoriaId,
-          metadata: {
-            tipo: formData.tipo,
-            status: formData.status,
-            ordem: formData.ordem,
-          },
-        },
-      ]);
-
-      toast.success("Categoria atualizada com sucesso!");
-
-      setTimeout(() => {
-        router.push("/admin/galeria/categorias");
-      }, 1000);
-    } catch (error) {
-      console.error("Erro ao atualizar categoria:", error);
-
-      if (error && typeof error === "object" && "code" in error) {
-        const supabaseError = error as { code: string };
-        if (supabaseError.code === "23505") {
-          toast.error("Já existe uma categoria com este nome ou slug.");
-        } else if (supabaseError.code === "42501") {
-          toast.error("Você não tem permissão para atualizar categorias.");
-        } else {
-          toast.error("Não foi possível atualizar a categoria.");
-        }
+      if (result.success) {
+        toast.success("Categoria atualizada!");
+        setTimeout(() => router.push("/admin/galeria/categorias"), 1000);
       } else {
-        toast.error("Não foi possível atualizar a categoria.");
+        toast.error(result.error || "Erro ao atualizar");
       }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro interno ao salvar");
     } finally {
       setSaving(false);
     }
   };
 
-  const generateSlug = (nome: string): string => {
-    return nome
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)+/g, "")
-      .slice(0, 100);
-  };
-
-  const handleNomeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nome = e.target.value;
-    setFormData((prev) => ({
-      ...prev,
-      nome,
-      slug: generateSlug(nome),
-    }));
-    if (formErrors.nome) {
-      setFormErrors((prev) => ({ ...prev, nome: "" }));
-    }
-  };
-
-  const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const slug = e.target.value.toLowerCase();
-    setFormData((prev) => ({ ...prev, slug: slug.slice(0, 100) }));
-    if (formErrors.slug) {
-      setFormErrors((prev) => ({ ...prev, slug: "" }));
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-        <div className="container mx-auto px-4">
-          <div className="text-center py-16">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="rounded-full h-12 w-12 border-b-2 border-navy-600 mx-auto mb-4"
-            />
-            <p className="text-gray-600">Carregando categoria...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!categoria) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-center py-16"
-          >
-            <RiAlertLine className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              Categoria Não Encontrada
-            </h2>
-            <p className="text-gray-600 mb-6">
-              A categoria que você está tentando editar não existe.
-            </p>
-            <Link href="/admin/galeria/categorias">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <RiArrowLeftLine className="w-4 h-4 mr-2" />
-                Voltar para Categorias
-              </Button>
-            </Link>
-          </motion.div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <RiRefreshLine className="w-8 h-8 animate-spin text-navy-600" />
+          <p className="text-gray-500">Carregando categoria...</p>
         </div>
       </div>
     );
@@ -324,209 +186,94 @@ export default function EditarCategoriaPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-      <div className="container mx-auto px-4">
-        {/* Header com botões abaixo */}
+      <div className="container mx-auto px-4 max-w-6xl">
+        {/* Header */}
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={slideIn}
-          className="mb-8"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
         >
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2 font-bebas tracking-wide bg-gradient-to-r from-navy-600 to-navy-800 bg-clip-text text-transparent">
+            <h1 className="text-3xl font-bold text-gray-800 font-bebas tracking-wide">
               EDITAR CATEGORIA
             </h1>
-            <p className="text-gray-600">Editando: {categoria.nome}</p>
+            <p className="text-gray-600">ID: {formData.id}</p>
           </div>
 
-          {/* Botões de Navegação - ABAIXO DO HEADER */}
-          <div className="flex flex-wrap gap-3 mt-6">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link href="/admin/galeria/categorias">
-                <Button
-                  variant="outline"
-                  className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                >
-                  <RiArrowLeftLine className="w-4 h-4 mr-2" />
-                  Voltar para Categorias
-                </Button>
-              </Link>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link href="/admin/dashboard">
-                <Button
-                  variant="outline"
-                  className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
-                >
-                  <RiBarChartLine className="w-4 h-4 mr-2" />
-                  Dashboard
-                </Button>
-              </Link>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.2 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link href="/perfil">
-                <Button
-                  variant="outline"
-                  className="border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-                >
-                  <RiUserLine className="w-4 h-4 mr-2" />
-                  Meu Perfil
-                </Button>
-              </Link>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, delay: 0.3 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Link href="/">
-                <Button
-                  variant="outline"
-                  className="border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white"
-                >
-                  <RiHomeLine className="w-4 h-4 mr-2" />
-                  Voltar ao Site
-                </Button>
-              </Link>
-            </motion.div>
-          </div>
+          <Link href="/admin/galeria/categorias">
+            <Button variant="outline">
+              <RiArrowLeftLine className="mr-2" /> Voltar
+            </Button>
+          </Link>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Formulário Principal */}
-          <div className="lg:col-span-2">
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.2 }}
-            >
-              <Card className="border-0 shadow-lg hover:shadow-xl">
-                <CardHeader className="border-b border-gray-200">
-                  <CardTitle className="flex items-center text-xl text-gray-800">
-                    <RiFolderLine className="w-5 h-5 mr-2 text-navy-600" />
-                    Editar Categoria
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+        >
+          {/* Coluna Principal */}
+          <div className="lg:col-span-2 space-y-6">
+            <motion.div variants={fadeInUp} initial="hidden" animate="visible">
+              <Card>
+                <CardHeader className="border-b">
+                  <CardTitle className="flex items-center gap-2">
+                    <RiFolderLine className="text-navy-600" /> Dados Principais
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Nome */}
-                    <motion.div variants={fadeInUp} className="space-y-2">
-                      <Label
-                        htmlFor="nome"
-                        className="text-sm font-semibold text-gray-700"
-                      >
-                        Nome da Categoria *
-                      </Label>
+                <CardContent className="p-6 space-y-6">
+                  {/* Nome */}
+                  <div className="space-y-2">
+                    <Label htmlFor="nome">Nome da Categoria *</Label>
+                    <Input
+                      id="nome"
+                      value={formData.nome}
+                      onChange={handleInputChange}
+                      maxLength={100}
+                      required
+                    />
+                  </div>
+
+                  {/* Slug */}
+                  <div className="space-y-2">
+                    <Label htmlFor="slug">Slug (URL) *</Label>
+                    <div className="flex">
+                      <span className="bg-gray-100 border border-r-0 rounded-l-md px-3 py-2 text-sm text-gray-500 flex items-center">
+                        /galeria/
+                      </span>
                       <Input
-                        id="nome"
-                        value={formData.nome}
-                        onChange={handleNomeChange}
-                        placeholder="Ex: Eventos Especiais, Treinamentos, etc."
-                        className={`${
-                          formErrors.nome
-                            ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                            : ""
-                        }`}
-                        maxLength={100}
+                        id="slug"
+                        value={formData.slug}
+                        onChange={handleSlugChange}
+                        className="rounded-l-none font-mono text-sm"
+                        required
                       />
-                      {formErrors.nome && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-red-600 text-sm flex items-center gap-1"
-                        >
-                          <RiAlertLine className="w-3 h-3" />
-                          {formErrors.nome}
-                        </motion.p>
-                      )}
-                      <p className="text-gray-500 text-sm">
-                        {formData.nome.length}/100 caracteres
-                      </p>
-                    </motion.div>
+                    </div>
+                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                      <RiAlertLine /> Cuidado ao alterar o slug, links antigos
+                      podem quebrar.
+                    </p>
+                  </div>
 
-                    {/* Slug */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.1 }}
-                      className="space-y-2"
-                    >
-                      <Label
-                        htmlFor="slug"
-                        className="text-sm font-semibold text-gray-700"
-                      >
-                        Slug (URL) *
-                      </Label>
-                      <div className="flex items-center">
-                        <span className="bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg px-3 py-2 text-gray-600 text-sm">
-                          /galeria/
-                        </span>
-                        <Input
-                          id="slug"
-                          value={formData.slug}
-                          onChange={handleSlugChange}
-                          placeholder="ex: eventos-especiais"
-                          className={`flex-1 rounded-l-none ${
-                            formErrors.slug
-                              ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                              : ""
-                          }`}
-                          maxLength={100}
-                        />
-                      </div>
-                      {formErrors.slug && (
-                        <motion.p
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="text-red-600 text-sm flex items-center gap-1"
-                        >
-                          <RiAlertLine className="w-3 h-3" />
-                          {formErrors.slug}
-                        </motion.p>
-                      )}
-                      <div className="flex items-center gap-2 text-xs text-gray-500">
-                        <span>
-                          URL: https://seusite.com/galeria/{formData.slug}
-                        </span>
-                      </div>
-                    </motion.div>
+                  {/* Descrição */}
+                  <div className="space-y-2">
+                    <Label htmlFor="descricao">Descrição</Label>
+                    <Textarea
+                      id="descricao"
+                      value={formData.descricao}
+                      onChange={handleInputChange}
+                      rows={4}
+                      maxLength={500}
+                    />
+                  </div>
 
-                    {/* Tipo */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.2 }}
-                      className="space-y-2"
-                    >
-                      <Label className="text-sm font-semibold text-gray-700">
-                        Tipo de Conteúdo *
-                      </Label>
+                  {/* Tipo e Ordem */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label>Tipo de Conteúdo</Label>
                       <Select
                         value={formData.tipo}
-                        onValueChange={(value: "fotos" | "videos") =>
-                          setFormData((prev) => ({ ...prev, tipo: value }))
+                        onValueChange={(v: "fotos" | "videos") =>
+                          setFormData((prev) => ({ ...prev, tipo: v }))
                         }
                       >
                         <SelectTrigger>
@@ -535,354 +282,175 @@ export default function EditarCategoriaPage() {
                         <SelectContent>
                           <SelectItem value="fotos">
                             <div className="flex items-center gap-2">
-                              <RiImageLine className="w-4 h-4 text-blue-600" />
-                              <span>Fotos</span>
+                              <RiImageLine className="text-blue-500" /> Fotos
                             </div>
                           </SelectItem>
                           <SelectItem value="videos">
                             <div className="flex items-center gap-2">
-                              <RiVideoLine className="w-4 h-4 text-purple-600" />
-                              <span>Vídeos</span>
+                              <RiVideoLine className="text-purple-500" /> Vídeos
                             </div>
                           </SelectItem>
                         </SelectContent>
                       </Select>
-                    </motion.div>
+                    </div>
 
-                    {/* Descrição */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.3 }}
-                      className="space-y-2"
-                    >
-                      <Label
-                        htmlFor="descricao"
-                        className="text-sm font-semibold text-gray-700"
-                      >
-                        Descrição
-                      </Label>
-                      <Textarea
-                        id="descricao"
-                        value={formData.descricao}
+                    <div className="space-y-2">
+                      <Label htmlFor="ordem">Ordem de Exibição</Label>
+                      <Input
+                        id="ordem"
+                        type="number"
+                        min="0"
+                        max="999"
+                        value={formData.ordem}
                         onChange={(e) =>
                           setFormData((prev) => ({
                             ...prev,
-                            descricao: e.target.value,
+                            ordem: Number(e.target.value),
                           }))
                         }
-                        placeholder="Descreva o propósito desta categoria..."
-                        rows={4}
-                        maxLength={500}
-                        className="resize-none"
                       />
-                      <p className="text-gray-500 text-sm">
-                        {formData.descricao.length}/500 caracteres
-                      </p>
-                    </motion.div>
+                    </div>
+                  </div>
 
-                    {/* Ordem e Status */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.4 }}
-                      className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                  {/* Botões Mobile/Desktop */}
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      type="submit"
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                      disabled={saving}
                     >
-                      {/* Ordem */}
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="ordem"
-                          className="text-sm font-semibold text-gray-700"
-                        >
-                          Ordem de Exibição
-                        </Label>
-                        <Input
-                          id="ordem"
-                          type="number"
-                          min="0"
-                          max="999"
-                          value={formData.ordem}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              ordem: parseInt(e.target.value) || 0,
-                            }))
-                          }
-                          className={
-                            formErrors.ordem
-                              ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                              : ""
-                          }
-                        />
-                        {formErrors.ordem && (
-                          <motion.p
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-red-600 text-sm flex items-center gap-1"
-                          >
-                            <RiAlertLine className="w-3 h-3" />
-                            {formErrors.ordem}
-                          </motion.p>
-                        )}
-                        <p className="text-gray-500 text-sm">
-                          Número menor aparece primeiro (0-999)
-                        </p>
-                      </div>
-
-                      {/* Status */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-semibold text-gray-700">
-                          Status da Categoria
-                        </Label>
-                        <motion.div
-                          className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 hover:shadow-sm"
-                          whileHover={{ scale: 1.02 }}
-                        >
-                          <Switch
-                            checked={formData.status}
-                            onCheckedChange={(checked) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                status: checked,
-                              }))
-                            }
-                          />
-                          <div>
-                            <p className="font-medium text-gray-800 flex items-center gap-2">
-                              {formData.status ? (
-                                <>
-                                  <RiEyeLine className="w-4 h-4 text-green-600" />
-                                  Ativa
-                                </>
-                              ) : (
-                                <>
-                                  <RiEyeOffLine className="w-4 h-4 text-gray-600" />
-                                  Inativa
-                                </>
-                              )}
-                            </p>
-                            <p className="text-gray-500 text-sm">
-                              {formData.status
-                                ? "Visível no site"
-                                : "Oculta no site"}
-                            </p>
-                          </div>
-                        </motion.div>
-                      </div>
-                    </motion.div>
-
-                    {/* Botões de Ação */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.5 }}
-                      className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200"
+                      {saving ? (
+                        <RiRefreshLine className="animate-spin mr-2" />
+                      ) : (
+                        <RiSaveLine className="mr-2" />
+                      )}
+                      {saving ? "Salvando..." : "Salvar Alterações"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => router.back()}
+                      disabled={saving}
                     >
-                      <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="flex-1"
-                      >
-                        <Button
-                          type="submit"
-                          disabled={saving}
-                          className="w-full bg-green-600 hover:bg-green-700 text-white py-3 disabled:opacity-50"
-                        >
-                          {saving ? (
-                            <>
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity }}
-                              >
-                                <RiRefreshLine className="w-4 h-4 mr-2" />
-                              </motion.div>
-                              Salvando...
-                            </>
-                          ) : (
-                            <>
-                              <RiSaveLine className="w-4 h-4 mr-2" />
-                              Salvar Alterações
-                            </>
-                          )}
-                        </Button>
-                      </motion.div>
-
-                      <motion.div
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="flex-1"
-                      >
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={saving}
-                          onClick={() =>
-                            router.push("/admin/galeria/categorias")
-                          }
-                          className="w-full border-gray-600 text-gray-600 hover:bg-gray-100 hover:text-gray-900 py-3"
-                        >
-                          <RiCloseLine className="w-4 h-4 mr-2" />
-                          Cancelar
-                        </Button>
-                      </motion.div>
-                    </motion.div>
-                  </form>
+                      <RiCloseLine className="mr-2" /> Cancelar
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
           </div>
 
-          {/* Informações e Ajuda */}
+          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Informações do Sistema */}
             <motion.div
+              variants={fadeInUp}
               initial="hidden"
               animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.2 }}
             >
-              <Card className="border-0 shadow-lg hover:shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-lg text-gray-800">
-                    Informações do Sistema
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-600">ID:</span>
-                    <code className="text-sm bg-gray-100 px-2 py-1 rounded">
-                      {categoria.id}
-                    </code>
+              {/* Card de Info */}
+              <Card className="mb-6 border-l-4 border-l-blue-500">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Itens vinculados:</span>
+                    <Badge
+                      variant="secondary"
+                      className="bg-blue-100 text-blue-700"
+                    >
+                      {formData.itens_count || 0}
+                    </Badge>
                   </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-600">Criada em:</span>
-                    <div className="flex items-center gap-1 text-sm text-gray-700">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Criada em:</span>
+                    <span className="flex items-center gap-1 text-gray-700">
                       <RiCalendarLine className="w-3 h-3" />
-                      {new Date(categoria.created_at).toLocaleDateString(
-                        "pt-BR"
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-600">Última atualização:</span>
-                    <div className="flex items-center gap-1 text-sm text-gray-700">
-                      <RiCalendarLine className="w-3 h-3" />
-                      {new Date(categoria.updated_at).toLocaleDateString(
-                        "pt-BR"
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-600">Arquivada:</span>
-                    <Badge
-                      className={
-                        categoria.arquivada
-                          ? "bg-amber-500 text-white"
-                          : "bg-gray-200 text-gray-700"
-                      }
-                    >
-                      {categoria.arquivada ? "Sim" : "Não"}
-                    </Badge>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-600">Tipo atual:</span>
-                    <Badge
-                      className={
-                        categoria.tipo === "fotos"
-                          ? "bg-blue-600 text-white"
-                          : "bg-purple-600 text-white"
-                      }
-                    >
-                      {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Status Atual */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.4 }}
-            >
-              <Card className="border-0 shadow-lg hover:shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-lg text-gray-800">
-                    Status Atual
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between items-center py-2 border-b border-gray-200">
-                    <span className="text-gray-600">Status:</span>
-                    <Badge
-                      className={
-                        categoria.status
-                          ? "bg-green-600 text-white"
-                          : "bg-gray-500 text-white"
-                      }
-                    >
-                      {categoria.status ? "Ativa" : "Inativa"}
-                    </Badge>
-                  </div>
-
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-gray-600">Ordem atual:</span>
-                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                      {categoria.ordem}
+                      {formData.created_at
+                        ? new Date(formData.created_at).toLocaleDateString()
+                        : "-"}
                     </span>
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
 
-            {/* Ajuda */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.5 }}
-            >
-              <Card className="border-0 shadow-lg hover:shadow-xl">
+              {/* Card de Configurações */}
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2 text-gray-800">
-                    <RiAlertLine className="w-4 h-4 text-amber-500" />
-                    Dicas de Edição
-                  </CardTitle>
+                  <CardTitle className="text-lg">Visibilidade</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 text-sm text-gray-600">
-                  <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
-                    <span>
-                      Categorias <strong>inativas</strong> não aparecem no site
-                    </span>
+                <CardContent className="space-y-6">
+                  {/* Status */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        {formData.status ? (
+                          <RiEyeLine className="text-green-600" />
+                        ) : (
+                          <RiEyeOffLine className="text-gray-400" />
+                        )}
+                        Status Ativo
+                      </Label>
+                      <span className="text-xs text-gray-500">
+                        {formData.status ? "Visível no site" : "Oculto"}
+                      </span>
+                    </div>
+                    <Switch
+                      checked={formData.status}
+                      onCheckedChange={(c) => handleSwitchChange("status", c)}
+                    />
+                  </div>
+
+                  {/* Arquivada */}
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        {formData.arquivada ? (
+                          <RiArchiveLine className="text-amber-500" />
+                        ) : (
+                          <RiCheckLine className="text-gray-400" />
+                        )}
+                        Arquivada
+                      </Label>
+                      <span className="text-xs text-gray-500">
+                        Mover para histórico
+                      </span>
+                    </div>
+                    <Switch
+                      checked={formData.arquivada}
+                      onCheckedChange={(c) =>
+                        handleSwitchChange("arquivada", c)
+                      }
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card de Resumo (Preview) */}
+              <Card className="mt-6 bg-gray-50 border-dashed">
+                <CardContent className="p-4 text-center">
+                  <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-2">
+                    Preview da Badge
                   </p>
-                  <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
-                    <span>
-                      A <strong>ordem</strong> define a posição na listagem
-                    </span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
-                    <span>
-                      Categorias <strong>arquivadas</strong> não podem ser
-                      editadas
-                    </span>
-                  </p>
-                  <p className="flex items-start gap-2">
-                    <RiCheckLine className="w-3 h-3 text-green-600 mt-0.5" />
-                    <span>
-                      O <strong>slug</strong> define a URL da categoria
-                    </span>
-                  </p>
+                  <div className="flex justify-center gap-2">
+                    <Badge
+                      className={
+                        formData.tipo === "fotos"
+                          ? "bg-blue-600"
+                          : "bg-purple-600"
+                      }
+                    >
+                      {formData.tipo === "fotos" ? "Fotos" : "Vídeos"}
+                    </Badge>
+                    <Badge
+                      variant={formData.status ? "default" : "destructive"}
+                    >
+                      {formData.status ? "Ativa" : "Inativa"}
+                    </Badge>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

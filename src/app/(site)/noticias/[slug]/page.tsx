@@ -2,172 +2,159 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { notFound, useRouter } from "next/navigation";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   RiCalendarLine,
   RiUserLine,
   RiTimeLine,
   RiArrowLeftLine,
   RiShareLine,
-  RiNewspaperLine,
   RiArrowRightLine,
-  RiImageLine,
-  RiEyeLine,
-  RiEyeOffLine,
-  RiStarFill,
+  RiErrorWarningLine,
 } from "react-icons/ri";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { useNoticiasStore, NoticiaLista } from "@/lib/stores/useNoticiasStore";
-import { getNewsBySlug, getNewsByCategory } from "@/app/actions/news/noticias";
+import { useNoticias } from "@/lib/stores/useNoticiasStore";
 
+// Interface para Params (Next 15)
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+function NoticiaSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-50 pt-32 pb-20">
+      <div className="container mx-auto px-4 max-w-4xl">
+        <div className="animate-pulse space-y-6">
+          <Skeleton className="h-10 w-32 mb-8 bg-gray-200" />
+          <div className="space-y-4 mb-12">
+            <Skeleton className="h-4 w-24 bg-gray-200" />
+            <Skeleton className="h-12 w-3/4 bg-gray-200" />
+            <div className="flex gap-4">
+              <Skeleton className="h-4 w-32 bg-gray-200" />
+              <Skeleton className="h-4 w-32 bg-gray-200" />
+            </div>
+          </div>
+          <Skeleton className="h-96 w-full rounded-xl mb-8 bg-gray-200" />
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-1/2 bg-gray-200" />
+            <Skeleton className="h-4 w-full bg-gray-200" />
+            <Skeleton className="h-4 w-full bg-gray-200" />
+            <Skeleton className="h-4 w-full bg-gray-200" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorState({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <Card className="max-w-md mx-4 border-red-100 shadow-lg">
+        <CardContent className="pt-6 text-center">
+          <RiErrorWarningLine className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-800 mb-2">
+            Erro ao carregar
+          </h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <div className="flex gap-4 justify-center">
+            <Button variant="outline" onClick={() => window.history.back()}>
+              Voltar
+            </Button>
+            <Button
+              onClick={onRetry}
+              className="bg-pac-primary hover:bg-pac-primary-dark text-white"
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function NoticiaPage({ params }: PageProps) {
   const router = useRouter();
+  const [slug, setSlug] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
-  // Usar o store de notícias
   const {
     noticiaDetalhe,
     noticiasRelacionadas,
-    loadingDetalhe,
-    setNoticiaDetalhe,
+    fetchNoticiaDetalhe,
     setNoticiasRelacionadas,
-    setLoadingDetalhe,
-    clearNoticiaDetalhe,
-    clearNoticiasRelacionadas,
-  } = useNoticiasStore();
+  } = useNoticias();
 
-  const [slug, setSlug] = useState<string>("");
-  const [imageError, setImageError] = useState(false);
-  const [notFoundError, setNotFoundError] = useState(false);
-
-  // Carregar parâmetros
   useEffect(() => {
     params.then((resolvedParams) => {
-      setSlug(resolvedParams.slug);
+      setSlug(decodeURIComponent(resolvedParams.slug));
     });
   }, [params]);
 
-  // Função para corrigir URL da imagem
-  const getImageUrl = (url: string | null | undefined) => {
-    if (!url) return null;
+  // Carregar notícias relacionadas
+  // Removido setNoticiasRelacionadas da dependência para evitar avisos
+  const loadRelacionadas = useCallback(async () => {
+    if (!noticiaDetalhe?.categoria || !noticiaDetalhe?.id) return;
 
-    if (url.startsWith("http")) return url;
+    try {
+      const result = await fetch(
+        `/api/noticias?categoria=${noticiaDetalhe.categoria}&limit=3&exclude=${noticiaDetalhe.id}`,
+      );
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const bucket = "imagens-noticias";
-
-    if (url.includes("/") && !url.startsWith("http")) {
-      if (url.includes(bucket)) {
-        return `${supabaseUrl}/storage/v1/object/public/${url}`;
-      } else {
-        return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
+      if (result.ok) {
+        const data = await result.json();
+        if (data.success && data.data) {
+          setNoticiasRelacionadas(data.data);
+        }
       }
+    } catch (err) {
+      console.error("Erro ao carregar notícias relacionadas:", err);
     }
+  }, [noticiaDetalhe, setNoticiasRelacionadas]);
 
-    return url;
-  };
-
-  // Função para buscar notícia por slug
-  const fetchNoticiaPorSlug = useCallback(
-    async (slugParam: string) => {
-      setLoadingDetalhe(true);
-      try {
-        const result = await getNewsBySlug(slugParam);
-
-        if (result.success && result.data) {
-          setNoticiaDetalhe(result.data);
-          return result.data;
-        } else {
-          setNotFoundError(true);
-          return null;
-        }
-      } catch (error) {
-        console.error("Erro ao buscar notícia:", error);
-        setNotFoundError(true);
-        return null;
-      } finally {
-        setLoadingDetalhe(false);
-      }
-    },
-    [setLoadingDetalhe, setNoticiaDetalhe]
-  );
-
-  // Função para buscar notícias relacionadas
-  const fetchNoticiasRelacionadas = useCallback(
-    async (categoria: string | null, excludeId: string) => {
-      if (!categoria) return;
-
-      try {
-        const result = await getNewsByCategory(categoria, 3);
-
-        if (result.success && result.data) {
-          const relacionadas = result.data.filter(
-            (noticia: NoticiaLista) => noticia.id !== excludeId
-          );
-          setNoticiasRelacionadas(relacionadas);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar notícias relacionadas:", error);
-      }
-    },
-    [setNoticiasRelacionadas]
-  );
-
-  // Carregar notícia e relacionadas
   useEffect(() => {
-    let isMounted = true;
-
     if (!slug) return;
-
     const loadNoticia = async () => {
       try {
-        const noticia = await fetchNoticiaPorSlug(slug);
-
-        if (!isMounted) return;
-
-        if (!noticia) {
-          setNotFoundError(true);
-          return;
-        }
-
-        // Carregar notícias relacionadas da mesma categoria
-        if (noticia.categoria && noticia.id) {
-          fetchNoticiasRelacionadas(noticia.categoria, noticia.id);
-        }
-      } catch (error) {
-        console.error("Erro ao carregar notícia:", error);
-        setNotFoundError(true);
+        setLoading(true);
+        setError(null);
+        setImageError(false);
+        await fetchNoticiaDetalhe(slug);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Erro desconhecido");
+      } finally {
+        setLoading(false);
       }
     };
-
     loadNoticia();
+  }, [slug, fetchNoticiaDetalhe]);
 
-    return () => {
-      isMounted = false;
-      clearNoticiaDetalhe();
-      clearNoticiasRelacionadas();
-    };
-  }, [
-    slug,
-    fetchNoticiaPorSlug,
-    fetchNoticiasRelacionadas,
-    clearNoticiaDetalhe,
-    clearNoticiasRelacionadas,
-  ]);
-
-  // Redirecionar para 404 se notícia não for encontrada
   useEffect(() => {
-    if (notFoundError && !loadingDetalhe) {
+    if (noticiaDetalhe?.id) {
+      loadRelacionadas();
+    }
+  }, [noticiaDetalhe?.id, loadRelacionadas]);
+
+  // Se o carregamento terminou e não há notícia nem erro, é 404
+  useEffect(() => {
+    if (!loading && !noticiaDetalhe && !error) {
       notFound();
     }
-  }, [notFoundError, loadingDetalhe]);
+  }, [loading, noticiaDetalhe, error]);
 
   const handleShare = async () => {
     if (navigator.share && noticiaDetalhe) {
@@ -177,335 +164,176 @@ export default function NoticiaPage({ params }: PageProps) {
           text: noticiaDetalhe.resumo || "",
           url: window.location.href,
         });
-      } catch (error) {
-        console.log("Erro ao compartilhar:", error);
+      } catch {
         navigator.clipboard.writeText(window.location.href);
-        alert("Link copiado para a área de transferência!");
+        alert("Link copiado!");
       }
     } else {
       navigator.clipboard.writeText(window.location.href);
-      alert("Link copiado para a área de transferência!");
+      alert("Link copiado!");
     }
   };
 
-  const handleImageError = () => {
-    console.log("❌ Erro ao carregar imagem da notícia");
-    setImageError(true);
-  };
-
-  // Função para formatar nome
-  const formatName = (name: string | null | undefined): string => {
-    if (!name) return "Autor Não Definido";
-
-    return name
-      .split(" ")
-      .map(
-        (word: string) =>
-          word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-      )
-      .join(" ");
-  };
-
-  if (loadingDetalhe) {
+  if (loading) return <NoticiaSkeleton />;
+  if (error && !noticiaDetalhe)
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-        <div className="container mx-auto px-4 py-8">
-          <div className="animate-pulse space-y-6">
-            <div className="h-10 bg-slate-200 rounded w-32"></div>
-            <div className="h-12 bg-slate-200 rounded w-3/4 mb-6"></div>
-            <div className="h-96 bg-slate-200 rounded mb-8"></div>
-            <div className="space-y-3">
-              <div className="h-4 bg-slate-200 rounded"></div>
-              <div className="h-4 bg-slate-200 rounded"></div>
-              <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+      <ErrorState error={error} onRetry={() => window.location.reload()} />
+    );
+  if (!noticiaDetalhe) return null; // Será tratado pelo useEffect do notFound
+
+  const imageUrl = noticiaDetalhe.media_url;
+  const readingTime = Math.ceil((noticiaDetalhe.conteudo?.length || 0) / 1000);
+  const authorName = noticiaDetalhe.autor?.full_name || "Autor da PAC";
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Dark Minimalista */}
+      <section className="relative bg-gray-900 text-white pt-32 pb-24 overflow-hidden">
+        <div className="absolute inset-0 bg-pac-primary/20" />
+
+        <div className="container mx-auto px-4 relative z-10 max-w-4xl">
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/noticias")}
+            className="mb-8 text-gray-300 hover:text-white hover:bg-white/10 transition-colors px-0 pl-2"
+          >
+            <RiArrowLeftLine className="mr-2 h-4 w-4" />
+            Voltar Para Notícias
+          </Button>
+
+          <Badge className="bg-pac-primary text-white hover:bg-pac-primary mb-6 border-0">
+            {noticiaDetalhe.categoria || "Geral"}
+          </Badge>
+
+          <h1 className="text-3xl md:text-5xl font-extrabold mb-6 tracking-tight leading-tight">
+            {noticiaDetalhe.titulo}
+          </h1>
+
+          <div className="flex flex-wrap items-center gap-6 text-gray-300 text-sm md:text-base">
+            <div className="flex items-center">
+              <RiUserLine className="h-4 w-4 mr-2" />
+              <span className="font-medium">{authorName}</span>
+            </div>
+            <div className="flex items-center">
+              <RiCalendarLine className="h-4 w-4 mr-2" />
+              <span>
+                {new Date(noticiaDetalhe.data_publicacao).toLocaleDateString(
+                  "pt-BR",
+                  {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  },
+                )}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <RiTimeLine className="h-4 w-4 mr-2" />
+              <span>{readingTime} min de leitura</span>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (!noticiaDetalhe) {
-    return null; // O notFound() será chamado pelo useEffect
-  }
-
-  const imageUrl = getImageUrl(noticiaDetalhe.imagem);
-  const readingTime = Math.ceil((noticiaDetalhe.conteudo?.length || 0) / 1000);
-  const isPublished = noticiaDetalhe.status === "publicado";
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-navy-600 via-navy-700 to-navy-800 text-white pt-32 pb-20 overflow-hidden">
-        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
-        <div className="absolute top-0 left-0 w-48 h-48 sm:w-60 sm:h-60 lg:w-72 lg:h-72 bg-navy-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96 bg-navy-500/10 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
-
-        <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            className="max-w-4xl mx-auto"
-          >
-            <Button
-              variant="ghost"
-              onClick={() => router.push("/noticias")}
-              className="mb-8 text-navy-200 hover:text-white hover:bg-navy-500/20 transition-colors hover:border-navy-300/50 px-4 py-2 rounded-lg border border-navy-300/20"
-            >
-              <RiArrowLeftLine className="mr-2 h-4 w-4" />
-              Voltar Para Notícias
-            </Button>
-
-            <div className="flex flex-wrap gap-2 mb-6">
-              <Badge className="bg-white/20 backdrop-blur-sm border-white/20 text-white hover:bg-white/30 px-4 py-2 text-sm font-medium">
-                <RiNewspaperLine className="w-4 h-4 mr-2" />
-                {noticiaDetalhe.categoria || "Geral"}
-              </Badge>
-
-              <Badge
-                variant={isPublished ? "default" : "secondary"}
-                className="backdrop-blur-sm text-sm"
-              >
-                {isPublished ? (
-                  <RiEyeLine className="w-4 h-4 mr-1" />
-                ) : (
-                  <RiEyeOffLine className="w-4 h-4 mr-1" />
-                )}
-                {isPublished ? "Publicado" : "Rascunho"}
-              </Badge>
-
-              {noticiaDetalhe.destaque && (
-                <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white backdrop-blur-sm text-sm">
-                  <RiStarFill className="w-4 h-4 mr-1" />
-                  Destaque
-                </Badge>
-              )}
-            </div>
-
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 font-bebas tracking-wide leading-tight">
-              {noticiaDetalhe.titulo}
-            </h1>
-
-            <div className="flex flex-wrap items-center gap-6 text-navy-100">
-              <div className="flex items-center text-lg">
-                <RiUserLine className="h-5 w-5 mr-2" />
-                <span className="font-medium">
-                  {formatName(noticiaDetalhe.autor?.full_name)}
-                  {noticiaDetalhe.autor?.graduacao &&
-                    ` • ${noticiaDetalhe.autor.graduacao}`}
-                </span>
-              </div>
-              <div className="flex items-center text-lg">
-                <RiCalendarLine className="h-5 w-5 mr-2" />
-                <span>
-                  {new Date(noticiaDetalhe.data_publicacao).toLocaleDateString(
-                    "pt-BR",
-                    {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    }
-                  )}
-                </span>
-              </div>
-              <div className="flex items-center text-lg">
-                <RiTimeLine className="h-5 w-5 mr-2" />
-                <span>{readingTime} min de leitura</span>
-              </div>
-            </div>
-          </motion.div>
-        </div>
       </section>
 
-      {/* Conteúdo da Notícia */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <article className="max-w-4xl mx-auto">
-            {/* Imagem de destaque */}
-            {imageUrl && !imageError ? (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6 }}
-                className="h-96 bg-slate-200 rounded-xl flex items-center justify-center mb-8 shadow-lg border border-slate-200 overflow-hidden"
-              >
-                <Image
-                  src={imageUrl}
-                  alt={noticiaDetalhe.titulo}
-                  fill
-                  className="object-cover"
-                  priority
-                  onError={handleImageError}
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1024px"
-                />
-              </motion.div>
-            ) : (
-              <div className="h-48 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center mb-8 shadow-lg border border-slate-200">
-                <div className="text-center text-slate-400">
-                  <RiImageLine className="w-16 h-16 mx-auto mb-4" />
-                  <p className="text-sm">Imagem não disponível</p>
-                </div>
-              </div>
-            )}
-
-            {/* Conteúdo */}
-            <Card className="border-2 border-slate-200 shadow-lg mb-8 bg-white/60 backdrop-blur-sm">
-              <CardContent className="p-6 sm:p-8">
-                {noticiaDetalhe.resumo && (
-                  <div className="mb-6 p-4 bg-gradient-to-r from-navy-50 to-blue-50 border-l-4 border-navy-600 rounded-r">
-                    <p className="text-slate-700 italic font-medium">
-                      {noticiaDetalhe.resumo}
-                    </p>
-                  </div>
-                )}
-                {noticiaDetalhe.conteudo ? (
-                  <div
-                    className="prose prose-lg max-w-none 
-                      prose-headings:font-bebas prose-headings:tracking-wide prose-headings:text-slate-800 
-                      prose-p:text-slate-600 prose-p:text-base prose-p:leading-relaxed
-                      prose-strong:text-slate-800 prose-strong:font-bold
-                      prose-li:text-slate-600 prose-li:text-base
-                      prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4
-                      prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3
-                      prose-a:text-navy-600 prose-a:font-medium prose-a:no-underline hover:prose-a:underline
-                      prose-blockquote:border-l-navy-600 prose-blockquote:bg-slate-50 prose-blockquote:py-2 prose-blockquote:px-4
-                      prose-img:rounded-lg prose-img:shadow-md prose-img:mx-auto prose-img:border prose-img:border-slate-200
-                      prose-table:border prose-table:border-slate-300 prose-table:rounded-lg
-                      prose-th:bg-slate-100 prose-th:p-3 prose-th:text-slate-700
-                      prose-td:p-3 prose-td:border-t prose-td:border-slate-300"
-                    dangerouslySetInnerHTML={{
-                      __html: noticiaDetalhe.conteudo,
-                    }}
-                  />
-                ) : (
-                  <p className="text-slate-500 italic">
-                    Conteúdo da notícia não disponível.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Ações */}
+      {/* Conteúdo */}
+      <section className="py-16 -mt-10">
+        <div className="container mx-auto px-4 max-w-4xl">
+          {/* Imagem Principal */}
+          {imageUrl && !imageError && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-12"
+              transition={{ duration: 0.6 }}
+              className="relative h-64 md:h-[500px] w-full bg-gray-200 rounded-xl shadow-2xl overflow-hidden mb-10 border-4 border-white z-20"
             >
-              <Button
-                variant="outline"
-                onClick={() => router.push("/noticias")}
-                className="border-2 border-navy-600 text-navy-700 hover:bg-navy-600 hover:text-white font-semibold py-3 px-6 transition-all duration-300 hover:scale-105"
-              >
-                <RiArrowLeftLine className="mr-2 h-4 w-4" />
-                Ver Todas as Notícias
-              </Button>
-
-              <div className="flex items-center gap-4">
-                <span className="text-slate-600 font-medium">
-                  Compartilhar:
-                </span>
-                <Button
-                  variant="ghost"
-                  size="lg"
-                  onClick={handleShare}
-                  className="rounded-full w-12 h-12 hover:bg-navy-600 hover:text-white transition-all duration-300 border border-slate-200 hover:border-navy-600"
-                >
-                  <RiShareLine className="h-5 w-5" />
-                </Button>
-              </div>
+              <Image
+                src={imageUrl}
+                alt={noticiaDetalhe.titulo}
+                fill
+                className="object-cover"
+                priority
+                onError={() => setImageError(true)}
+              />
             </motion.div>
+          )}
 
-            {/* Notícias Relacionadas */}
-            {noticiasRelacionadas.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
-                <div className="text-center mb-8">
-                  <h2 className="text-2xl md:text-3xl font-bebas tracking-wide text-slate-800 mb-4">
-                    NOTÍCIAS RELACIONADAS
-                  </h2>
-                  <div className="w-20 h-1 bg-navy-600 mx-auto rounded-full"></div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {noticiasRelacionadas.map(
-                    (noticiaRelacionada: NoticiaLista) => {
-                      const isRelatedPublished =
-                        noticiaRelacionada.status === "publicado";
-
-                      return (
-                        <Card
-                          key={noticiaRelacionada.id}
-                          className="border-2 border-slate-200 shadow-lg hover:shadow-xl transition-all duration-300 group bg-white/60 backdrop-blur-sm hover:border-navy-300/50"
-                        >
-                          <CardContent className="p-6">
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              <Badge
-                                variant="secondary"
-                                className="bg-slate-100 text-slate-700 border-0"
-                              >
-                                <RiNewspaperLine className="w-3 h-3 mr-1" />
-                                {noticiaRelacionada.categoria || "Geral"}
-                              </Badge>
-
-                              {noticiaRelacionada.destaque && (
-                                <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white border-0">
-                                  <RiStarFill className="w-3 h-3 mr-1" />
-                                  Destaque
-                                </Badge>
-                              )}
-                            </div>
-
-                            <h3 className="font-bebas tracking-wide text-lg text-slate-800 mb-2 leading-tight group-hover:text-navy-600 transition-colors line-clamp-2">
-                              {noticiaRelacionada.titulo}
-                            </h3>
-
-                            <p className="text-slate-600 text-sm mb-4 leading-relaxed line-clamp-3">
-                              {noticiaRelacionada.resumo ||
-                                "Leia mais sobre esta notícia..."}
-                            </p>
-
-                            <div className="flex items-center justify-between text-xs text-slate-500 mb-4">
-                              <div className="flex items-center">
-                                <RiCalendarLine className="h-3 w-3 mr-1" />
-                                <span>
-                                  {new Date(
-                                    noticiaRelacionada.data_publicacao
-                                  ).toLocaleDateString("pt-BR")}
-                                </span>
-                              </div>
-                              <Badge variant="outline" className="text-xs">
-                                {isRelatedPublished ? "Publicado" : "Rascunho"}
-                              </Badge>
-                            </div>
-
-                            <Button
-                              asChild
-                              variant="outline"
-                              size="sm"
-                              className="w-full border-navy-200 text-navy-700 hover:bg-navy-600 hover:text-white hover:border-navy-600 transition-all duration-300 group/btn"
-                            >
-                              <Link
-                                href={`/noticias/${noticiaRelacionada.slug}`}
-                                prefetch={true}
-                                scroll={true}
-                              >
-                                Continuar Lendo
-                                <RiArrowRightLine className="w-4 h-4 ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
-                              </Link>
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      );
-                    }
-                  )}
-                </div>
-              </motion.div>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 md:p-10 mb-8 relative z-10">
+            {/* Resumo */}
+            {noticiaDetalhe.resumo && (
+              <div className="mb-8 p-6 bg-blue-50 border-l-4 border-pac-primary rounded-r-lg">
+                <p className="text-lg text-gray-700 italic font-medium leading-relaxed">
+                  {noticiaDetalhe.resumo}
+                </p>
+              </div>
             )}
-          </article>
+
+            {/* Texto Rico */}
+            {noticiaDetalhe.conteudo ? (
+              <div
+                className="prose prose-lg max-w-none text-gray-700 
+                  prose-headings:font-bold prose-headings:text-gray-900 
+                  prose-a:text-pac-primary prose-a:no-underline hover:prose-a:underline
+                  prose-img:rounded-xl prose-img:shadow-lg
+                  prose-blockquote:border-l-pac-primary prose-blockquote:bg-gray-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:not-italic"
+                dangerouslySetInnerHTML={{ __html: noticiaDetalhe.conteudo }}
+              />
+            ) : (
+              <p className="text-gray-500 italic">Conteúdo não disponível.</p>
+            )}
+          </div>
+
+          {/* Botões Finais */}
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-16">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/noticias")}
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              <RiArrowLeftLine className="mr-2 h-4 w-4" />
+              Voltar para Notícias
+            </Button>
+
+            <Button
+              variant="secondary"
+              onClick={handleShare}
+              className="bg-gray-100 text-gray-700 hover:bg-gray-200"
+            >
+              <RiShareLine className="mr-2 h-4 w-4" />
+              Compartilhar
+            </Button>
+          </div>
+
+          {/* Relacionados */}
+          {noticiasRelacionadas.length > 0 && (
+            <div className="border-t border-gray-200 pt-12">
+              <h3 className="text-2xl font-bold text-gray-800 mb-8">
+                Notícias Relacionadas
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {noticiasRelacionadas.map((relacionada) => (
+                  <Link
+                    href={`/noticias/${relacionada.slug}`}
+                    key={relacionada.id}
+                    className="group"
+                  >
+                    <Card className="h-full hover:shadow-lg transition-all border-gray-200">
+                      <CardContent className="p-4">
+                        <h4 className="font-bold text-gray-800 mb-2 group-hover:text-pac-primary transition-colors line-clamp-2">
+                          {relacionada.titulo}
+                        </h4>
+                        <p className="text-sm text-gray-500 line-clamp-3">
+                          {relacionada.resumo}
+                        </p>
+                        <div className="mt-4 flex items-center text-xs text-gray-400 font-medium">
+                          Ler mais <RiArrowRightLine className="ml-1 w-3 h-3" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>

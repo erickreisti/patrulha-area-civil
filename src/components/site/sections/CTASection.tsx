@@ -1,5 +1,3 @@
-// src/components/site/sections/CTASection.tsx
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -17,12 +15,13 @@ export function CTASection() {
   return (
     <section
       ref={ref}
-      className="w-full bg-gradient-to-br from-navy via-navy-600 to-navy-800 text-white py-12 sm:py-16 lg:py-20 relative overflow-hidden"
+      // Corrigido gradiente para usar cores do tema
+      className="w-full bg-gradient-to-br from-pac-primary via-pac-primary-light to-pac-primary-dark text-white py-12 sm:py-16 lg:py-20 relative overflow-hidden"
     >
       {/* Background Elements */}
       <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
-      <div className="absolute top-0 left-0 w-48 h-48 sm:w-72 sm:h-72 bg-navy-400/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-alert/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
+      <div className="absolute top-0 left-0 w-48 h-48 sm:w-72 sm:h-72 bg-pac-primary-muted/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+      <div className="absolute bottom-0 right-0 w-64 h-64 sm:w-96 sm:h-96 bg-pac-alert/5 rounded-full blur-3xl translate-x-1/3 translate-y-1/3" />
 
       <div className="container mx-auto px-4 text-center relative z-10">
         <motion.div
@@ -51,14 +50,15 @@ export function CTASection() {
           </motion.div>
 
           <motion.h2
-            className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 font-bebas tracking-wide"
+            // Corrigido fonte: font-extrabold e removido font-bebas
+            className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold mb-4 sm:mb-6 tracking-wide"
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5, delay: 0.3 }}
           >
             Pronto para{" "}
             <motion.span
-              className="bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent"
+              className="bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent"
               initial={{ opacity: 0, scale: 0.8 }}
               animate={isInView ? { opacity: 1, scale: 1 } : {}}
               transition={{ duration: 0.5, delay: 0.4 }}
@@ -69,8 +69,9 @@ export function CTASection() {
 
           <motion.p
             className={cn(
-              "text-white/90 mb-6 sm:mb-8 lg:mb-10 max-w-2xl mx-auto font-roboto leading-relaxed px-4",
-              "text-base sm:text-lg lg:text-xl"
+              // Corrigido fonte: font-sans e removido font-roboto
+              "text-white/90 mb-6 sm:mb-8 lg:mb-10 max-w-2xl mx-auto font-sans leading-relaxed px-4",
+              "text-base sm:text-lg lg:text-xl",
             )}
             initial={{ opacity: 0, y: 20 }}
             animate={isInView ? { opacity: 1, y: 0 } : {}}
@@ -88,7 +89,7 @@ export function CTASection() {
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.5, delay: 0.5 }}
           >
-            {/* Primary Button - Contact - CORRIGIDO */}
+            {/* Primary Button - Contact */}
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -98,21 +99,21 @@ export function CTASection() {
               <Button
                 size="lg"
                 className={cn(
-                  "group relative bg-white text-navy hover:bg-white/95 font-roboto font-bold rounded-xl",
+                  // Corrigido cores e fontes
+                  "group relative bg-white text-pac-primary hover:bg-white/95 font-sans font-bold rounded-xl",
                   "px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5",
                   "text-sm sm:text-base lg:text-lg",
                   "w-full sm:min-w-[180px] lg:min-w-[200px]",
                   "border-2 border-white shadow-2xl hover:shadow-3xl",
                   "touch-optimize active:scale-95",
-                  "overflow-hidden" // Adicionado
+                  "overflow-hidden",
                 )}
                 asChild
               >
                 <Link
                   href="/contato"
-                  className="flex items-center justify-center gap-2 sm:gap-3 relative z-20" // z-index aumentado
+                  className="flex items-center justify-center gap-2 sm:gap-3 relative z-20"
                 >
-                  {/* Shine effect - CORRIGIDO */}
                   <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent group-hover:translate-x-full transition-transform duration-1000 z-10 pointer-events-none" />
 
                   <motion.div
@@ -143,7 +144,7 @@ export function CTASection() {
               </Button>
             </motion.div>
 
-            {/* Secondary Button - Learn More - CORRIGIDO */}
+            {/* Secondary Button - Learn More */}
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -155,12 +156,13 @@ export function CTASection() {
                 variant="outline"
                 className={cn(
                   "group relative border-2 border-white/80 bg-transparent text-white hover:text-white hover:bg-white/10 hover:border-white",
-                  "font-roboto font-bold rounded-xl backdrop-blur-sm shadow-2xl hover:shadow-3xl",
+                  // Corrigido fonte
+                  "font-sans font-bold rounded-xl backdrop-blur-sm shadow-2xl hover:shadow-3xl",
                   "px-4 sm:px-6 lg:px-8 py-3 sm:py-4 lg:py-5",
                   "text-sm sm:text-base lg:text-lg",
                   "w-full sm:min-w-[180px] lg:min-w-[200px]",
                   "touch-optimize active:scale-95",
-                  "overflow-hidden" // Adicionado
+                  "overflow-hidden",
                 )}
                 asChild
               >
@@ -168,7 +170,6 @@ export function CTASection() {
                   href="/sobre"
                   className="flex items-center justify-center gap-2 sm:gap-3 relative z-20"
                 >
-                  {/* Background shine - CORRIGIDO */}
                   <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:translate-x-full transition-transform duration-1000 z-10 pointer-events-none" />
 
                   <span className="relative z-20">Saiba Mais</span>

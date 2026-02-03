@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,12 +22,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   RiNewspaperLine,
   RiAddLine,
@@ -37,24 +35,65 @@ import {
   RiEyeLine,
   RiEyeOffLine,
   RiStarFill,
-  RiStarLine,
   RiCalendarLine,
   RiUserLine,
   RiBarChartLine,
-  RiHomeLine,
   RiDeleteBinLine,
   RiArchiveLine,
-  RiRocketLine,
   RiRefreshLine,
   RiImageLine,
-  RiExternalLinkLine,
   RiAlertLine,
+  RiVideoLine,
+  RiCheckLine,
 } from "react-icons/ri";
 
-// Import do store
-import { useNoticias, type NoticiaStatus } from "@/lib/stores/useNoticiasStore";
+import { useNoticias, type StatusFilter } from "@/lib/stores/useNoticiasStore";
 
-// Componente de estatísticas
+type NoticiaStatus = "rascunho" | "publicado" | "arquivado";
+
+// Helper para formatar data
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(date);
+  } catch {
+    return dateString;
+  }
+};
+
+// Helper para cor do status
+const getStatusColor = (status: NoticiaStatus): string => {
+  switch (status) {
+    case "rascunho":
+      return "bg-yellow-100 text-yellow-800 border-yellow-200";
+    case "publicado":
+      return "bg-green-100 text-green-800 border-green-200";
+    case "arquivado":
+      return "bg-gray-100 text-gray-800 border-gray-200";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
+
+// Helper para texto do status
+const getStatusText = (status: NoticiaStatus): string => {
+  switch (status) {
+    case "rascunho":
+      return "Rascunho";
+    case "publicado":
+      return "Publicado";
+    case "arquivado":
+      return "Arquivado";
+    default:
+      return "Desconhecido";
+  }
+};
+
+// Componente StatCard
 const StatCard = ({
   title,
   value,
@@ -123,13 +162,13 @@ const StatCard = ({
   );
 };
 
-// Componente de placeholder para imagem
+// Componente ImageWithFallback
 const ImageWithFallback = ({
   src,
   alt,
   className = "w-16 h-16",
 }: {
-  src: string | null;
+  src: string | null | undefined;
   alt: string;
   className?: string;
 }) => {
@@ -138,119 +177,63 @@ const ImageWithFallback = ({
   if (!src || imageError) {
     return (
       <div
-        className={`${className} rounded flex items-center justify-center bg-gray-200`}
+        className={`${className} rounded flex items-center justify-center bg-gray-100 border border-gray-200`}
       >
-        <RiImageLine className="w-8 h-8 text-gray-400" />
+        <RiImageLine className="w-6 h-6 text-gray-300" />
       </div>
     );
   }
 
   return (
     <div
-      className={`${className} rounded overflow-hidden relative bg-gray-200`}
+      className={`${className} rounded overflow-hidden relative border border-gray-100 bg-gray-50`}
     >
       <Image
         src={src}
         alt={alt}
         fill
         className="object-cover"
-        sizes="64px"
+        sizes="(max-width: 768px) 100px, 200px"
         onError={() => setImageError(true)}
+        unoptimized={src.startsWith("blob:")}
       />
     </div>
   );
 };
 
 export default function NoticiasPage() {
-  const {
-    // Dados
-    stats,
-    categoriasDisponiveis,
-
-    // Estados
-    loadingLista,
-    loadingStats,
-    saving,
-    error,
-
-    // Filtros
-    filtros,
-    totalCount,
-    paginatedNoticias,
-    totalPages,
-
-    // Setters
-    setSearchTerm,
-    setCategoria,
-    setSortBy,
-    setSortOrder,
-    setItemsPerPage,
-    setCurrentPage,
-    setStatus,
-    setDestaque,
-    clearFilters,
-
-    // Ações
-    fetchNoticias,
-    fetchStats,
-    fetchCategorias,
-    toggleStatus,
-    toggleDestaque,
-    deletarNoticia,
-
-    // Utilitários
-    formatDate,
-    getStatusColor,
-    getStatusText,
-  } = useNoticias();
-
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
     noticiaId: string | null;
     noticiaTitulo: string;
   }>({ open: false, noticiaId: null, noticiaTitulo: "" });
-  const [isClient, setIsClient] = useState(false);
 
-  // Inicializar no cliente (com setTimeout para evitar cascading renders)
+  const {
+    noticias,
+    stats,
+    categories,
+    loading,
+    loadingStats,
+    pagination,
+    filters,
+    setFilters,
+    fetchNoticias,
+    fetchStats,
+    fetchCategories,
+    excluirNoticia,
+    alternarStatus,
+    alternarDestaque,
+  } = useNoticias();
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsClient(true);
-    }, 0);
+    fetchNoticias();
+    fetchStats();
+    fetchCategories();
+  }, [fetchNoticias, fetchStats, fetchCategories]);
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Carregar dados iniciais
-  useEffect(() => {
-    if (isClient) {
-      fetchNoticias();
-      fetchStats();
-      fetchCategorias();
-    }
-  }, [isClient, fetchNoticias, fetchStats, fetchCategorias]);
-
-  // Tratar erros
-  useEffect(() => {
-    if (error) {
-      toast.error(error, {
-        duration: 5000,
-        action: {
-          label: "Tentar novamente",
-          onClick: () => {
-            fetchNoticias();
-            fetchStats();
-          },
-        },
-      });
-    }
-  }, [error, fetchNoticias, fetchStats]);
-
-  // Handler para deletar notícia
   const handleDeleteNoticia = async () => {
     if (!deleteDialog.noticiaId) return;
-
-    const result = await deletarNoticia(deleteDialog.noticiaId);
-
+    const result = await excluirNoticia(deleteDialog.noticiaId);
     if (result.success) {
       toast.success("Notícia excluída com sucesso");
       setDeleteDialog({ open: false, noticiaId: null, noticiaTitulo: "" });
@@ -259,71 +242,28 @@ export default function NoticiasPage() {
     }
   };
 
-  // Handler para alternar status
   const handleToggleStatus = async (
     id: string,
-    currentStatus: NoticiaStatus
+    currentStatus: NoticiaStatus,
   ) => {
-    const result = await toggleStatus(id, currentStatus);
-
+    const result = await alternarStatus(id, currentStatus);
     if (result.success) {
-      toast.success(
-        `Notícia ${
-          currentStatus === "rascunho"
-            ? "publicada"
-            : currentStatus === "publicado"
-            ? "arquivada"
-            : "publicada"
-        }`
-      );
+      toast.success("Status atualizado com sucesso");
     } else {
       toast.error(result.error || "Erro ao alterar status");
     }
   };
 
-  // Handler para alternar destaque
   const handleToggleDestaque = async (id: string, currentDestaque: boolean) => {
-    const result = await toggleDestaque(id, currentDestaque);
-
+    const result = await alternarDestaque(id, currentDestaque);
     if (result.success) {
       toast.success(
-        currentDestaque ? "Destaque removido" : "Notícia destacada"
+        currentDestaque ? "Destaque removido" : "Notícia destacada",
       );
     } else {
       toast.error(result.error || "Erro ao alterar destaque");
     }
   };
-
-  // Loading durante SSR
-  if (!isClient) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-        <div className="container mx-auto px-4">
-          <div className="flex justify-center items-center h-64">
-            <Spinner className="w-8 h-8" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Botões de navegação
-  const navigationButtons = [
-    {
-      href: "/admin/dashboard",
-      icon: RiBarChartLine,
-      label: "Dashboard",
-      className:
-        "border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white",
-    },
-    {
-      href: "/",
-      icon: RiHomeLine,
-      label: "Voltar ao Site",
-      className:
-        "border-gray-600 text-gray-600 hover:bg-gray-600 hover:text-white",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
@@ -350,100 +290,82 @@ export default function NoticiasPage() {
           transition={{ duration: 0.6, delay: 0.2 }}
           className="flex flex-wrap gap-3 mb-8"
         >
-          {/* Botão de Atualizar */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button
-              onClick={() => {
-                fetchNoticias();
-                fetchStats();
-              }}
-              disabled={loadingLista || loadingStats}
-              variant="outline"
-              className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50"
-            >
-              <RiRefreshLine
-                className={`w-4 h-4 ${
-                  loadingLista || loadingStats ? "animate-spin" : ""
-                }`}
-              />
-              {loadingLista || loadingStats ? "Atualizando..." : "Atualizar"}
+          <Button
+            onClick={() => {
+              fetchNoticias();
+              fetchStats();
+            }}
+            disabled={loading || loadingStats}
+            variant="outline"
+            className="flex items-center gap-2 text-gray-600 border-gray-300 hover:bg-gray-50"
+          >
+            <RiRefreshLine
+              className={`w-4 h-4 ${
+                loading || loadingStats ? "animate-spin" : ""
+              }`}
+            />
+            Atualizar
+          </Button>
+
+          <Link href="/admin/noticias/criar">
+            <Button className="bg-green-600 hover:bg-green-700 text-white">
+              <RiAddLine className="w-4 h-4 mr-2" />
+              Nova Notícia
             </Button>
-          </motion.div>
+          </Link>
 
-          {/* Botão Nova Notícia */}
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link href="/admin/noticias/criar">
-              <Button className="bg-green-600 hover:bg-green-700 text-white">
-                <RiAddLine className="w-4 h-4 mr-2" />
-                Nova Notícia
-              </Button>
-            </Link>
-          </motion.div>
-
-          {/* Botões de Navegação */}
-          {navigationButtons.map((button, index) => (
-            <motion.div
-              key={button.href}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+          <Link href="/admin/dashboard">
+            <Button
+              variant="outline"
+              className="border-purple-600 text-purple-600 hover:bg-purple-600 hover:text-white"
             >
-              <Link href={button.href}>
-                <Button
-                  variant="outline"
-                  className={`transition-all duration-300 ${button.className}`}
-                >
-                  <button.icon className="w-4 h-4 mr-2" />
-                  {button.label}
-                </Button>
-              </Link>
-            </motion.div>
-          ))}
+              <RiBarChartLine className="w-4 h-4 mr-2" />
+              Dashboard
+            </Button>
+          </Link>
         </motion.div>
 
         {/* Estatísticas */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-8">
           <StatCard
             title="Total"
-            value={stats.total}
+            value={stats?.total || 0}
             icon={<RiNewspaperLine className="w-6 h-6" />}
-            description="Notícias no sistema"
+            description="Notícias"
             color="blue"
             delay={0}
             loading={loadingStats}
           />
           <StatCard
             title="Publicadas"
-            value={stats.published}
+            value={stats?.published || 0}
             icon={<RiEyeLine className="w-6 h-6" />}
-            description="Disponíveis no site"
+            description="Online"
             color="green"
             delay={1}
             loading={loadingStats}
           />
           <StatCard
             title="Rascunho"
-            value={stats.rascunho}
+            value={stats?.rascunho || 0}
             icon={<RiEyeOffLine className="w-6 h-6" />}
-            description="Aguardando publicação"
+            description="Pendentes"
             color="amber"
             delay={2}
             loading={loadingStats}
           />
           <StatCard
             title="Arquivadas"
-            value={stats.arquivado}
+            value={stats?.arquivado || 0}
             icon={<RiArchiveLine className="w-6 h-6" />}
-            description="Notícias antigas"
+            description="Offline"
             color="gray"
             delay={3}
             loading={loadingStats}
           />
           <StatCard
             title="Destaque"
-            value={stats.featured}
+            value={stats?.featured || 0}
             icon={<RiStarFill className="w-6 h-6" />}
             description="Em destaque"
             color="purple"
@@ -451,546 +373,276 @@ export default function NoticiasPage() {
             loading={loadingStats}
           />
           <StatCard
-            title="Recentes"
-            value={stats.recent}
-            icon={<RiCalendarLine className="w-6 h-6" />}
-            description="Últimos 7 dias"
-            color="blue"
+            title="Vídeos"
+            value={stats?.videos || 0}
+            icon={<RiVideoLine className="w-6 h-6" />}
+            description="Notícias vídeo"
+            color="red"
             delay={5}
             loading={loadingStats}
           />
         </div>
 
-        {/* Filtros e Busca */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-        >
-          <Card className="border-0 shadow-lg mb-8 hover:shadow-xl transition-all duration-300">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-800">
-                <RiSearchLine className="w-5 h-5 text-navy-600" />
-                Filtros e Busca
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="md:col-span-2">
-                  <div className="relative">
-                    <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      type="text"
-                      placeholder="Buscar por título, resumo ou conteúdo..."
-                      value={filtros.searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                      disabled={loadingLista}
+        {/* Filtros */}
+        <Card className="border-0 shadow-lg mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-gray-800">
+              <RiSearchLine className="w-5 h-5 text-navy-600" />
+              Filtros
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2 relative">
+                <RiSearchLine className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Input
+                  type="text"
+                  placeholder="Buscar por título..."
+                  value={filters.search}
+                  onChange={(e) => setFilters({ search: e.target.value })}
+                  className="pl-10"
+                />
+              </div>
+              <Select
+                value={filters.categoria}
+                onValueChange={(v) => setFilters({ categoria: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={filters.status}
+                onValueChange={(v) => setFilters({ status: v as StatusFilter })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="publicado">Publicado</SelectItem>
+                  <SelectItem value="rascunho">Rascunho</SelectItem>
+                  <SelectItem value="arquivado">Arquivado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lista */}
+        <Card className="border-0 shadow-lg">
+          <CardContent className="p-0">
+            {loading ? (
+              <div className="p-8 space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : noticias.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-500">Nenhuma notícia encontrada.</p>
+              </div>
+            ) : (
+              <div className="divide-y">
+                {noticias.map((noticia) => (
+                  <div
+                    key={noticia.id}
+                    className="p-4 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row gap-4 items-start group"
+                  >
+                    <ImageWithFallback
+                      src={noticia.thumbnail_url || noticia.media_url}
+                      alt={noticia.titulo}
+                      className="w-full sm:w-24 h-40 sm:h-24 rounded-lg flex-shrink-0"
                     />
-                  </div>
-                </div>
-
-                <div>
-                  <Select
-                    value={filtros.status}
-                    onValueChange={(value: NoticiaStatus | "all") =>
-                      setStatus(value)
-                    }
-                    disabled={loadingLista}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos os status</SelectItem>
-                      <SelectItem value="rascunho">Rascunho</SelectItem>
-                      <SelectItem value="publicado">Publicado</SelectItem>
-                      <SelectItem value="arquivado">Arquivado</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Select
-                    value={filtros.categoria}
-                    onValueChange={setCategoria}
-                    disabled={loadingLista}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categoriasDisponiveis.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                <div>
-                  <Select
-                    value={filtros.destaque}
-                    onValueChange={(value: "all" | "destaque" | "normal") =>
-                      setDestaque(value)
-                    }
-                    disabled={loadingLista}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Destaque" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="destaque">Em destaque</SelectItem>
-                      <SelectItem value="normal">Normais</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Select
-                    value={filtros.sortBy}
-                    onValueChange={(
-                      value:
-                        | "data_publicacao"
-                        | "created_at"
-                        | "views"
-                        | "titulo"
-                    ) => setSortBy(value)}
-                    disabled={loadingLista}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Ordenar por" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="data_publicacao">
-                        Data de publicação
-                      </SelectItem>
-                      <SelectItem value="created_at">
-                        Data de criação
-                      </SelectItem>
-                      <SelectItem value="views">Visualizações</SelectItem>
-                      <SelectItem value="titulo">Título</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Select
-                    value={filtros.sortOrder}
-                    onValueChange={(value: "asc" | "desc") =>
-                      setSortOrder(value)
-                    }
-                    disabled={loadingLista}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Ordem" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desc">Decrescente</SelectItem>
-                      <SelectItem value="asc">Crescente</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 pt-6 border-t">
-                <div className="text-sm text-gray-600">
-                  Mostrando <strong>{paginatedNoticias.length}</strong> de{" "}
-                  <strong>{totalCount}</strong> notícias
-                  {totalPages > 1 && (
-                    <span>
-                      {" "}
-                      (Página <strong>{filtros.currentPage}</strong> de{" "}
-                      <strong>{totalPages}</strong>)
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <Select
-                    value={filtros.itemsPerPage.toString()}
-                    onValueChange={(value) => setItemsPerPage(parseInt(value))}
-                    disabled={loadingLista}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="10">10 por página</SelectItem>
-                      <SelectItem value="20">20 por página</SelectItem>
-                      <SelectItem value="50">50 por página</SelectItem>
-                      <SelectItem value="100">100 por página</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    variant="outline"
-                    onClick={clearFilters}
-                    disabled={loadingLista}
-                  >
-                    Limpar Filtros
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* Lista de Notícias */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardHeader>
-              <CardTitle className="flex items-center text-gray-800">
-                <RiNewspaperLine className="w-5 h-5 mr-2 text-navy-600" />
-                Lista de Notícias ({totalCount})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loadingLista ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center space-x-4 p-4 border rounded-lg"
-                    >
-                      <Skeleton className="h-12 w-12 rounded-lg" />
-                      <div className="space-y-2 flex-1">
-                        <Skeleton className="h-4 w-[250px]" />
-                        <Skeleton className="h-4 w-[200px]" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {noticia.destaque && (
+                          <RiStarFill className="text-yellow-500 w-4 h-4" />
+                        )}
+                        <h3 className="font-semibold text-lg text-gray-900 truncate">
+                          {noticia.titulo}
+                        </h3>
+                        <Badge
+                          variant="secondary"
+                          className={getStatusColor(
+                            noticia.status as NoticiaStatus,
+                          )}
+                        >
+                          {getStatusText(noticia.status as NoticiaStatus)}
+                        </Badge>
+                        {noticia.tipo_media === "video" && (
+                          <Badge
+                            variant="outline"
+                            className="border-blue-200 text-blue-700 bg-blue-50"
+                          >
+                            <RiVideoLine className="w-3 h-3 mr-1" /> Vídeo
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {noticia.resumo}
+                      </p>
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <RiUserLine />{" "}
+                          {noticia.autor?.full_name || "Desconhecido"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <RiCalendarLine />{" "}
+                          {formatDate(noticia.data_publicacao)}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <RiEyeLine /> {noticia.views}
+                        </span>
+                        {noticia.categoria && (
+                          <Badge variant="outline" className="text-xs">
+                            {noticia.categoria}
+                          </Badge>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : paginatedNoticias.length === 0 ? (
-                <div className="text-center py-12">
-                  <RiNewspaperLine className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-4">
-                    {totalCount === 0
-                      ? "Nenhuma notícia cadastrada no sistema"
-                      : "Nenhuma notícia encontrada com os filtros aplicados"}
-                  </p>
-                  {totalCount === 0 && (
-                    <Link href="/admin/noticias/criar">
-                      <Button className="bg-green-600 hover:bg-green-700 text-white">
-                        <RiAddLine className="w-4 h-4 mr-2" />
-                        Criar Primeira Notícia
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-4 mb-6">
-                    <AnimatePresence>
-                      {paginatedNoticias.map((noticia, index) => (
-                        <motion.div
-                          key={noticia.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -20 }}
-                          transition={{ duration: 0.3, delay: index * 0.05 }}
-                          className="group"
-                        >
-                          <div className="border rounded-lg p-4 hover:bg-gray-50 transition-colors hover:shadow-md">
-                            <div className="flex items-start justify-between">
-                              <div className="flex items-start space-x-4 flex-1">
-                                <ImageWithFallback
-                                  src={noticia.imagem}
-                                  alt={noticia.titulo}
-                                  className="w-16 h-16"
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    {noticia.destaque && (
-                                      <motion.div
-                                        animate={{ scale: [1, 1.2, 1] }}
-                                        transition={{
-                                          duration: 2,
-                                          repeat: Infinity,
-                                        }}
-                                      >
-                                        <RiStarFill className="w-4 h-4 text-yellow-500 flex-shrink-0" />
-                                      </motion.div>
-                                    )}
-                                    <h3 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">
-                                      {noticia.titulo}
-                                    </h3>
-                                    <Badge
-                                      className={getStatusColor(noticia.status)}
-                                    >
-                                      {getStatusText(noticia.status)}
-                                    </Badge>
-                                  </div>
-                                  <p className="text-sm text-gray-600 line-clamp-2 mb-2">
-                                    {noticia.resumo}
-                                  </p>
-                                  <div className="flex items-center gap-4 text-sm text-gray-500">
-                                    <div className="flex items-center gap-1">
-                                      <RiUserLine className="w-3 h-3" />
-                                      <span>
-                                        {noticia.autor?.full_name ||
-                                          "Autor não definido"}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <RiCalendarLine className="w-3 h-3" />
-                                      <span>
-                                        {formatDate(noticia.data_publicacao)}
-                                      </span>
-                                    </div>
-                                    {noticia.categoria && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="bg-blue-100 text-blue-700"
-                                      >
-                                        {noticia.categoria}
-                                      </Badge>
-                                    )}
-                                    <div className="flex items-center gap-1">
-                                      <RiExternalLinkLine className="w-3 h-3" />
-                                      <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 font-mono">
-                                        /{noticia.slug}
-                                      </code>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <RiEyeLine className="w-3 h-3" />
-                                      <span>{noticia.views} visualizações</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex flex-col sm:flex-row sm:space-x-2 space-y-2 sm:space-y-0 ml-4">
-                                <motion.div
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  <Link href={`/admin/noticias/${noticia.id}`}>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="w-full sm:w-auto border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
-                                      disabled={saving}
-                                    >
-                                      <RiEditLine className="w-3 h-3 mr-1" />
-                                      Editar
-                                    </Button>
-                                  </Link>
-                                </motion.div>
 
-                                <motion.div
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleToggleStatus(
-                                        noticia.id,
-                                        noticia.status
-                                      )
-                                    }
-                                    className="w-full sm:w-auto border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-                                    disabled={saving}
-                                  >
-                                    {noticia.status === "rascunho" ? (
-                                      <RiRocketLine className="w-3 h-3 mr-1" />
-                                    ) : noticia.status === "publicado" ? (
-                                      <RiArchiveLine className="w-3 h-3 mr-1" />
-                                    ) : (
-                                      <RiEyeLine className="w-3 h-3 mr-1" />
-                                    )}
-                                    {noticia.status === "rascunho"
-                                      ? "Publicar"
-                                      : noticia.status === "publicado"
-                                      ? "Arquivar"
-                                      : "Republicar"}
-                                  </Button>
-                                </motion.div>
-
-                                <motion.div
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleToggleDestaque(
-                                        noticia.id,
-                                        noticia.destaque
-                                      )
-                                    }
-                                    className="w-full sm:w-auto border-yellow-600 text-yellow-600 hover:bg-yellow-600 hover:text-white"
-                                    disabled={saving}
-                                  >
-                                    {noticia.destaque ? (
-                                      <RiStarLine className="w-3 h-3 mr-1" />
-                                    ) : (
-                                      <RiStarFill className="w-3 h-3 mr-1" />
-                                    )}
-                                    {noticia.destaque ? "Remover" : "Destacar"}
-                                  </Button>
-                                </motion.div>
-
-                                <motion.div
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                >
-                                  <AlertDialog
-                                    open={
-                                      deleteDialog.open &&
-                                      deleteDialog.noticiaId === noticia.id
-                                    }
-                                    onOpenChange={(open) =>
-                                      setDeleteDialog({
-                                        open,
-                                        noticiaId: open ? noticia.id : null,
-                                        noticiaTitulo: noticia.titulo,
-                                      })
-                                    }
-                                  >
-                                    <AlertDialogTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="w-full sm:w-auto text-red-600 border-red-600 hover:bg-red-600 hover:text-white"
-                                        disabled={saving}
-                                      >
-                                        <RiDeleteBinLine className="w-3 h-3 mr-1" />
-                                        Excluir
-                                      </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-                                          <RiAlertLine className="w-5 h-5" />
-                                          Confirmar exclusão
-                                        </AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tem certeza que deseja excluir
-                                          permanentemente a notícia{" "}
-                                          <strong>
-                                            &quot;{noticia.titulo}&quot;
-                                          </strong>
-                                          ?
-                                          <br />
-                                          <br />
-                                          <span className="text-red-500 font-semibold">
-                                            ⚠️ Esta ação não pode ser desfeita!
-                                          </span>
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel disabled={saving}>
-                                          Cancelar
-                                        </AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={handleDeleteNoticia}
-                                          disabled={saving}
-                                          className="bg-red-600 hover:bg-red-700 text-white"
-                                        >
-                                          {saving ? (
-                                            <>
-                                              <Spinner className="w-4 h-4 mr-2" />
-                                              Excluindo...
-                                            </>
-                                          ) : (
-                                            "Sim, excluir permanentemente"
-                                          )}
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </motion.div>
-                              </div>
-                            </div>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                  </div>
-
-                  {/* Paginação */}
-                  {totalPages > 1 && (
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t">
-                      <div className="text-sm text-gray-600">
-                        Página <strong>{filtros.currentPage}</strong> de{" "}
-                        <strong>{totalPages}</strong>
-                      </div>
-
-                      <div className="flex gap-2">
+                    {/* Botões de Ação na Lista */}
+                    <div className="flex sm:flex-col gap-2 w-full sm:w-auto mt-2 sm:mt-0 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex gap-2 w-full sm:w-auto">
                         <Button
-                          variant="outline"
-                          onClick={() =>
-                            setCurrentPage(Math.max(1, filtros.currentPage - 1))
+                          variant="ghost"
+                          size="icon"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          title={
+                            noticia.status === "publicado"
+                              ? "Arquivar"
+                              : "Publicar"
                           }
-                          disabled={filtros.currentPage === 1 || loadingLista}
-                        >
-                          Anterior
-                        </Button>
-
-                        {Array.from(
-                          { length: Math.min(5, totalPages) },
-                          (_, i) => {
-                            let pageNum;
-                            if (totalPages <= 5) {
-                              pageNum = i + 1;
-                            } else if (filtros.currentPage <= 3) {
-                              pageNum = i + 1;
-                            } else if (filtros.currentPage >= totalPages - 2) {
-                              pageNum = totalPages - 4 + i;
-                            } else {
-                              pageNum = filtros.currentPage - 2 + i;
-                            }
-
-                            return (
-                              <Button
-                                key={pageNum}
-                                variant={
-                                  filtros.currentPage === pageNum
-                                    ? "default"
-                                    : "outline"
-                                }
-                                onClick={() => setCurrentPage(pageNum)}
-                                disabled={loadingLista}
-                                className="min-w-[40px]"
-                              >
-                                {pageNum}
-                              </Button>
-                            );
-                          }
-                        )}
-
-                        <Button
-                          variant="outline"
                           onClick={() =>
-                            setCurrentPage(
-                              Math.min(totalPages, filtros.currentPage + 1)
+                            handleToggleStatus(
+                              noticia.id,
+                              noticia.status === "publicado"
+                                ? "arquivado"
+                                : "publicado",
                             )
                           }
-                          disabled={
-                            filtros.currentPage === totalPages || loadingLista
+                        >
+                          {noticia.status === "publicado" ? (
+                            <RiArchiveLine className="w-4 h-4" />
+                          ) : (
+                            <RiCheckLine className="w-4 h-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={
+                            noticia.destaque
+                              ? "text-yellow-600 hover:bg-yellow-50"
+                              : "text-gray-400 hover:text-yellow-600 hover:bg-yellow-50"
+                          }
+                          title="Destacar"
+                          onClick={() =>
+                            handleToggleDestaque(noticia.id, noticia.destaque)
                           }
                         >
-                          Próxima
+                          <RiStarFill className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Link
+                          href={`/admin/noticias/${noticia.id}`}
+                          className="flex-1 sm:flex-none"
+                        >
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full justify-center"
+                          >
+                            <RiEditLine className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none text-red-600 hover:bg-red-50 border-red-200"
+                          onClick={() =>
+                            setDeleteDialog({
+                              open: true,
+                              noticiaId: noticia.id,
+                              noticiaTitulo: noticia.titulo,
+                            })
+                          }
+                        >
+                          <RiDeleteBinLine className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Paginação */}
+        {pagination.totalPages > 1 && (
+          <div className="flex justify-center gap-2 mt-6">
+            <Button
+              variant="outline"
+              disabled={pagination.page === 1}
+              onClick={() => setFilters({ page: pagination.page - 1 })}
+            >
+              Anterior
+            </Button>
+            <span className="flex items-center px-4 text-sm text-gray-600">
+              Página {pagination.page} de {pagination.totalPages}
+            </span>
+            <Button
+              variant="outline"
+              disabled={pagination.page === pagination.totalPages}
+              onClick={() => setFilters({ page: pagination.page + 1 })}
+            >
+              Próxima
+            </Button>
+          </div>
+        )}
+
+        {/* Dialog de Exclusão */}
+        <AlertDialog
+          open={deleteDialog.open}
+          onOpenChange={(open) =>
+            setDeleteDialog((prev) => ({ ...prev, open }))
+          }
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+                <RiAlertLine /> Confirmar Exclusão
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a notícia{" "}
+                <strong>&quot;{deleteDialog.noticiaTitulo}&quot;</strong>?
+                <br />
+                <br />
+                Essa ação é irreversível.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteNoticia}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );

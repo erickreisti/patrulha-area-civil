@@ -9,7 +9,7 @@ import {
   FaExclamationCircle,
   FaSpinner,
 } from "react-icons/fa";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils/cn"; // <-- CORREÇÃO AQUI: aponta para o arquivo correto
 
 // Tipos para as opções do toast
 type ToastOptions = Omit<ToastT, "id" | "type" | "title"> & {
@@ -54,7 +54,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "group toast group-[.toaster]:pointer-events-auto",
             "w-full max-w-md rounded-lg border shadow-lg",
             "transition-all duration-300 ease-in-out",
-            "relative top-4 right-4"
+            "relative top-4 right-4",
           ),
 
           // Estilos por tipo - CORES MAIS ESCURAS COM TEXTO BRANCO
@@ -62,35 +62,35 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "!bg-success-700 !text-white",
             "!border-success-600 !shadow-success/30",
             "[&>button]:!text-white [&>button:hover]:!text-success-100",
-            "[&>button]:!border-white/20 [&>button:hover]:!bg-success-600"
+            "[&>button]:!border-white/20 [&>button:hover]:!bg-success-600",
           ),
 
           error: cn(
             "!bg-error-700 !text-white",
             "!border-error-600 !shadow-error/30",
             "[&>button]:!text-white [&>button:hover]:!text-error-100",
-            "[&>button]:!border-white/20 [&>button:hover]:!bg-error-600"
+            "[&>button]:!border-white/20 [&>button:hover]:!bg-error-600",
           ),
 
           warning: cn(
             "!bg-warning-600 !text-white",
             "!border-warning-500 !shadow-warning/30",
             "[&>button]:!text-white [&>button:hover]:!text-warning-100",
-            "[&>button]:!border-white/20 [&>button:hover]:!bg-warning-500"
+            "[&>button]:!border-white/20 [&>button:hover]:!bg-warning-500",
           ),
 
           info: cn(
             "!bg-navy-700 !text-white",
             "!border-navy-600 !shadow-navy/30",
             "[&>button]:!text-white [&>button:hover]:!text-navy-100",
-            "[&>button]:!border-white/20 [&>button:hover]:!bg-navy-600"
+            "[&>button]:!border-white/20 [&>button:hover]:!bg-navy-600",
           ),
 
           loading: cn(
             "!bg-navy-700 !text-white",
             "!border-navy-600 !shadow-navy/30",
             "[&>button]:!text-white [&>button:hover]:!text-navy-100",
-            "[&>button]:!border-white/20 [&>button:hover]:!bg-navy-600"
+            "[&>button]:!border-white/20 [&>button:hover]:!bg-navy-600",
           ),
 
           // Componentes internos
@@ -139,7 +139,7 @@ const toastHelpers = {
   promise: async <T,>(
     promise: Promise<T>,
     messages: PromiseMessages,
-    options?: PromiseOptions
+    options?: PromiseOptions,
   ) => {
     const toastId = toast.loading(messages.loading, {
       description: options?.description,

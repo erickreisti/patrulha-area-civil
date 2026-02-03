@@ -18,7 +18,7 @@ import {
   type Agent as ApiAgentType,
 } from "@/app/actions/admin/agents/agents";
 
-// Constantes para graduações
+// ==================== CONSTANTES ====================
 export const GRADUACOES = [
   "Soldado",
   "Cabo",
@@ -39,7 +39,6 @@ export const GRADUACOES = [
   "General de Exército",
 ];
 
-// Constantes para tipos sanguíneos
 export const TIPOS_SANGUINEOS = [
   "A+",
   "A-",
@@ -51,7 +50,37 @@ export const TIPOS_SANGUINEOS = [
   "O-",
 ];
 
-// Função para formatar data
+export const UFS_BRASIL = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+];
+
+// ==================== FUNÇÕES UTILITÁRIAS ====================
 export function formatDate(dateString?: string | null): string {
   if (!dateString) return "Não informada";
   try {
@@ -62,7 +91,6 @@ export function formatDate(dateString?: string | null): string {
   }
 }
 
-// Função para verificar status da certificação
 export function getCertificationStatus(certDate?: string | null): {
   status: "valida" | "proximo-vencimento" | "expirada" | "nao-informada";
   color: "green" | "yellow" | "red" | "gray";
@@ -79,7 +107,6 @@ export function getCertificationStatus(certDate?: string | null): {
     const expiryDate = new Date(certDate);
     const today = new Date();
 
-    // Resetar horas para comparar apenas datas
     expiryDate.setHours(0, 0, 0, 0);
     today.setHours(0, 0, 0, 0);
 
@@ -120,7 +147,7 @@ export function getCertificationStatus(certDate?: string | null): {
   }
 }
 
-// Interface do store principal
+// ==================== STORE PRINCIPAL ====================
 interface AgentsStore {
   // Estado
   agents: ApiAgentType[];
@@ -164,7 +191,7 @@ interface AgentsStore {
 // Função auxiliar para aplicar filtros
 function applyFilters(
   agentList: ApiAgentType[],
-  filters: AgentsStore["filters"]
+  filters: AgentsStore["filters"],
 ): ApiAgentType[] {
   if (!agentList || agentList.length === 0) return [];
 
@@ -175,7 +202,10 @@ function applyFilters(
       const matchesSearch =
         agent.matricula.toLowerCase().includes(searchTerm) ||
         agent.email.toLowerCase().includes(searchTerm) ||
-        (agent.full_name && agent.full_name.toLowerCase().includes(searchTerm));
+        (agent.full_name &&
+          agent.full_name.toLowerCase().includes(searchTerm)) ||
+        (agent.telefone && agent.telefone.includes(searchTerm)) ||
+        (agent.uf && agent.uf.toLowerCase().includes(searchTerm));
       if (!matchesSearch) return false;
     }
 
@@ -194,7 +224,6 @@ function applyFilters(
   });
 }
 
-// Criação do store principal
 export const useAgentsStore = create<AgentsStore>((set, get) => ({
   // Estado inicial
   agents: [],
@@ -240,7 +269,7 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
 
       if (result.success && result.data) {
         console.log(
-          `✅ [AgentsStore] ${result.data.length} agentes carregados`
+          `✅ [AgentsStore] ${result.data.length} agentes carregados`,
         );
 
         const agentsData = result.data;
@@ -282,7 +311,7 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
       } else {
         console.warn(
           "⚠️ [AgentsStore] Estatísticas não carregadas:",
-          result.error
+          result.error,
         );
       }
     } catch (error) {
@@ -298,7 +327,7 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
       return {
         filters: updatedFilters,
         filteredAgents,
-        pagination: { ...state.pagination, page: 1 }, // Resetar para página 1
+        pagination: { ...state.pagination, page: 1 },
       };
     });
   },
@@ -318,7 +347,6 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
       const result = await toggleAgentStatus(agentId);
 
       if (result.success) {
-        // Recarregar agentes para atualizar a lista
         await get().fetchAgents();
         await get().fetchAgentsStats();
 
@@ -343,7 +371,6 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
       const result = await deleteAgent(agentId);
 
       if (result.success) {
-        // Recarregar agentes e estatísticas
         await get().fetchAgents();
         await get().fetchAgentsStats();
 
@@ -364,87 +391,29 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
-// Hook para listar agentes
-export function useAgentsList() {
-  const {
-    filteredAgents,
-    agentsStats,
-    loading,
-    error,
-    filters,
-    pagination,
-    fetchAgents,
-    fetchAgentsStats,
-    setFilters,
-    setPagination,
-    toggleAgentStatus,
-    deleteAgent,
-    clearError,
-  } = useAgentsStore(
-    useShallow((state) => ({
-      agents: state.agents,
-      filteredAgents: state.filteredAgents,
-      agentsStats: state.agentsStats,
-      loading: state.loading,
-      error: state.error,
-      filters: state.filters,
-      pagination: state.pagination,
-      fetchAgents: state.fetchAgents,
-      fetchAgentsStats: state.fetchAgentsStats,
-      setFilters: state.setFilters,
-      setPagination: state.setPagination,
-      toggleAgentStatus: state.toggleAgentStatus,
-      deleteAgent: state.deleteAgent,
-      clearError: state.clearError,
-    }))
-  );
-
-  // Calcular agentes paginados
-  const paginatedAgents = useMemo(() => {
-    const startIndex = (pagination.page - 1) * pagination.limit;
-    return filteredAgents.slice(startIndex, startIndex + pagination.limit);
-  }, [filteredAgents, pagination.page, pagination.limit]);
-
-  return {
-    // Agentes (paginados)
-    agents: paginatedAgents,
-    filteredAgents,
-    agentsStats,
-    loading,
-    error,
-    filters,
-    pagination,
-    fetchAgents,
-    fetchAgentsStats,
-    setFilters,
-    setPagination,
-    toggleAgentStatus,
-    deleteAgent,
-    clearError,
-    // Funções utilitárias
-    formatDate,
-    getCertificationStatus,
-  };
-}
-
-// Store para criação de agentes
+// ==================== STORE PARA CRIAÇÃO ====================
 interface AgentCreateStore {
   // Estado do formulário
   formData: Partial<CreateAgentInput> & {
     matricula?: string;
     email?: string;
     full_name?: string;
-    graduacao?: string;
-    tipo_sanguineo?: string;
-    validade_certificacao?: string;
+    graduacao?: string | null;
+    tipo_sanguineo?: string | null;
+    validade_certificacao?: string | null;
     role?: "agent" | "admin";
-    avatar_url?: string;
+    avatar_url?: string | null;
+    uf?: string | null;
+    data_nascimento?: string | null;
+    telefone?: string | null;
   };
   saving: boolean;
   error: string | null;
+  hasUnsavedChanges: boolean;
 
   // Ações
   setFormData: (data: Partial<AgentCreateStore["formData"]>) => void;
+  setHasUnsavedChanges: (hasChanges: boolean) => void;
   resetFormData: () => void;
   createAgent: (data: CreateAgentInput) => Promise<{
     success: boolean;
@@ -455,26 +424,36 @@ interface AgentCreateStore {
   generateMatricula: () => void;
 }
 
-export const useAgentCreate = create<AgentCreateStore>((set, get) => ({
+const useAgentCreateStore = create<AgentCreateStore>((set, get) => ({
   // Estado inicial
   formData: {
     matricula: "",
     email: "",
     full_name: "",
-    graduacao: "",
-    tipo_sanguineo: "",
-    validade_certificacao: "",
+    graduacao: null,
+    tipo_sanguineo: null,
+    validade_certificacao: null,
     role: "agent",
-    avatar_url: "",
+    avatar_url: null,
+    uf: null,
+    data_nascimento: null,
+    telefone: null,
   },
   saving: false,
   error: null,
+  hasUnsavedChanges: false,
 
   // Atualizar dados do formulário
   setFormData: (data) => {
     set((state) => ({
       formData: { ...state.formData, ...data },
+      hasUnsavedChanges: true,
     }));
+  },
+
+  // Controlar mudanças não salvas
+  setHasUnsavedChanges: (hasChanges) => {
+    set({ hasUnsavedChanges: hasChanges });
   },
 
   // Resetar formulário
@@ -484,38 +463,45 @@ export const useAgentCreate = create<AgentCreateStore>((set, get) => ({
         matricula: "",
         email: "",
         full_name: "",
-        graduacao: "",
-        tipo_sanguineo: "",
-        validade_certificacao: "",
+        graduacao: null,
+        tipo_sanguineo: null,
+        validade_certificacao: null,
         role: "agent",
-        avatar_url: "",
+        avatar_url: null,
+        uf: null,
+        data_nascimento: null,
+        telefone: null,
       },
       error: null,
+      hasUnsavedChanges: false,
     });
   },
 
   // Criar agente
-  createAgent: async (data) => {
+  createAgent: async (data: CreateAgentInput) => {
     try {
-      console.log("🆕 [AgentCreateStore] Criando agente...");
+      console.log("🆕 [AgentCreateStore] Criando agente com dados:", data);
       set({ saving: true, error: null });
 
       const result = await createAgent(data);
 
       if (result.success) {
         console.log("✅ [AgentCreateStore] Agente criado com sucesso");
+        get().resetFormData();
         return { success: true, data: result.data };
       } else {
         console.error(
           "❌ [AgentCreateStore] Erro ao criar agente:",
-          result.error
+          result.error,
         );
+        set({ error: result.error || "Erro desconhecido" });
         return { success: false, error: result.error };
       }
     } catch (error) {
       console.error("❌ [AgentCreateStore] Erro:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Erro ao criar agente";
+      set({ error: errorMessage });
       return { success: false, error: errorMessage };
     } finally {
       set({ saving: false });
@@ -536,8 +522,26 @@ export const useAgentCreate = create<AgentCreateStore>((set, get) => ({
       errors.push("Matrícula deve ter 11 dígitos");
     }
 
+    if (formData.matricula && !/^\d+$/.test(formData.matricula)) {
+      errors.push("Apenas números são permitidos na matrícula");
+    }
+
     if (formData.email && !formData.email.includes("@")) {
       errors.push("Email inválido");
+    }
+
+    if (formData.telefone && formData.telefone.trim() !== "") {
+      const cleanPhone = formData.telefone.replace(/\D/g, "");
+      if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+        errors.push("Telefone deve ter 10 ou 11 dígitos");
+      }
+    }
+
+    if (formData.uf && formData.uf.trim() !== "") {
+      const ufRegex = /^[A-Z]{2}$/;
+      if (!ufRegex.test(formData.uf.toUpperCase())) {
+        errors.push("UF deve ter exatamente 2 letras maiúsculas");
+      }
     }
 
     return errors;
@@ -545,15 +549,14 @@ export const useAgentCreate = create<AgentCreateStore>((set, get) => ({
 
   // Gerar matrícula
   generateMatricula: () => {
-    // Gerar uma matrícula aleatória de 11 dígitos
     const randomMatricula = Math.floor(
-      10000000000 + Math.random() * 90000000000
+      10000000000 + Math.random() * 90000000000,
     ).toString();
     get().setFormData({ matricula: randomMatricula });
   },
 }));
 
-// Store para edição de agentes
+// ==================== STORE PARA EDIÇÃO ====================
 interface AgentEditStore {
   agent: ApiAgentType | null;
   loading: boolean;
@@ -566,7 +569,7 @@ interface AgentEditStore {
   setAgent: (agent: ApiAgentType) => void;
   setFormData: (data: Partial<ApiAgentType>) => void;
   setHasUnsavedChanges: (hasChanges: boolean) => void;
-  updateAgent: (data: Partial<UpdateAgentInput>) => Promise<{
+  updateAgent: (data: Partial<Omit<UpdateAgentInput, "id">>) => Promise<{
     success: boolean;
     error?: string;
     data?: unknown;
@@ -574,7 +577,7 @@ interface AgentEditStore {
   validateForm: () => string[];
 }
 
-export const useAgentEditStore = create<AgentEditStore>((set, get) => ({
+const useAgentEditStore = create<AgentEditStore>((set, get) => ({
   agent: null,
   loading: true,
   saving: false,
@@ -614,7 +617,7 @@ export const useAgentEditStore = create<AgentEditStore>((set, get) => ({
       console.log("✏️ [AgentEditStore] Atualizando agente:", agent.id);
       set({ saving: true, error: null });
 
-      const result = await updateAgent(agent.id, { id: agent.id, ...data });
+      const result = await updateAgent(agent.id, data);
 
       if (result.success && result.data) {
         console.log("✅ [AgentEditStore] Agente atualizado com sucesso");
@@ -623,14 +626,16 @@ export const useAgentEditStore = create<AgentEditStore>((set, get) => ({
       } else {
         console.error(
           "❌ [AgentEditStore] Erro ao atualizar agente:",
-          result.error
+          result.error,
         );
+        set({ error: result.error || "Erro ao atualizar" });
         return { success: false, error: result.error };
       }
     } catch (error) {
       console.error("❌ [AgentEditStore] Erro:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Erro ao atualizar agente";
+      set({ error: errorMessage });
       return { success: false, error: errorMessage };
     } finally {
       set({ saving: false });
@@ -651,15 +656,142 @@ export const useAgentEditStore = create<AgentEditStore>((set, get) => ({
       errors.push("Matrícula deve ter 11 dígitos");
     }
 
+    if (formData.matricula && !/^\d+$/.test(formData.matricula)) {
+      errors.push("Apenas números são permitidos na matrícula");
+    }
+
     if (formData.email && !formData.email.includes("@")) {
       errors.push("Email inválido");
+    }
+
+    if (formData.telefone && formData.telefone.trim() !== "") {
+      const cleanPhone = formData.telefone.replace(/\D/g, "");
+      if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+        errors.push("Telefone deve ter 10 ou 11 dígitos");
+      }
+    }
+
+    if (formData.uf && formData.uf.trim() !== "") {
+      const ufRegex = /^[A-Z]{2}$/;
+      if (!ufRegex.test(formData.uf.toUpperCase())) {
+        errors.push("UF deve ter exatamente 2 letras maiúsculas");
+      }
     }
 
     return errors;
   },
 }));
 
-// Hook para edição de agente - EXPORTADO COM O NOME CORRETO
+// ==================== HOOKS PÚBLICOS ====================
+
+// Hook para listar agentes
+export function useAgentsList() {
+  const {
+    filteredAgents,
+    agentsStats,
+    loading,
+    error,
+    filters,
+    pagination,
+    fetchAgents,
+    fetchAgentsStats,
+    setFilters,
+    setPagination,
+    toggleAgentStatus,
+    deleteAgent,
+    clearError,
+  } = useAgentsStore(
+    useShallow((state) => ({
+      agents: state.agents,
+      filteredAgents: state.filteredAgents,
+      agentsStats: state.agentsStats,
+      loading: state.loading,
+      error: state.error,
+      filters: state.filters,
+      pagination: state.pagination,
+      fetchAgents: state.fetchAgents,
+      fetchAgentsStats: state.fetchAgentsStats,
+      setFilters: state.setFilters,
+      setPagination: state.setPagination,
+      toggleAgentStatus: state.toggleAgentStatus,
+      deleteAgent: state.deleteAgent,
+      clearError: state.clearError,
+    })),
+  );
+
+  // Calcular agentes paginados
+  const paginatedAgents = useMemo(() => {
+    const startIndex = (pagination.page - 1) * pagination.limit;
+    return filteredAgents.slice(startIndex, startIndex + pagination.limit);
+  }, [filteredAgents, pagination.page, pagination.limit]);
+
+  return {
+    agents: paginatedAgents,
+    filteredAgents,
+    agentsStats,
+    loading,
+    error,
+    filters,
+    pagination,
+    fetchAgents,
+    fetchAgentsStats,
+    setFilters,
+    setPagination,
+    toggleAgentStatus,
+    deleteAgent,
+    clearError,
+    formatDate,
+    getCertificationStatus,
+  };
+}
+
+// Hook para criação de agente
+export function useAgentCreate() {
+  const {
+    formData,
+    saving,
+    error,
+    hasUnsavedChanges,
+    setFormData,
+    setHasUnsavedChanges,
+    resetFormData,
+    createAgent,
+    validateForm,
+    generateMatricula,
+  } = useAgentCreateStore(
+    useShallow((state) => ({
+      formData: state.formData,
+      saving: state.saving,
+      error: state.error,
+      hasUnsavedChanges: state.hasUnsavedChanges,
+      setFormData: state.setFormData,
+      setHasUnsavedChanges: state.setHasUnsavedChanges,
+      resetFormData: state.resetFormData,
+      createAgent: state.createAgent,
+      validateForm: state.validateForm,
+      generateMatricula: state.generateMatricula,
+    })),
+  );
+
+  return {
+    formData,
+    saving,
+    error,
+    hasUnsavedChanges,
+    setFormData,
+    setHasUnsavedChanges,
+    resetFormData,
+    createAgent,
+    validateForm,
+    generateMatricula,
+    GRADUACOES,
+    TIPOS_SANGUINEOS,
+    UFS_BRASIL,
+    formatDate,
+  };
+}
+
+// Hook para edição de agente
 export function useAgentEdit(agentId: string) {
   const [initialized, setInitialized] = useState(false);
   const {
@@ -687,7 +819,7 @@ export function useAgentEdit(agentId: string) {
       setHasUnsavedChanges: state.setHasUnsavedChanges,
       updateAgent: state.updateAgent,
       validateForm: state.validateForm,
-    }))
+    })),
   );
 
   // Carregar dados do agente
@@ -725,5 +857,23 @@ export function useAgentEdit(agentId: string) {
     setHasUnsavedChanges,
     updateAgent,
     validateForm,
+    GRADUACOES,
+    TIPOS_SANGUINEOS,
+    UFS_BRASIL,
+    formatDate,
   };
+}
+
+// Hook simplificado para busca rápida de agentes
+export function useAgents() {
+  const { agents, loading, error, fetchAgents } = useAgentsStore(
+    useShallow((state) => ({
+      agents: state.agents,
+      loading: state.loading,
+      error: state.error,
+      fetchAgents: state.fetchAgents,
+    })),
+  );
+
+  return { agents, loading, error, fetchAgents };
 }

@@ -7,7 +7,12 @@ import { cookies } from "next/headers";
 import * as crypto from "crypto";
 import { z } from "zod";
 import type { Session, User } from "@supabase/supabase-js";
-import type { Profile, Database } from "@/lib/supabase/types";
+import type { Profile, Database, AdminSessionData } from "@/lib/supabase/types";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+// ============================================
+// SCHEMAS ZOD
+// ============================================
 
 const LoginSchema = z.object({
   matricula: z
@@ -23,49 +28,44 @@ const AdminAuthSchema = z.object({
   adminPassword: z.string().min(1, "Senha de administrador é obrigatória"),
 });
 
-// 🔧 Função para definir cookies de admin
-const setAdminCookies = async (
-  userId: string,
-  userEmail: string,
-  sessionToken: string,
-  expiresAt: Date
-): Promise<boolean> => {
+// ============================================
+// HELPER FUNCTIONS (COOKIES)
+// ============================================
+
+/**
+ * Definir cookies de sessão admin (2ª camada)
+ */
+async function setAdminCookies(
+  sessionData: AdminSessionData
+): Promise<boolean> {
   try {
-    console.log("🍪 [setAdminCookies] Definindo cookies admin...", {
-      userId,
-      userEmail,
-      expiresAt: expiresAt.toISOString(),
-    });
+    console.log("🍪 [setAdminCookies] Definindo cookies admin...");
 
     const cookieStore = await cookies();
+    const expiresAt = new Date(sessionData.expiresAt);
 
-    // ✅ CORRETO: httpOnly true para segurança
+    // Sessão admin (2ª camada) - httpOnly para segurança
     cookieStore.set({
       name: "admin_session",
-      value: JSON.stringify({
-        userId,
-        userEmail,
-        sessionToken,
-        expiresAt: expiresAt.toISOString(),
-        createdAt: new Date().toISOString(),
-      }),
-      httpOnly: true, // 🔒 Proteção contra XSS
+      value: JSON.stringify(sessionData),
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
       expires: expiresAt,
-      maxAge: 2 * 60 * 60, // 2 horas em segundos
+      maxAge: 2 * 60 * 60, // 2 horas
     });
 
+    // Flag de admin
     cookieStore.set({
       name: "is_admin",
       value: "true",
-      httpOnly: true, // 🔒 Proteção contra XSS
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
       expires: expiresAt,
-      maxAge: 2 * 60 * 60, // 2 horas em segundos
+      maxAge: 2 * 60 * 60,
     });
 
     console.log("✅ [setAdminCookies] Cookies admin definidos com sucesso");
@@ -74,9 +74,12 @@ const setAdminCookies = async (
     console.error("❌ [setAdminCookies] Erro:", error);
     return false;
   }
-};
+}
 
-const clearAdminCookies = async (): Promise<boolean> => {
+/**
+ * Limpar cookies de sessão admin
+ */
+async function clearAdminCookies(): Promise<boolean> {
   try {
     const cookieStore = await cookies();
     cookieStore.delete("admin_session");
@@ -87,12 +90,15 @@ const clearAdminCookies = async (): Promise<boolean> => {
     console.error("❌ [clearAdminCookies] Erro:", error);
     return false;
   }
-};
+}
 
 // ============================================
 // PRINCIPAIS FUNÇÕES
 // ============================================
 
+/**
+ * Login principal (1ª camada de autenticação)
+ */
 export async function login(formData: FormData) {
   try {
     console.log("🔐 [login] Iniciando processo de login...");
@@ -102,15 +108,13 @@ export async function login(formData: FormData) {
 
     console.log("🔢 [login] Matrícula validada:", validated.matricula);
 
-    const supabaseAdmin = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
+    // ✅ USANDO ADMIN CLIENT PARA BUSCAR PERFIL
+    const supabaseAdmin = createAdminClient();
 
+    // Buscar perfil pelo número de matrícula
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select("id, email, status, role, full_name")
+      .select("id, email, status, role, full_name, admin_2fa_enabled")
       .eq("matricula", validated.matricula)
       .single();
 
@@ -126,6 +130,7 @@ export async function login(formData: FormData) {
       status: profile.status,
     });
 
+    // Criar cliente normal para autenticação
     const supabase = createClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -145,6 +150,7 @@ export async function login(formData: FormData) {
     if (authError) {
       console.log("⚠️ [login] Erro no login:", authError.message);
 
+      // Se usuário não existe, criar com admin client
       if (authError.message.includes("Invalid login credentials")) {
         console.log("🔄 [login] Criando usuário...");
 
@@ -199,6 +205,9 @@ export async function login(formData: FormData) {
   }
 }
 
+/**
+ * Logout (limpa ambas as camadas)
+ */
 export async function logout() {
   try {
     console.log("🚪 [logout] Iniciando logout...");
@@ -208,9 +217,10 @@ export async function logout() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // Limpar cookies admin primeiro
+    // 1. Limpar cookies admin (2ª camada)
     await clearAdminCookies();
 
+    // 2. Fazer logout do Supabase (1ª camada)
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("❌ [logout] Erro ao fazer logout:", error);
@@ -226,6 +236,9 @@ export async function logout() {
   }
 }
 
+/**
+ * Autenticação da 2ª camada admin
+ */
 export async function authenticateAdminSession(
   userId: string,
   userEmail: string,
@@ -251,11 +264,8 @@ export async function authenticateAdminSession(
       adminPassword,
     });
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
+    // ✅ USANDO ADMIN CLIENT EXCLUSIVAMENTE
+    const supabaseAdmin = createAdminClient();
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -280,6 +290,7 @@ export async function authenticateAdminSession(
       return { success: false, error: "Senha não configurada" };
     }
 
+    // Verificar senha hash
     const hash = crypto
       .createHash("sha256")
       .update(validated.adminPassword + profile.admin_secret_salt)
@@ -292,7 +303,7 @@ export async function authenticateAdminSession(
       return { success: false, error: "Senha incorreta" };
     }
 
-    // Atualizar último auth
+    // Atualizar último auth no perfil
     await supabaseAdmin
       .from("profiles")
       .update({
@@ -305,17 +316,21 @@ export async function authenticateAdminSession(
     const sessionToken = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
 
+    const sessionData: AdminSessionData = {
+      userId: validated.userId,
+      userEmail: validated.userEmail,
+      sessionToken,
+      expiresAt: expiresAt.toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+
     console.log("🔐 [authenticateAdminSession] Criando sessão...", {
       expiresAt: expiresAt.toISOString(),
       sessionToken: sessionToken.substring(0, 10) + "...",
     });
 
-    const cookiesSet = await setAdminCookies(
-      validated.userId,
-      validated.userEmail,
-      sessionToken,
-      expiresAt
-    );
+    // Definir cookies
+    const cookiesSet = await setAdminCookies(sessionData);
 
     if (!cookiesSet) {
       console.log("❌ [authenticateAdminSession] Erro ao criar cookies");
@@ -334,11 +349,15 @@ export async function authenticateAdminSession(
   }
 }
 
+/**
+ * Verificar sessão admin (2ª camada)
+ */
 export async function verifyAdminSession(): Promise<{
   success: boolean;
   error?: string;
   user?: { id: string; email: string };
   expiresAt?: string;
+  session?: AdminSessionData;
 }> {
   try {
     console.log("🔍 [verifyAdminSession] Verificando sessão admin...");
@@ -351,7 +370,7 @@ export async function verifyAdminSession(): Promise<{
       return { success: false, error: "Sessão não encontrada" };
     }
 
-    const sessionData = JSON.parse(adminSessionCookie);
+    const sessionData: AdminSessionData = JSON.parse(adminSessionCookie);
 
     console.log("📅 [verifyAdminSession] Dados da sessão:", {
       userId: sessionData.userId,
@@ -366,11 +385,8 @@ export async function verifyAdminSession(): Promise<{
       return { success: false, error: "Sessão expirada" };
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
+    // ✅ USANDO ADMIN CLIENT PARA VERIFICAR PERFIL
+    const supabaseAdmin = createAdminClient();
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -396,6 +412,7 @@ export async function verifyAdminSession(): Promise<{
         email: sessionData.userEmail,
       },
       expiresAt: sessionData.expiresAt,
+      session: sessionData,
     };
   } catch (error) {
     console.error("❌ [verifyAdminSession] Erro:", error);
@@ -404,6 +421,9 @@ export async function verifyAdminSession(): Promise<{
   }
 }
 
+/**
+ * Configurar senha admin inicial
+ */
 export async function setupAdminPassword(formData: FormData) {
   try {
     console.log("🔧 [setupAdminPassword] Configurando senha admin...");
@@ -422,11 +442,8 @@ export async function setupAdminPassword(formData: FormData) {
       return { success: false, error: "As senhas não coincidem" };
     }
 
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } }
-    );
+    // ✅ USANDO ADMIN CLIENT
+    const supabaseAdmin = createAdminClient();
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")
@@ -442,6 +459,7 @@ export async function setupAdminPassword(formData: FormData) {
 
     console.log("✅ [setupAdminPassword] Perfil encontrado:", profile.id);
 
+    // Gerar salt e hash
     const salt = crypto.randomBytes(16).toString("hex");
     const hash = crypto
       .createHash("sha256")
@@ -466,6 +484,9 @@ export async function setupAdminPassword(formData: FormData) {
   }
 }
 
+/**
+ * Verificar rapidamente se há cookies admin
+ */
 export async function checkAdminSession() {
   try {
     console.log("🔍 [checkAdminSession] Verificando cookies...");
@@ -494,12 +515,21 @@ export async function checkAdminSession() {
 // FUNÇÃO INTERNA
 // ============================================
 
+/**
+ * Processar login bem-sucedido e obter perfil completo
+ */
 async function handleSuccessfulLogin(
   session: Session,
   user: User,
-  profile: { id: string; email: string; status: boolean; role: string },
+  profile: {
+    id: string;
+    email: string;
+    status: boolean;
+    role: string;
+    admin_2fa_enabled: boolean;
+  },
   matricula: string,
-  supabaseAdmin: ReturnType<typeof createClient<Database>>
+  supabaseAdmin: ReturnType<typeof createAdminClient>
 ): Promise<{
   success: boolean;
   message: string;
@@ -508,6 +538,7 @@ async function handleSuccessfulLogin(
   try {
     console.log("👤 [handleSuccessfulLogin] Processando login bem-sucedido...");
 
+    // Buscar perfil completo
     const { data: fullProfile, error: fullProfileError } = await supabaseAdmin
       .from("profiles")
       .select("*")
@@ -534,7 +565,7 @@ async function handleSuccessfulLogin(
         telefone: null,
         admin_secret_hash: null,
         admin_secret_salt: null,
-        admin_2fa_enabled: false,
+        admin_2fa_enabled: profile.admin_2fa_enabled,
         admin_last_auth: null,
       };
 

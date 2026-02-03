@@ -1,5 +1,4 @@
-// src/lib/supabase/types.ts
-
+// src/lib/supabase/types.ts - VERSÃO COMPLETA CORRIGIDA
 import { UserRole, Json } from "@/lib/types/shared";
 import { User as SupabaseUser } from "@supabase/supabase-js";
 export type { Json };
@@ -81,7 +80,7 @@ export type Database = {
             isOneToOne: true;
             referencedRelation: "users";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
 
@@ -150,7 +149,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
 
@@ -192,7 +191,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
 
@@ -203,7 +202,7 @@ export type Database = {
           slug: string;
           conteudo: string;
           resumo: string | null;
-          imagem: string | null;
+          media_url: string | null; // ✅ CORRIGIDO: de "imagem" para "media_url"
           categoria: string | null;
           autor_id: string | null;
           destaque: boolean;
@@ -212,6 +211,10 @@ export type Database = {
           created_at: string;
           updated_at: string;
           views: number;
+          video_url: string | null; // ✅ ADICIONADO: campo específico para vídeo
+          thumbnail_url: string | null; // ✅ ADICIONADO: thumbnail para vídeo
+          tipo_media: "imagem" | "video"; // ✅ ADICIONADO: tipo da mídia
+          duracao_video: number | null; // ✅ ADICIONADO: duração em segundos
         };
         Insert: {
           id?: string;
@@ -219,7 +222,7 @@ export type Database = {
           slug: string;
           conteudo: string;
           resumo?: string | null;
-          imagem?: string | null;
+          media_url?: string | null;
           categoria?: string | null;
           autor_id?: string | null;
           destaque?: boolean;
@@ -228,6 +231,10 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           views?: number;
+          video_url?: string | null;
+          thumbnail_url?: string | null;
+          tipo_media?: "imagem" | "video";
+          duracao_video?: number | null;
         };
         Update: {
           id?: string;
@@ -235,7 +242,7 @@ export type Database = {
           slug?: string;
           conteudo?: string;
           resumo?: string | null;
-          imagem?: string | null;
+          media_url?: string | null;
           categoria?: string | null;
           autor_id?: string | null;
           destaque?: boolean;
@@ -244,6 +251,10 @@ export type Database = {
           created_at?: string;
           updated_at?: string;
           views?: number;
+          video_url?: string | null;
+          thumbnail_url?: string | null;
+          tipo_media?: "imagem" | "video";
+          duracao_video?: number | null;
         };
         Relationships: [
           {
@@ -252,7 +263,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
 
@@ -356,7 +367,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
 
@@ -431,7 +442,7 @@ export type Database = {
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
-          }
+          },
         ];
       };
     };
@@ -453,7 +464,8 @@ export type Database = {
   };
 };
 
-// Tipos de uso comum
+// ==================== TIPOS BASE DO BANCO ====================
+
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
@@ -495,7 +507,226 @@ export type ProfilesHistoryInsert =
 export type ProfilesHistoryUpdate =
   Database["public"]["Tables"]["profiles_history"]["Update"];
 
-// Helper para converter Record<string, unknown> para Json
+export type User = SupabaseUser;
+
+// ==================== TIPOS ESTENDIDOS ====================
+
+export interface NoticiaCompleta extends Noticia {
+  profiles?: Profile | null;
+}
+
+export interface GaleriaCategoriaComItens extends GaleriaCategoria {
+  itens_count?: number;
+  itens?: GaleriaItemComCategoria[];
+}
+
+export interface GaleriaItemComCategoria extends GaleriaItem {
+  galeria_categorias?: GaleriaCategoria | null;
+  profiles?: Profile | null; // Autor da mídia
+}
+
+// ==================== TIPOS PARA NOTÍCIAS ====================
+
+export interface NoticiaFormData {
+  titulo: string;
+  slug: string;
+  conteudo: string;
+  resumo: string;
+  media_url: string;
+  categoria: string;
+  destaque: boolean;
+  data_publicacao: string;
+  status: "rascunho" | "publicado" | "arquivado";
+  video_url?: string;
+  thumbnail_url?: string;
+  tipo_media: "imagem" | "video";
+  duracao_video?: number;
+}
+
+export interface NoticiaUploadData {
+  media_url?: string;
+  video_url?: string;
+  thumbnail_url?: string;
+  tipo_media: "imagem" | "video";
+  duracao_video?: number;
+}
+
+// ==================== TIPOS PARA FILTROS ====================
+
+export type TipoCategoriaFilter = "all" | "fotos" | "videos";
+export type TipoItemFilter = "all" | "foto" | "video";
+export type TipoNoticiaFilter = "all" | "imagem" | "video";
+export type StatusFilter = "all" | "ativo" | "inativo";
+export type StatusNoticiaFilter =
+  | "all"
+  | "rascunho"
+  | "publicado"
+  | "arquivado";
+export type DestaqueFilter = "all" | boolean;
+
+// ==================== TIPOS PARA FORMULÁRIOS ====================
+
+export interface FormDataCategoria {
+  nome: string;
+  slug: string;
+  descricao: string;
+  tipo: "fotos" | "videos";
+  status: boolean;
+  ordem: number;
+}
+
+export interface FormDataItem {
+  titulo: string;
+  descricao: string;
+  categoria_id: string | null;
+  arquivo_url: string;
+  thumbnail_url: string | null;
+  tipo: "foto" | "video";
+  ordem: number;
+  status: boolean;
+  destaque: boolean;
+}
+
+// ==================== TIPOS PARA PAGINAÇÃO ====================
+
+export interface PaginationData {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  pagination?: PaginationData;
+}
+
+// ==================== TIPOS PARA ESTATÍSTICAS ====================
+
+export interface EstatisticasGaleria {
+  total_categorias: number;
+  total_itens: number;
+  total_fotos: number;
+  total_videos: number;
+  itens_destaque: number;
+  categorias_ativas: number;
+  itens_ativos: number;
+  categorias_por_tipo: {
+    fotos: number;
+    videos: number;
+  };
+}
+
+export interface EstatisticasNoticias {
+  total: number;
+  publicadas: number;
+  rascunhos: number;
+  arquivadas: number;
+  com_destaque: number;
+  imagens: number;
+  videos: number;
+  views_total: number;
+  por_categoria: Record<string, number>;
+}
+
+export interface EstatisticasAgentes {
+  total: number;
+  ativos: number;
+  inativos: number;
+  admins: number;
+  agentes: number;
+  por_uf: Record<string, number>;
+}
+
+// ✅ TIPO PARA O STORE DE GALERIA
+export type EstatisticasStore = {
+  total: number;
+  fotos: number;
+  videos: number;
+  ativos: number;
+  inativos: number;
+  comDestaque: number;
+};
+
+// ==================== TIPOS PARA UPLOAD ====================
+
+export interface UploadResult {
+  url: string;
+  path: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  duration?: number; // Para vídeos
+  thumbnailUrl?: string; // Para vídeos
+}
+
+export type MediaType = "image" | "video";
+
+// ==================== TIPOS PARA SESSÃO ADMIN ====================
+
+export interface AdminSessionData {
+  userId: string;
+  userEmail: string;
+  sessionToken: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+// ==================== TIPOS PARA DASHBOARD ====================
+
+export interface DashboardStats {
+  summary: {
+    agents: {
+      total: number;
+      active: number;
+      inactive: number;
+      admins: number;
+      regular: number;
+    };
+    news: {
+      total: number;
+      published: number;
+      draft: number;
+      archived: number;
+      featured: number;
+      images: number;
+      videos: number;
+    };
+    gallery: {
+      total_categories: number;
+      total_items: number;
+      photos: number;
+      videos: number;
+      active_categories: number;
+      featured_items: number;
+    };
+    system: {
+      totalActivities: number;
+      recentActivities: number;
+      activeUsers: number;
+      totalStorage: number;
+    };
+  };
+  recentActivities: Array<{
+    id: string;
+    action_type: string;
+    description: string;
+    created_at: string;
+    user_name: string | null;
+  }>;
+  calculations: {
+    activePercentage: number;
+    adminPercentage: number;
+    publishedPercentage: number;
+    featuredPercentage: number;
+    galleryActivePercentage: number;
+  };
+}
+
+// ==================== UTILITÁRIOS ====================
+
 export function toJson(data?: Record<string, unknown>): Json | null {
   if (!data) return null;
   try {
@@ -505,4 +736,58 @@ export function toJson(data?: Record<string, unknown>): Json | null {
   }
 }
 
-export type User = SupabaseUser;
+// ==================== TIPOS PARA OPERAÇÕES DE STORAGE ====================
+
+export interface StorageUploadConfig {
+  bucket: string;
+  maxSize: number;
+  allowedTypes: string[];
+  path: (identifier: string) => string;
+}
+
+export interface FileValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+// ==================== TIPOS PARA NOTIFICAÇÕES ====================
+
+export interface NotificationData {
+  user_id?: string | null;
+  type:
+    | "system"
+    | "user_created"
+    | "news_published"
+    | "gallery_upload"
+    | "warning"
+    | "info";
+  title: string;
+  message: string;
+  action_url?: string;
+  metadata?: Json;
+}
+
+// ==================== TIPOS PARA ATIVIDADES DO SISTEMA ====================
+
+export interface SystemActivityData {
+  user_id?: string | null;
+  action_type: string;
+  description: string;
+  resource_type?: string;
+  resource_id?: string;
+  metadata?: Json;
+}
+
+// ==================== EXPORT COMPLETO ====================
+
+export type {
+  Database as SupabaseDatabase,
+  Profile as SupabaseProfile,
+  Notification as SupabaseNotification,
+  SystemActivity as SupabaseSystemActivity,
+  Noticia as SupabaseNoticia,
+  GaleriaCategoria as SupabaseGaleriaCategoria,
+  GaleriaItem as SupabaseGaleriaItem,
+};
+
+export * from "./types";

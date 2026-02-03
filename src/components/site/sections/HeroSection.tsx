@@ -1,5 +1,3 @@
-// src/components/site/sections/HeroSection.tsx
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -68,36 +66,32 @@ const buttonVariants: Variants = {
   tap: { scale: 0.95 },
 };
 
-// ✅ CORRIGIDO: BackgroundImage simplificado sem estado
 const BackgroundImage = () => {
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {/* Background Image with Next.js Image component */}
       <div className="absolute inset-0">
         <Image
           src="/images/site/hero-bg.webp"
           alt="Patrulha Aérea Civil - Operações Aéreas"
           fill
           priority
-          quality={85}
+          // CORREÇÃO: Qualidade padrão do Next.js é 75. Removido 85 para evitar warning.
+          quality={75}
           className="object-cover object-center"
           sizes="100vw"
           style={{
             objectPosition: "center 30%",
           }}
-          // ✅ REMOVIDO: onLoad e loading state
           loading="eager"
-          // ✅ ADICIONADO: Decoding async para melhor performance
           decoding="async"
         />
       </div>
 
-      {/* Overlay gradients - sempre visíveis */}
-      <div className="absolute inset-0 bg-gradient-to-b from-navy-900/70 via-navy-800/50 to-navy-900/60"></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-navy-900/70 via-navy-800/40 to-transparent"></div>
-      <div className="absolute inset-0 bg-gradient-to-r from-navy-900/30 via-navy-800/20 to-navy-900/40"></div>
+      {/* Overlay gradients - usando cores do tema PAC */}
+      <div className="absolute inset-0 bg-gradient-to-b from-pac-primary-dark/70 via-pac-primary/50 to-pac-primary-dark/60"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-pac-primary-dark/70 via-pac-primary/40 to-transparent"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-pac-primary-dark/30 via-pac-primary/20 to-pac-primary-dark/40"></div>
 
-      {/* Subtle pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]"></div>
       </div>
@@ -109,9 +103,9 @@ const Subtitle = () => (
   <motion.div className="mb-4 sm:mb-5 md:mb-6 lg:mb-8" variants={itemVariants}>
     <p
       className={cn(
-        "font-medium text-white mb-0 leading-relaxed drop-shadow-lg font-roboto text-center",
+        "font-medium text-white mb-0 leading-relaxed drop-shadow-lg text-center",
         "text-base sm:text-lg md:text-xl lg:text-2xl px-4 mx-auto max-w-3xl",
-        "bg-gradient-to-r from-white via-offwhite-200 to-white bg-clip-text text-transparent"
+        "bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent",
       )}
     >
       Excelência em Resgate Aéreo & Proteção Civil
@@ -123,7 +117,7 @@ const Description = () => (
   <motion.div
     className={cn(
       "mb-6 sm:mb-8 md:mb-10 lg:mb-12 mx-auto px-4 sm:px-6",
-      "max-w-xl sm:max-w-2xl md:max-w-3xl lg:max-w-4xl"
+      "max-w-xl sm:max-w-2xl md:max-w-3xl lg:max-w-4xl",
     )}
     variants={scaleInVariants}
   >
@@ -131,11 +125,11 @@ const Description = () => (
       className={cn(
         "text-white leading-relaxed sm:leading-loose bg-slate-900/80 backdrop-blur-md",
         "rounded-xl lg:rounded-2xl border border-white/20 shadow-2xl",
-        "font-roboto font-medium text-center text-sm sm:text-base md:text-lg",
-        "p-4 sm:p-6 md:p-8 relative overflow-hidden"
+        "font-medium text-center text-sm sm:text-base md:text-lg",
+        "p-4 sm:p-6 md:p-8 relative overflow-hidden",
       )}
     >
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-navy-400/10 to-transparent transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-pac-primary-light/10 to-transparent transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
       <p className="mb-0">
         Organização civil especializada em operações aéreas de resgate, busca e
         proteção civil. Comprometidos com a segurança e bem-estar da população,
@@ -150,7 +144,7 @@ const ActionButtons = () => (
     className={cn(
       "flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6 justify-center items-stretch",
       "px-4 sm:px-6 w-full mx-auto max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl",
-      "mb-4 sm:mb-6"
+      "mb-4 sm:mb-6",
     )}
     variants={containerVariants}
   >
@@ -163,11 +157,11 @@ const ActionButtons = () => (
       <Button
         size="lg"
         className={cn(
-          "w-full font-bold uppercase tracking-wider transition-all duration-300 font-roboto border-0",
+          "w-full font-bold uppercase tracking-wider transition-all duration-300 border-0",
           "relative overflow-hidden shadow-lg hover:shadow-xl group/button",
-          "bg-navy hover:bg-navy-600 text-white text-sm sm:text-base",
+          "bg-pac-primary hover:bg-pac-primary-light text-white text-sm sm:text-base", // Cores do tema
           "px-4 sm:px-6 md:px-8 py-3 sm:py-4 h-auto min-h-[48px] sm:min-h-[56px]",
-          "active:scale-95"
+          "active:scale-95",
         )}
         asChild
       >
@@ -199,12 +193,12 @@ const ActionButtons = () => (
         variant="outline"
         size="lg"
         className={cn(
-          "w-full font-bold uppercase tracking-wider transition-all duration-300 font-roboto",
+          "w-full font-bold uppercase tracking-wider transition-all duration-300",
           "relative overflow-hidden shadow-lg hover:shadow-xl group/outline",
           "border-2 border-white bg-white/10 backdrop-blur-sm",
-          "text-white hover:bg-white hover:text-navy-800 text-sm sm:text-base",
+          "text-white hover:bg-white hover:text-pac-primary-dark text-sm sm:text-base", // Hover com cor do tema
           "px-4 sm:px-6 md:px-8 py-3 sm:py-4 h-auto min-h-[48px] sm:min-h-[56px]",
-          "active:scale-95"
+          "active:scale-95",
         )}
         asChild
       >
@@ -213,7 +207,7 @@ const ActionButtons = () => (
             <motion.div
               animate={{ scale: [1, 1.2, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="flex items-center text-alert-300"
+              className="flex items-center text-pac-alert-light" // Cor de alerta do tema
             >
               <RiAlarmWarningLine className="w-4 h-4 sm:w-5 sm:h-5" />
             </motion.div>
@@ -247,7 +241,7 @@ const ScrollIndicator = () => {
       aria-label="Role para baixo para saber mais"
     >
       <div className="flex flex-col items-center mt-8 sm:mt-10 gap-2 sm:gap-3">
-        <span className="text-sm text-white/80 font-roboto uppercase tracking-wider group-hover/scroll:text-white transition-colors duration-300">
+        <span className="text-sm text-white/80 uppercase tracking-wider group-hover/scroll:text-white transition-colors duration-300">
           Saiba Mais
         </span>
         <div className="w-6 h-10 sm:w-7 sm:h-12 border-2 border-white/50 rounded-full flex justify-center group-hover/scroll:border-white transition-colors duration-300">
@@ -263,7 +257,6 @@ const ScrollIndicator = () => {
 };
 
 export function HeroSection() {
-  // ✅ CORRIGIDO: Remover lógica de mounted - não é mais necessária
   const [height, setHeight] = useState("calc(100vh - 90px)");
 
   useEffect(() => {
@@ -284,7 +277,7 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative bg-navy-800 text-white overflow-hidden ios-h-screen"
+      className="relative bg-pac-primary-dark text-white overflow-hidden ios-h-screen" // Cor de fundo do tema
       style={{
         height,
         minHeight: "600px",
@@ -304,7 +297,7 @@ export function HeroSection() {
           className={cn(
             "mx-auto w-full h-full flex flex-col justify-end items-center",
             "pb-12 sm:pb-16 md:pb-20 lg:pb-24 pt-16 sm:pt-20",
-            "min-h-[600px]"
+            "min-h-[600px]",
           )}
         >
           <div className="text-center w-full">
@@ -314,10 +307,10 @@ export function HeroSection() {
             >
               <h1
                 className={cn(
-                  "font-bold text-white leading-tight drop-shadow-2xl font-bebas uppercase tracking-normal text-center",
+                  "font-extrabold text-white leading-tight drop-shadow-2xl uppercase tracking-tight text-center", // Removido font-bebas
                   "text-4xl xs:text-5xl leading-[0.9] px-2",
                   "sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl",
-                  "mx-auto max-w-[90vw]"
+                  "mx-auto max-w-[90vw]",
                 )}
               >
                 PATRULHA AÉREA CIVIL
@@ -331,7 +324,7 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-28 lg:h-32 bg-gradient-to-t from-navy-900/80 via-navy-900/40 to-transparent pointer-events-none"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-28 lg:h-32 bg-gradient-to-t from-pac-primary-dark/80 via-pac-primary-dark/40 to-transparent pointer-events-none"></div>
     </section>
   );
 }

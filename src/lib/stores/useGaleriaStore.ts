@@ -1,439 +1,420 @@
 "use client";
 
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { useShallow } from "zustand/react/shallow";
+
+// Imports das Server Actions
 import {
-  getCategoriasGaleria,
+  getCategoriasAdmin,
   getCategoriaPorSlug,
-  getItensPorCategoria,
-  getEstatisticasGaleria,
-  getCategoriasDestaque,
-  type ApiResponse,
-  type CategoriaComItens,
-  type ItemGaleria,
-  type EstatisticasGaleria,
-  type TipoCategoriaFilter,
-} from "@/app/actions/gallery/galeria";
+  getItensAdmin,
+  createCategoria,
+  toggleCategoriaStatus,
+  createItem,
+  toggleItemStatus,
+  toggleItemDestaque,
+  getGaleriaStats,
+  // generateAvailableSlug - removido pois não é usado na store
+} from "@/app/actions/gallery";
 
-// Tipos baseados nas actions
-type SortType = "recent" | "oldest" | "name" | "destaque" | "popular";
+import type {
+  Categoria,
+  Item,
+  GaleriaStats,
+  CreateCategoriaInput,
+  // CreateItemInput removido pois usamos FormData para itens (arquivo)
+  TipoCategoriaFilter,
+  TipoItemFilter,
+  StatusFilter,
+  DestaqueFilter,
+} from "@/app/actions/gallery/types";
 
-interface GalleryFiltersCategorias {
-  searchTerm: string;
-  tipo: TipoCategoriaFilter;
-  sortBy: SortType;
-  currentPage: number;
-  itemsPerPage: number;
-  total: number;
-}
+// ============================================
+// TIPOS DO ESTADO
+// ============================================
 
-interface GalleryFiltersItens {
-  searchTerm: string;
-  sortBy: SortType;
-  destaque: boolean | null;
-  currentPage: number;
-  itemsPerPage: number;
+interface PaginationState {
+  page: number;
+  limit: number;
+  totalPages: number;
   total: number;
 }
 
 interface GaleriaStore {
-  // Estado das categorias
-  categorias: CategoriaComItens[];
+  // --- Estado de Dados ---
+  categorias: Categoria[];
+  categoriaSelecionada: Categoria | null;
+  itens: Item[];
+  itemSelecionado: Item | null;
+  stats: GaleriaStats | null;
+
+  // --- Estado de Loading/Erro ---
   loadingCategorias: boolean;
   errorCategorias: string | null;
-
-  // Estado dos itens
-  itens: ItemGaleria[];
   loadingItens: boolean;
   errorItens: string | null;
-  categoriaAtual: CategoriaComItens | null;
+  loadingStats: boolean;
 
-  // Filtros
-  filtrosCategorias: GalleryFiltersCategorias;
-  filtrosItens: GalleryFiltersItens;
+  // --- Filtros ---
+  filtrosCategorias: {
+    search: string;
+    tipo: TipoCategoriaFilter;
+    status: StatusFilter;
+    page: number;
+    limit: number;
+  };
 
-  // Estatísticas
-  stats: EstatisticasGaleria | null;
+  filtrosItens: {
+    search: string;
+    categoria_id: string | "all";
+    tipo: TipoItemFilter;
+    status: StatusFilter;
+    destaque: DestaqueFilter;
+    page: number;
+    limit: number;
+  };
 
-  // Categorias em destaque
-  categoriasDestaque: CategoriaComItens[];
-  loadingDestaque: boolean;
-  errorDestaque: string | null;
-
-  // ==================== ACTIONS ====================
-
-  // Categorias
+  // --- Actions (Categorias) ---
   fetchCategorias: () => Promise<void>;
-  fetchCategoriaPorSlug: (slug: string) => Promise<CategoriaComItens | null>;
-  fetchEstatisticas: () => Promise<void>;
-  fetchCategoriasDestaque: (limit?: number) => Promise<void>;
+  fetchCategoriaPorSlug: (slug: string) => Promise<void>;
+  criarCategoria: (
+    data: CreateCategoriaInput,
+  ) => Promise<{ success: boolean; error?: string }>;
+  alternarStatusCategoria: (
+    id: string,
+    current: boolean,
+  ) => Promise<{ success: boolean; error?: string }>;
 
-  // Itens
-  fetchItensPorCategoria: (categoriaId: string) => Promise<void>;
+  // --- Actions (Itens) ---
+  fetchItens: () => Promise<void>;
+  // FormData é o tipo correto aqui para envio de arquivos
+  criarItem: (data: FormData) => Promise<{ success: boolean; error?: string }>;
+  alternarStatusItem: (
+    id: string,
+    current: boolean,
+  ) => Promise<{ success: boolean; error?: string }>;
+  alternarDestaqueItem: (
+    id: string,
+    current: boolean,
+  ) => Promise<{ success: boolean; error?: string }>;
 
-  // Setters Categorias
-  setSearchTermCategorias: (term: string) => void;
-  setTipoCategorias: (tipo: TipoCategoriaFilter) => void;
-  setSortByCategorias: (sortBy: SortType) => void;
-  setCurrentPageCategorias: (page: number) => void;
-  setItemsPerPageCategorias: (itemsPerPage: number) => void;
+  // --- Actions (Gerais) ---
+  fetchStats: () => Promise<void>;
 
-  // Setters Itens
-  setSearchTermItens: (term: string) => void;
-  setSortByItens: (sortBy: SortType) => void;
-  setDestaqueItens: (destaque: boolean | null) => void;
-  setCurrentPageItens: (page: number) => void;
-  setItemsPerPageItens: (itemsPerPage: number) => void;
+  // --- Setters de Filtro ---
+  setFiltrosCategorias: (
+    filtros: Partial<GaleriaStore["filtrosCategorias"]>,
+  ) => void;
+  setFiltrosItens: (filtros: Partial<GaleriaStore["filtrosItens"]>) => void;
+  setPaginationCategorias: (pagination: Partial<PaginationState>) => void;
+  setPaginationItens: (pagination: Partial<PaginationState>) => void;
 
-  // Reset
+  // --- Utils ---
+  clearErrorCategorias: () => void;
+  clearErrorItens: () => void;
   resetFiltrosCategorias: () => void;
   resetFiltrosItens: () => void;
-  clearItens: () => void;
-  clearAll: () => void;
 }
-
-// Estado inicial
-const filtrosIniciaisCategorias: GalleryFiltersCategorias = {
-  searchTerm: "",
-  tipo: "all",
-  sortBy: "recent",
-  currentPage: 1,
-  itemsPerPage: 12,
-  total: 0,
-};
-
-const filtrosIniciaisItens: GalleryFiltersItens = {
-  searchTerm: "",
-  sortBy: "destaque",
-  destaque: null,
-  currentPage: 1,
-  itemsPerPage: 12,
-  total: 0,
-};
 
 const initialState = {
   categorias: [],
+  categoriaSelecionada: null,
+  itens: [],
+  itemSelecionado: null,
+  stats: null,
+
   loadingCategorias: false,
   errorCategorias: null,
-
-  itens: [],
   loadingItens: false,
   errorItens: null,
-  categoriaAtual: null,
+  loadingStats: false,
 
-  categoriasDestaque: [],
-  loadingDestaque: false,
-  errorDestaque: null,
+  filtrosCategorias: {
+    search: "",
+    tipo: "all" as TipoCategoriaFilter,
+    status: "all" as StatusFilter,
+    page: 1,
+    limit: 12,
+  },
 
-  filtrosCategorias: { ...filtrosIniciaisCategorias },
-  filtrosItens: { ...filtrosIniciaisItens },
-
-  stats: null,
+  filtrosItens: {
+    search: "",
+    categoria_id: "all",
+    tipo: "all" as TipoItemFilter,
+    status: "all" as StatusFilter,
+    destaque: "all" as DestaqueFilter,
+    page: 1,
+    limit: 12,
+  },
 };
 
-export const useGaleriaStore = create<GaleriaStore>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
+// ============================================
+// CREATE STORE
+// ============================================
 
-      // ==================== ACTIONS IMPLEMENTATION ====================
+export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
+  ...initialState,
 
-      fetchCategorias: async () => {
-        set({ loadingCategorias: true, errorCategorias: null });
+  // --- Actions Categorias ---
+  fetchCategorias: async () => {
+    set({ loadingCategorias: true, errorCategorias: null });
+    try {
+      const { filtrosCategorias } = get();
+      const res = await getCategoriasAdmin({
+        search: filtrosCategorias.search,
+        tipo:
+          filtrosCategorias.tipo !== "all" ? filtrosCategorias.tipo : undefined,
+        status:
+          filtrosCategorias.status !== "all"
+            ? filtrosCategorias.status
+            : undefined,
+        page: filtrosCategorias.page,
+        limit: filtrosCategorias.limit,
+      });
 
-        try {
-          const state = get();
-          const { searchTerm, tipo, sortBy, currentPage, itemsPerPage } =
-            state.filtrosCategorias;
-
-          const result: ApiResponse<CategoriaComItens[]> =
-            await getCategoriasGaleria({
-              tipo: tipo !== "all" ? tipo : undefined,
-              search: searchTerm,
-              sortBy,
-              limit: itemsPerPage,
-              page: currentPage,
-            });
-
-          if (!result.success) {
-            throw new Error(result.error || "Erro ao buscar categorias");
-          }
-
-          set({
-            categorias: result.data || [],
-            loadingCategorias: false,
-            filtrosCategorias: {
-              ...state.filtrosCategorias,
-              total: result.pagination?.total || 0,
-            },
-          });
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : "Erro ao carregar categorias";
-          set({
-            errorCategorias: errorMessage,
-            loadingCategorias: false,
-          });
-        }
-      },
-
-      fetchCategoriaPorSlug: async (
-        slug: string
-      ): Promise<CategoriaComItens | null> => {
-        try {
-          set({ loadingItens: true, errorItens: null });
-
-          const result: ApiResponse<CategoriaComItens> =
-            await getCategoriaPorSlug(slug);
-
-          if (!result.success) {
-            set({ errorItens: result.error || "Categoria não encontrada" });
-            return null;
-          }
-
-          const categoria = result.data;
-          if (!categoria) {
-            set({ errorItens: "Categoria não encontrada" });
-            return null;
-          }
-
-          set({
-            categoriaAtual: categoria,
-            errorItens: null,
-            loadingItens: false,
-          });
-
-          return categoria;
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : "Erro ao buscar categoria";
-          set({
-            errorItens: errorMessage,
-            loadingItens: false,
-          });
-          return null;
-        }
-      },
-
-      fetchEstatisticas: async (): Promise<void> => {
-        try {
-          const result: ApiResponse<EstatisticasGaleria> =
-            await getEstatisticasGaleria();
-
-          if (result.success && result.data) {
-            set({ stats: result.data });
-          }
-        } catch (error) {
-          console.error("Erro ao buscar estatísticas:", error);
-        }
-      },
-
-      fetchCategoriasDestaque: async (limit: number = 3): Promise<void> => {
-        set({ loadingDestaque: true, errorDestaque: null });
-
-        try {
-          const result: ApiResponse<CategoriaComItens[]> =
-            await getCategoriasDestaque(limit);
-
-          if (!result.success) {
-            throw new Error(
-              result.error || "Erro ao buscar categorias em destaque"
-            );
-          }
-
-          set({
-            categoriasDestaque: result.data || [],
-            loadingDestaque: false,
-          });
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error
-              ? error.message
-              : "Erro ao carregar destaques";
-          set({
-            errorDestaque: errorMessage,
-            loadingDestaque: false,
-          });
-        }
-      },
-
-      fetchItensPorCategoria: async (categoriaId: string) => {
-        set({ loadingItens: true, errorItens: null });
-
-        try {
-          const state = get();
-          const { searchTerm, sortBy, destaque, currentPage, itemsPerPage } =
-            state.filtrosItens;
-
-          const result: ApiResponse<ItemGaleria[]> = await getItensPorCategoria(
-            categoriaId,
-            {
-              search: searchTerm,
-              sortBy,
-              destaque,
-              limit: itemsPerPage,
-              page: currentPage,
-            }
-          );
-
-          if (!result.success) {
-            throw new Error(result.error || "Erro ao buscar itens");
-          }
-
-          set({
-            itens: result.data || [],
-            loadingItens: false,
-            filtrosItens: {
-              ...state.filtrosItens,
-              total: result.pagination?.total || 0,
-            },
-          });
-        } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : "Erro ao carregar itens";
-          set({
-            errorItens: errorMessage,
-            loadingItens: false,
-          });
-        }
-      },
-
-      // ==================== SETTERS ====================
-
-      setSearchTermCategorias: (term: string) => {
-        set((state) => ({
-          filtrosCategorias: {
-            ...state.filtrosCategorias,
-            searchTerm: term,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      setTipoCategorias: (tipo: TipoCategoriaFilter) => {
-        set((state) => ({
-          filtrosCategorias: {
-            ...state.filtrosCategorias,
-            tipo,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      setSortByCategorias: (sortBy: SortType) => {
-        set((state) => ({
-          filtrosCategorias: {
-            ...state.filtrosCategorias,
-            sortBy,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      setCurrentPageCategorias: (page: number) => {
-        set((state) => ({
-          filtrosCategorias: {
-            ...state.filtrosCategorias,
-            currentPage: page,
-          },
-        }));
-      },
-
-      setItemsPerPageCategorias: (itemsPerPage: number) => {
-        set((state) => ({
-          filtrosCategorias: {
-            ...state.filtrosCategorias,
-            itemsPerPage,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      setSearchTermItens: (term: string) => {
-        set((state) => ({
-          filtrosItens: {
-            ...state.filtrosItens,
-            searchTerm: term,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      setSortByItens: (sortBy: SortType) => {
-        set((state) => ({
-          filtrosItens: {
-            ...state.filtrosItens,
-            sortBy,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      setDestaqueItens: (destaque: boolean | null) => {
-        set((state) => ({
-          filtrosItens: {
-            ...state.filtrosItens,
-            destaque,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      setCurrentPageItens: (page: number) => {
-        set((state) => ({
-          filtrosItens: {
-            ...state.filtrosItens,
-            currentPage: page,
-          },
-        }));
-      },
-
-      setItemsPerPageItens: (itemsPerPage: number) => {
-        set((state) => ({
-          filtrosItens: {
-            ...state.filtrosItens,
-            itemsPerPage,
-            currentPage: 1,
-          },
-        }));
-      },
-
-      // ==================== RESET ====================
-
-      resetFiltrosCategorias: () => {
-        set({
-          filtrosCategorias: { ...filtrosIniciaisCategorias },
-        });
-      },
-
-      resetFiltrosItens: () => {
-        set({
-          filtrosItens: { ...filtrosIniciaisItens },
-        });
-      },
-
-      clearItens: () => {
-        set({
-          itens: [],
-          categoriaAtual: null,
-          loadingItens: false,
-          errorItens: null,
-          filtrosItens: { ...filtrosIniciaisItens },
-        });
-      },
-
-      clearAll: () => {
-        set(initialState);
-      },
-    }),
-    {
-      name: "galeria-store",
-      partialize: (state) => ({
-        filtrosCategorias: state.filtrosCategorias,
-        filtrosItens: state.filtrosItens,
-      }),
+      if (res.success && res.data) {
+        set({ categorias: res.data, loadingCategorias: false });
+      } else {
+        throw new Error(res.error || "Erro ao buscar categorias");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorCategorias: message, loadingCategorias: false });
     }
-  )
-);
+  },
+
+  fetchCategoriaPorSlug: async (slug: string) => {
+    set({ loadingCategorias: true, errorCategorias: null });
+    try {
+      const res = await getCategoriaPorSlug(slug);
+      if (res.success && res.data) {
+        set({ categoriaSelecionada: res.data, loadingCategorias: false });
+      } else {
+        throw new Error(res.error || "Categoria não encontrada");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorCategorias: message, loadingCategorias: false });
+    }
+  },
+
+  criarCategoria: async (data: CreateCategoriaInput) => {
+    set({ loadingCategorias: true, errorCategorias: null });
+    try {
+      const res = await createCategoria(data);
+      if (res.success) {
+        await get().fetchCategorias(); // Recarrega a lista
+        return { success: true };
+      } else {
+        throw new Error(res.error || "Erro ao criar categoria");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorCategorias: message, loadingCategorias: false });
+      return { success: false, error: message };
+    }
+  },
+
+  alternarStatusCategoria: async (id: string, current: boolean) => {
+    set({ loadingCategorias: true });
+    try {
+      // Inverte o status atual
+      const res = await toggleCategoriaStatus(id, !current);
+      if (res.success) {
+        // Atualiza a lista localmente para ser mais rápido (otimista) ou recarrega
+        // Vamos recarregar para garantir consistência
+        await get().fetchCategorias();
+        set({ loadingCategorias: false });
+        return { success: true };
+      } else {
+        throw new Error(res.error);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorCategorias: message, loadingCategorias: false });
+      return { success: false, error: message };
+    }
+  },
+
+  // --- Actions Itens ---
+  fetchItens: async () => {
+    set({ loadingItens: true, errorItens: null });
+    try {
+      const { filtrosItens } = get();
+      const res = await getItensAdmin({
+        search: filtrosItens.search,
+        categoria_id:
+          filtrosItens.categoria_id !== "all"
+            ? filtrosItens.categoria_id
+            : undefined,
+        tipo: filtrosItens.tipo !== "all" ? filtrosItens.tipo : undefined,
+        status: filtrosItens.status !== "all" ? filtrosItens.status : undefined,
+        destaque:
+          filtrosItens.destaque !== "all" ? filtrosItens.destaque : undefined,
+        page: filtrosItens.page,
+        limit: filtrosItens.limit,
+      });
+
+      if (res.success && res.data) {
+        set({ itens: res.data, loadingItens: false });
+      } else {
+        throw new Error(res.error || "Erro ao buscar itens");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorItens: message, loadingItens: false });
+    }
+  },
+
+  criarItem: async (data: FormData) => {
+    set({ loadingItens: true, errorItens: null });
+    try {
+      const res = await createItem(data);
+      if (res.success) {
+        await get().fetchItens();
+        return { success: true };
+      } else {
+        throw new Error(res.error);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorItens: message, loadingItens: false });
+      return { success: false, error: message };
+    }
+  },
+
+  alternarStatusItem: async (id: string, current: boolean) => {
+    try {
+      const res = await toggleItemStatus(id, !current);
+      if (res.success) {
+        await get().fetchItens();
+        return { success: true };
+      } else {
+        throw new Error(res.error);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorItens: message });
+      return { success: false, error: message };
+    }
+  },
+
+  alternarDestaqueItem: async (id: string, current: boolean) => {
+    try {
+      const res = await toggleItemDestaque(id, !current);
+      if (res.success) {
+        await get().fetchItens();
+        return { success: true };
+      } else {
+        throw new Error(res.error);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Erro desconhecido";
+      set({ errorItens: message });
+      return { success: false, error: message };
+    }
+  },
+
+  fetchStats: async () => {
+    set({ loadingStats: true });
+    try {
+      const res = await getGaleriaStats();
+      if (res.success && res.data) {
+        set({ stats: res.data, loadingStats: false });
+      } else {
+        set({ loadingStats: false });
+      }
+    } catch (err) {
+      console.error(err);
+      set({ loadingStats: false });
+    }
+  },
+
+  // --- Setters ---
+  setFiltrosCategorias: (filtros) =>
+    set((state) => ({
+      filtrosCategorias: { ...state.filtrosCategorias, ...filtros },
+    })),
+
+  setFiltrosItens: (filtros) =>
+    set((state) => ({ filtrosItens: { ...state.filtrosItens, ...filtros } })),
+
+  setPaginationCategorias: (pagination) =>
+    set((state) => ({
+      filtrosCategorias: { ...state.filtrosCategorias, ...pagination },
+    })),
+
+  setPaginationItens: (pagination) =>
+    set((state) => ({
+      filtrosItens: { ...state.filtrosItens, ...pagination },
+    })),
+
+  // --- Utils ---
+  clearErrorCategorias: () => set({ errorCategorias: null }),
+  clearErrorItens: () => set({ errorItens: null }),
+  resetFiltrosCategorias: () =>
+    set({ filtrosCategorias: initialState.filtrosCategorias }),
+  resetFiltrosItens: () => set({ filtrosItens: initialState.filtrosItens }),
+}));
+
+// ============================================
+// HOOKS EXPORTADOS
+// ============================================
+
+export function useCategoriasList() {
+  const store = useGaleriaStore(
+    useShallow((state) => ({
+      categorias: state.categorias,
+      loading: state.loadingCategorias,
+      error: state.errorCategorias,
+      filtros: state.filtrosCategorias,
+      fetchCategorias: state.fetchCategorias,
+      setFiltros: state.setFiltrosCategorias,
+      resetFiltros: state.resetFiltrosCategorias,
+      setPagination: state.setPaginationCategorias,
+      pagination: {
+        page: state.filtrosCategorias.page,
+        limit: state.filtrosCategorias.limit,
+        // Fallback seguro se stats não estiver carregado
+        total: state.stats?.total_categorias || state.categorias.length,
+        totalPages: 1,
+      },
+    })),
+  );
+  return store;
+}
+
+export function useCategoriaSelecionada() {
+  const store = useGaleriaStore(
+    useShallow((state) => ({
+      categoria: state.categoriaSelecionada,
+      loading: state.loadingCategorias,
+      error: state.errorCategorias,
+      fetchCategoriaPorSlug: state.fetchCategoriaPorSlug,
+      clearError: state.clearErrorCategorias,
+    })),
+  );
+  return store;
+}
+
+export function useItensList() {
+  const store = useGaleriaStore(
+    useShallow((state) => ({
+      itens: state.itens,
+      loading: state.loadingItens,
+      error: state.errorItens,
+      filtros: state.filtrosItens,
+      fetchItens: state.fetchItens,
+      setFiltros: state.setFiltrosItens,
+      clearError: state.clearErrorItens,
+      setPagination: state.setPaginationItens,
+      pagination: {
+        page: state.filtrosItens.page,
+        limit: state.filtrosItens.limit,
+        total: state.stats?.total_itens || state.itens.length,
+        totalPages: 1,
+      },
+    })),
+  );
+  return store;
+}

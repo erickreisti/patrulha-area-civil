@@ -1,5 +1,3 @@
-// src/components/site/layout/Header.tsx
-
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -103,8 +101,8 @@ const TopBar = () => {
   return (
     <div
       className={cn(
-        "bg-navy py-1.5 xs:py-2 transition-all duration-300",
-        scrolled ? "shadow-md" : ""
+        "bg-pac-primary py-1.5 xs:py-2 transition-all duration-300", // Corrigido para pac-primary
+        scrolled ? "shadow-md" : "",
       )}
       role="complementary"
       aria-label="Barra superior"
@@ -120,7 +118,7 @@ const TopBar = () => {
               className="rounded-sm w-auto h-auto min-w-[20px]"
               priority
             />
-            <span className="text-slate-200 font-medium truncate text-[10px] xs:text-xs">
+            <span className="text-white/90 font-medium truncate text-[10px] xs:text-xs">
               Brasil
             </span>
           </div>
@@ -134,7 +132,7 @@ const TopBar = () => {
               className="rounded-sm w-auto h-auto"
               priority
             />
-            <span className="text-slate-200 font-medium font-roboto text-xs lg:text-sm xl:text-base">
+            <span className="text-white/90 font-medium font-sans text-xs lg:text-sm xl:text-base">
               República Federativa do Brasil
             </span>
           </div>
@@ -158,7 +156,7 @@ const TopBar = () => {
                     "no-underline transition-all duration-300 border border-white/20",
                     social.hoverColor,
                     "hover:border-transparent hover:scale-110 hover:shadow-lg",
-                    "touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    "touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50",
                   )}
                   aria-label={social.label}
                   role="listitem"
@@ -194,10 +192,10 @@ const Logo = () => {
       </div>
 
       <div className="text-left transition-all duration-300 min-w-0 flex-1">
-        <h1 className="font-bebas bg-gradient-to-r from-navy to-navy-700 bg-clip-text text-transparent tracking-wider uppercase leading-tight transition-all duration-300 text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl truncate">
+        <h1 className="font-extrabold bg-gradient-to-r from-pac-primary to-pac-primary-light bg-clip-text text-transparent tracking-tight uppercase leading-tight transition-all duration-300 text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl truncate">
           PATRULHA AÉREA CIVIL
         </h1>
-        <p className="text-slate-600 leading-tight mt-0.5 font-roboto transition-all duration-300 text-[9px] xs:text-[10px] sm:text-xs md:text-sm truncate">
+        <p className="text-gray-600 leading-tight mt-0.5 font-sans transition-all duration-300 text-[9px] xs:text-[10px] sm:text-xs md:text-sm truncate">
           COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
         </p>
       </div>
@@ -219,13 +217,13 @@ const NavigationItem = ({
       href={item.href}
       onClick={onClick}
       className={cn(
-        "no-underline text-slate-700 font-medium py-1.5 xs:py-2 px-1 transition-all duration-300",
-        "uppercase tracking-wider font-roboto relative group/navlink w-fit",
+        "no-underline text-gray-700 font-medium py-1.5 xs:py-2 px-1 transition-all duration-300",
+        "uppercase tracking-wider font-sans relative group/navlink w-fit",
         isActive
-          ? "text-navy font-semibold"
-          : "text-slate-600 hover:text-navy hover:font-semibold",
+          ? "text-pac-primary font-bold"
+          : "text-gray-600 hover:text-pac-primary hover:font-semibold",
         "touch-optimize active:scale-95",
-        "text-xs xs:text-sm sm:text-base"
+        "text-xs xs:text-sm sm:text-base",
       )}
       aria-current={isActive ? "page" : undefined}
       role="menuitem"
@@ -235,8 +233,8 @@ const NavigationItem = ({
       </span>
       <div
         className={cn(
-          "absolute -bottom-1 left-0 w-0 h-0.5 bg-navy transition-all duration-300",
-          isActive ? "w-full" : "group-hover/navlink:w-full"
+          "absolute -bottom-1 left-0 w-0 h-0.5 bg-pac-primary transition-all duration-300",
+          isActive ? "w-full" : "group-hover/navlink:w-full",
         )}
         aria-hidden="true"
       />
@@ -268,7 +266,7 @@ const DesktopNavigation = ({ pathname }: { pathname: string }) => (
 const LoadingButton = () => {
   return (
     <Button
-      className="bg-navy hover:bg-navy-700 text-white font-medium px-3 xs:px-4 py-2 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 font-roboto border-0 min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md"
+      className="bg-pac-primary hover:bg-pac-primary-dark text-white font-medium px-3 xs:px-4 py-2 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 font-sans border-0 min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md"
       disabled
       aria-label="Carregando..."
       aria-busy="true"
@@ -297,20 +295,17 @@ const IdentificationButton = () => {
     }
   }, [logout]);
 
-  // Mostrar botão de loading APENAS durante os primeiros 2 segundos
-  // para evitar que fique "carregando" permanentemente
   if (isLoading) {
     return <LoadingButton />;
   }
 
-  // Se o usuário estiver logado, mostrar dropdown com "Identificação"
   if (user && profile) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            className="bg-navy hover:bg-navy-700 text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+            className="bg-pac-primary hover:bg-pac-primary-dark text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-sans border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
             aria-label="Menu do usuário"
             role="button"
           >
@@ -327,29 +322,29 @@ const IdentificationButton = () => {
           collisionPadding={12}
           role="menu"
         >
-          <DropdownMenuLabel className="p-3 xs:p-4 border-b border-slate-200">
+          <DropdownMenuLabel className="p-3 xs:p-4 border-b border-gray-200">
             <div className="flex items-center gap-2 xs:gap-3">
-              <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-navy/20 flex-shrink-0">
+              <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-pac-primary/20 flex-shrink-0">
                 <AvatarImage
                   src={profile?.avatar_url || ""}
                   alt={`Avatar de ${profile?.full_name || "Agente"}`}
                   className="object-cover object-center"
                   sizes="40px"
                 />
-                <AvatarFallback className="bg-navy text-white text-xs">
+                <AvatarFallback className="bg-pac-primary text-white text-xs">
                   <RiUserLine className="w-4 h-4 xs:w-5 xs:h-5" />
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-xs xs:text-sm font-semibold text-slate-800 truncate">
+                <p className="text-xs xs:text-sm font-semibold text-gray-800 truncate">
                   {profile?.full_name || "Agente PAC"}
                 </p>
-                <p className="text-[10px] xs:text-xs text-slate-600 truncate">
+                <p className="text-[10px] xs:text-xs text-gray-600 truncate">
                   {profile?.matricula
                     ? `Matrícula: ${profile.matricula}`
                     : user.email}
                 </p>
-                <p className="text-[10px] xs:text-xs text-navy font-medium capitalize truncate">
+                <p className="text-[10px] xs:text-xs text-pac-primary font-medium capitalize truncate">
                   {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
                 </p>
               </div>
@@ -361,7 +356,7 @@ const IdentificationButton = () => {
               <DropdownMenuItem asChild role="menuitem">
                 <Link
                   href="/perfil"
-                  className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-slate-100 py-2"
+                  className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-gray-100 py-2"
                 >
                   <RiUserLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 text-blue-600 flex-shrink-0" />
                   <span className="truncate">Ver Meu Perfil</span>
@@ -373,7 +368,7 @@ const IdentificationButton = () => {
               <DropdownMenuItem asChild role="menuitem">
                 <Link
                   href="/admin/dashboard"
-                  className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-slate-100 py-2"
+                  className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-gray-100 py-2"
                 >
                   <RiBarChartLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 text-purple-600 flex-shrink-0" />
                   <span className="truncate">Ir ao Dashboard</span>
@@ -399,10 +394,9 @@ const IdentificationButton = () => {
     );
   }
 
-  // Se não estiver logado, mostrar botão normal de login
   return (
     <Button
-      className="bg-navy hover:bg-navy-700 text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-roboto border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+      className="bg-pac-primary hover:bg-pac-primary-dark text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-sans border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
       asChild
     >
       <Link href="/login" aria-label="Fazer login" role="button">
@@ -484,22 +478,22 @@ const MobileMenu = ({
             id={id}
           >
             <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between p-3 xs:p-4 border-b border-slate-200 bg-white">
-                <h2 className="text-lg xs:text-xl font-semibold text-navy">
+              <div className="flex items-center justify-between p-3 xs:p-4 border-b border-gray-200 bg-white">
+                <h2 className="text-lg xs:text-xl font-semibold text-pac-primary">
                   Menu
                 </h2>
                 <button
                   onClick={onClose}
-                  className="p-1.5 xs:p-2 rounded-lg hover:bg-slate-100 transition-colors touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                  className="p-1.5 xs:p-2 rounded-lg hover:bg-gray-100 transition-colors touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
                   aria-label="Fechar menu"
                   type="button"
                 >
-                  <RiCloseLine className="w-5 h-5 xs:w-6 xs:h-6 text-slate-700" />
+                  <RiCloseLine className="w-5 h-5 xs:w-6 xs:h-6 text-gray-700" />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-3 xs:p-4">
-                <h3 className="text-xs xs:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
+                <h3 className="text-xs xs:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
                   Navegação
                 </h3>
                 <nav className="space-y-1" role="navigation">
@@ -510,10 +504,10 @@ const MobileMenu = ({
                       onClick={onClose}
                       className={cn(
                         "flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium rounded-md transition-colors duration-200",
-                        "focus:outline-none focus:ring-2 focus:ring-navy/50",
+                        "focus:outline-none focus:ring-2 focus:ring-pac-primary/50",
                         pathname.startsWith(item.href)
-                          ? "bg-navy/10 text-navy border-r-2 border-navy"
-                          : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                          ? "bg-pac-primary/10 text-pac-primary border-r-2 border-pac-primary"
+                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
                       )}
                       role="menuitem"
                     >
@@ -523,29 +517,29 @@ const MobileMenu = ({
                 </nav>
 
                 {user ? (
-                  <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
-                    <div className="flex items-center gap-2 xs:gap-3 px-2 xs:px-3 py-2 xs:py-3 bg-slate-50 rounded-lg mb-2 xs:mb-3">
-                      <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-navy/20 flex-shrink-0">
+                  <div className="border-t border-gray-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
+                    <div className="flex items-center gap-2 xs:gap-3 px-2 xs:px-3 py-2 xs:py-3 bg-gray-50 rounded-lg mb-2 xs:mb-3">
+                      <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-pac-primary/20 flex-shrink-0">
                         <AvatarImage
                           src={profile?.avatar_url || ""}
                           alt={`Avatar de ${profile?.full_name || "Agente"}`}
                           className="object-cover object-center"
                           sizes="40px"
                         />
-                        <AvatarFallback className="bg-navy text-white text-xs">
+                        <AvatarFallback className="bg-pac-primary text-white text-xs">
                           <RiUserLine className="w-4 h-4 xs:w-5 xs:h-5" />
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs xs:text-sm font-semibold text-slate-800 truncate">
+                        <p className="text-xs xs:text-sm font-semibold text-gray-800 truncate">
                           {profile?.full_name || "Agente PAC"}
                         </p>
-                        <p className="text-[10px] xs:text-xs text-slate-600 truncate">
+                        <p className="text-[10px] xs:text-xs text-gray-600 truncate">
                           {profile?.matricula
                             ? `Matrícula: ${profile.matricula}`
                             : user.email}
                         </p>
-                        <p className="text-[10px] xs:text-xs text-navy font-medium capitalize">
+                        <p className="text-[10px] xs:text-xs text-pac-primary font-medium capitalize">
                           {profile?.graduacao || "Agente"}{" "}
                           {isAdmin ? "• Admin" : ""}
                         </p>
@@ -556,7 +550,7 @@ const MobileMenu = ({
                       {!isOnProfilePage && (
                         <Link
                           href="/perfil"
-                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
+                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
                           onClick={onClose}
                           role="menuitem"
                         >
@@ -568,7 +562,7 @@ const MobileMenu = ({
                       {isAdmin && (
                         <Link
                           href="/admin/dashboard"
-                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-navy/50"
+                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
                           onClick={onClose}
                           role="menuitem"
                         >
@@ -589,9 +583,9 @@ const MobileMenu = ({
                     </div>
                   </div>
                 ) : (
-                  <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
+                  <div className="border-t border-gray-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
                     <Button
-                      className="w-full bg-navy hover:bg-navy-700 text-white font-medium py-2 xs:py-3 text-xs xs:text-sm uppercase tracking-wider font-roboto border-0 group/button relative overflow-hidden shadow-md transition-all duration-300 touch-optimize focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className="w-full bg-pac-primary hover:bg-pac-primary-dark text-white font-medium py-2 xs:py-3 text-xs xs:text-sm uppercase tracking-wider font-sans border-0 group/button relative overflow-hidden shadow-md transition-all duration-300 touch-optimize focus:outline-none focus:ring-2 focus:ring-white/50"
                       asChild
                     >
                       <Link href="/login" onClick={onClose} role="button">
@@ -604,8 +598,8 @@ const MobileMenu = ({
                   </div>
                 )}
 
-                <div className="border-t border-slate-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
-                  <h3 className="text-xs xs:text-sm font-semibold text-slate-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
+                <div className="border-t border-gray-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
+                  <h3 className="text-xs xs:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
                     Redes Sociais
                   </h3>
                   <div
@@ -622,10 +616,10 @@ const MobileMenu = ({
                           target="_blank"
                           rel="noopener noreferrer"
                           className={cn(
-                            "w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 bg-slate-100 rounded-full flex items-center justify-center text-slate-700 no-underline transition-all duration-300 hover:shadow-lg",
-                            "focus:outline-none focus:ring-2 focus:ring-navy/50",
+                            "w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-700 no-underline transition-all duration-300 hover:shadow-lg",
+                            "focus:outline-none focus:ring-2 focus:ring-pac-primary/50",
                             social.hoverColor,
-                            "hover:text-white hover:scale-110 touch-optimize"
+                            "hover:text-white hover:scale-110 touch-optimize",
                           )}
                           aria-label={social.label}
                           onClick={onClose}
@@ -639,8 +633,8 @@ const MobileMenu = ({
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 p-3 xs:p-4 bg-slate-50">
-                <div className="text-center text-[10px] xs:text-xs text-slate-500">
+              <div className="border-t border-gray-200 p-3 xs:p-4 bg-gray-50">
+                <div className="text-center text-[10px] xs:text-xs text-gray-500">
                   <p>© {new Date().getFullYear()} Patrulha Aérea Civil</p>
                   <p className="mt-0.5 xs:mt-1">Todos os direitos reservados</p>
                 </div>
@@ -664,7 +658,6 @@ export function Header() {
   const toggleMenu = useCallback(() => setIsMenuOpen((prev) => !prev), []);
   const closeMenu = useCallback(() => setIsMenuOpen(false), []);
 
-  // Inicializar auth store no mount do componente
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -700,18 +693,17 @@ export function Header() {
     };
   }, []);
 
-  // Se ainda estiver carregando a inicialização, mostrar versão simplificada
   if (initLoading) {
     return (
       <header
         className={cn(
-          "bg-white sticky top-0 left-0 right-0 z-50 min-h-[80px] xs:min-h-[85px] md:min-h-[90px] lg:min-h-[100px] xl:min-h-[120px] shadow-sm"
+          "bg-white sticky top-0 left-0 right-0 z-50 min-h-[80px] xs:min-h-[85px] md:min-h-[90px] lg:min-h-[100px] xl:min-h-[120px] shadow-sm",
         )}
         role="banner"
         aria-label="Cabeçalho principal"
       >
         <TopBar />
-        <div className="bg-white border-b border-slate-200">
+        <div className="bg-white border-b border-gray-200">
           <div className="container mx-auto px-3 xs:px-4 sm:px-6">
             <div className="flex items-center justify-between w-full py-2 xs:py-3">
               <Logo />
@@ -727,14 +719,14 @@ export function Header() {
     <header
       className={cn(
         "bg-white sticky top-0 left-0 right-0 z-50 min-h-[80px] xs:min-h-[85px] md:min-h-[90px] lg:min-h-[100px] xl:min-h-[120px] transition-all duration-300",
-        scrolled ? "shadow-lg" : "shadow-sm"
+        scrolled ? "shadow-lg" : "shadow-sm",
       )}
       role="banner"
       aria-label="Cabeçalho principal"
     >
       <TopBar />
 
-      <div className="bg-white border-b border-slate-200">
+      <div className="bg-white border-b border-gray-200">
         <div className="container mx-auto px-3 xs:px-4 sm:px-6">
           <div className="flex md:hidden items-center justify-between w-full py-2 xs:py-3">
             <Logo />
@@ -743,7 +735,7 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 onClick={toggleMenu}
-                className="text-slate-700 hover:bg-slate-100 w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                className="text-gray-700 hover:bg-gray-100 w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
                 aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
                 aria-expanded={isMenuOpen}
                 aria-controls="mobile-menu"
@@ -762,7 +754,7 @@ export function Header() {
                 variant="ghost"
                 size="icon"
                 onClick={toggleMenu}
-                className="text-slate-700 hover:bg-slate-100 w-9 h-9 xs:w-10 xs:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-navy/50"
+                className="text-gray-700 hover:bg-gray-100 w-9 h-9 xs:w-10 xs:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
                 aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
                 aria-expanded={isMenuOpen}
                 aria-controls="mobile-menu"

@@ -1,15 +1,22 @@
-// src/app/(app)/admin/agentes/[id]/page.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { motion } from "framer-motion";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+
+// Components UI
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
-import { FileUpload } from "@/components/ui/file-upload";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,11 +43,8 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Calendar } from "@/components/ui/calendar";
-import { toast } from "sonner";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+
+// Icons
 import {
   RiUserLine,
   RiIdCardLine,
@@ -59,15 +63,88 @@ import {
   RiCalendar2Line,
   RiShieldKeyholeLine,
   RiShieldUserLine,
+  RiUploadLine,
+  RiPhoneLine,
+  RiCalendarEventLine,
+  RiMapPinLine,
 } from "react-icons/ri";
 
-// IMPORT DO STORE
-import {
-  useAgentEdit,
-  GRADUACOES,
-  TIPOS_SANGUINEOS,
-} from "@/lib/stores/useAgentesStore";
+// Store CORRETO
+import { useAgentEdit } from "@/lib/stores/useAgentesStore";
+
+// Actions
 import { deleteAgent } from "@/app/actions/admin/agents/agents";
+
+// ==================== CONSTANTES ====================
+
+// Lista de graduações
+const GRADUACOES = [
+  "Soldado",
+  "Cabo",
+  "3º Sargento",
+  "2º Sargento",
+  "1º Sargento",
+  "Subtenente",
+  "Cadete",
+  "Aspirante",
+  "2º Tenente",
+  "1º Tenente",
+  "Capitão",
+  "Major",
+  "Tenente-Coronel",
+  "Coronel",
+  "General de Brigada",
+  "General de Divisão",
+  "General de Exército",
+];
+
+// Tipos sanguíneos
+const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+// UFs do Brasil
+const UFS_BRASIL = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+];
+
+// ==================== FUNÇÕES UTILITÁRIAS ====================
+
+const formatDateLocal = (dateString?: string | null): string => {
+  if (!dateString) return "Não informada";
+  try {
+    const date = new Date(dateString);
+    return format(date, "dd/MM/yyyy", { locale: ptBR });
+  } catch {
+    return "Data inválida";
+  }
+};
+
+// ==================== ANIMAÇÕES ====================
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
@@ -80,21 +157,249 @@ const fadeInUp = {
   },
 };
 
-interface AgentUpdateData {
-  full_name?: string;
-  graduacao?: string | null;
-  tipo_sanguineo?: string | null;
-  validade_certificacao?: string | null;
-  avatar_url?: string | null;
-  matricula?: string;
-  email?: string;
-  role?: "agent" | "admin";
-  status?: boolean;
+// ==================== COMPONENTE AVATAR UPLOAD CORRIGIDO ====================
+
+function AvatarUpload({
+  currentAvatar,
+  onAvatarChange,
+  matricula,
+  isLoading,
+  userId,
+}: {
+  currentAvatar?: string;
+  onAvatarChange: (url: string | null) => void;
+  matricula: string;
+  isLoading: boolean;
+  userId: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = () => {
+    if (fileInputRef.current && !uploading && !isLoading) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validação básica
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Máximo: 2MB");
+      return;
+    }
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Tipo de arquivo não permitido. Use JPG, PNG, WEBP ou GIF.");
+      return;
+    }
+
+    setUploading(true);
+    setProgress(10);
+
+    const toastId = toast.loading("Enviando imagem...", {
+      description: "Upload em andamento",
+    });
+
+    try {
+      // Simular progresso
+      const progressInterval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      const { uploadAgentAvatar } = await import("@/app/actions/upload/avatar");
+
+      const formData = new FormData();
+      formData.append("userId", userId);
+      formData.append("matricula", matricula);
+      formData.append("file", file);
+      formData.append("mode", "edit"); // ✅ IMPORTANTE: Modo edição
+
+      const result = await uploadAgentAvatar(formData);
+
+      clearInterval(progressInterval);
+      setProgress(100);
+
+      if (result.success && result.data?.url) {
+        toast.success("✅ Avatar atualizado com sucesso!", {
+          id: toastId,
+          description: "A imagem foi enviada e salva com sucesso.",
+          duration: 4000,
+        });
+
+        onAvatarChange(result.data.url);
+
+        // Delay para mostrar progresso completo
+        setTimeout(() => setProgress(0), 500);
+      } else {
+        toast.error(`❌ ${result.error || "Erro no upload"}`, {
+          id: toastId,
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      console.error("Erro no upload:", error);
+      toast.error("❌ Erro ao enviar imagem", {
+        id: toastId,
+        description: error instanceof Error ? error.message : "Tente novamente",
+        duration: 5000,
+      });
+    } finally {
+      setUploading(false);
+      setProgress(0);
+
+      // Limpar input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!currentAvatar || uploading || isLoading) return;
+
+    const toastId = toast.loading("Removendo imagem...");
+
+    try {
+      const { removeAgentAvatar } = await import("@/app/actions/upload/avatar");
+
+      const formData = new FormData();
+      formData.append("userId", userId);
+      formData.append("avatarUrl", currentAvatar);
+      formData.append("matricula", matricula);
+      formData.append("mode", "edit"); // ✅ IMPORTANTE: Modo edição
+
+      const result = await removeAgentAvatar(formData);
+
+      if (result.success) {
+        toast.success("✅ Avatar removido com sucesso!", { id: toastId });
+        onAvatarChange(null);
+      } else {
+        toast.error(`❌ ${result.error || "Erro ao remover"}`, { id: toastId });
+      }
+    } catch (error) {
+      console.error("Erro ao remover:", error);
+      toast.error("❌ Erro ao remover imagem", { id: toastId });
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <Label className="text-base font-semibold text-gray-700 flex items-center">
+          <RiImageLine className="w-5 h-5 mr-2 text-navy-500" />
+          Foto do Agente
+        </Label>
+        {currentAvatar && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleRemoveAvatar}
+            disabled={uploading || isLoading}
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+          >
+            <RiDeleteBinLine className="w-4 h-4 mr-1" />
+            Remover
+          </Button>
+        )}
+      </div>
+
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept=".jpg,.jpeg,.png,.webp,.gif"
+        className="hidden"
+        disabled={uploading || isLoading}
+      />
+
+      <div
+        className={`relative p-6 border-2 border-dashed rounded-xl transition-all duration-300 ${
+          uploading || isLoading
+            ? "border-gray-300 bg-gray-50"
+            : currentAvatar
+              ? "border-blue-500 bg-blue-50"
+              : "border-gray-300 hover:border-blue-500 hover:bg-blue-50/50 bg-white"
+        }`}
+        onClick={handleFileSelect}
+      >
+        {uploading ? (
+          <div className="text-center space-y-3">
+            <Spinner className="w-8 h-8 mx-auto text-navy-600" />
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Enviando imagem...</p>
+              <Progress value={progress} className="h-2" />
+              <p className="text-xs text-gray-500">{progress}%</p>
+            </div>
+          </div>
+        ) : currentAvatar ? (
+          <div className="flex flex-col items-center space-y-3">
+            <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
+              <Image
+                src={currentAvatar}
+                alt="Avatar do agente"
+                fill
+                className="object-cover"
+                sizes="96px"
+                onError={(e) => {
+                  console.error("Erro ao carregar imagem:", currentAvatar);
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/default-avatar.png";
+                }}
+              />
+            </div>
+            <p className="text-sm text-gray-600">Clique para alterar a foto</p>
+            <p className="text-xs text-gray-500">
+              Suporta JPG, PNG, WebP, GIF (até 2MB)
+            </p>
+          </div>
+        ) : (
+          <div className="text-center space-y-3 cursor-pointer">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-600">
+              <RiUploadLine className="w-8 h-8" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-700">
+                Clique para fazer upload
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                ou arraste uma imagem aqui
+              </p>
+            </div>
+            <div className="text-xs text-gray-400">
+              <p>Formatos: JPG, PNG, WebP, GIF</p>
+              <p>Tamanho máximo: 2MB</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {currentAvatar && !uploading && (
+        <div className="text-center">
+          <p className="text-xs text-gray-500">
+            Imagem salva no Supabase Storage
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
-// Validações em tempo real
+// ==================== VALIDAÇÕES ====================
+
 const validateMatricula = (
-  matricula: string
+  matricula: string,
 ): { valid: boolean; error?: string } => {
   if (!matricula) return { valid: false, error: "Matrícula é obrigatória" };
   if (matricula.length !== 11)
@@ -119,12 +424,33 @@ const validateFullName = (name: string): { valid: boolean; error?: string } => {
   return { valid: true };
 };
 
+const validateTelefone = (
+  telefone: string,
+): { valid: boolean; error?: string } => {
+  if (!telefone) return { valid: true }; // Opcional
+  const cleaned = telefone.replace(/\D/g, "");
+  if (cleaned.length < 10 || cleaned.length > 11)
+    return { valid: false, error: "Telefone deve ter 10 ou 11 dígitos" };
+  return { valid: true };
+};
+
+const validateUF = (uf: string): { valid: boolean; error?: string } => {
+  if (!uf) return { valid: true }; // Opcional
+  const ufRegex = /^[A-Z]{2}$/;
+  if (!ufRegex.test(uf.toUpperCase()))
+    return { valid: false, error: "UF deve ter 2 letras maiúsculas (ex: SP)" };
+  return { valid: true };
+};
+
+// ==================== COMPONENTE PRINCIPAL CORRIGIDO ====================
+
 export default function EditarAgentePage() {
   const params = useParams();
   const router = useRouter();
   const agentId = params.id as string;
 
-  const [dateOpen, setDateOpen] = useState(false);
+  const [nascimentoOpen, setNascimentoOpen] = useState(false);
+  const [certOpen, setCertOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -176,39 +502,35 @@ export default function EditarAgentePage() {
     setFormData({ [name]: value });
 
     // Validação em tempo real
-    if (name === "matricula") {
-      const validation = validateMatricula(value);
-      if (!validation.valid) {
-        setFieldErrors((prev) => ({ ...prev, matricula: validation.error! }));
-      } else {
-        setFieldErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.matricula;
-          return newErrors;
-        });
-      }
-    } else if (name === "email") {
-      const validation = validateEmail(value);
-      if (!validation.valid) {
-        setFieldErrors((prev) => ({ ...prev, email: validation.error! }));
-      } else {
-        setFieldErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.email;
-          return newErrors;
-        });
-      }
-    } else if (name === "full_name") {
-      const validation = validateFullName(value);
-      if (!validation.valid) {
-        setFieldErrors((prev) => ({ ...prev, full_name: validation.error! }));
-      } else {
-        setFieldErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.full_name;
-          return newErrors;
-        });
-      }
+    let validation;
+    switch (name) {
+      case "matricula":
+        validation = validateMatricula(value);
+        break;
+      case "email":
+        validation = validateEmail(value);
+        break;
+      case "full_name":
+        validation = validateFullName(value);
+        break;
+      case "telefone":
+        validation = validateTelefone(value);
+        break;
+      case "uf":
+        validation = validateUF(value);
+        break;
+      default:
+        return;
+    }
+
+    if (!validation.valid && validation.error) {
+      setFieldErrors((prev) => ({ ...prev, [name]: validation.error! }));
+    } else {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
     }
   };
 
@@ -220,7 +542,7 @@ export default function EditarAgentePage() {
         : "Status alterado para INATIVO - lembre-se de salvar",
       {
         duration: 3000,
-      }
+      },
     );
   };
 
@@ -232,36 +554,32 @@ export default function EditarAgentePage() {
         : "Tipo alterado para AGENTE - lembre-se de salvar",
       {
         duration: 3000,
-      }
+      },
     );
   };
 
   const handleGraduacaoChange = (value: string) => {
-    setFormData({ graduacao: value });
+    setFormData({ graduacao: value === "not_informed" ? null : value });
   };
 
   const handleTipoSanguineoChange = (value: string) => {
-    setFormData({ tipo_sanguineo: value });
+    setFormData({ tipo_sanguineo: value === "not_informed" ? null : value });
+  };
+
+  const handleUFChange = (value: string) => {
+    setFormData({ uf: value === "not_informed" ? null : value.toUpperCase() });
   };
 
   const handleAvatarChange = (avatarUrl: string | null) => {
-    setFormData({ avatar_url: avatarUrl || null });
+    setFormData({ avatar_url: avatarUrl });
   };
 
-  const handleDateSelect = (date: Date | undefined) => {
+  const handleDateSelect = (date: Date | undefined, field: string) => {
     const dateString = date ? format(date, "yyyy-MM-dd") : "";
-    setFormData({ validade_certificacao: dateString });
-    setDateOpen(false);
-  };
+    setFormData({ [field]: dateString || null });
 
-  const formatDate = (dateString?: string | null) => {
-    if (!dateString) return "Selecionar data";
-    try {
-      const date = new Date(dateString);
-      return format(date, "dd/MM/yyyy", { locale: ptBR });
-    } catch {
-      return "Data inválida";
-    }
+    if (field === "validade_certificacao") setCertOpen(false);
+    if (field === "data_nascimento") setNascimentoOpen(false);
   };
 
   const getCurrentCertStatus = () => {
@@ -297,7 +615,7 @@ export default function EditarAgentePage() {
     }
 
     const daysUntilExpiry = Math.ceil(
-      (certDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+      (certDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
     );
 
     if (daysUntilExpiry <= 30) {
@@ -338,6 +656,16 @@ export default function EditarAgentePage() {
         value: formData.full_name || "",
         validator: validateFullName,
       },
+      {
+        field: "telefone",
+        value: formData.telefone || "",
+        validator: validateTelefone,
+      },
+      {
+        field: "uf",
+        value: formData.uf || "",
+        validator: validateUF,
+      },
     ];
 
     const newErrors: Record<string, string> = {};
@@ -355,9 +683,9 @@ export default function EditarAgentePage() {
     }
 
     // Validações do formulário do store
-    const validationErrors = validateForm();
-    if (validationErrors.length > 0) {
-      validationErrors.forEach((error) => toast.error(error));
+    const storeValidationErrors = validateForm();
+    if (storeValidationErrors.length > 0) {
+      storeValidationErrors.forEach((error) => toast.error(error));
       return;
     }
 
@@ -366,21 +694,30 @@ export default function EditarAgentePage() {
       `Atualizando agente ${formData.full_name}...`,
       {
         description: "Salvando alterações no sistema",
-      }
+      },
     );
 
     try {
-      const updateData: AgentUpdateData = {
+      // Preparar dados para envio
+      const updateData = {
         full_name: formData.full_name || "",
-        graduacao: formData.graduacao || null,
-        tipo_sanguineo: formData.tipo_sanguineo || null,
-        validade_certificacao: formData.validade_certificacao || null,
-        avatar_url: formData.avatar_url || null,
         matricula: formData.matricula || "",
         email: formData.email || "",
         role: formData.role || "agent",
         status: formData.status ?? true,
+        graduacao: formData.graduacao || null,
+        tipo_sanguineo: formData.tipo_sanguineo || null,
+        validade_certificacao: formData.validade_certificacao || null,
+        avatar_url: formData.avatar_url || null,
+        uf: formData.uf || null,
+        data_nascimento: formData.data_nascimento || null,
+        telefone: formData.telefone || null,
       };
+
+      console.log("📤 Enviando dados de atualização:", {
+        ...updateData,
+        avatar_url: updateData.avatar_url ? "✅ Com avatar" : "❌ Sem avatar",
+      });
 
       const result = await updateAgent(updateData);
 
@@ -404,7 +741,7 @@ export default function EditarAgentePage() {
 
         // Recarregar a página após 2 segundos
         setTimeout(() => {
-          window.location.reload();
+          router.refresh();
         }, 2000);
       } else {
         throw new Error(result.error || "Erro ao atualizar agente");
@@ -422,6 +759,8 @@ export default function EditarAgentePage() {
         description: errorMessage,
         duration: 6000,
       });
+    } finally {
+      setSubmitStatus("idle");
     }
   };
 
@@ -570,8 +909,7 @@ export default function EditarAgentePage() {
                 <Alert className="bg-green-50 border-green-200 rounded-xl p-4">
                   <RiCheckLine className="h-5 w-5 text-green-600" />
                   <AlertDescription className="ml-3 text-green-800">
-                    <strong>✅ Agente atualizado com sucesso!</strong>{" "}
-                    Recarregando página...
+                    <strong>✅ Agente atualizado com sucesso!</strong>
                   </AlertDescription>
                 </Alert>
               </motion.div>
@@ -664,353 +1002,560 @@ export default function EditarAgentePage() {
                 <CardContent className="p-8">
                   <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Upload de Avatar */}
-                    <motion.div variants={fadeInUp} className="space-y-4">
-                      <Label className="text-base font-semibold text-gray-700 flex items-center">
-                        <RiImageLine className="w-5 h-5 mr-2 text-navy-500" />
-                        Foto do Agente
-                      </Label>
-                      <FileUpload
-                        type="avatar"
-                        onFileChange={handleAvatarChange}
-                        currentFile={currentAvatarUrl}
-                        className="p-6 border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-500 transition-all duration-300"
-                        userId={agent.matricula}
+                    <motion.div variants={fadeInUp}>
+                      <AvatarUpload
+                        currentAvatar={currentAvatarUrl}
+                        onAvatarChange={handleAvatarChange}
+                        matricula={agent.matricula}
+                        isLoading={isLoading}
+                        userId={agent.id}
                       />
                     </motion.div>
 
-                    {/* Matrícula */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.1 }}
-                      className="space-y-3"
-                    >
-                      <Label
-                        htmlFor="matricula"
-                        className="text-base font-semibold text-gray-700 flex items-center"
-                      >
-                        <RiIdCardLine className="w-5 h-5 mr-2 text-navy-500" />
-                        Matrícula *
-                        <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">
-                          Única
-                        </Badge>
-                      </Label>
-                      <div className="relative">
-                        <RiIdCardLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
-                        <Input
-                          id="matricula"
-                          type="text"
-                          name="matricula"
-                          value={formData.matricula || ""}
-                          onChange={handleInputChange}
-                          placeholder="00000000000"
-                          maxLength={11}
-                          required
-                          className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
-                            fieldErrors.matricula
-                              ? "border-red-500 focus:ring-red-200"
-                              : "focus:ring-blue-500 border-gray-300"
-                          }`}
-                          disabled={isLoading}
-                        />
-                        {fieldErrors.matricula && (
-                          <motion.p
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-red-500 text-sm mt-1 flex items-center gap-1"
-                          >
-                            <RiAlertLine className="w-3 h-3" />
-                            {fieldErrors.matricula}
-                          </motion.p>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 pl-1">
-                        11 dígitos numéricos
-                      </p>
-                    </motion.div>
+                    {/* Seção 1: Dados Básicos */}
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-semibold text-navy-700 border-b pb-2">
+                        Dados Básicos
+                      </h3>
 
-                    {/* Nome Completo */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.2 }}
-                      className="space-y-3"
-                    >
-                      <Label
-                        htmlFor="full_name"
-                        className="text-base font-semibold text-gray-700 flex items-center"
-                      >
-                        <RiUserLine className="w-5 h-5 mr-2 text-navy-500" />
-                        Nome Completo *
-                      </Label>
-                      <div className="relative">
-                        <RiUserLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
-                        <Input
-                          id="full_name"
-                          type="text"
-                          name="full_name"
-                          value={formData.full_name || ""}
-                          onChange={handleInputChange}
-                          placeholder="Nome completo do agente"
-                          required
-                          className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
-                            fieldErrors.full_name
-                              ? "border-red-500 focus:ring-red-200"
-                              : "focus:ring-blue-500 border-gray-300"
-                          }`}
-                          disabled={isLoading}
-                        />
-                        {fieldErrors.full_name && (
-                          <motion.p
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-red-500 text-sm mt-1 flex items-center gap-1"
-                          >
-                            <RiAlertLine className="w-3 h-3" />
-                            {fieldErrors.full_name}
-                          </motion.p>
-                        )}
-                      </div>
-                    </motion.div>
-
-                    {/* Email */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.3 }}
-                      className="space-y-3"
-                    >
-                      <Label
-                        htmlFor="email"
-                        className="text-base font-semibold text-gray-700 flex items-center"
-                      >
-                        <RiMailLine className="w-5 h-5 mr-2 text-navy-500" />
-                        Email *
-                      </Label>
-                      <div className="relative">
-                        <RiMailLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
-                        <Input
-                          id="email"
-                          type="email"
-                          name="email"
-                          value={formData.email || ""}
-                          onChange={handleInputChange}
-                          placeholder="agente@pac.org.br"
-                          required
-                          className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
-                            fieldErrors.email
-                              ? "border-red-500 focus:ring-red-200"
-                              : "focus:ring-blue-500 border-gray-300"
-                          }`}
-                          disabled={isLoading}
-                        />
-                        {fieldErrors.email && (
-                          <motion.p
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-red-500 text-sm mt-1 flex items-center gap-1"
-                          >
-                            <RiAlertLine className="w-3 h-3" />
-                            {fieldErrors.email}
-                          </motion.p>
-                        )}
-                      </div>
-                    </motion.div>
-
-                    {/* Graduação e Tipo Sanguíneo */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Graduação */}
+                      {/* Matrícula */}
                       <motion.div
                         variants={fadeInUp}
-                        transition={{ delay: 0.4 }}
+                        transition={{ delay: 0.1 }}
                         className="space-y-3"
                       >
                         <Label
-                          htmlFor="graduacao"
-                          className="text-base font-semibold text-gray-700"
+                          htmlFor="matricula"
+                          className="text-base font-semibold text-gray-700 flex items-center"
                         >
-                          Graduação
+                          <RiIdCardLine className="w-5 h-5 mr-2 text-navy-500" />
+                          Matrícula *
+                          <Badge className="ml-2 bg-blue-100 text-blue-800 text-xs">
+                            Única
+                          </Badge>
                         </Label>
-                        <Select
-                          value={formData.graduacao || ""}
-                          onValueChange={handleGraduacaoChange}
-                          disabled={isLoading}
-                        >
-                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
-                            <SelectValue placeholder="Selecione uma graduação" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {GRADUACOES.map((graduacao) => (
-                              <SelectItem key={graduacao} value={graduacao}>
-                                {graduacao}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </motion.div>
-
-                      {/* Tipo Sanguíneo */}
-                      <motion.div
-                        variants={fadeInUp}
-                        transition={{ delay: 0.5 }}
-                        className="space-y-3"
-                      >
-                        <Label
-                          htmlFor="tipo_sanguineo"
-                          className="text-base font-semibold text-gray-700"
-                        >
-                          Tipo Sanguíneo
-                        </Label>
-                        <Select
-                          value={formData.tipo_sanguineo || ""}
-                          onValueChange={handleTipoSanguineoChange}
-                          disabled={isLoading}
-                        >
-                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
-                            <SelectValue placeholder="Selecione o tipo sanguíneo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {TIPOS_SANGUINEOS.map((tipo) => (
-                              <SelectItem key={tipo} value={tipo}>
-                                {tipo}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </motion.div>
-                    </div>
-
-                    {/* Validade da Certificação e Tipo de Usuário */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* Validade da Certificação */}
-                      <motion.div
-                        variants={fadeInUp}
-                        transition={{ delay: 0.6 }}
-                        className="space-y-3"
-                      >
-                        <Label className="text-base font-semibold text-gray-700">
-                          Validade da Certificação
-                        </Label>
-                        <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full h-14 justify-between text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
-                              disabled={isLoading}
-                              type="button"
+                        <div className="relative">
+                          <RiIdCardLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
+                          <Input
+                            id="matricula"
+                            type="text"
+                            name="matricula"
+                            value={formData.matricula || ""}
+                            onChange={handleInputChange}
+                            placeholder="00000000000"
+                            maxLength={11}
+                            required
+                            className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                              fieldErrors.matricula
+                                ? "border-red-500 focus:ring-red-200"
+                                : "focus:ring-blue-500 border-gray-300"
+                            }`}
+                            disabled={isLoading}
+                          />
+                          {fieldErrors.matricula && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-red-500 text-sm mt-1 flex items-center gap-1"
                             >
-                              <div className="flex items-center">
-                                <RiCalendar2Line className="w-5 h-5 mr-3 text-navy-500" />
-                                {formData.validade_certificacao
-                                  ? formatDate(formData.validade_certificacao)
-                                  : "Selecionar data"}
-                              </div>
-                              <RiArrowDownSLine className="w-4 h-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              selected={
-                                formData.validade_certificacao
-                                  ? new Date(formData.validade_certificacao)
-                                  : undefined
-                              }
-                              onSelect={handleDateSelect}
-                              initialFocus
-                              locale={ptBR}
-                              className="rounded-xl border shadow-2xl"
-                            />
-                          </PopoverContent>
-                        </Popover>
-                        {formData.validade_certificacao && (
-                          <div className="flex items-center justify-between text-sm mt-2 px-1">
-                            <span className="text-gray-600">
-                              Selecionado:{" "}
-                              {formatDate(formData.validade_certificacao)}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDateSelect(undefined)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-3 rounded-lg"
-                              disabled={isLoading}
-                            >
-                              Limpar
-                            </Button>
-                          </div>
-                        )}
-                      </motion.div>
-
-                      {/* Tipo de Usuário */}
-                      <motion.div
-                        variants={fadeInUp}
-                        transition={{ delay: 0.7 }}
-                        className="space-y-3"
-                      >
-                        <Label
-                          htmlFor="role"
-                          className="text-base font-semibold text-gray-700"
-                        >
-                          Tipo de Usuário
-                        </Label>
-                        <Select
-                          value={formData.role || "agent"}
-                          onValueChange={(value: "agent" | "admin") =>
-                            handleRoleChange(value)
-                          }
-                          disabled={isLoading}
-                        >
-                          <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
-                            <SelectValue placeholder="Selecione o tipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem
-                              value="agent"
-                              className="text-base py-3"
-                            >
-                              Agente
-                            </SelectItem>
-                            <SelectItem
-                              value="admin"
-                              className="text-base py-3"
-                            >
-                              Administrador
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </motion.div>
-                    </div>
-
-                    {/* Status do Agente */}
-                    <motion.div
-                      variants={fadeInUp}
-                      transition={{ delay: 0.8 }}
-                      className="space-y-3"
-                    >
-                      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
-                        <div>
-                          <Label
-                            htmlFor="status"
-                            className="text-base font-semibold text-gray-700 cursor-pointer"
-                          >
-                            Agente Ativo na PAC
-                          </Label>
-                          <p className="text-sm text-gray-500 mt-1">
-                            Desative para tornar o agente inativo no sistema
-                          </p>
+                              <RiAlertLine className="w-3 h-3" />
+                              {fieldErrors.matricula}
+                            </motion.p>
+                          )}
                         </div>
-                        <Switch
-                          checked={formData.status ?? true}
-                          onCheckedChange={handleSwitchChange}
-                          disabled={isLoading}
-                          className="scale-110"
-                        />
+                        <p className="text-sm text-gray-500 pl-1">
+                          11 dígitos numéricos
+                        </p>
+                      </motion.div>
+
+                      {/* Nome Completo */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.2 }}
+                        className="space-y-3"
+                      >
+                        <Label
+                          htmlFor="full_name"
+                          className="text-base font-semibold text-gray-700 flex items-center"
+                        >
+                          <RiUserLine className="w-5 h-5 mr-2 text-navy-500" />
+                          Nome Completo *
+                        </Label>
+                        <div className="relative">
+                          <RiUserLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
+                          <Input
+                            id="full_name"
+                            type="text"
+                            name="full_name"
+                            value={formData.full_name || ""}
+                            onChange={handleInputChange}
+                            placeholder="Nome completo do agente"
+                            required
+                            className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                              fieldErrors.full_name
+                                ? "border-red-500 focus:ring-red-200"
+                                : "focus:ring-blue-500 border-gray-300"
+                            }`}
+                            disabled={isLoading}
+                          />
+                          {fieldErrors.full_name && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                            >
+                              <RiAlertLine className="w-3 h-3" />
+                              {fieldErrors.full_name}
+                            </motion.p>
+                          )}
+                        </div>
+                      </motion.div>
+
+                      {/* Email */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 0.3 }}
+                        className="space-y-3"
+                      >
+                        <Label
+                          htmlFor="email"
+                          className="text-base font-semibold text-gray-700 flex items-center"
+                        >
+                          <RiMailLine className="w-5 h-5 mr-2 text-navy-500" />
+                          Email *
+                        </Label>
+                        <div className="relative">
+                          <RiMailLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
+                          <Input
+                            id="email"
+                            type="email"
+                            name="email"
+                            value={formData.email || ""}
+                            onChange={handleInputChange}
+                            placeholder="agente@pac.org.br"
+                            required
+                            className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                              fieldErrors.email
+                                ? "border-red-500 focus:ring-red-200"
+                                : "focus:ring-blue-500 border-gray-300"
+                            }`}
+                            disabled={isLoading}
+                          />
+                          {fieldErrors.email && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-red-500 text-sm mt-1 flex items-center gap-1"
+                            >
+                              <RiAlertLine className="w-3 h-3" />
+                              {fieldErrors.email}
+                            </motion.p>
+                          )}
+                        </div>
+                      </motion.div>
+                    </div>
+
+                    {/* Seção 2: Dados Adicionais (NOVOS CAMPOS) */}
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-semibold text-navy-700 border-b pb-2">
+                        Dados Adicionais
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* UF */}
+                        <motion.div
+                          variants={fadeInUp}
+                          transition={{ delay: 0.4 }}
+                          className="space-y-3"
+                        >
+                          <Label
+                            htmlFor="uf"
+                            className="text-base font-semibold text-gray-700 flex items-center"
+                          >
+                            <RiMapPinLine className="w-5 h-5 mr-2 text-navy-500" />
+                            UF
+                          </Label>
+                          <Select
+                            value={formData.uf || "not_informed"}
+                            onValueChange={handleUFChange}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                              <SelectValue placeholder="Selecione a UF" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not_informed">
+                                Não informado
+                              </SelectItem>
+                              {UFS_BRASIL.map((uf) => (
+                                <SelectItem key={uf} value={uf}>
+                                  {uf}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {fieldErrors.uf && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-red-500 text-sm mt-1"
+                            >
+                              {fieldErrors.uf}
+                            </motion.p>
+                          )}
+                        </motion.div>
+
+                        {/* Telefone */}
+                        <motion.div
+                          variants={fadeInUp}
+                          transition={{ delay: 0.5 }}
+                          className="space-y-3"
+                        >
+                          <Label
+                            htmlFor="telefone"
+                            className="text-base font-semibold text-gray-700 flex items-center"
+                          >
+                            <RiPhoneLine className="w-5 h-5 mr-2 text-navy-500" />
+                            Telefone
+                          </Label>
+                          <div className="relative">
+                            <RiPhoneLine className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5 transition-colors duration-300" />
+                            <Input
+                              id="telefone"
+                              type="tel"
+                              name="telefone"
+                              value={formData.telefone || ""}
+                              onChange={handleInputChange}
+                              placeholder="(00) 00000-0000"
+                              className={`pl-12 text-lg py-3 h-14 transition-all duration-300 focus:ring-3 border-2 rounded-xl ${
+                                fieldErrors.telefone
+                                  ? "border-red-500 focus:ring-red-200"
+                                  : "focus:ring-blue-500 border-gray-300"
+                              }`}
+                              disabled={isLoading}
+                            />
+                            {fieldErrors.telefone && (
+                              <motion.p
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-red-500 text-sm mt-1"
+                              >
+                                {fieldErrors.telefone}
+                              </motion.p>
+                            )}
+                          </div>
+                        </motion.div>
+
+                        {/* Data de Nascimento */}
+                        <motion.div
+                          variants={fadeInUp}
+                          transition={{ delay: 0.6 }}
+                          className="space-y-3"
+                        >
+                          <Label className="text-base font-semibold text-gray-700 flex items-center">
+                            <RiCalendarEventLine className="w-5 h-5 mr-2 text-navy-500" />
+                            Data de Nascimento
+                          </Label>
+                          <Popover
+                            open={nascimentoOpen}
+                            onOpenChange={setNascimentoOpen}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full h-14 justify-between text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
+                                disabled={isLoading}
+                                type="button"
+                              >
+                                <div className="flex items-center">
+                                  <RiCalendarEventLine className="w-5 h-5 mr-3 text-navy-500" />
+                                  {formData.data_nascimento
+                                    ? formatDateLocal(formData.data_nascimento)
+                                    : "Selecionar data"}
+                                </div>
+                                <RiArrowDownSLine className="w-4 h-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-auto p-0"
+                              align="start"
+                            >
+                              <Calendar
+                                mode="single"
+                                selected={
+                                  formData.data_nascimento
+                                    ? new Date(formData.data_nascimento)
+                                    : undefined
+                                }
+                                onSelect={(date) =>
+                                  handleDateSelect(date, "data_nascimento")
+                                }
+                                initialFocus
+                                locale={ptBR}
+                                className="rounded-xl border shadow-2xl"
+                                disabled={(date) =>
+                                  date > new Date() ||
+                                  date < new Date("1900-01-01")
+                                }
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          {formData.data_nascimento && (
+                            <div className="flex items-center justify-between text-sm mt-2 px-1">
+                              <span className="text-gray-600">
+                                Selecionado:{" "}
+                                {formatDateLocal(formData.data_nascimento)}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleDateSelect(undefined, "data_nascimento")
+                                }
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-3 rounded-lg"
+                                disabled={isLoading}
+                              >
+                                Limpar
+                              </Button>
+                            </div>
+                          )}
+                        </motion.div>
                       </div>
-                    </motion.div>
+                    </div>
+
+                    {/* Seção 3: Dados Militares */}
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-semibold text-navy-700 border-b pb-2">
+                        Dados Militares
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Graduação */}
+                        <motion.div
+                          variants={fadeInUp}
+                          transition={{ delay: 0.7 }}
+                          className="space-y-3"
+                        >
+                          <Label
+                            htmlFor="graduacao"
+                            className="text-base font-semibold text-gray-700"
+                          >
+                            Graduação
+                          </Label>
+                          <Select
+                            value={formData.graduacao || "not_informed"}
+                            onValueChange={handleGraduacaoChange}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                              <SelectValue placeholder="Selecione uma graduação" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not_informed">
+                                Não informado
+                              </SelectItem>
+                              {GRADUACOES.map((graduacao) => (
+                                <SelectItem key={graduacao} value={graduacao}>
+                                  {graduacao}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </motion.div>
+
+                        {/* Tipo Sanguíneo */}
+                        <motion.div
+                          variants={fadeInUp}
+                          transition={{ delay: 0.8 }}
+                          className="space-y-3"
+                        >
+                          <Label
+                            htmlFor="tipo_sanguineo"
+                            className="text-base font-semibold text-gray-700"
+                          >
+                            Tipo Sanguíneo
+                          </Label>
+                          <Select
+                            value={formData.tipo_sanguineo || "not_informed"}
+                            onValueChange={handleTipoSanguineoChange}
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                              <SelectValue placeholder="Selecione o tipo sanguíneo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="not_informed">
+                                Não informado
+                              </SelectItem>
+                              {TIPOS_SANGUINEOS.map((tipo) => (
+                                <SelectItem key={tipo} value={tipo}>
+                                  {tipo}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </motion.div>
+                      </div>
+                    </div>
+
+                    {/* Seção 4: Sistema e Validade */}
+                    <div className="space-y-6">
+                      <h3 className="text-xl font-semibold text-navy-700 border-b pb-2">
+                        Sistema e Validade
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Validade da Certificação */}
+                        <motion.div
+                          variants={fadeInUp}
+                          transition={{ delay: 0.9 }}
+                          className="space-y-3"
+                        >
+                          <Label className="text-base font-semibold text-gray-700">
+                            Validade da Certificação
+                          </Label>
+                          <Popover open={certOpen} onOpenChange={setCertOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full h-14 justify-between text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500 px-4"
+                                disabled={isLoading}
+                                type="button"
+                              >
+                                <div className="flex items-center">
+                                  <RiCalendar2Line className="w-5 h-5 mr-3 text-navy-500" />
+                                  {formData.validade_certificacao
+                                    ? formatDateLocal(
+                                        formData.validade_certificacao,
+                                      )
+                                    : "Selecionar data"}
+                                </div>
+                                <RiArrowDownSLine className="w-4 h-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-auto p-0"
+                              align="start"
+                            >
+                              <Calendar
+                                mode="single"
+                                selected={
+                                  formData.validade_certificacao
+                                    ? new Date(formData.validade_certificacao)
+                                    : undefined
+                                }
+                                onSelect={(date) =>
+                                  handleDateSelect(
+                                    date,
+                                    "validade_certificacao",
+                                  )
+                                }
+                                initialFocus
+                                locale={ptBR}
+                                className="rounded-xl border shadow-2xl"
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          {formData.validade_certificacao && (
+                            <div className="flex items-center justify-between text-sm mt-2 px-1">
+                              <span className="text-gray-600">
+                                Selecionado:{" "}
+                                {formatDateLocal(
+                                  formData.validade_certificacao,
+                                )}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  handleDateSelect(
+                                    undefined,
+                                    "validade_certificacao",
+                                  )
+                                }
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-3 rounded-lg"
+                                disabled={isLoading}
+                              >
+                                Limpar
+                              </Button>
+                            </div>
+                          )}
+                        </motion.div>
+
+                        {/* Tipo de Usuário */}
+                        <motion.div
+                          variants={fadeInUp}
+                          transition={{ delay: 1.0 }}
+                          className="space-y-3"
+                        >
+                          <Label
+                            htmlFor="role"
+                            className="text-base font-semibold text-gray-700"
+                          >
+                            Tipo de Usuário
+                          </Label>
+                          <Select
+                            value={formData.role || "agent"}
+                            onValueChange={(value: "agent" | "admin") =>
+                              handleRoleChange(value)
+                            }
+                            disabled={isLoading}
+                          >
+                            <SelectTrigger className="h-14 text-base border-2 rounded-xl transition-all duration-300 hover:border-blue-500">
+                              <SelectValue placeholder="Selecione o tipo" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem
+                                value="agent"
+                                className="text-base py-3"
+                              >
+                                Agente
+                              </SelectItem>
+                              <SelectItem
+                                value="admin"
+                                className="text-base py-3"
+                              >
+                                Administrador
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </motion.div>
+                      </div>
+
+                      {/* Status do Agente */}
+                      <motion.div
+                        variants={fadeInUp}
+                        transition={{ delay: 1.1 }}
+                        className="space-y-3"
+                      >
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border">
+                          <div>
+                            <Label
+                              htmlFor="status"
+                              className="text-base font-semibold text-gray-700 cursor-pointer"
+                            >
+                              Agente Ativo na PAC
+                            </Label>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Desative para tornar o agente inativo no sistema
+                            </p>
+                          </div>
+                          <Switch
+                            checked={formData.status ?? true}
+                            onCheckedChange={handleSwitchChange}
+                            disabled={isLoading}
+                            className="scale-110"
+                          />
+                        </div>
+                      </motion.div>
+                    </div>
 
                     {/* Botões de Ação */}
                     <motion.div
                       variants={fadeInUp}
-                      transition={{ delay: 0.9 }}
+                      transition={{ delay: 1.2 }}
                       className="flex flex-col sm:flex-row gap-4 pt-8 border-t border-gray-200 mt-8"
                     >
                       <motion.div
@@ -1058,11 +1603,11 @@ export default function EditarAgentePage() {
                       </motion.div>
                     </motion.div>
 
-                    {/* Zona de Perigo (Apenas Admin) */}
+                    {/* Zona de Perigo */}
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      transition={{ delay: 1 }}
+                      transition={{ delay: 1.3 }}
                       className="pt-8 border-t border-red-200 mt-10"
                     >
                       <div className="bg-red-50 border border-red-200 rounded-xl p-6">
@@ -1187,56 +1732,6 @@ export default function EditarAgentePage() {
 
           {/* Sidebar - Informações */}
           <div className="space-y-8">
-            {/* Informações Importantes */}
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={fadeInUp}
-              transition={{ delay: 0.3 }}
-            >
-              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-                <CardHeader className="pb-6">
-                  <CardTitle className="flex items-center text-xl text-gray-800">
-                    <RiInformationLine className="w-6 h-6 mr-3 text-navy-600" />
-                    Informações Importantes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
-                    <RiUserLine className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm">
-                      As alterações serão aplicadas imediatamente após salvar
-                    </p>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
-                    <RiIdCardLine className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm">
-                      A matrícula deve conter exatamente 11 dígitos
-                    </p>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
-                    <RiShieldKeyholeLine className="w-5 h-5 text-purple-500 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm">
-                      Administradores têm acesso total ao sistema
-                    </p>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
-                    <RiCalendar2Line className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm">
-                      A validade da certificação controla o acesso ao sistema
-                    </p>
-                  </div>
-                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
-                    <RiImageLine className="w-5 h-5 text-blue-300 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm">
-                      A foto de perfil é opcional e pode ser alterada a qualquer
-                      momento
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
             {/* Status da Certificação */}
             <motion.div
               initial="hidden"
@@ -1268,7 +1763,7 @@ export default function EditarAgentePage() {
                       <>
                         <p className="text-base text-gray-600">
                           <strong>Validade:</strong>{" "}
-                          {formatDate(formData.validade_certificacao)}
+                          {formatDateLocal(formData.validade_certificacao)}
                         </p>
 
                         {certStatus.status === "expirada" && (
@@ -1349,6 +1844,26 @@ export default function EditarAgentePage() {
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">UF:</span>
+                      <Badge className="bg-blue-100 text-blue-700 text-sm py-1 px-2">
+                        {formData.uf || "Não informado"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Telefone:</span>
+                      <span className="font-medium text-blue-600">
+                        {formData.telefone || "Não informado"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                      <span className="font-medium">Data Nasc.:</span>
+                      <span className="font-medium">
+                        {formData.data_nascimento
+                          ? formatDateLocal(formData.data_nascimento)
+                          : "Não informada"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-gray-100">
                       <span className="font-medium">Graduação:</span>
                       <Badge className="bg-blue-100 text-blue-700 text-sm py-1 px-2">
                         {formData.graduacao || "Não definida"}
@@ -1366,6 +1881,55 @@ export default function EditarAgentePage() {
                         {formData.status ? "ATIVO" : "INATIVO"}
                       </Badge>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Informações Importantes */}
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeInUp}
+              transition={{ delay: 0.3 }}
+            >
+              <Card className="border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                <CardHeader className="pb-6">
+                  <CardTitle className="flex items-center text-xl text-gray-800">
+                    <RiInformationLine className="w-6 h-6 mr-3 text-navy-600" />
+                    Informações Importantes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiUserLine className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      As alterações serão aplicadas imediatamente após salvar
+                    </p>
+                  </div>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiIdCardLine className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      A matrícula deve conter exatamente 11 dígitos
+                    </p>
+                  </div>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiMapPinLine className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      UF deve ser o estado de origem (ex: SP, RJ, MG)
+                    </p>
+                  </div>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiShieldKeyholeLine className="w-5 h-5 text-purple-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      Administradores têm acesso total ao sistema
+                    </p>
+                  </div>
+                  <div className="flex items-start space-x-4 p-4 bg-blue-50 rounded-xl border border-blue-200 transition-all duration-300 hover:bg-blue-100 hover:border-blue-300">
+                    <RiImageLine className="w-5 h-5 text-blue-300 mt-0.5 flex-shrink-0" />
+                    <p className="text-sm">
+                      A foto de perfil é opcional (max 2MB)
+                    </p>
                   </div>
                 </CardContent>
               </Card>
