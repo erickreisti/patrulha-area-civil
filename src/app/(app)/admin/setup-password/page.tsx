@@ -1,4 +1,3 @@
-// src/app/admin/setup-password/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,7 +15,6 @@ import {
   RiCheckLine,
 } from "react-icons/ri";
 
-// ✅ Importar a server action correta
 import { setupAdminPassword } from "@/app/actions/auth/auth";
 
 export default function AdminSetupPasswordPage() {
@@ -74,7 +72,7 @@ export default function AdminSetupPasswordPage() {
 
     if (passwordStrength < 2) {
       setError(
-        "A senha deve conter pelo menos uma letra maiúscula e um número"
+        "A senha deve conter pelo menos uma letra maiúscula e um número",
       );
       return;
     }
@@ -91,7 +89,6 @@ export default function AdminSetupPasswordPage() {
 
       console.log("🔍 [SetupPassword] Configurando senha...");
 
-      // ✅ Agora usando a importação direta
       const result = await setupAdminPassword(formData);
 
       console.log("🔍 [SetupPassword] Resultado:", result);
@@ -186,7 +183,7 @@ export default function AdminSetupPasswordPage() {
               </label>
               <Input
                 type="text"
-                value={profile.matricula}
+                value={profile?.matricula || ""}
                 disabled
                 className="bg-slate-100 font-mono"
               />
@@ -242,12 +239,12 @@ export default function AdminSetupPasswordPage() {
                       passwordStrength === 0
                         ? "w-0"
                         : passwordStrength === 1
-                        ? "w-1/4 bg-error"
-                        : passwordStrength === 2
-                        ? "w-1/2 bg-warning"
-                        : passwordStrength === 3
-                        ? "w-3/4 bg-success"
-                        : "w-full bg-success"
+                          ? "w-1/4 bg-error"
+                          : passwordStrength === 2
+                            ? "w-1/2 bg-warning"
+                            : passwordStrength === 3
+                              ? "w-3/4 bg-success"
+                              : "w-full bg-success"
                     }`}
                   />
                 </div>

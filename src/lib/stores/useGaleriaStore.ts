@@ -14,7 +14,6 @@ import {
   toggleItemStatus,
   toggleItemDestaque,
   getGaleriaStats,
-  // generateAvailableSlug - removido pois não é usado na store
 } from "@/app/actions/gallery";
 
 import type {
@@ -22,7 +21,6 @@ import type {
   Item,
   GaleriaStats,
   CreateCategoriaInput,
-  // CreateItemInput removido pois usamos FormData para itens (arquivo)
   TipoCategoriaFilter,
   TipoItemFilter,
   StatusFilter,
@@ -87,7 +85,6 @@ interface GaleriaStore {
 
   // --- Actions (Itens) ---
   fetchItens: () => Promise<void>;
-  // FormData é o tipo correto aqui para envio de arquivos
   criarItem: (data: FormData) => Promise<{ success: boolean; error?: string }>;
   alternarStatusItem: (
     id: string,
@@ -177,8 +174,9 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         throw new Error(res.error || "Erro ao buscar categorias");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorCategorias: message, loadingCategorias: false });
     }
   },
@@ -192,8 +190,9 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         throw new Error(res.error || "Categoria não encontrada");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorCategorias: message, loadingCategorias: false });
     }
   },
@@ -203,13 +202,14 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
     try {
       const res = await createCategoria(data);
       if (res.success) {
-        await get().fetchCategorias(); // Recarrega a lista
+        await get().fetchCategorias();
         return { success: true };
       } else {
         throw new Error(res.error || "Erro ao criar categoria");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorCategorias: message, loadingCategorias: false });
       return { success: false, error: message };
     }
@@ -218,19 +218,17 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
   alternarStatusCategoria: async (id: string, current: boolean) => {
     set({ loadingCategorias: true });
     try {
-      // Inverte o status atual
       const res = await toggleCategoriaStatus(id, !current);
       if (res.success) {
-        // Atualiza a lista localmente para ser mais rápido (otimista) ou recarrega
-        // Vamos recarregar para garantir consistência
         await get().fetchCategorias();
         set({ loadingCategorias: false });
         return { success: true };
       } else {
         throw new Error(res.error);
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorCategorias: message, loadingCategorias: false });
       return { success: false, error: message };
     }
@@ -260,8 +258,9 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         throw new Error(res.error || "Erro ao buscar itens");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorItens: message, loadingItens: false });
     }
   },
@@ -276,8 +275,9 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         throw new Error(res.error);
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorItens: message, loadingItens: false });
       return { success: false, error: message };
     }
@@ -292,8 +292,9 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         throw new Error(res.error);
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorItens: message });
       return { success: false, error: message };
     }
@@ -308,8 +309,9 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         throw new Error(res.error);
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erro desconhecido";
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Erro desconhecido";
       set({ errorItens: message });
       return { success: false, error: message };
     }
@@ -324,8 +326,8 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         set({ loadingStats: false });
       }
-    } catch (err) {
-      console.error(err);
+    } catch (error: unknown) {
+      console.error(error);
       set({ loadingStats: false });
     }
   },
@@ -375,7 +377,6 @@ export function useCategoriasList() {
       pagination: {
         page: state.filtrosCategorias.page,
         limit: state.filtrosCategorias.limit,
-        // Fallback seguro se stats não estiver carregado
         total: state.stats?.total_categorias || state.categorias.length,
         totalPages: 1,
       },
@@ -414,6 +415,17 @@ export function useItensList() {
         total: state.stats?.total_itens || state.itens.length,
         totalPages: 1,
       },
+    })),
+  );
+  return store;
+}
+
+export function useGaleriaStats() {
+  const store = useGaleriaStore(
+    useShallow((state) => ({
+      stats: state.stats,
+      loading: state.loadingStats,
+      fetchStats: state.fetchStats,
     })),
   );
   return store;
