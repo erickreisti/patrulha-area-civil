@@ -41,7 +41,7 @@ export const CreateCategoriaSchema = CategoriaSchema.pick({
 });
 
 export const UpdateCategoriaSchema = CategoriaSchema.partial().extend({
-  id: z.string().uuid("ID inválido"),
+  id: z.string().uuid("ID inválido").optional(), // ID opcional no input do form, obrigatório na action
 });
 
 export const ListCategoriasSchema = z.object({
@@ -80,7 +80,7 @@ export const ItemSchema = z.object({
 export const CreateItemSchema = ItemSchema;
 
 export const UpdateItemSchema = ItemSchema.partial().extend({
-  id: z.string().uuid("ID inválido"),
+  id: z.string().uuid("ID inválido").optional(),
 });
 
 export const ListItensSchema = z.object({
@@ -104,23 +104,26 @@ export type UpdateCategoriaInput = z.infer<typeof UpdateCategoriaSchema>;
 export type CreateItemInput = z.infer<typeof CreateItemSchema>;
 export type UpdateItemInput = z.infer<typeof UpdateItemSchema>;
 
-// Tipos Estendidos (com Joins/Counts)
+// --- Tipos de Entidade Estendidos ---
+
 export type Categoria = GaleriaCategoria & {
   itens_count?: number;
 };
 
+// Item com join da categoria
 export type Item = GaleriaItem & {
   galeria_categorias?: {
     id: string;
     nome: string;
+    slug: string; // Adicionado slug, geralmente útil no front
     tipo: string;
   } | null;
 };
 
-// ALIAS NECESSÁRIO
+// Alias para consistência com outros arquivos
 export type ItemGaleria = Item;
 
-// TIPOS DE FILTRO ADICIONADOS
+// Filtros
 export type TipoCategoriaFilter = "all" | "fotos" | "videos";
 export type TipoItemFilter = "all" | "foto" | "video";
 export type StatusFilter = "all" | "ativo" | "inativo";

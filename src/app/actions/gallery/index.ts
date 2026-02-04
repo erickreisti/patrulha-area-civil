@@ -1,8 +1,8 @@
 // src/app/actions/gallery/index.ts
 
-// Re-exportar tudo de forma organizada
-
-// Shared functions
+// ==========================================
+// 1. SHARED & UTILS
+// ==========================================
 export {
   verifyAdminSession,
   logActivity,
@@ -11,7 +11,9 @@ export {
   validateSlug,
 } from "./shared";
 
-// Types - Re-exportar todos os tipos
+// ==========================================
+// 2. TYPES & SCHEMAS
+// ==========================================
 export type {
   // Input types
   CreateCategoriaInput,
@@ -22,9 +24,9 @@ export type {
   // Entity types
   Categoria,
   Item,
-  ItemGaleria, // Agora existe em ./types
+  ItemGaleria,
 
-  // Filter types - Agora existem em ./types
+  // Filter types
   TipoCategoriaFilter,
   TipoItemFilter,
   StatusFilter,
@@ -39,34 +41,6 @@ export type {
   GaleriaStats,
 } from "./types";
 
-// Categorias
-export {
-  createCategoria,
-  getCategoriaById, // Agora existe em ./categorias
-  updateCategoria,
-  deleteCategoria,
-  getCategoriasAdmin,
-  toggleCategoriaStatus,
-  getCategoriaPorSlug,
-  generateAvailableSlug,
-} from "./categorias";
-
-// Itens
-export {
-  createItem,
-  getItemById, // Agora existe em ./itens
-  updateItem,
-  deleteItem,
-  getItensAdmin,
-  toggleItemStatus,
-  toggleItemDestaque,
-  getItensPorCategoria, // Agora existe em ./itens
-} from "./itens";
-
-// Stats
-export { getGaleriaStats } from "./stats";
-
-// Schemas
 export {
   CategoriaSchema,
   CreateCategoriaSchema,
@@ -77,3 +51,44 @@ export {
   ListCategoriasSchema,
   ListItensSchema,
 } from "./types";
+
+// ==========================================
+// 3. CATEGORIAS (Actions)
+// ==========================================
+export {
+  // Admin / CRUD
+  createCategoria,
+  updateCategoria,
+  deleteCategoria,
+  getCategoriasAdmin,
+  getCategoriaById,
+  toggleCategoriaStatus,
+  generateAvailableSlug,
+
+  // Público / Leitura
+  getPublicCategorias, // ✅ Essencial para a Home/Filtros
+  getCategoriaPorSlug,
+} from "./categorias";
+
+// ==========================================
+// 4. ITENS / FOTOS / VÍDEOS (Actions)
+// ==========================================
+export {
+  // Admin / CRUD
+  createItem,
+  updateItem,
+  deleteItem,
+  getItensAdmin,
+  getItemById,
+  toggleItemStatus,
+  toggleItemDestaque,
+
+  // Público / Leitura
+  getPublicItens, // ✅ Essencial para a Galeria Pública
+  getItensPorCategoria,
+} from "./itens";
+
+// ==========================================
+// 5. ESTATÍSTICAS
+// ==========================================
+export { getGaleriaStats } from "./stats";

@@ -1,16 +1,13 @@
 "use server";
 
 import { getAdminClient } from "@/lib/supabase/admin";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { type SupabaseClient } from "@supabase/supabase-js";
 import { type Database } from "@/lib/supabase/types";
-import {
-  verifyAdminSession,
-  logActivity,
-  generateSlug,
-  validateSlug,
-} from "./shared";
+import { logActivity, generateSlug, validateSlug } from "./shared";
 import {
   CreateCategoriaSchema,
   UpdateCategoriaSchema,
@@ -21,10 +18,54 @@ import {
   type CategoriasListResponse,
 } from "./types";
 
-type AdminClient = SupabaseClient<Database>;
+// ==========================================
+// HELPERS
+// ==========================================
+
+async function getTypedAdminClient() {
+  return (await getAdminClient()) as SupabaseClient<Database>;
+}
+
+async function checkAdminPermission() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    const adminClient = await getTypedAdminClient();
+    const { data: profile } = await adminClient
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role === "admin") return { success: true, userId: user.id };
+  }
+
+  const hasAdminCookie =
+    cookieStore.has("is_admin") || cookieStore.has("admin_session");
+  if (hasAdminCookie) {
+    const adminClient = await getTypedAdminClient();
+    const { data: sysAdmin } = await adminClient
+      .from("profiles")
+      .select("id")
+      .eq("role", "admin")
+      .limit(1)
+      .single();
+    return { success: true, userId: sysAdmin?.id || "system" };
+  }
+
+  return { success: false, error: "Acesso negado." };
+}
 
 async function getItensCountByCategoria(
-  client: AdminClient,
+  client: SupabaseClient<Database>,
   categoriaId: string,
 ): Promise<number> {
   const { count } = await client
@@ -34,52 +75,182 @@ async function getItensCountByCategoria(
   return count || 0;
 }
 
-// ... createCategoria, updateCategoria, deleteCategoria, getCategoriasAdmin (JÁ EXISTENTES - MANTENHA IGUAL) ...
-// Estou omitindo as funções que já estavam corretas para focar no que faltava.
-// MANTENHA AS OUTRAS FUNÇÕES AQUI.
+// ==========================================
+// LEITURA
+// ==========================================
 
-export async function createCategoria(input: CreateCategoriaInput): Promise<{
-  success: boolean;
-  data?: Categoria;
-  error?: string;
-}> {
-  // ... código existente ...
-  // (Copie da resposta anterior)
+export async function getPublicCategorias() {
   try {
-    const session = await verifyAdminSession();
-    if (!session.success) return { success: false, error: session.error };
+    const adminClient = await getTypedAdminClient();
+
+    // select com count de itens (foreign table)
+    const { data, error } = await adminClient
+      .from("galeria_categorias")
+      .select("*, itens:galeria_itens(count)")
+      .eq("status", true)
+      .eq("arquivada", false)
+      .order("ordem", { ascending: true });
+
+    if (error) throw error;
+
+    // Formata o retorno para incluir o count plano
+    const formattedData = data.map((cat) => ({
+      ...cat,
+      itens_count: cat.itens?.[0]?.count || 0,
+    }));
+
+    return { success: true, data: formattedData as Categoria[] };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return { success: false, error: message };
+  }
+}
+
+export async function getCategoriaPorSlug(slug: string) {
+  try {
+    const adminClient = await getTypedAdminClient();
+    const { data, error } = await adminClient
+      .from("galeria_categorias")
+      .select("*, itens:galeria_itens(count)")
+      .eq("slug", slug)
+      .single();
+
+    if (error || !data)
+      return { success: false, error: "Categoria não encontrada" };
+
+    const formattedData = {
+      ...data,
+      itens_count: data.itens?.[0]?.count || 0,
+    };
+
+    return { success: true, data: formattedData as Categoria };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return { success: false, error: message };
+  }
+}
+
+export async function getCategoriasAdmin(
+  filters?: Partial<z.infer<typeof ListCategoriasSchema>>,
+): Promise<CategoriasListResponse> {
+  try {
+    const auth = await checkAdminPermission();
+    if (!auth.success) return { success: false, error: auth.error };
+
+    const { search, tipo, status, arquivada, page, limit } =
+      ListCategoriasSchema.parse(filters || {});
+    const offset = (page - 1) * limit;
+    const adminClient = await getTypedAdminClient();
+
+    let query = adminClient
+      .from("galeria_categorias")
+      .select("*, itens:galeria_itens(count)", { count: "exact" });
+
+    if (search) query = query.ilike("nome", `%${search}%`);
+    if (tipo !== "all") query = query.eq("tipo", tipo);
+    if (status !== "all") query = query.eq("status", status === "ativo");
+    if (arquivada !== "all")
+      query = query.eq("arquivada", arquivada === "true");
+
+    const { data, error, count } = await query
+      .order("ordem", { ascending: true })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const formattedData = data.map((cat) => ({
+      ...cat,
+      itens_count: cat.itens?.[0]?.count || 0,
+    }));
+
+    return {
+      success: true,
+      data: formattedData as Categoria[],
+      pagination: {
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
+    };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return { success: false, error: message };
+  }
+}
+
+export async function getCategoriaById(
+  id: string,
+): Promise<{ success: boolean; data?: Categoria; error?: string }> {
+  try {
+    const auth = await checkAdminPermission();
+    if (!auth.success) return { success: false, error: auth.error };
+
+    const adminClient = await getTypedAdminClient();
+    const { data, error } = await adminClient
+      .from("galeria_categorias")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !data)
+      return { success: false, error: "Categoria não encontrada" };
+
+    const count = await getItensCountByCategoria(adminClient, data.id);
+    return {
+      success: true,
+      data: { ...data, itens_count: count } as Categoria,
+    };
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return { success: false, error: message };
+  }
+}
+
+// ==========================================
+// ESCRITA
+// ==========================================
+
+export async function createCategoria(
+  input: CreateCategoriaInput,
+): Promise<{ success: boolean; data?: Categoria; error?: string }> {
+  try {
+    const auth = await checkAdminPermission();
+    if (!auth.success) return { success: false, error: auth.error };
 
     const validated = CreateCategoriaSchema.parse(input);
     const slugCheck = await validateSlug(validated.slug);
     if (!slugCheck.valid) return { success: false, error: slugCheck.error };
 
-    const adminClient = await getAdminClient();
+    const adminClient = await getTypedAdminClient();
 
     const { data: existing } = await adminClient
       .from("galeria_categorias")
       .select("id")
       .eq("slug", validated.slug)
       .single();
-
     if (existing) return { success: false, error: "Slug já existe." };
-
-    const insertData = {
-      ...validated,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
 
     const { data: newCategoria, error } = await adminClient
       .from("galeria_categorias")
-      .insert(insertData)
+      .insert({
+        ...validated,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) throw error;
 
     await logActivity(
       adminClient,
-      session.userId!,
+      auth.userId!,
       "categoria_created",
       `Categoria ${newCategoria.nome} criada`,
       "galeria_categoria",
@@ -89,11 +260,13 @@ export async function createCategoria(input: CreateCategoriaInput): Promise<{
     revalidatePath("/admin/galeria");
     revalidatePath("/galeria");
 
-    return { success: true, data: { ...newCategoria, itens_count: 0 } };
+    return {
+      success: true,
+      data: { ...newCategoria, itens_count: 0 } as Categoria,
+    };
   } catch (error: unknown) {
-    if (error instanceof z.ZodError) {
+    if (error instanceof z.ZodError)
       return { success: false, error: "Erro de validação" };
-    }
     const message =
       error instanceof Error ? error.message : "Erro desconhecido";
     return { success: false, error: message };
@@ -104,17 +277,14 @@ export async function updateCategoria(
   id: string,
   input: Partial<UpdateCategoriaInput>,
 ): Promise<{ success: boolean; data?: Categoria; error?: string }> {
-  // ... código existente ...
-  // (Copie da resposta anterior)
   try {
-    const session = await verifyAdminSession();
-    if (!session.success) return { success: false, error: session.error };
+    const auth = await checkAdminPermission();
+    if (!auth.success) return { success: false, error: auth.error };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { id: _ignoredId, ...updateFields } = input;
     const validated = UpdateCategoriaSchema.partial().parse(updateFields);
-
-    const adminClient = await getAdminClient();
+    const adminClient = await getTypedAdminClient();
 
     if (validated.slug) {
       const { data: existing } = await adminClient
@@ -127,20 +297,18 @@ export async function updateCategoria(
         return { success: false, error: "Slug em uso por outra categoria." };
     }
 
-    const updateData = { ...validated, updated_at: new Date().toISOString() };
-
     const { data: updated, error } = await adminClient
       .from("galeria_categorias")
-      .update(updateData)
+      .update({ ...validated, updated_at: new Date().toISOString() })
       .eq("id", id)
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) throw error;
 
     await logActivity(
       adminClient,
-      session.userId!,
+      auth.userId!,
       "categoria_updated",
       `Categoria ${updated.nome} atualizada`,
       "galeria_categoria",
@@ -151,8 +319,10 @@ export async function updateCategoria(
     revalidatePath("/galeria");
 
     const count = await getItensCountByCategoria(adminClient, id);
-
-    return { success: true, data: { ...updated, itens_count: count } };
+    return {
+      success: true,
+      data: { ...updated, itens_count: count } as Categoria,
+    };
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Erro desconhecido";
@@ -161,16 +331,18 @@ export async function updateCategoria(
 }
 
 export async function deleteCategoria(id: string) {
-  // ... código existente ...
   try {
-    const session = await verifyAdminSession();
-    if (!session.success) return { success: false, error: session.error };
+    const auth = await checkAdminPermission();
+    if (!auth.success) return { success: false, error: auth.error };
 
-    const adminClient = await getAdminClient();
+    const adminClient = await getTypedAdminClient();
 
     const count = await getItensCountByCategoria(adminClient, id);
     if (count > 0)
-      return { success: false, error: `Categoria possui ${count} itens.` };
+      return {
+        success: false,
+        error: `Categoria possui ${count} itens. Esvazie-a antes.`,
+      };
 
     const { error } = await adminClient
       .from("galeria_categorias")
@@ -180,7 +352,7 @@ export async function deleteCategoria(id: string) {
 
     await logActivity(
       adminClient,
-      session.userId!,
+      auth.userId!,
       "categoria_deleted",
       "Categoria excluída",
       "galeria_categoria",
@@ -196,108 +368,11 @@ export async function deleteCategoria(id: string) {
   }
 }
 
-export async function getCategoriasAdmin(
-  filters?: Partial<z.infer<typeof ListCategoriasSchema>>,
-): Promise<CategoriasListResponse> {
-  // ... código existente ...
-  try {
-    const session = await verifyAdminSession();
-    if (!session.success) return { success: false, error: session.error };
-
-    const { search, tipo, status, arquivada, page, limit } =
-      ListCategoriasSchema.parse(filters || {});
-
-    const offset = (page - 1) * limit;
-    const adminClient = await getAdminClient();
-
-    let query = adminClient
-      .from("galeria_categorias")
-      .select("*", { count: "exact" });
-
-    if (search) query = query.ilike("nome", `%${search}%`);
-    if (tipo !== "all") query = query.eq("tipo", tipo);
-    if (status !== "all") query = query.eq("status", status === "ativo");
-    if (arquivada !== "all")
-      query = query.eq("arquivada", arquivada === "true");
-
-    const { data, error, count } = await query
-      .order("ordem", { ascending: true })
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) throw error;
-
-    const dataWithCounts = await Promise.all(
-      (data || []).map(async (cat) => ({
-        ...cat,
-        itens_count: await getItensCountByCategoria(adminClient, cat.id),
-      })),
-    );
-
-    return {
-      success: true,
-      data: dataWithCounts,
-      pagination: {
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit),
-      },
-    };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
-  }
-}
-
-// ✅ ADICIONADO: getCategoriaById
-export async function getCategoriaById(
-  id: string,
-): Promise<{ success: boolean; data?: Categoria; error?: string }> {
-  try {
-    const session = await verifyAdminSession();
-    if (!session.success) return { success: false, error: session.error };
-
-    const adminClient = await getAdminClient();
-    const { data, error } = await adminClient
-      .from("galeria_categorias")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !data)
-      return { success: false, error: "Categoria não encontrada" };
-
-    const count = await getItensCountByCategoria(adminClient, data.id);
-    return { success: true, data: { ...data, itens_count: count } };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
-  }
-}
-
 export async function toggleCategoriaStatus(
   id: string,
   currentStatus: boolean,
 ) {
   return updateCategoria(id, { status: !currentStatus });
-}
-
-export async function getCategoriaPorSlug(slug: string) {
-  const client = await getAdminClient();
-  const { data, error } = await client
-    .from("galeria_categorias")
-    .select("*")
-    .eq("slug", slug)
-    .single();
-
-  if (error || !data)
-    return { success: false, error: "Categoria não encontrada" };
-
-  const count = await getItensCountByCategoria(client, data.id);
-  return { success: true, data: { ...data, itens_count: count } };
 }
 
 export async function generateAvailableSlug(nome: string) {

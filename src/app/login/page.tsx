@@ -1,72 +1,91 @@
-// src/app/(app)/login/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import {
   formatMatricula,
   validateMatricula,
   extractMatriculaNumbers,
 } from "@/lib/utils/validation";
-import Image from "next/image";
-import Link from "next/link";
-import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { isAuthenticated, loginWithServerAction, initialize } = useAuthStore();
+
+  // Estados
   const [matricula, setMatricula] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
-  const { isAuthenticated, loginWithServerAction, initialize } = useAuthStore();
-
+  // Estados de controle de fluxo
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Inicializar o auth store
+  // 1. Inicialização do Auth Store
   useEffect(() => {
+    let mounted = true;
     const init = async () => {
-      console.log("🔄 [LoginPage] Inicializando auth store...");
       await initialize();
-      setIsInitialized(true);
-      console.log("✅ [LoginPage] Auth store inicializado");
+      // setTimeout garante que a atualização ocorra após a montagem
+      setTimeout(() => {
+        if (mounted) setIsInitialized(true);
+      }, 0);
     };
     init();
+    return () => {
+      mounted = false;
+    };
   }, [initialize]);
 
-  // ✅ CORREÇÃO: Removido useSearchParams não utilizado
+  // 2. Carregar Matrícula Salva
+  // ✅ CORREÇÃO: Envolvido em setTimeout para evitar o erro "setState synchronously"
   useEffect(() => {
-    if (!isInitialized) {
-      console.log("⏳ [LoginPage] Aguardando inicialização...");
-      return;
-    }
-
-    if (isAuthenticated) {
-      console.log(
-        "✅ [LoginPage] Usuário autenticado, redirecionando para /perfil"
-      );
-
-      // Pequeno delay para garantir que o estado foi atualizado
-      const timer = setTimeout(() => {
-        router.replace("/perfil");
-      }, 500);
-
-      return () => clearTimeout(timer);
-    }
-  }, [isAuthenticated, router, isInitialized]);
-
-  // Carregar matrícula salva
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const savedMatricula = localStorage.getItem("saved_matricula");
-      if (savedMatricula) {
-        setMatricula(savedMatricula);
-        setRememberMe(true);
+    const loadSavedData = () => {
+      if (typeof window !== "undefined") {
+        try {
+          const savedMatricula = localStorage.getItem("saved_matricula");
+          if (savedMatricula) {
+            setMatricula(savedMatricula);
+            setRememberMe(true);
+          }
+        } catch (e) {
+          console.error("Erro ao ler localStorage:", e);
+        }
       }
-    }
+    };
+
+    const timeoutId = setTimeout(loadSavedData, 0);
+    return () => clearTimeout(timeoutId);
   }, []);
+
+  // 3. Redirecionamento se já autenticado
+  // ✅ CORREÇÃO: Envolvido em setTimeout para evitar o erro "setState synchronously"
+  useEffect(() => {
+    if (isInitialized && isAuthenticated && !isRedirecting) {
+      const handleRedirect = () => {
+        setIsRedirecting(true);
+        toast.success("Sessão restaurada com sucesso!");
+        router.replace("/perfil");
+      };
+
+      const timeoutId = setTimeout(handleRedirect, 0);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isInitialized, isAuthenticated, router, isRedirecting]);
+
+  // Handlers
+  const handleMatriculaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const valor = e.target.value;
+    if (error) setError(null);
+    setMatricula(formatMatricula(valor));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,239 +93,273 @@ export default function LoginPage() {
 
     const matriculaNumerica = extractMatriculaNumbers(matricula);
 
-    // Validação da matrícula
+    // Validação Local
     if (!validateMatricula(matriculaNumerica)) {
-      setError("A matrícula deve ter 11 dígitos");
+      setError("A matrícula deve conter 11 dígitos numéricos.");
+      toast.error("Formato inválido", {
+        description: "Verifique se digitou todos os números corretamente.",
+      });
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Gerenciar "Lembrar-me"
-      if (rememberMe) {
-        localStorage.setItem("saved_matricula", matricula);
-      } else {
-        localStorage.removeItem("saved_matricula");
+      // Persistência do "Lembrar-me"
+      if (typeof window !== "undefined") {
+        if (rememberMe) {
+          localStorage.setItem("saved_matricula", matricula);
+        } else {
+          localStorage.removeItem("saved_matricula");
+        }
       }
 
-      console.log("🔄 [LoginPage] Iniciando login...");
+      // Chamada de Login
       const result = await loginWithServerAction(matriculaNumerica);
 
-      console.log("📊 [LoginPage] Resultado do login:", result);
-
       if (result?.success) {
-        toast.success("Login realizado com sucesso!");
+        toast.success("Bem-vindo de volta!", {
+          icon: <CheckCircle2 className="h-5 w-5 text-green-600" />,
+        });
 
-        // Verificar status do perfil
         if (result.data?.profile && !result.data.profile.status) {
-          toast.warning(
-            "Sua conta está inativa. Entre em contato com o comando."
-          );
+          toast.warning("Atenção: Conta Inativa", {
+            description: "Entre em contato com o comando para regularizar.",
+            duration: 5000,
+          });
         }
 
-        console.log(
-          "✅ [LoginPage] Login bem-sucedido, aguardando redirecionamento..."
-        );
-
-        // O redirecionamento será tratado pelo useEffect acima
+        setIsRedirecting(true);
+        router.replace("/perfil");
       } else {
         const errorMessage = result?.error?.toLowerCase() || "";
-        let finalMessage = result?.error || "Erro ao fazer login";
+        let finalMessage = "Não foi possível realizar o login.";
 
         if (
           errorMessage.includes("não encontrada") ||
           errorMessage.includes("não existe")
         ) {
-          finalMessage =
-            "Matrícula não encontrada. Você não faz parte da PAC - Patrulha Aérea Civil";
+          finalMessage = "Matrícula não encontrada no sistema.";
         } else if (errorMessage.includes("inativa")) {
-          finalMessage =
-            "Sua conta está inativa. Entre em contato com o comando.";
-        } else if (
-          errorMessage.includes("senha") ||
-          errorMessage.includes("credenciais")
-        ) {
-          finalMessage = "Credenciais inválidas. Tente novamente.";
+          finalMessage = "Sua conta está inativa/bloqueada.";
         }
 
-        toast.error("Falha no login", {
-          description: finalMessage,
-        });
         setError(finalMessage);
+        toast.error("Falha na autenticação", { description: finalMessage });
+        setIsLoading(false);
       }
     } catch (err) {
-      console.error("❌ [LoginPage] Erro no login:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Erro desconhecido";
-      toast.error("Erro na autenticação", {
-        description: errorMessage,
+      console.error("Erro crítico no login:", err);
+      setError("Ocorreu um erro inesperado no servidor.");
+      toast.error("Erro de conexão", {
+        description: "Tente novamente em instantes.",
       });
-      setError("Erro inesperado. Tente novamente.");
-    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleMatriculaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMatricula(formatMatricula(e.target.value));
-  };
-
-  const isFormValid = extractMatriculaNumbers(matricula).length === 11;
-
-  // Mostrar loading enquanto inicializa
-  if (!isInitialized) {
+  // ---------------------------------------------------------
+  // TELA DE LOADING
+  // ---------------------------------------------------------
+  if (!isInitialized || isRedirecting) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
-        <div className="flex flex-col items-center">
-          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-          <p className="text-gray-600">Inicializando sistema...</p>
-        </div>
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center"
+        >
+          <div className="relative w-24 h-24 mb-6 animate-pulse">
+            {/* Usamos <img> normal aqui para evitar warnings de preload do Next.js
+                em componentes que desmontam muito rápido */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logos/logo.webp"
+              alt="Carregando..."
+              className="object-contain w-full h-full"
+            />
+          </div>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-2" />
+          <p className="text-sm font-medium text-slate-500">
+            {isRedirecting ? "Entrando..." : "Iniciando sistema..."}
+          </p>
+        </motion.div>
       </div>
     );
   }
 
+  const isFormValid = extractMatriculaNumbers(matricula).length === 11;
+
+  // ---------------------------------------------------------
+  // TELA DE LOGIN (Principal)
+  // ---------------------------------------------------------
   return (
-    <>
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-4">
-        {/* Header */}
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-[440px]"
+      >
+        {/* Cabeçalho */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="relative w-40 h-40">
+          <div className="flex justify-center mb-6">
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 drop-shadow-xl filter">
+              {/* Esta é a imagem principal LCP, usamos Next Image com priority */}
               <Image
                 src="/images/logos/logo.webp"
-                alt="Patrulha Aérea Civil"
+                alt="Brasão Patrulha Aérea Civil"
                 fill
                 className="object-contain"
+                sizes="(max-width: 640px) 128px, 160px"
                 priority
-                sizes="(max-width: 160px) 100vw, 160px"
               />
             </div>
           </div>
 
-          <h1 className="text-3xl font-bold text-navy-900 mb-2">
-            Patrulha Aérea Civil
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight mb-2">
+            PATRULHA AÉREA CIVIL
           </h1>
-          <p className="text-lg text-gray-600 uppercase tracking-wider font-medium">
-            Comando Operacional no Estado do Rio de Janeiro
+          <p className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-widest">
+            Comando Operacional Rio de Janeiro
           </p>
         </div>
 
         {/* Card de Login */}
-        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 border border-gray-200">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Portal do Agente
-            </h2>
-            <p className="text-gray-600">Acesse sua conta com sua matrícula</p>
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden">
+          <div className="p-8">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold text-slate-800">
+                Portal do Agente
+              </h2>
+              <p className="text-slate-500 text-sm mt-1">
+                Identifique-se para acessar o sistema.
+              </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Input Matrícula */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="matricula"
+                  className="block text-sm font-semibold text-slate-700"
+                >
+                  Matrícula
+                </label>
+                <div className="relative group">
+                  <input
+                    id="matricula"
+                    name="matricula"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="username"
+                    required
+                    disabled={isLoading}
+                    value={matricula}
+                    onChange={handleMatriculaChange}
+                    placeholder="000.000.000-00"
+                    className={`
+                      w-full px-4 py-3.5 bg-slate-50 border rounded-xl text-slate-900 text-lg font-medium tracking-wide
+                      transition-all duration-200 ease-in-out
+                      placeholder:text-slate-400
+                      focus:outline-none focus:bg-white focus:ring-2 focus:ring-offset-1
+                      disabled:opacity-60 disabled:cursor-not-allowed
+                      ${
+                        error
+                          ? "border-red-300 focus:ring-red-500 focus:border-red-500"
+                          : "border-slate-200 focus:ring-blue-600 focus:border-blue-600 group-hover:border-blue-300"
+                      }
+                    `}
+                  />
+                  {isLoading && (
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Mensagem de Erro Inline */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex items-center gap-2 text-red-600 text-sm mt-2 font-medium"
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      {error}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Checkbox Lembrar-me */}
+              <div className="flex items-center">
+                <div className="flex items-center h-5">
+                  <input
+                    id="remember-me"
+                    name="remember-me"
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={isLoading}
+                    className="h-5 w-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer transition duration-150 ease-in-out"
+                  />
+                </div>
+                <div className="ml-3 text-sm">
+                  <label
+                    htmlFor="remember-me"
+                    className="font-medium text-slate-600 cursor-pointer select-none"
+                  >
+                    Lembrar minha matrícula
+                  </label>
+                </div>
+              </div>
+
+              {/* Botão de Ação */}
+              <button
+                type="submit"
+                disabled={isLoading || !isFormValid}
+                className={`
+                  w-full py-4 px-6 rounded-xl text-white font-bold text-base shadow-lg shadow-blue-500/20
+                  transition-all duration-200 transform
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600
+                  flex items-center justify-center gap-2
+                  ${
+                    isLoading || !isFormValid
+                      ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
+                      : "bg-blue-700 hover:bg-blue-800 hover:-translate-y-0.5 active:translate-y-0"
+                  }
+                `}
+              >
+                {isLoading ? "Validando..." : "Acessar Portal"}
+              </button>
+            </form>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Campo Matrícula */}
-            <div>
-              <label
-                htmlFor="matricula"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Matrícula
-              </label>
-              <div className="relative">
-                <input
-                  id="matricula"
-                  name="matricula"
-                  type="text"
-                  required
-                  value={matricula}
-                  onChange={handleMatriculaChange}
-                  placeholder="XXX.XXX.XXX-XX"
-                  maxLength={14}
-                  disabled={isLoading}
-                  autoComplete="username"
-                  className={`
-                    w-full px-4 py-3 border rounded-lg
-                    placeholder-gray-500 text-gray-900 text-lg
-                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    ${error ? "border-red-300" : "border-gray-300"}
-                  `}
-                />
-                {isLoading && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-2">
-                <p className="text-sm text-gray-500">
-                  Digite sua matrícula no formato: XXX.XXX.XXX-XX
-                </p>
-                {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-              </div>
-            </div>
-
-            {/* Lembrar-me */}
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                disabled={isLoading}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label
-                htmlFor="remember-me"
-                className="ml-2 block text-sm text-gray-700"
-              >
-                Lembrar minha matrícula
-              </label>
-            </div>
-
-            {/* Botão de Login */}
-            <button
-              type="submit"
-              disabled={isLoading || !isFormValid}
-              className={`
-                w-full py-3 px-4 text-lg font-medium rounded-lg
-                text-white bg-blue-600 hover:bg-blue-700
-                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-                disabled:opacity-50 disabled:cursor-not-allowed
-                transition-colors duration-200
-                flex items-center justify-center
-              `}
+          {/* Rodapé do Card */}
+          <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
+            <Link
+              href="/"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 group"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Autenticando...
-                </>
-              ) : (
-                "Entrar no Portal"
-              )}
-            </button>
-
-            {/* Voltar ao site */}
-            <div className="text-center pt-2">
-              <Link
-                href="/"
-                className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
-              >
-                ← Voltar ao site principal
-              </Link>
-            </div>
-          </form>
+              <span>←</span>
+              <span className="group-hover:underline">
+                Voltar ao site principal
+              </span>
+            </Link>
+          </div>
         </div>
 
-        {/* Rodapé */}
-        <div className="mt-8 text-center text-xs text-gray-500">
-          <p>Sistema exclusivo para agentes cadastrados</p>
-          <p className="mt-1">
-            © {new Date().getFullYear()} Patrulha Aérea Civil.
-          </p>
-        </div>
-      </div>
-    </>
+        {/* Rodapé da Página */}
+        <p className="mt-8 text-center text-xs font-medium text-slate-400">
+          &copy; {new Date().getFullYear()} Patrulha Aérea Civil - Todos os
+          direitos reservados.
+          <br />
+          Sistema de uso exclusivo interno.
+        </p>
+      </motion.div>
+    </div>
   );
 }

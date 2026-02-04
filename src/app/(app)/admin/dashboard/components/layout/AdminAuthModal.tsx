@@ -24,7 +24,6 @@ import {
   RiEyeOffLine,
   RiLockPasswordLine,
   RiArrowRightLine,
-  RiCloseLine,
 } from "react-icons/ri";
 
 interface AdminAuthModalProps {
@@ -42,7 +41,6 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
 
   const { user, profile, verifyAdminAccess } = useAuthStore();
 
-  // Limpar estados quando o modal abre/fecha
   useEffect(() => {
     if (isOpen) {
       setAdminPassword("");
@@ -54,16 +52,11 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
     }
   }, [isOpen]);
 
-  // Contador para redirecionamento
   useEffect(() => {
     let interval: NodeJS.Timeout;
-
     if (successMessage && countdown > 0) {
-      interval = setInterval(() => {
-        setCountdown((prev) => prev - 1);
-      }, 1000);
+      interval = setInterval(() => setCountdown((prev) => prev - 1), 1000);
     }
-
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -87,7 +80,6 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
     setSuccessMessage("");
 
     try {
-      // Verificar se o admin já configurou a senha
       if (!profile.admin_2fa_enabled) {
         setError("Configure sua senha administrativa primeiro");
         setLoading(false);
@@ -100,7 +92,6 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
         setSuccessMessage(result.message || "Autenticação bem-sucedida!");
         setAdminPassword("");
 
-        // Iniciar contagem regressiva para redirecionamento
         const interval = setInterval(() => {
           setCountdown((prev) => {
             if (prev <= 1) {
@@ -122,315 +113,159 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
     }
   };
 
-  // Definindo os tipos corretamente para as animações
   const fadeInUp: Variants = {
-    hidden: {
-      opacity: 0,
-      y: 20,
-    },
+    hidden: { opacity: 0, y: 20 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut" as const, // Corrigido: usando 'as const' para tipo literal
-      },
-    },
-  };
-
-  const messageVariants: Variants = {
-    hidden: {
-      opacity: 0,
-      height: 0,
-      marginTop: 0,
-      marginBottom: 0,
-    },
-    visible: {
-      opacity: 1,
-      height: "auto",
-      marginTop: "0.5rem",
-      marginBottom: "0.5rem",
-      transition: {
-        duration: 0.3,
-        ease: "easeOut" as const,
-      },
-    },
-    exit: {
-      opacity: 0,
-      height: 0,
-      marginTop: 0,
-      marginBottom: 0,
-      transition: {
-        duration: 0.2,
-        ease: "easeIn" as const,
-      },
-    },
-  };
-
-  const successVariants: Variants = {
-    hidden: {
-      opacity: 0,
-      scale: 0.9,
-    },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      transition: {
-        type: "spring",
-        stiffness: 200,
-        damping: 20,
-      },
+      transition: { duration: 0.4, ease: "easeOut" },
     },
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md w-[95vw] max-w-[420px] mx-auto bg-gradient-to-b from-white to-gray-50/90 border border-gray-200 shadow-2xl rounded-2xl overflow-hidden">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          className="space-y-4"
+      <DialogContent className="sm:max-w-md w-[95vw] max-w-[420px] mx-auto bg-background-primary border border-border-light shadow-pac-xl rounded-2xl overflow-hidden p-0">
+        {/* Cabeçalho */}
+        <div className="relative bg-pac-primary text-white py-6 px-6">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+          <DialogHeader className="relative z-10 flex flex-col items-center">
+            <div className="bg-white/20 p-3 rounded-full backdrop-blur-md mb-4 shadow-inner">
+              <RiShieldKeyholeLine className="w-8 h-8 text-white" />
+            </div>
+            <DialogTitle className="text-center text-xl font-bold tracking-tight text-white">
+              Acesso Administrativo
+            </DialogTitle>
+            <DialogDescription className="text-center text-pac-primary-pale/80 mt-1 text-sm">
+              Segunda camada de segurança
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        {/* Formulário */}
+        <form
+          onSubmit={handleSubmit}
+          className="p-6 space-y-5 bg-background-primary"
         >
-          {/* Cabeçalho com gradiente */}
-          <div className="relative bg-gradient-to-r from-navy-600 to-navy-800 text-white py-6 px-6 rounded-t-2xl overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-            <DialogHeader className="relative z-10">
-              <div className="flex items-center justify-center mb-4">
-                <div className="bg-white/20 p-3 rounded-full backdrop-blur-sm">
-                  <RiShieldKeyholeLine className="w-8 h-8" />
-                </div>
-              </div>
-
-              <DialogTitle className="text-center text-2xl font-bold tracking-tight">
-                Acesso Administrativo
-              </DialogTitle>
-
-              <DialogDescription className="text-center text-blue-100/80 mt-1 text-sm">
-                Segunda camada de segurança
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-
-          {/* Conteúdo principal */}
-          <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-5">
-            {/* Campo de senha */}
-            <motion.div variants={fadeInUp} transition={{ delay: 0.1 }}>
-              <div className="mb-3">
-                <div className="flex items-center gap-2 text-gray-700">
-                  <RiLockPasswordLine className="w-4 h-4 text-navy-600" />
-                  <span className="text-sm font-semibold">
-                    Senha Administrativa
-                  </span>
-                </div>
-              </div>
-
-              <div className="relative group">
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  value={adminPassword}
-                  onChange={(e) => {
-                    setAdminPassword(e.target.value);
-                    setError("");
-                    setSuccessMessage("");
-                  }}
-                  placeholder="Digite sua senha administrativa"
-                  disabled={loading || !!successMessage}
-                  className={`w-full h-12 text-base pl-4 pr-12 transition-all duration-300 rounded-xl border-2 ${
-                    error
-                      ? "border-red-500 focus:ring-2 focus:ring-red-200"
-                      : successMessage
-                      ? "border-green-500 focus:ring-2 focus:ring-green-200"
-                      : "border-gray-300 focus:border-navy-600 focus:ring-2 focus:ring-navy-100"
-                  } ${loading || successMessage ? "bg-gray-50" : "bg-white"}`}
-                  autoFocus
-                />
-
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-navy-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
-                  disabled={loading || !!successMessage}
-                >
-                  {showPassword ? (
-                    <RiEyeOffLine className="w-5 h-5" />
-                  ) : (
-                    <RiEyeLine className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </motion.div>
-
-            {/* Mensagens de status */}
-            <AnimatePresence mode="wait">
-              {error && (
-                <motion.div
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  variants={messageVariants}
-                  className="bg-red-50 border border-red-200 rounded-xl p-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="bg-red-100 p-2 rounded-full flex-shrink-0">
-                      <RiErrorWarningLine className="w-5 h-5 text-red-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-red-700 text-sm">
-                        Erro de autenticação
-                      </p>
-                      <p className="text-red-600 text-sm mt-1">{error}</p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {successMessage && (
-                <motion.div
-                  initial="hidden"
-                  animate="visible"
-                  variants={successVariants}
-                  className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-5"
-                >
-                  <div className="flex flex-col items-center text-center space-y-3">
-                    <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-full">
-                      <RiCheckLine className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="font-bold text-green-800 text-lg">
-                        ✅ Autenticação bem-sucedida!
-                      </p>
-                      <p className="text-green-700 text-sm">
-                        Redirecionando para o Painel Administrativo
-                      </p>
-                    </div>
-                    <div className="flex items-center justify-center gap-3">
-                      <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm">
-                        <Spinner className="w-4 h-4 text-green-600 animate-spin" />
-                        <span className="text-green-700 font-semibold">
-                          {countdown} segundo{countdown !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {profile?.admin_2fa_enabled === false && (
-                <motion.div
-                  initial="hidden"
-                  animate="visible"
-                  variants={messageVariants}
-                  className="bg-amber-50 border border-amber-200 rounded-xl p-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="bg-amber-100 p-2 rounded-full flex-shrink-0">
-                      <RiErrorWarningLine className="w-5 h-5 text-amber-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-amber-700 text-sm">
-                        Configuração necessária
-                      </p>
-                      <p className="text-amber-600 text-sm mt-1">
-                        Configure sua senha administrativa primeiro
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Botões de ação */}
-            <motion.div
-              variants={fadeInUp}
-              transition={{ delay: 0.2 }}
-              className="flex flex-col sm:flex-row gap-3 pt-2"
-            >
-              <Button
-                type="submit"
-                disabled={
-                  loading ||
-                  !!successMessage ||
-                  profile?.admin_2fa_enabled === false
-                }
-                className={`flex-1 h-12 rounded-xl font-semibold text-base transition-all duration-300 relative overflow-hidden group ${
-                  successMessage
-                    ? "bg-gradient-to-r from-green-600 to-emerald-700 cursor-wait hover:from-green-700 hover:to-emerald-800"
-                    : profile?.admin_2fa_enabled === false
-                    ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-gradient-to-r from-navy-600 to-navy-800 hover:from-navy-700 hover:to-navy-900 shadow-lg hover:shadow-xl"
-                }`}
-              >
-                <div className="relative z-10 flex items-center justify-center gap-2">
-                  {loading ? (
-                    <>
-                      <Spinner className="w-5 h-5 animate-spin" />
-                      <span>Verificando...</span>
-                    </>
-                  ) : successMessage ? (
-                    <span>Redirecionando...</span>
-                  ) : profile?.admin_2fa_enabled === false ? (
-                    <span>Configurar senha</span>
-                  ) : (
-                    <>
-                      <span>Acessar Painel</span>
-                      <RiArrowRightLine className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                    </>
-                  )}
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={loading || !!successMessage}
-                className="flex-1 h-12 rounded-xl border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-semibold transition-colors duration-300"
-              >
-                <div className="flex items-center justify-center gap-2">
-                  <RiCloseLine className="w-5 h-5" />
-                  <span>Cancelar</span>
-                </div>
-              </Button>
-            </motion.div>
-          </form>
-
-          {/* Rodapé informativo */}
-          <motion.div
-            variants={fadeInUp}
-            transition={{ delay: 0.3 }}
-            className="px-6 pb-6 pt-2"
-          >
-            <div className="text-center space-y-2">
-              <div className="flex items-center justify-center gap-2 text-gray-600 text-sm">
-                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                <span className="font-medium">
-                  Sessão administrativa válida por 2 horas
-                </span>
-              </div>
-
-              {profile?.role === "admin" && profile?.admin_2fa_enabled && (
-                <div className="flex items-center justify-center gap-2 text-green-600 text-sm">
-                  <div className="bg-green-100 p-1.5 rounded-full">
-                    <RiCheckLine className="w-3 h-3" />
-                  </div>
-                  <span className="font-medium">
-                    Senha administrativa configurada
-                  </span>
-                </div>
-              )}
+          <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
+            <div className="mb-2 flex items-center gap-2 text-text-secondary">
+              <RiLockPasswordLine className="w-4 h-4 text-pac-primary" />
+              <span className="text-sm font-semibold uppercase tracking-wide">
+                Senha Administrativa
+              </span>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <p className="text-center text-xs text-gray-500">
-                Para segurança do sistema, todas as ações administrativas são
-                registradas em log.
-              </p>
+            <div className="relative group">
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  setError("");
+                }}
+                placeholder="Digite sua senha"
+                disabled={loading || !!successMessage}
+                className={`w-full h-12 text-base pl-4 pr-12 rounded-xl border-2 transition-all ${
+                  error
+                    ? "border-pac-alert focus:ring-pac-alert/20"
+                    : successMessage
+                      ? "border-pac-secondary focus:ring-pac-secondary/20"
+                      : "border-border-DEFAULT focus:border-pac-primary focus:ring-pac-primary/10"
+                }`}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-text-tertiary hover:text-pac-primary transition-colors p-1"
+                disabled={loading || !!successMessage}
+              >
+                {showPassword ? (
+                  <RiEyeOffLine className="w-5 h-5" />
+                ) : (
+                  <RiEyeLine className="w-5 h-5" />
+                )}
+              </button>
             </div>
           </motion.div>
-        </motion.div>
+
+          <AnimatePresence mode="wait">
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="bg-pac-alert/10 border border-pac-alert/20 rounded-lg p-3 flex items-start gap-3"
+              >
+                <RiErrorWarningLine className="w-5 h-5 text-pac-alert flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-pac-alert font-medium">{error}</p>
+              </motion.div>
+            )}
+
+            {successMessage && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-pac-secondary/10 border border-pac-secondary/20 rounded-lg p-4 text-center space-y-2"
+              >
+                <div className="inline-flex bg-pac-secondary text-white p-2 rounded-full mb-1">
+                  <RiCheckLine className="w-6 h-6" />
+                </div>
+                <p className="font-bold text-pac-secondary-dark">
+                  Acesso Autorizado!
+                </p>
+                <div className="flex items-center justify-center gap-2 text-sm text-text-secondary">
+                  <Spinner className="w-4 h-4 text-pac-secondary" />
+                  <span>Entrando em {countdown}s...</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <Button
+              type="submit"
+              disabled={
+                loading ||
+                !!successMessage ||
+                profile?.admin_2fa_enabled === false
+              }
+              className={`flex-1 h-12 rounded-xl font-bold uppercase tracking-wide transition-all shadow-md ${
+                successMessage
+                  ? "bg-pac-secondary hover:bg-pac-secondary-dark text-white"
+                  : "bg-pac-primary hover:bg-pac-primary-dark text-white"
+              }`}
+            >
+              {loading ? (
+                <>
+                  <Spinner className="w-4 h-4 mr-2" /> Verificando...
+                </>
+              ) : successMessage ? (
+                "Redirecionando..."
+              ) : (
+                <>
+                  Acessar Painel <RiArrowRightLine className="ml-2 w-4 h-4" />
+                </>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading || !!successMessage}
+              className="flex-1 h-12 rounded-xl border-border-DEFAULT text-text-secondary hover:bg-background-secondary font-semibold"
+            >
+              Cancelar
+            </Button>
+          </div>
+        </form>
+
+        {/* Footer */}
+        <div className="bg-background-secondary px-6 py-4 text-center border-t border-border-light">
+          <p className="text-[10px] text-text-tertiary uppercase font-bold tracking-wider">
+            Monitoramento de Segurança Ativo • IP Registrado
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   );

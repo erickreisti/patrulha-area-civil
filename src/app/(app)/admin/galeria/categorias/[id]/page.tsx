@@ -2,6 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+
+// UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +21,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
-import Link from "next/link";
-import { motion } from "framer-motion";
 
 // Icons
 import {
@@ -33,8 +35,9 @@ import {
   RiCalendarLine,
   RiEyeLine,
   RiEyeOffLine,
-  RiCheckLine,
   RiArchiveLine,
+  RiInformationLine,
+  RiCheckLine,
 } from "react-icons/ri";
 
 // Actions & Store
@@ -56,9 +59,21 @@ interface FormData {
   itens_count?: number;
 }
 
-const fadeInUp = {
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 },
+  },
+};
+
+const itemVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4 },
+  },
 };
 
 export default function EditarCategoriaPage() {
@@ -81,7 +96,7 @@ export default function EditarCategoriaPage() {
 
   const categoriaId = params.id as string;
 
-  // 1. Verificar Permissões e Carregar Dados
+  // 1. Verificar Permissões
   useEffect(() => {
     if (isAdmin === false || !hasAdminSession) {
       toast.error("Acesso negado.");
@@ -89,6 +104,7 @@ export default function EditarCategoriaPage() {
     }
   }, [isAdmin, hasAdminSession, router]);
 
+  // 2. Carregar Dados
   const fetchCategoria = useCallback(async () => {
     if (!categoriaId) return;
     try {
@@ -126,7 +142,7 @@ export default function EditarCategoriaPage() {
     if (hasAdminSession) fetchCategoria();
   }, [fetchCategoria, hasAdminSession]);
 
-  // 2. Handlers Genéricos
+  // 3. Handlers
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -134,17 +150,16 @@ export default function EditarCategoriaPage() {
     setFormData((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleSwitchChange = (key: keyof FormData, checked: boolean) => {
-    setFormData((prev) => ({ ...prev, [key]: checked }));
-  };
-
   const handleSlugChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Normaliza slug (apenas letras minúsculas, números e hifens)
     const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-");
     setFormData((prev) => ({ ...prev, slug: val }));
   };
 
-  // 3. Submit
+  const handleSwitchChange = (key: keyof FormData, checked: boolean) => {
+    setFormData((prev) => ({ ...prev, [key]: checked }));
+  };
+
+  // 4. Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -160,8 +175,8 @@ export default function EditarCategoriaPage() {
       });
 
       if (result.success) {
-        toast.success("Categoria atualizada!");
-        setTimeout(() => router.push("/admin/galeria/categorias"), 1000);
+        toast.success("Categoria atualizada com sucesso!");
+        router.push("/admin/galeria/categorias");
       } else {
         toast.error(result.error || "Erro ao atualizar");
       }
@@ -175,282 +190,355 @@ export default function EditarCategoriaPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen bg-slate-50/50 py-10 font-sans flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <RiRefreshLine className="w-8 h-8 animate-spin text-navy-600" />
-          <p className="text-gray-500">Carregando categoria...</p>
+          <RiRefreshLine className="w-10 h-10 animate-spin text-emerald-600" />
+          <p className="text-slate-500 font-medium">
+            Carregando dados da categoria...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-      <div className="container mx-auto px-4 max-w-6xl">
+    <div className="min-h-screen bg-slate-50/50 py-10 font-sans">
+      <div className="container mx-auto px-4 max-w-5xl">
         {/* Header */}
         <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4"
         >
           <div>
-            <h1 className="text-3xl font-bold text-gray-800 font-bebas tracking-wide">
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight font-bebas">
               EDITAR CATEGORIA
             </h1>
-            <p className="text-gray-600">ID: {formData.id}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge
+                variant="outline"
+                className="text-slate-500 border-slate-300 bg-white font-mono text-[10px]"
+              >
+                ID: {formData.id.split("-")[0]}...
+              </Badge>
+              <span className="text-slate-400 text-sm">•</span>
+              <p className="text-slate-500 font-medium text-sm">
+                Editando:{" "}
+                <span className="text-slate-700 font-bold">
+                  {formData.nome}
+                </span>
+              </p>
+            </div>
           </div>
 
           <Link href="/admin/galeria/categorias">
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"
+            >
               <RiArrowLeftLine className="mr-2" /> Voltar
             </Button>
           </Link>
         </motion.div>
 
-        <form
+        <motion.form
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
           onSubmit={handleSubmit}
           className="grid grid-cols-1 lg:grid-cols-3 gap-8"
         >
-          {/* Coluna Principal */}
-          <div className="lg:col-span-2 space-y-6">
-            <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-              <Card>
-                <CardHeader className="border-b">
-                  <CardTitle className="flex items-center gap-2">
-                    <RiFolderLine className="text-navy-600" /> Dados Principais
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6 space-y-6">
-                  {/* Nome */}
-                  <div className="space-y-2">
-                    <Label htmlFor="nome">Nome da Categoria *</Label>
+          {/* Coluna Principal (Formulário) */}
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-2 space-y-6"
+          >
+            <Card className="border-none shadow-lg bg-white overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+                <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <RiFolderLine className="text-emerald-600" /> Informações
+                  Básicas
+                </CardTitle>
+              </CardHeader>
+
+              <CardContent className="p-6 space-y-6">
+                {/* Nome */}
+                <div className="space-y-2">
+                  <Label htmlFor="nome" className="text-slate-700">
+                    Nome da Categoria <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="nome"
+                    value={formData.nome}
+                    onChange={handleInputChange}
+                    placeholder="Ex: Treinamentos 2024"
+                    maxLength={100}
+                    required
+                    className="h-11 border-slate-200 focus-visible:ring-emerald-500/20"
+                  />
+                </div>
+
+                {/* Slug */}
+                <div className="space-y-2">
+                  <Label htmlFor="slug" className="text-slate-700">
+                    Slug (URL) <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="flex shadow-sm rounded-md">
+                    <span className="bg-slate-50 border border-r-0 border-slate-200 rounded-l-md px-3 flex items-center text-sm text-slate-500 font-medium min-w-fit">
+                      /galeria/
+                    </span>
                     <Input
-                      id="nome"
-                      value={formData.nome}
-                      onChange={handleInputChange}
-                      maxLength={100}
+                      id="slug"
+                      value={formData.slug}
+                      onChange={handleSlugChange}
+                      className="rounded-l-none font-mono text-sm h-11 border-slate-200 focus-visible:ring-emerald-500/20"
                       required
                     />
                   </div>
+                  <p className="text-xs text-amber-600 flex items-center gap-1 mt-1 font-medium bg-amber-50 p-2 rounded border border-amber-100 w-fit">
+                    <RiAlertLine /> Alterar o slug pode quebrar links externos
+                    existentes.
+                  </p>
+                </div>
 
-                  {/* Slug */}
-                  <div className="space-y-2">
-                    <Label htmlFor="slug">Slug (URL) *</Label>
-                    <div className="flex">
-                      <span className="bg-gray-100 border border-r-0 rounded-l-md px-3 py-2 text-sm text-gray-500 flex items-center">
-                        /galeria/
-                      </span>
-                      <Input
-                        id="slug"
-                        value={formData.slug}
-                        onChange={handleSlugChange}
-                        className="rounded-l-none font-mono text-sm"
-                        required
-                      />
-                    </div>
-                    <p className="text-xs text-amber-600 flex items-center gap-1">
-                      <RiAlertLine /> Cuidado ao alterar o slug, links antigos
-                      podem quebrar.
+                {/* Descrição */}
+                <div className="space-y-2">
+                  <Label htmlFor="descricao" className="text-slate-700">
+                    Descrição
+                  </Label>
+                  <Textarea
+                    id="descricao"
+                    value={formData.descricao}
+                    onChange={handleInputChange}
+                    rows={4}
+                    maxLength={500}
+                    className="resize-none border-slate-200 focus-visible:ring-emerald-500/20 min-h-[100px]"
+                    placeholder="Descreva o conteúdo desta categoria..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {/* Tipo */}
+                  <div className="space-y-3">
+                    <Label className="text-slate-700">Tipo de Conteúdo</Label>
+                    <Select
+                      value={formData.tipo}
+                      // ✅ CORREÇÃO: Cast explícito para evitar erro de string vs literal
+                      onValueChange={(v) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          tipo: v as "fotos" | "videos",
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="h-11 border-slate-200">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fotos">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 bg-blue-100 rounded text-blue-600">
+                              <RiImageLine />
+                            </div>
+                            <span>Álbum de Fotos</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="videos">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 bg-purple-100 rounded text-purple-600">
+                              <RiVideoLine />
+                            </div>
+                            <span>Galeria de Vídeos</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Ordem */}
+                  <div className="space-y-3">
+                    <Label htmlFor="ordem" className="text-slate-700">
+                      Ordem de Exibição
+                    </Label>
+                    <Input
+                      id="ordem"
+                      type="number"
+                      min="0"
+                      max="999"
+                      value={formData.ordem}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          ordem: Number(e.target.value),
+                        }))
+                      }
+                      className="h-11 border-slate-200"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => router.back()}
+                  disabled={saving}
+                  className="text-slate-600 hover:text-slate-800 hover:bg-slate-200/50"
+                >
+                  <RiCloseLine className="mr-2" /> Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={saving}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 shadow-md shadow-emerald-100 transition-all hover:translate-y-[-1px]"
+                >
+                  {saving ? (
+                    <>
+                      <RiRefreshLine className="animate-spin mr-2" />{" "}
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <RiSaveLine className="mr-2" /> Salvar Alterações
+                    </>
+                  )}
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Coluna Lateral */}
+          <motion.div variants={itemVariants} className="space-y-6">
+            {/* Card de Informações */}
+            <Card className="border-none shadow-md bg-white overflow-hidden">
+              <div className="bg-slate-50/50 border-b border-slate-100 p-4">
+                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+                  Status da Categoria
+                </h3>
+              </div>
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center justify-between text-sm py-2 border-b border-slate-50">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <RiFolderLine /> Total de Itens
+                  </span>
+                  <Badge
+                    variant="secondary"
+                    className="bg-blue-50 text-blue-700 font-bold border-blue-100"
+                  >
+                    {formData.itens_count || 0}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between text-sm py-2 border-b border-slate-50">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <RiCalendarLine /> Criado em
+                  </span>
+                  <span className="font-medium text-slate-700">
+                    {formData.created_at
+                      ? new Date(formData.created_at).toLocaleDateString()
+                      : "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm py-2">
+                  <span className="text-slate-500 flex items-center gap-2">
+                    <RiRefreshLine /> Atualizado em
+                  </span>
+                  <span className="font-medium text-slate-700">
+                    {formData.updated_at
+                      ? new Date(formData.updated_at).toLocaleDateString()
+                      : "-"}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Card de Visibilidade */}
+            <Card className="border-none shadow-md bg-white overflow-hidden">
+              <div className="bg-slate-50/50 border-b border-slate-100 p-4">
+                <h3 className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+                  Visibilidade
+                </h3>
+              </div>
+              <CardContent className="p-5 space-y-6">
+                {/* Status Switch */}
+                <div className="flex items-center justify-between group">
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-2 text-slate-700 cursor-pointer font-semibold">
+                      {formData.status ? (
+                        <RiEyeLine className="text-emerald-500" />
+                      ) : (
+                        <RiEyeOffLine className="text-slate-400" />
+                      )}
+                      Status Ativo
+                    </Label>
+                    <p className="text-xs text-slate-500">
+                      {formData.status
+                        ? "Visível no site."
+                        : "Oculto (Rascunho)."}
                     </p>
                   </div>
+                  <Switch
+                    checked={formData.status}
+                    onCheckedChange={(c) => handleSwitchChange("status", c)}
+                    className="data-[state=checked]:bg-emerald-500"
+                  />
+                </div>
 
-                  {/* Descrição */}
-                  <div className="space-y-2">
-                    <Label htmlFor="descricao">Descrição</Label>
-                    <Textarea
-                      id="descricao"
-                      value={formData.descricao}
-                      onChange={handleInputChange}
-                      rows={4}
-                      maxLength={500}
-                    />
-                  </div>
+                <div className="h-px bg-slate-100 w-full" />
 
-                  {/* Tipo e Ordem */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label>Tipo de Conteúdo</Label>
-                      <Select
-                        value={formData.tipo}
-                        onValueChange={(v: "fotos" | "videos") =>
-                          setFormData((prev) => ({ ...prev, tipo: v }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="fotos">
-                            <div className="flex items-center gap-2">
-                              <RiImageLine className="text-blue-500" /> Fotos
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="videos">
-                            <div className="flex items-center gap-2">
-                              <RiVideoLine className="text-purple-500" /> Vídeos
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="ordem">Ordem de Exibição</Label>
-                      <Input
-                        id="ordem"
-                        type="number"
-                        min="0"
-                        max="999"
-                        value={formData.ordem}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            ordem: Number(e.target.value),
-                          }))
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  {/* Botões Mobile/Desktop */}
-                  <div className="flex gap-3 pt-4">
-                    <Button
-                      type="submit"
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <RiRefreshLine className="animate-spin mr-2" />
+                {/* Arquivada Switch */}
+                <div className="flex items-center justify-between group">
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-2 text-slate-700 cursor-pointer font-semibold">
+                      {formData.arquivada ? (
+                        <RiArchiveLine className="text-amber-500" />
                       ) : (
-                        <RiSaveLine className="mr-2" />
+                        <RiCheckLine className="text-slate-400" />
                       )}
-                      {saving ? "Salvando..." : "Salvar Alterações"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => router.back()}
-                      disabled={saving}
-                    >
-                      <RiCloseLine className="mr-2" /> Cancelar
-                    </Button>
+                      Arquivada
+                    </Label>
+                    <p className="text-xs text-slate-500">
+                      Mover para histórico antigo.
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
+                  <Switch
+                    checked={formData.arquivada}
+                    onCheckedChange={(c) => handleSwitchChange("arquivada", c)}
+                    className="data-[state=checked]:bg-amber-500"
+                  />
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <motion.div
-              variants={fadeInUp}
-              initial="hidden"
-              animate="visible"
-              transition={{ delay: 0.2 }}
-            >
-              {/* Card de Info */}
-              <Card className="mb-6 border-l-4 border-l-blue-500">
-                <CardContent className="p-4 space-y-3">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Itens vinculados:</span>
-                    <Badge
-                      variant="secondary"
-                      className="bg-blue-100 text-blue-700"
-                    >
-                      {formData.itens_count || 0}
-                    </Badge>
+            {/* Card de Preview */}
+            <Card className="border-l-4 border-l-blue-500 shadow-md bg-blue-50/30">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex gap-3">
+                  <div className="mt-0.5 p-1 bg-blue-100 text-blue-600 rounded-full h-fit shadow-sm">
+                    <RiInformationLine size={16} />
                   </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-500">Criada em:</span>
-                    <span className="flex items-center gap-1 text-gray-700">
-                      <RiCalendarLine className="w-3 h-3" />
-                      {formData.created_at
-                        ? new Date(formData.created_at).toLocaleDateString()
-                        : "-"}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Card de Configurações */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Visibilidade</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Status */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center gap-2">
-                        {formData.status ? (
-                          <RiEyeLine className="text-green-600" />
-                        ) : (
-                          <RiEyeOffLine className="text-gray-400" />
-                        )}
-                        Status Ativo
-                      </Label>
-                      <span className="text-xs text-gray-500">
-                        {formData.status ? "Visível no site" : "Oculto"}
-                      </span>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-blue-900 text-sm">
+                      Preview da Categoria
+                    </h4>
+                    <div className="flex gap-2 mt-2">
+                      <Badge
+                        className={`border-0 ${formData.tipo === "fotos" ? "bg-blue-600" : "bg-purple-600"}`}
+                      >
+                        {formData.tipo === "fotos" ? "Fotos" : "Vídeos"}
+                      </Badge>
+                      <Badge
+                        variant={formData.status ? "default" : "destructive"}
+                      >
+                        {formData.status ? "Ativa" : "Inativa"}
+                      </Badge>
                     </div>
-                    <Switch
-                      checked={formData.status}
-                      onCheckedChange={(c) => handleSwitchChange("status", c)}
-                    />
                   </div>
-
-                  {/* Arquivada */}
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="flex items-center gap-2">
-                        {formData.arquivada ? (
-                          <RiArchiveLine className="text-amber-500" />
-                        ) : (
-                          <RiCheckLine className="text-gray-400" />
-                        )}
-                        Arquivada
-                      </Label>
-                      <span className="text-xs text-gray-500">
-                        Mover para histórico
-                      </span>
-                    </div>
-                    <Switch
-                      checked={formData.arquivada}
-                      onCheckedChange={(c) =>
-                        handleSwitchChange("arquivada", c)
-                      }
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Card de Resumo (Preview) */}
-              <Card className="mt-6 bg-gray-50 border-dashed">
-                <CardContent className="p-4 text-center">
-                  <p className="text-xs uppercase tracking-wider text-gray-400 font-bold mb-2">
-                    Preview da Badge
-                  </p>
-                  <div className="flex justify-center gap-2">
-                    <Badge
-                      className={
-                        formData.tipo === "fotos"
-                          ? "bg-blue-600"
-                          : "bg-purple-600"
-                      }
-                    >
-                      {formData.tipo === "fotos" ? "Fotos" : "Vídeos"}
-                    </Badge>
-                    <Badge
-                      variant={formData.status ? "default" : "destructive"}
-                    >
-                      {formData.status ? "Ativa" : "Inativa"}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </div>
-        </form>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </motion.form>
       </div>
     </div>
   );

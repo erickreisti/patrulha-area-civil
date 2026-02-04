@@ -3,19 +3,28 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 
-// Imports das Server Actions
+// --- IMPORTS DAS ACTIONS ---
 import {
   getCategoriasAdmin,
   getCategoriaPorSlug,
-  getItensAdmin,
   createCategoria,
   toggleCategoriaStatus,
+  deleteCategoria,
+  getPublicCategorias,
+} from "@/app/actions/gallery/categorias";
+
+import {
+  getItensAdmin,
   createItem,
   toggleItemStatus,
   toggleItemDestaque,
-  getGaleriaStats,
-} from "@/app/actions/gallery";
+  deleteItem,
+  getPublicItens,
+} from "@/app/actions/gallery/itens";
 
+import { getGaleriaStats } from "@/app/actions/gallery/stats";
+
+// --- TIPOS ---
 import type {
   Categoria,
   Item,
@@ -25,17 +34,20 @@ import type {
   TipoItemFilter,
   StatusFilter,
   DestaqueFilter,
+  ListItensSchema,
 } from "@/app/actions/gallery/types";
+import { z } from "zod";
 
 // ============================================
 // TIPOS DO ESTADO
 // ============================================
 
-interface PaginationState {
+// Tipo unificado para paginação
+interface PaginationData {
   page: number;
   limit: number;
-  totalPages: number;
   total: number;
+  totalPages: number;
 }
 
 interface GaleriaStore {
@@ -53,7 +65,7 @@ interface GaleriaStore {
   errorItens: string | null;
   loadingStats: boolean;
 
-  // --- Filtros ---
+  // --- Filtros Admin ---
   filtrosCategorias: {
     search: string;
     tipo: TipoCategoriaFilter;
@@ -72,9 +84,23 @@ interface GaleriaStore {
     limit: number;
   };
 
+  // --- Filtros Públicos ---
+  filtrosPublicos: {
+    categoriaSlug: string | "all";
+    page: number;
+    limit: number;
+  };
+
+  // --- Paginações Separadas (Estado Real) ---
+  paginationCategorias: PaginationData;
+  paginationItens: PaginationData;
+  paginationPublica: PaginationData;
+
   // --- Actions (Categorias) ---
-  fetchCategorias: () => Promise<void>;
+  fetchCategoriasAdmin: () => Promise<void>;
+  fetchCategoriasPublicas: () => Promise<void>;
   fetchCategoriaPorSlug: (slug: string) => Promise<void>;
+
   criarCategoria: (
     data: CreateCategoriaInput,
   ) => Promise<{ success: boolean; error?: string }>;
@@ -82,10 +108,16 @@ interface GaleriaStore {
     id: string,
     current: boolean,
   ) => Promise<{ success: boolean; error?: string }>;
+  deletarCategoria: (
+    id: string,
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // --- Actions (Itens) ---
-  fetchItens: () => Promise<void>;
+  fetchItensAdmin: () => Promise<void>;
+  fetchItensPublicos: () => Promise<void>;
+
   criarItem: (data: FormData) => Promise<{ success: boolean; error?: string }>;
+  deletarItem: (id: string) => Promise<{ success: boolean; error?: string }>;
   alternarStatusItem: (
     id: string,
     current: boolean,
@@ -98,13 +130,18 @@ interface GaleriaStore {
   // --- Actions (Gerais) ---
   fetchStats: () => Promise<void>;
 
-  // --- Setters de Filtro ---
+  // --- Setters ---
   setFiltrosCategorias: (
     filtros: Partial<GaleriaStore["filtrosCategorias"]>,
   ) => void;
   setFiltrosItens: (filtros: Partial<GaleriaStore["filtrosItens"]>) => void;
-  setPaginationCategorias: (pagination: Partial<PaginationState>) => void;
-  setPaginationItens: (pagination: Partial<PaginationState>) => void;
+  setFiltrosPublicos: (
+    filtros: Partial<GaleriaStore["filtrosPublicos"]>,
+  ) => void;
+
+  setPaginationCategorias: (pagination: Partial<PaginationData>) => void;
+  setPaginationItens: (pagination: Partial<PaginationData>) => void;
+  setPaginationPublica: (pagination: Partial<PaginationData>) => void;
 
   // --- Utils ---
   clearErrorCategorias: () => void;
@@ -112,6 +149,13 @@ interface GaleriaStore {
   resetFiltrosCategorias: () => void;
   resetFiltrosItens: () => void;
 }
+
+const initialPagination: PaginationData = {
+  page: 1,
+  limit: 12,
+  total: 0,
+  totalPages: 1,
+};
 
 const initialState = {
   categorias: [],
@@ -143,6 +187,16 @@ const initialState = {
     page: 1,
     limit: 12,
   },
+
+  filtrosPublicos: {
+    categoriaSlug: "all",
+    page: 1,
+    limit: 12,
+  },
+
+  paginationCategorias: { ...initialPagination },
+  paginationItens: { ...initialPagination },
+  paginationPublica: { ...initialPagination },
 };
 
 // ============================================
@@ -153,7 +207,8 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
   ...initialState,
 
   // --- Actions Categorias ---
-  fetchCategorias: async () => {
+
+  fetchCategoriasAdmin: async () => {
     set({ loadingCategorias: true, errorCategorias: null });
     try {
       const { filtrosCategorias } = get();
@@ -170,14 +225,40 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       });
 
       if (res.success && res.data) {
-        set({ categorias: res.data, loadingCategorias: false });
+        set({
+          categorias: res.data,
+          paginationCategorias: res.pagination
+            ? { ...res.pagination }
+            : { ...initialPagination },
+          loadingCategorias: false,
+        });
       } else {
         throw new Error(res.error || "Erro ao buscar categorias");
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorCategorias: message, loadingCategorias: false });
+    } catch (error) {
+      set({
+        errorCategorias:
+          error instanceof Error ? error.message : "Erro desconhecido",
+        loadingCategorias: false,
+      });
+    }
+  },
+
+  fetchCategoriasPublicas: async () => {
+    set({ loadingCategorias: true, errorCategorias: null });
+    try {
+      const res = await getPublicCategorias();
+      if (res.success && res.data) {
+        set({ categorias: res.data, loadingCategorias: false });
+      } else {
+        throw new Error(res.error || "Erro ao buscar categorias públicas");
+      }
+    } catch (error) {
+      set({
+        errorCategorias:
+          error instanceof Error ? error.message : "Erro desconhecido",
+        loadingCategorias: false,
+      });
     }
   },
 
@@ -190,10 +271,12 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         throw new Error(res.error || "Categoria não encontrada");
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorCategorias: message, loadingCategorias: false });
+    } catch (error) {
+      set({
+        errorCategorias:
+          error instanceof Error ? error.message : "Erro desconhecido",
+        loadingCategorias: false,
+      });
     }
   },
 
@@ -202,16 +285,14 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
     try {
       const res = await createCategoria(data);
       if (res.success) {
-        await get().fetchCategorias();
+        await get().fetchCategoriasAdmin();
         return { success: true };
-      } else {
-        throw new Error(res.error || "Erro ao criar categoria");
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorCategorias: message, loadingCategorias: false });
-      return { success: false, error: message };
+      throw new Error(res.error || "Erro ao criar categoria");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      set({ errorCategorias: msg, loadingCategorias: false });
+      return { success: false, error: msg };
     }
   },
 
@@ -220,26 +301,42 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
     try {
       const res = await toggleCategoriaStatus(id, !current);
       if (res.success) {
-        await get().fetchCategorias();
+        await get().fetchCategoriasAdmin();
         set({ loadingCategorias: false });
         return { success: true };
-      } else {
-        throw new Error(res.error);
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorCategorias: message, loadingCategorias: false });
-      return { success: false, error: message };
+      throw new Error(res.error);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      set({ errorCategorias: msg, loadingCategorias: false });
+      return { success: false, error: msg };
+    }
+  },
+
+  deletarCategoria: async (id: string) => {
+    try {
+      const res = await deleteCategoria(id);
+      if (res.success) {
+        await get().fetchCategoriasAdmin();
+        return { success: true };
+      }
+      return { success: false, error: res.error };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Erro desconhecido",
+      };
     }
   },
 
   // --- Actions Itens ---
-  fetchItens: async () => {
+
+  fetchItensAdmin: async () => {
     set({ loadingItens: true, errorItens: null });
     try {
       const { filtrosItens } = get();
-      const res = await getItensAdmin({
+
+      const filters: Partial<z.infer<typeof ListItensSchema>> = {
         search: filtrosItens.search,
         categoria_id:
           filtrosItens.categoria_id !== "all"
@@ -251,17 +348,57 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
           filtrosItens.destaque !== "all" ? filtrosItens.destaque : undefined,
         page: filtrosItens.page,
         limit: filtrosItens.limit,
-      });
+      };
+
+      const res = await getItensAdmin(filters);
 
       if (res.success && res.data) {
-        set({ itens: res.data, loadingItens: false });
+        set({
+          itens: res.data,
+          paginationItens: res.pagination
+            ? { ...res.pagination }
+            : { ...initialPagination },
+          loadingItens: false,
+        });
       } else {
         throw new Error(res.error || "Erro ao buscar itens");
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorItens: message, loadingItens: false });
+    } catch (error) {
+      set({
+        errorItens:
+          error instanceof Error ? error.message : "Erro desconhecido",
+        loadingItens: false,
+      });
+    }
+  },
+
+  fetchItensPublicos: async () => {
+    set({ loadingItens: true, errorItens: null });
+    try {
+      const { filtrosPublicos } = get();
+      const res = await getPublicItens(
+        filtrosPublicos.categoriaSlug,
+        filtrosPublicos.limit,
+        filtrosPublicos.page,
+      );
+
+      if (res.success && res.data) {
+        set({
+          itens: res.data,
+          paginationPublica: res.pagination
+            ? { ...res.pagination }
+            : { ...initialPagination },
+          loadingItens: false,
+        });
+      } else {
+        throw new Error(res.error);
+      }
+    } catch (error) {
+      set({
+        errorItens:
+          error instanceof Error ? error.message : "Erro desconhecido",
+        loadingItens: false,
+      });
     }
   },
 
@@ -270,16 +407,14 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
     try {
       const res = await createItem(data);
       if (res.success) {
-        await get().fetchItens();
+        await get().fetchItensAdmin();
         return { success: true };
-      } else {
-        throw new Error(res.error);
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorItens: message, loadingItens: false });
-      return { success: false, error: message };
+      throw new Error(res.error);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      set({ errorItens: msg, loadingItens: false });
+      return { success: false, error: msg };
     }
   },
 
@@ -287,16 +422,19 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
     try {
       const res = await toggleItemStatus(id, !current);
       if (res.success) {
-        await get().fetchItens();
+        // Atualização Otimista
+        set((state) => ({
+          itens: state.itens.map((i) =>
+            i.id === id ? { ...i, status: !current } : i,
+          ),
+        }));
         return { success: true };
-      } else {
-        throw new Error(res.error);
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorItens: message });
-      return { success: false, error: message };
+      throw new Error(res.error);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      set({ errorItens: msg });
+      return { success: false, error: msg };
     }
   },
 
@@ -304,18 +442,38 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
     try {
       const res = await toggleItemDestaque(id, !current);
       if (res.success) {
-        await get().fetchItens();
+        set((state) => ({
+          itens: state.itens.map((i) =>
+            i.id === id ? { ...i, destaque: !current } : i,
+          ),
+        }));
         return { success: true };
-      } else {
-        throw new Error(res.error);
       }
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "Erro desconhecido";
-      set({ errorItens: message });
-      return { success: false, error: message };
+      throw new Error(res.error);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
+      set({ errorItens: msg });
+      return { success: false, error: msg };
     }
   },
+
+  deletarItem: async (id: string) => {
+    try {
+      const res = await deleteItem(id);
+      if (res.success) {
+        await get().fetchItensAdmin();
+        return { success: true };
+      }
+      return { success: false, error: res.error };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Erro",
+      };
+    }
+  },
+
+  // --- Gerais ---
 
   fetchStats: async () => {
     set({ loadingStats: true });
@@ -326,29 +484,53 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
       } else {
         set({ loadingStats: false });
       }
-    } catch (error: unknown) {
+    } catch (error) {
       console.error(error);
       set({ loadingStats: false });
     }
   },
 
-  // --- Setters ---
+  // --- Setters (CORRIGIDOS: Sem chaves duplicadas) ---
+
   setFiltrosCategorias: (filtros) =>
     set((state) => ({
-      filtrosCategorias: { ...state.filtrosCategorias, ...filtros },
+      filtrosCategorias: {
+        ...state.filtrosCategorias,
+        ...filtros,
+        // Se mudou algum filtro (exceto page), reseta a página
+        page: filtros.page !== undefined ? filtros.page : 1,
+      },
     })),
 
   setFiltrosItens: (filtros) =>
-    set((state) => ({ filtrosItens: { ...state.filtrosItens, ...filtros } })),
+    set((state) => ({
+      filtrosItens: {
+        ...state.filtrosItens,
+        ...filtros,
+        page: filtros.page !== undefined ? filtros.page : 1,
+      },
+    })),
+
+  setFiltrosPublicos: (filtros) =>
+    set((state) => ({
+      filtrosPublicos: { ...state.filtrosPublicos, ...filtros },
+    })),
 
   setPaginationCategorias: (pagination) =>
     set((state) => ({
       filtrosCategorias: { ...state.filtrosCategorias, ...pagination },
+      paginationCategorias: { ...state.paginationCategorias, ...pagination },
     })),
 
   setPaginationItens: (pagination) =>
     set((state) => ({
       filtrosItens: { ...state.filtrosItens, ...pagination },
+      paginationItens: { ...state.paginationItens, ...pagination },
+    })),
+
+  setPaginationPublica: (pagination) =>
+    set((state) => ({
+      paginationPublica: { ...state.paginationPublica, ...pagination },
     })),
 
   // --- Utils ---
@@ -363,58 +545,69 @@ export const useGaleriaStore = create<GaleriaStore>((set, get) => ({
 // HOOKS EXPORTADOS
 // ============================================
 
-export function useCategoriasList() {
+export function useCategoriasAdmin() {
   const store = useGaleriaStore(
     useShallow((state) => ({
       categorias: state.categorias,
       loading: state.loadingCategorias,
       error: state.errorCategorias,
       filtros: state.filtrosCategorias,
-      fetchCategorias: state.fetchCategorias,
+      // Mapeia pagination e setPagination
+      pagination: state.paginationCategorias,
+      setPagination: state.setPaginationCategorias,
+
+      fetchCategorias: state.fetchCategoriasAdmin,
       setFiltros: state.setFiltrosCategorias,
       resetFiltros: state.resetFiltrosCategorias,
-      setPagination: state.setPaginationCategorias,
-      pagination: {
-        page: state.filtrosCategorias.page,
-        limit: state.filtrosCategorias.limit,
-        total: state.stats?.total_categorias || state.categorias.length,
-        totalPages: 1,
-      },
+      createCategoria: state.criarCategoria,
+      toggleStatus: state.alternarStatusCategoria,
+      deleteCategoria: state.deletarCategoria,
     })),
   );
   return store;
 }
 
-export function useCategoriaSelecionada() {
-  const store = useGaleriaStore(
-    useShallow((state) => ({
-      categoria: state.categoriaSelecionada,
-      loading: state.loadingCategorias,
-      error: state.errorCategorias,
-      fetchCategoriaPorSlug: state.fetchCategoriaPorSlug,
-      clearError: state.clearErrorCategorias,
-    })),
-  );
-  return store;
-}
-
-export function useItensList() {
+export function useItensAdmin() {
   const store = useGaleriaStore(
     useShallow((state) => ({
       itens: state.itens,
+      categorias: state.categorias,
       loading: state.loadingItens,
       error: state.errorItens,
       filtros: state.filtrosItens,
-      fetchItens: state.fetchItens,
+      // Mapeia pagination e setPagination
+      pagination: state.paginationItens,
+      setPagination: state.setPaginationItens,
+      resetFiltros: state.resetFiltrosItens,
+
+      fetchItens: state.fetchItensAdmin,
+      fetchCategorias: state.fetchCategoriasAdmin,
       setFiltros: state.setFiltrosItens,
       clearError: state.clearErrorItens,
-      setPagination: state.setPaginationItens,
-      pagination: {
-        page: state.filtrosItens.page,
-        limit: state.filtrosItens.limit,
-        total: state.stats?.total_itens || state.itens.length,
-        totalPages: 1,
-      },
+      createItem: state.criarItem,
+      deleteItem: state.deletarItem,
+      toggleStatus: state.alternarStatusItem,
+      toggleDestaque: state.alternarDestaqueItem,
+    })),
+  );
+  return store;
+}
+
+export function useGaleriaPublica() {
+  const store = useGaleriaStore(
+    useShallow((state) => ({
+      categorias: state.categorias,
+      itens: state.itens,
+      loading: state.loadingItens || state.loadingCategorias,
+      error: state.errorItens || state.errorCategorias,
+      filtros: state.filtrosPublicos,
+      // Mapeia pagination e setPagination
+      pagination: state.paginationPublica,
+      setPagination: state.setPaginationPublica,
+
+      fetchCategorias: state.fetchCategoriasPublicas,
+      fetchItens: state.fetchItensPublicos,
+      setFiltros: state.setFiltrosPublicos,
     })),
   );
   return store;

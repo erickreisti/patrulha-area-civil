@@ -25,10 +25,11 @@ import {
   RiFolderLine,
   RiImageLine,
   RiVideoLine,
-  RiAlertLine,
-  RiCheckLine,
   RiEyeLine,
   RiEyeOffLine,
+  RiArchiveLine,
+  RiInformationLine,
+  RiCheckLine,
 } from "react-icons/ri";
 
 // Actions e Store
@@ -55,30 +56,28 @@ interface FormErrors {
   ordem?: string;
 }
 
-const slideIn = {
-  hidden: { opacity: 0, x: -20 },
+const containerVariants = {
+  hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    x: 0,
-    transition: { duration: 0.6 },
+    transition: {
+      staggerChildren: 0.1,
+    },
   },
 };
 
-const fadeInUp = {
+const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5 },
+    transition: { duration: 0.4 },
   },
 };
 
 export default function CriarCategoriaPage() {
   const router = useRouter();
   const { isAdmin, hasAdminSession } = useAuthStore();
-
-  // CORREÇÃO: Removido fetchCategorias não utilizado
-  // const { fetchCategorias } = useCategoriasList();
 
   const [loading, setLoading] = useState(false);
   const [slugChecking, setSlugChecking] = useState(false);
@@ -161,13 +160,12 @@ export default function CriarCategoriaPage() {
     try {
       const res = await createCategoria({
         ...formData,
-        descricao: formData.descricao || null, // Converter string vazia para null
+        descricao: formData.descricao || null,
       });
 
       if (res.success) {
         toast.success("Categoria criada com sucesso!");
-        // Redireciona de volta para a lista (a lista vai recarregar automaticamente)
-        setTimeout(() => router.push("/admin/galeria/categorias"), 1000);
+        router.push("/admin/galeria");
       } else {
         toast.error(res.error || "Erro ao criar categoria");
       }
@@ -179,94 +177,121 @@ export default function CriarCategoriaPage() {
     }
   };
 
-  if (!hasAdminSession) return null; // Evita flash de conteúdo
+  if (!hasAdminSession) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50/50 py-8">
+    <div className="min-h-screen bg-slate-50/50 py-10 font-sans">
       <div className="container mx-auto px-4 max-w-5xl">
         {/* Header */}
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={slideIn}
-          className="mb-8"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4"
         >
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">
-                Nova Categoria
-              </h1>
-              <p className="text-gray-500">
-                Crie um novo álbum para organizar mídias
-              </p>
-            </div>
-            <Link href="/admin/galeria/categorias">
-              <Button variant="outline">
-                <RiArrowLeftLine className="mr-2" /> Voltar
-              </Button>
-            </Link>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight font-bebas">
+              NOVA CATEGORIA
+            </h1>
+            <p className="text-slate-500 font-medium">
+              Crie um novo álbum para organizar mídias da galeria.
+            </p>
           </div>
+          <Link href="/admin/galeria">
+            <Button
+              variant="outline"
+              className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"
+            >
+              <RiArrowLeftLine className="mr-2" /> Voltar
+            </Button>
+          </Link>
         </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Formulário Principal */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+        >
+          {/* Coluna Principal (Formulário) */}
           <motion.div
-            variants={fadeInUp}
-            initial="hidden"
-            animate="visible"
-            className="lg:col-span-2"
+            variants={itemVariants}
+            className="lg:col-span-2 space-y-6"
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <RiFolderLine className="text-blue-600" /> Informações Básicas
+            <Card className="border-none shadow-lg bg-white overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
+                <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <RiFolderLine className="text-emerald-600" /> Informações
+                  Básicas
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
+
+              <CardContent className="p-6">
+                <form
+                  id="categoria-form"
+                  onSubmit={handleSubmit}
+                  className="space-y-6"
+                >
                   {/* Nome */}
                   <div className="space-y-2">
-                    <Label htmlFor="nome">Nome da Categoria *</Label>
+                    <Label htmlFor="nome" className="text-slate-700">
+                      Nome da Categoria <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="nome"
                       value={formData.nome}
                       onChange={handleNomeChange}
                       placeholder="Ex: Treinamentos 2024"
-                      className={formErrors.nome ? "border-red-500" : ""}
+                      className={`h-11 ${formErrors.nome ? "border-red-500 focus-visible:ring-red-200" : "border-slate-200"}`}
                     />
                     {formErrors.nome && (
-                      <p className="text-xs text-red-500">{formErrors.nome}</p>
+                      <p className="text-xs text-red-500 font-medium">
+                        {formErrors.nome}
+                      </p>
                     )}
                   </div>
 
                   {/* Slug */}
                   <div className="space-y-2">
-                    <Label htmlFor="slug">Slug (URL) *</Label>
-                    <div className="relative">
+                    <Label htmlFor="slug" className="text-slate-700">
+                      Slug (URL Amigável){" "}
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400 bg-slate-50 border-r border-slate-200 rounded-l-md px-3 text-sm">
+                        /galeria/
+                      </div>
                       <Input
                         id="slug"
                         value={formData.slug}
                         onChange={handleSlugChange}
                         placeholder="ex: treinamentos-2024"
-                        className={`pl-20 ${formErrors.slug ? "border-red-500" : ""}`}
+                        className={`pl-24 h-11 ${formErrors.slug ? "border-red-500" : "border-slate-200"}`}
                       />
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                        /galeria/
-                      </div>
                       {slugChecking && (
                         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <RiRefreshLine className="animate-spin text-gray-400" />
+                          <RiRefreshLine className="animate-spin text-slate-400" />
                         </div>
                       )}
                     </div>
-                    {formErrors.slug && (
-                      <p className="text-xs text-red-500">{formErrors.slug}</p>
+                    {formErrors.slug ? (
+                      <p className="text-xs text-red-500 font-medium">
+                        {formErrors.slug}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-400">
+                        Gerado automaticamente a partir do nome.
+                      </p>
                     )}
                   </div>
 
                   {/* Descrição */}
                   <div className="space-y-2">
-                    <Label htmlFor="descricao">Descrição</Label>
+                    <Label htmlFor="descricao" className="text-slate-700">
+                      Descrição{" "}
+                      <span className="text-slate-400 font-normal">
+                        (Opcional)
+                      </span>
+                    </Label>
                     <Textarea
                       id="descricao"
                       value={formData.descricao}
@@ -276,34 +301,40 @@ export default function CriarCategoriaPage() {
                           descricao: e.target.value,
                         }))
                       }
-                      rows={3}
-                      placeholder="Opcional: Descreva o conteúdo desta categoria"
+                      rows={4}
+                      placeholder="Descreva o conteúdo desta categoria..."
+                      className="resize-none border-slate-200 focus:border-emerald-500 min-h-[100px]"
                     />
                   </div>
 
-                  {/* Configurações em Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                     {/* Tipo */}
-                    <div className="space-y-2">
-                      <Label>Tipo de Conteúdo</Label>
+                    <div className="space-y-3">
+                      <Label className="text-slate-700">Tipo de Conteúdo</Label>
                       <Select
                         value={formData.tipo}
                         onValueChange={(v: "fotos" | "videos") =>
                           setFormData((prev) => ({ ...prev, tipo: v }))
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-11 border-slate-200">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="fotos">
                             <div className="flex items-center gap-2">
-                              <RiImageLine className="text-blue-500" /> Fotos
+                              <div className="p-1 bg-blue-100 rounded text-blue-600">
+                                <RiImageLine />
+                              </div>
+                              <span>Álbum de Fotos</span>
                             </div>
                           </SelectItem>
                           <SelectItem value="videos">
                             <div className="flex items-center gap-2">
-                              <RiVideoLine className="text-purple-500" /> Vídeos
+                              <div className="p-1 bg-purple-100 rounded text-purple-600">
+                                <RiVideoLine />
+                              </div>
+                              <span>Galeria de Vídeos</span>
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -311,8 +342,10 @@ export default function CriarCategoriaPage() {
                     </div>
 
                     {/* Ordem */}
-                    <div className="space-y-2">
-                      <Label htmlFor="ordem">Ordem de Exibição</Label>
+                    <div className="space-y-3">
+                      <Label htmlFor="ordem" className="text-slate-700">
+                        Ordem de Exibição
+                      </Label>
                       <Input
                         id="ordem"
                         type="number"
@@ -325,120 +358,146 @@ export default function CriarCategoriaPage() {
                             ordem: Number(e.target.value),
                           }))
                         }
+                        className="h-11 border-slate-200"
                       />
                     </div>
                   </div>
-
-                  <div className="pt-4 flex gap-3">
-                    <Button
-                      type="submit"
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <RiRefreshLine className="animate-spin mr-2" />
-                      ) : (
-                        <RiSaveLine className="mr-2" />
-                      )}
-                      {loading ? "Criando..." : "Criar Categoria"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => router.back()}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
                 </form>
               </CardContent>
+
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => router.back()}
+                  className="text-slate-600 hover:text-slate-800 hover:bg-slate-200/50"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  form="categoria-form"
+                  type="submit"
+                  disabled={loading}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 shadow-md shadow-emerald-100 transition-all hover:translate-y-[-1px]"
+                >
+                  {loading ? (
+                    <>
+                      <RiRefreshLine className="animate-spin mr-2" />{" "}
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <RiSaveLine className="mr-2" /> Salvar Categoria
+                    </>
+                  )}
+                </Button>
+              </div>
             </Card>
           </motion.div>
 
-          {/* Sidebar (Configurações) */}
-          <motion.div
-            variants={fadeInUp}
-            initial="hidden"
-            animate="visible"
-            transition={{ delay: 0.2 }}
-            className="space-y-6"
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Status e Visibilidade</CardTitle>
+          {/* Coluna Lateral (Configurações) */}
+          <motion.div variants={itemVariants} className="space-y-6">
+            {/* Card de Visibilidade */}
+            <Card className="border-none shadow-md bg-white overflow-hidden">
+              <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-4">
+                <CardTitle className="font-bold text-slate-800 text-sm uppercase tracking-wide">
+                  Visibilidade
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
+              <CardContent className="p-5 space-y-6">
                 {/* Status Switch */}
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="flex items-center gap-2">
+                <div className="flex items-center justify-between group">
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-2 text-slate-700 cursor-pointer">
                       {formData.status ? (
-                        <RiEyeLine className="text-green-600" />
+                        <RiEyeLine className="text-emerald-500" />
                       ) : (
-                        <RiEyeOffLine className="text-gray-400" />
+                        <RiEyeOffLine className="text-slate-400" />
                       )}
                       Status Ativo
                     </Label>
-                    <span className="text-xs text-gray-500">
+                    <p className="text-xs text-slate-500">
                       {formData.status
-                        ? "Visível publicamente"
-                        : "Oculto (Rascunho)"}
-                    </span>
+                        ? "Visível no site público."
+                        : "Oculto (Rascunho)."}
+                    </p>
                   </div>
                   <Switch
                     checked={formData.status}
                     onCheckedChange={(c) =>
                       setFormData((prev) => ({ ...prev, status: c }))
                     }
+                    className="data-[state=checked]:bg-emerald-500"
                   />
                 </div>
 
+                <div className="h-px bg-slate-100 w-full" />
+
                 {/* Arquivada Switch */}
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="flex items-center gap-2">
-                      <RiFolderLine
+                <div className="flex items-center justify-between group">
+                  <div className="space-y-1">
+                    <Label className="flex items-center gap-2 text-slate-700 cursor-pointer">
+                      <RiArchiveLine
                         className={
                           formData.arquivada
                             ? "text-amber-500"
-                            : "text-gray-400"
+                            : "text-slate-400"
                         }
                       />
                       Arquivada
                     </Label>
-                    <span className="text-xs text-gray-500">
-                      Mover para arquivo morto
-                    </span>
+                    <p className="text-xs text-slate-500">
+                      Mover para histórico antigo.
+                    </p>
                   </div>
                   <Switch
                     checked={formData.arquivada}
                     onCheckedChange={(c) =>
                       setFormData((prev) => ({ ...prev, arquivada: c }))
                     }
+                    className="data-[state=checked]:bg-amber-500"
                   />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-blue-50 border-blue-100">
-              <CardContent className="p-4 text-sm text-blue-800 space-y-2">
-                <div className="flex gap-2">
-                  <RiAlertLine className="w-5 h-5 flex-shrink-0" />
-                  <p>
-                    <strong>Dica:</strong> O slug é gerado automaticamente, mas
-                    você pode editá-lo para melhorar o SEO.
-                  </p>
+            {/* Card de Dicas */}
+            <Card className="border-l-4 border-l-blue-500 shadow-md bg-blue-50/30">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex gap-3">
+                  <div className="mt-0.5 p-1 bg-blue-100 text-blue-600 rounded-full h-fit">
+                    <RiInformationLine size={16} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-blue-900 text-sm">
+                      Organização
+                    </h4>
+                    <p className="text-xs text-blue-800/80 leading-relaxed">
+                      Categorias de <strong>Fotos</strong> só aceitam uploads de
+                      imagens. Categorias de <strong>Vídeos</strong> aceitam
+                      links (YouTube) ou arquivos de vídeo.
+                    </p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  <RiCheckLine className="w-5 h-5 flex-shrink-0" />
-                  <p>
-                    Categorias de vídeo só aceitam itens de vídeo, e vice-versa.
-                  </p>
+
+                <div className="flex gap-3">
+                  <div className="mt-0.5 p-1 bg-emerald-100 text-emerald-600 rounded-full h-fit">
+                    <RiCheckLine size={16} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-bold text-emerald-900 text-sm">
+                      SEO Friendly
+                    </h4>
+                    <p className="text-xs text-emerald-800/80 leading-relaxed">
+                      O <strong>slug</strong> é usado na URL. Mantenha-o curto e
+                      descritivo para melhor indexação.
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

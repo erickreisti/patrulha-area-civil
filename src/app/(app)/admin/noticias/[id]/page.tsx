@@ -1,7 +1,20 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import {
+  RiSaveLine,
+  RiArrowLeftLine,
+  RiDeleteBinLine,
+  RiSettings3Line,
+  RiAlertLine,
+  RiImageLine,
+} from "react-icons/ri";
+
+// Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Select,
   SelectContent,
@@ -16,19 +30,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
-import { toast } from "sonner";
-import Link from "next/link";
-import { motion } from "framer-motion";
 import {
-  RiNewspaperLine,
-  RiSaveLine,
-  RiArrowLeftLine,
-  RiDeleteBinLine,
-} from "react-icons/ri";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 // Hooks
-import { useNoticiaEdicao, useNoticias } from "@/lib/stores/useNoticiasStore";
+import { useNoticiaEdit, useNoticias } from "@/lib/stores/useNoticiasStore";
 import { MediaUpload } from "@/app/(app)/admin/noticias/components/MediaUpload";
 import {
   deletarNoticia,
@@ -45,21 +60,18 @@ export default function EditarNoticiaPage() {
   const router = useRouter();
   const noticiaId = params.id as string;
 
-  // Pegar categorias do store global
   const { categories, fetchCategories } = useNoticias();
 
   const {
     noticia,
-    carregando,
-    salvando,
+    loading,
+    saving,
     formData,
     hasUnsavedChanges,
-    setCampo,
-    setMedia,
-    setHasUnsavedChanges,
-    validarForm,
-    salvar,
-  } = useNoticiaEdicao(noticiaId);
+    setFormData,
+    updateNoticia,
+    validateForm,
+  } = useNoticiaEdit(noticiaId);
 
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -68,7 +80,7 @@ export default function EditarNoticiaPage() {
     if (categories.length === 0) fetchCategories();
   }, [categories.length, fetchCategories]);
 
-  // Prevenir perda de dados
+  // Prevenir saída sem salvar
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
@@ -81,46 +93,38 @@ export default function EditarNoticiaPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Handlers de Mídia
-  const handleMediaSelect = useCallback(
-    (file: File, tipo: "imagem" | "video") => {
-      setMedia(file, tipo === "imagem" ? "image" : "video");
-      setHasUnsavedChanges(true);
-    },
-    [setMedia, setHasUnsavedChanges],
-  );
+  // Handlers Simplificados (setFormData já ativa hasUnsavedChanges no store)
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value } = e.target;
+    setFormData({ [name]: value });
+  };
 
-  const handleUploadComplete = useCallback(
-    (url: string, tipo: "imagem" | "video") => {
-      if (tipo === "imagem") {
-        setCampo("media_url", url);
-        setCampo("tipo_media", "imagem");
-      } else {
-        setCampo("video_url", url);
-        setCampo("tipo_media", "video");
-      }
-      setHasUnsavedChanges(true);
-      toast.success("Upload concluído!");
-    },
-    [setCampo, setHasUnsavedChanges],
-  );
+  const handleUploadComplete = (url: string, tipo: "imagem" | "video") => {
+    if (tipo === "imagem") {
+      setFormData({ media_url: url, tipo_media: "imagem" });
+    } else {
+      setFormData({ video_url: url, tipo_media: "video" });
+    }
+    toast.success("Upload concluído!");
+  };
 
-  const handleMediaRemove = useCallback(
-    (tipo: "imagem" | "video") => {
-      if (tipo === "imagem") setCampo("media_url", "");
-      else setCampo("video_url", "");
-      setHasUnsavedChanges(true);
-      toast.info("Mídia removida");
-    },
-    [setCampo, setHasUnsavedChanges],
-  );
+  const handleMediaRemove = () => {
+    if (formData.tipo_media === "imagem") {
+      setFormData({ media_url: "" });
+    } else {
+      setFormData({ video_url: "" });
+    }
+    toast.info("Mídia removida");
+  };
 
-  // Submit
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errors = validarForm();
+
+    const errors = validateForm();
     if (errors.length > 0) {
-      toast.error("Erro de validação", { description: errors.join(", ") });
+      toast.error("Verifique o formulário", { description: errors.join(", ") });
       return;
     }
 
@@ -129,303 +133,347 @@ export default function EditarNoticiaPage() {
       return;
     }
 
-    const toastId = toast.loading("Atualizando...");
+    const toastId = toast.loading("Salvando alterações...");
 
-    try {
-      const result = await salvar();
-      if (result.success) {
-        setHasUnsavedChanges(false);
-        toast.success("✅ Notícia atualizada!", { id: toastId });
-        setTimeout(() => router.refresh(), 1000);
-      } else {
-        toast.error("Erro ao atualizar", {
-          id: toastId,
-          description: result.error,
-        });
-      }
-    } catch (error) {
-      toast.error("Erro crítico", { id: toastId, description: String(error) });
+    // Casting seguro para o tipo esperado pela Action
+    const result = await updateNoticia(formData as UpdateNoticiaInput);
+
+    if (result.success) {
+      toast.success("✅ Notícia atualizada!", { id: toastId });
+      router.refresh();
+    } else {
+      toast.error("Erro ao atualizar", {
+        id: toastId,
+        description: result.error,
+      });
     }
   };
 
   const handleDeleteNoticia = async () => {
-    if (!noticia || !window.confirm(`Excluir "${noticia.titulo}"?`)) return;
+    if (!noticia) return;
     setIsDeleting(true);
-    const toastId = toast.loading("Excluindo...");
+    const toastId = toast.loading("Excluindo notícia...");
 
-    try {
-      const result = await deletarNoticia(noticia.id);
-      if (result.success) {
-        toast.success("Excluída com sucesso", { id: toastId });
-        setTimeout(() => {
-          router.push("/admin/noticias");
-          router.refresh();
-        }, 1500);
-      } else {
-        toast.error("Erro ao excluir", { id: toastId });
-        setIsDeleting(false);
-      }
-    } catch {
-      toast.error("Erro desconhecido", { id: toastId });
+    const result = await deletarNoticia(noticia.id);
+    if (result.success) {
+      toast.success("Excluída com sucesso", { id: toastId });
+      router.push("/admin/noticias");
+    } else {
+      toast.error("Erro ao excluir", { id: toastId });
       setIsDeleting(false);
     }
   };
 
-  if (carregando || !noticia) {
+  if (loading || !noticia) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Spinner className="w-8 h-8 animate-spin text-navy-600" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <Spinner className="w-10 h-10 animate-spin text-slate-600 mb-4" />
+        <p className="text-slate-500 font-medium">Carregando notícia...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 py-8">
-      <div className="container mx-auto px-4 max-w-7xl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
+      <div className="container mx-auto px-4 max-w-6xl">
+        {/* Header */}
         <motion.div
           initial="hidden"
           animate="visible"
           variants={fadeInUp}
           className="mb-8"
         >
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800 font-bebas tracking-wide">
-                EDITAR NOTÍCIA
-              </h1>
-              <p className="text-gray-600">
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-3xl font-bold text-slate-900 font-bebas tracking-wide">
+                  EDITAR NOTÍCIA
+                </h1>
+                <Badge
+                  className={
+                    noticia.status === "publicado"
+                      ? "bg-emerald-500"
+                      : noticia.status === "rascunho"
+                        ? "bg-amber-500"
+                        : "bg-slate-500"
+                  }
+                >
+                  {noticia.status?.toUpperCase()}
+                </Badge>
+              </div>
+              <p className="text-slate-600">
                 Editando: <strong>{noticia.titulo}</strong>
               </p>
             </div>
-            <div className="flex gap-2">
-              <Badge
-                className={
-                  noticia.status === "publicado"
-                    ? "bg-green-500"
-                    : "bg-gray-500"
-                }
-              >
-                {noticia.status.toUpperCase()}
-              </Badge>
+
+            <div className="flex gap-3">
+              <Link href="/admin/noticias">
+                <Button
+                  variant="outline"
+                  className="border-slate-300 text-slate-700 bg-white hover:bg-slate-50"
+                >
+                  <RiArrowLeftLine className="mr-2" /> Voltar
+                </Button>
+              </Link>
+
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    disabled={isDeleting}
+                    className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 hover:border-red-300"
+                  >
+                    <RiDeleteBinLine className="mr-2" /> Excluir
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-red-600 flex items-center gap-2">
+                      <RiAlertLine /> Tem certeza?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação não pode ser desfeita. A notícia{" "}
+                      <strong>{noticia.titulo}</strong> será permanentemente
+                      removida.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteNoticia}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      Sim, Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
           </div>
+        </motion.div>
 
+        <form onSubmit={handleFormSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              <Card className="border-0 shadow-xl">
-                <CardContent className="p-8">
-                  <form onSubmit={handleFormSubmit} className="space-y-6">
-                    {/* Upload */}
-                    <div className="space-y-2">
-                      <Label>Mídia</Label>
+            {/* Coluna Principal */}
+            <div className="lg:col-span-2 space-y-6">
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={fadeInUp}
+                transition={{ delay: 0.1 }}
+              >
+                <Card className="border-none shadow-xl">
+                  <CardHeader className="bg-slate-50/50 border-b border-slate-100">
+                    <CardTitle className="text-lg text-slate-800">
+                      Conteúdo Principal
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-6">
+                    {/* Mídia */}
+                    <div className="space-y-3">
+                      <Label className="text-slate-700 font-semibold flex items-center gap-2">
+                        <RiImageLine /> Mídia de Capa
+                      </Label>
                       <MediaUpload
                         slug={formData.slug || noticia.slug}
                         tipo={
                           formData.tipo_media === "video" ? "video" : "imagem"
                         }
-                        onFileSelect={(f, t) => handleMediaSelect(f, t)}
-                        onUploadComplete={(u, t) => handleUploadComplete(u, t)}
-                        onRemove={() =>
-                          handleMediaRemove(
+                        onFileSelect={() => {}}
+                        onUploadComplete={(url) =>
+                          handleUploadComplete(
+                            url,
                             formData.tipo_media === "video"
                               ? "video"
                               : "imagem",
                           )
                         }
+                        onRemove={handleMediaRemove}
                         currentMedia={
                           formData.tipo_media === "video"
                             ? formData.video_url
                             : formData.media_url
                         }
-                        disabled={salvando}
                         uploadImmediately
+                        disabled={saving}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="titulo">Título</Label>
+                      <Label
+                        htmlFor="titulo"
+                        className="text-slate-700 font-semibold"
+                      >
+                        Título
+                      </Label>
                       <Input
                         id="titulo"
+                        name="titulo"
                         value={formData.titulo || ""}
-                        onChange={(e) => {
-                          setCampo("titulo", e.target.value);
-                          setHasUnsavedChanges(true);
-                        }}
+                        onChange={handleInputChange}
+                        className="text-lg border-slate-200 focus:border-indigo-500"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="slug">Slug</Label>
+                      <Label
+                        htmlFor="slug"
+                        className="text-slate-700 font-semibold"
+                      >
+                        Slug
+                      </Label>
                       <Input
                         id="slug"
+                        name="slug"
                         value={formData.slug || ""}
-                        onChange={(e) => {
-                          setCampo("slug", e.target.value);
-                          setHasUnsavedChanges(true);
-                        }}
+                        onChange={handleInputChange}
+                        className="bg-slate-50 border-slate-200 text-slate-500"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="resumo">Resumo</Label>
+                      <Label
+                        htmlFor="resumo"
+                        className="text-slate-700 font-semibold"
+                      >
+                        Resumo
+                      </Label>
                       <Textarea
                         id="resumo"
+                        name="resumo"
                         value={formData.resumo || ""}
-                        onChange={(e) => {
-                          setCampo("resumo", e.target.value);
-                          setHasUnsavedChanges(true);
-                        }}
+                        onChange={handleInputChange}
+                        className="h-24 resize-none border-slate-200"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="conteudo">Conteúdo</Label>
+                      <Label
+                        htmlFor="conteudo"
+                        className="text-slate-700 font-semibold"
+                      >
+                        Conteúdo Completo
+                      </Label>
                       <Textarea
                         id="conteudo"
+                        name="conteudo"
                         value={formData.conteudo || ""}
-                        onChange={(e) => {
-                          setCampo("conteudo", e.target.value);
-                          setHasUnsavedChanges(true);
-                        }}
-                        rows={10}
+                        onChange={handleInputChange}
+                        rows={12}
+                        className="min-h-[300px] border-slate-200 leading-relaxed"
                       />
                     </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Categoria</Label>
-                        <Select
-                          value={
-                            formData.categoria ||
-                            noticia.categoria ||
-                            "Operações"
-                          }
-                          onValueChange={(v) => {
-                            setCampo("categoria", v);
-                            setHasUnsavedChanges(true);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categories.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Status</Label>
-                        <Select
-                          value={formData.status || noticia.status}
-                          onValueChange={(v) => {
-                            setCampo(
-                              "status",
-                              v as UpdateNoticiaInput["status"],
-                            );
-                            setHasUnsavedChanges(true);
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="rascunho">Rascunho</SelectItem>
-                            <SelectItem value="publicado">Publicado</SelectItem>
-                            <SelectItem value="arquivado">Arquivado</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+            {/* Sidebar */}
+            <div className="space-y-6">
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={fadeInUp}
+                transition={{ delay: 0.2 }}
+              >
+                <Card className="border-none shadow-xl sticky top-6">
+                  <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
+                    <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
+                      <RiSettings3Line className="text-slate-500" />{" "}
+                      Configurações
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-6">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-semibold">
+                        Status da Publicação
+                      </Label>
+                      <Select
+                        value={formData.status || "rascunho"}
+                        onValueChange={(v) => {
+                          setFormData({
+                            status: v as UpdateNoticiaInput["status"],
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="w-full border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rascunho">📝 Rascunho</SelectItem>
+                          <SelectItem value="publicado">
+                            ✅ Publicado
+                          </SelectItem>
+                          <SelectItem value="arquivado">
+                            🗄️ Arquivado
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    <div className="flex items-center gap-2 pt-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-700 font-semibold">
+                        Categoria
+                      </Label>
+                      <Select
+                        value={formData.categoria || "Operações"}
+                        onValueChange={(v) => {
+                          setFormData({ categoria: v });
+                        }}
+                      >
+                        <SelectTrigger className="w-full border-slate-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                      <Label
+                        htmlFor="destaque"
+                        className="cursor-pointer font-semibold text-slate-700"
+                      >
+                        Destaque
+                      </Label>
                       <Switch
+                        id="destaque"
                         checked={formData.destaque || false}
                         onCheckedChange={(c) => {
-                          setCampo("destaque", c);
-                          setHasUnsavedChanges(true);
+                          setFormData({ destaque: c });
                         }}
                       />
-                      <Label>Destacar Notícia</Label>
                     </div>
 
-                    <div className="flex gap-4 pt-4">
-                      <Button
-                        type="submit"
-                        disabled={!hasUnsavedChanges || salvando}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        {salvando ? (
-                          <Spinner className="mr-2" />
-                        ) : (
-                          <RiSaveLine className="mr-2" />
-                        )}{" "}
-                        Salvar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => router.push("/admin/noticias")}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        onClick={handleDeleteNoticia}
-                        disabled={isDeleting}
-                      >
-                        <RiDeleteBinLine />
-                      </Button>
+                    <Button
+                      type="submit"
+                      disabled={!hasUnsavedChanges || saving}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 shadow-md shadow-emerald-100 mt-4"
+                    >
+                      {saving ? (
+                        <Spinner className="mr-2 text-white" />
+                      ) : (
+                        <RiSaveLine className="mr-2" />
+                      )}
+                      Salvar Alterações
+                    </Button>
+
+                    <div className="text-xs text-center text-slate-400 mt-2">
+                      {hasUnsavedChanges
+                        ? "⚠️ Alterações pendentes"
+                        : "✅ Tudo salvo"}
                     </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Sidebar info */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center text-gray-700">
-                    <RiNewspaperLine className="mr-2" /> Informações
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm text-gray-600">
-                  <p>
-                    <strong>ID:</strong>{" "}
-                    <span className="font-mono bg-gray-100 px-1 rounded">
-                      {noticia.id.slice(0, 8)}...
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Criado em:</strong>{" "}
-                    {new Date(noticia.created_at).toLocaleDateString()}
-                  </p>
-                  <p>
-                    <strong>Autor:</strong>{" "}
-                    {noticia.autor?.full_name || "Desconhecido"}
-                  </p>
-                  <p>
-                    <strong>Visualizações:</strong> {noticia.views}
-                  </p>
-                </CardContent>
-              </Card>
-
-              <div className="flex justify-center">
-                <Link href="/admin/noticias">
-                  <Button variant="ghost">
-                    <RiArrowLeftLine className="mr-2" /> Voltar para lista
-                  </Button>
-                </Link>
-              </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
             </div>
           </div>
-        </motion.div>
+        </form>
       </div>
     </div>
   );

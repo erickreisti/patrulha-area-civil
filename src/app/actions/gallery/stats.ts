@@ -15,7 +15,7 @@ export async function getGaleriaStats(): Promise<{
 
     const adminClient = await getAdminClient();
 
-    // Executar todas as contagens em paralelo para performance
+    // Executar todas as contagens em paralelo para performance máxima
     const [
       { count: total_categorias },
       { count: total_itens },
@@ -79,13 +79,10 @@ export async function getGaleriaStats(): Promise<{
         },
       },
     };
-  } catch (error) {
-    // CORREÇÃO: Removido ': any'. O TypeScript trata erro como 'unknown' automaticamente.
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Erro desconhecido";
     console.error("Erro stats:", error);
-
-    // Se quiser usar a mensagem real do erro no futuro:
-    // const message = error instanceof Error ? error.message : "Erro desconhecido";
-
-    return { success: false, error: "Erro ao carregar estatísticas" };
+    return { success: false, error: message };
   }
 }

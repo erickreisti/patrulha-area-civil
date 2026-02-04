@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-// Removido useRouter pois não é mais necessário com o componente Link
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { motion } from "framer-motion";
+
+// UI Components
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -13,6 +17,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+// Icons
 import {
   RiNewspaperLine,
   RiSearchLine,
@@ -22,39 +28,21 @@ import {
   RiStarFill,
   RiFilterLine,
   RiSortAsc,
-  RiSparklingFill,
-  RiListOrdered,
-  RiGridFill,
+  RiVideoLine,
+  RiCloseLine,
 } from "react-icons/ri";
-import Link from "next/link"; // ADICIONADO AQUI
-import Image from "next/image";
-import { motion } from "framer-motion"; // Removido AnimatePresence não utilizado
+
+// Store & Types
 import { useNoticiasBasico, type SortBy } from "@/lib/stores/useNoticiasStore";
 import type { NoticiaLista } from "@/app/actions/news/noticias";
-import { cn } from "@/lib/utils/cn";
 
-// --- Interfaces e Constantes ---
+// --- CONSTANTES ---
 
-interface NewsCardProps {
-  noticia: NoticiaLista;
-  index: number;
-}
-
-interface CategoryItem {
-  value: string;
-  label: string;
-}
-
-const SORT_OPTIONS: Array<{
-  value: SortBy;
-  label: string;
-  icon: React.ElementType;
-}> = [
-  { value: "recent", label: "Mais Recentes", icon: RiSparklingFill },
-  { value: "oldest", label: "Mais Antigas", icon: RiCalendarLine },
-  { value: "titulo", label: "Nome A-Z", icon: RiListOrdered },
-  { value: "popular", label: "Mais Populares", icon: RiGridFill },
-  { value: "destaque", label: "Em Destaque", icon: RiStarFill },
+const SORT_OPTIONS = [
+  { value: "recent", label: "Mais Recentes" },
+  { value: "oldest", label: "Mais Antigas" },
+  { value: "popular", label: "Mais Populares" },
+  { value: "titulo", label: "Ordem Alfabética" },
 ];
 
 const ITEMS_PER_PAGE_OPTIONS = [
@@ -63,14 +51,40 @@ const ITEMS_PER_PAGE_OPTIONS = [
   { value: "24", label: "24 por página" },
 ];
 
-// --- Componentes Auxiliares ---
+// --- HELPERS ---
 
-function NewsCard({ noticia, index }: NewsCardProps) {
-  const [imageLoaded, setImageLoaded] = useState(false);
+const formatDate = (dateString: string): string => {
+  if (!dateString) return "--/--/--";
+  try {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(dateString));
+  } catch {
+    return dateString;
+  }
+};
 
-  const readingTime = Math.ceil((noticia.resumo?.length || 0) / 1000);
-  const isPublished = noticia.status === "publicado";
-  const imageUrl = noticia.media_url;
+const getImageUrl = (url: string | null | undefined) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return `${supabaseUrl}/storage/v1/object/public/imagens-noticias/${url}`;
+};
+
+// --- COMPONENTES ---
+
+function NewsCard({
+  noticia,
+  index,
+}: {
+  noticia: NoticiaLista;
+  index: number;
+}) {
+  const imageUrl = getImageUrl(noticia.thumbnail_url || noticia.media_url);
+  const hasImage = !!imageUrl;
+  const isVideo = noticia.tipo_media === "video";
 
   return (
     <motion.div
@@ -79,76 +93,90 @@ function NewsCard({ noticia, index }: NewsCardProps) {
       transition={{ delay: index * 0.05 }}
       className="h-full"
     >
-      {/* Card é apenas visual, não é link */}
-      <Card className="group h-full flex flex-col border-gray-200 bg-white hover:shadow-xl transition-all duration-300 overflow-hidden">
-        <div className="relative h-48 bg-gray-100 overflow-hidden">
-          {imageUrl ? (
+      <Card className="group h-full flex flex-col border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden bg-white hover:-translate-y-1">
+        {/* Imagem de Capa */}
+        <div className="relative h-52 bg-slate-100 overflow-hidden">
+          {hasImage ? (
             <Image
-              src={imageUrl}
+              src={imageUrl!}
               alt={noticia.titulo}
               fill
-              className={cn(
-                "object-cover transition-transform duration-700 group-hover:scale-105",
-                imageLoaded ? "opacity-100" : "opacity-0",
-              )}
-              onLoad={() => setImageLoaded(true)}
+              className="object-cover transition-transform duration-700 group-hover:scale-110"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-              <RiNewspaperLine className="h-12 w-12" />
+            <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+              <RiNewspaperLine className="h-16 w-16 opacity-50" />
             </div>
           )}
 
-          <div className="absolute top-3 left-3 flex gap-2">
-            <Badge className="bg-white/90 text-pac-primary hover:bg-white backdrop-blur-sm shadow-sm">
+          {/* Gradiente Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+
+          {/* Badges */}
+          <div className="absolute top-3 left-3 flex gap-2 z-10">
+            <Badge
+              variant="secondary"
+              className="bg-white/90 text-slate-800 hover:bg-white backdrop-blur-md shadow-sm border-0 font-bold px-2.5"
+            >
               {noticia.categoria || "Geral"}
             </Badge>
-            {noticia.destaque && (
-              <Badge className="bg-amber-500 text-white border-0 shadow-sm">
-                <RiStarFill className="w-3 h-3 mr-1" /> Destaque
+            {isVideo && (
+              <Badge className="bg-red-600 text-white border-0 shadow-sm flex items-center gap-1">
+                <RiVideoLine className="w-3 h-3" /> Vídeo
               </Badge>
             )}
           </div>
+
+          {noticia.destaque && (
+            <div className="absolute top-3 right-3 z-10">
+              <Badge className="bg-amber-500 text-white border-0 shadow-md flex items-center gap-1">
+                <RiStarFill className="w-3 h-3" /> Destaque
+              </Badge>
+            </div>
+          )}
         </div>
 
-        <CardHeader className="p-5 pb-2">
-          <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-            <div className="flex items-center">
-              <RiCalendarLine className="w-3 h-3 mr-1" />
-              {new Date(noticia.data_publicacao).toLocaleDateString("pt-BR")}
+        <CardContent className="flex-1 flex flex-col p-6">
+          {/* Metadados */}
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-3">
+            <div className="flex items-center gap-1.5 text-emerald-600">
+              <RiCalendarLine className="w-3.5 h-3.5" />
+              {formatDate(noticia.data_publicacao)}
             </div>
-            {!isPublished && (
-              <Badge variant="secondary" className="text-[10px] h-5">
-                Rascunho
-              </Badge>
-            )}
+            <div className="flex items-center gap-1">
+              <RiTimeLine className="w-3.5 h-3.5" />
+              {Math.ceil((noticia.resumo?.length || 0) / 200)} min leitura
+            </div>
           </div>
-          <CardTitle className="text-lg font-bold text-gray-800 leading-snug line-clamp-2 group-hover:text-pac-primary transition-colors">
-            {noticia.titulo}
-          </CardTitle>
-        </CardHeader>
 
-        <CardContent className="p-5 pt-2 flex-1 flex flex-col">
-          <p className="text-gray-600 text-sm line-clamp-3 mb-4 flex-grow">
-            {noticia.resumo}
+          {/* Título */}
+          <Link
+            href={`/noticias/${noticia.slug}`}
+            className="block group/link mb-3"
+          >
+            <h3 className="text-xl font-bold text-slate-800 leading-snug line-clamp-2 group-hover/link:text-emerald-600 transition-colors">
+              {noticia.titulo}
+            </h3>
+          </Link>
+
+          {/* Resumo */}
+          <p className="text-slate-600 text-sm line-clamp-3 mb-6 flex-grow leading-relaxed">
+            {noticia.resumo || "Clique para ler a matéria completa."}
           </p>
 
-          <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
-            <div className="flex items-center text-xs text-gray-500 font-medium">
-              <RiTimeLine className="w-3 h-3 mr-1" />
-              {readingTime} min leitura
-            </div>
-
-            {/* Botão com Link - A única parte clicável */}
+          {/* Botão */}
+          <div className="pt-4 border-t border-slate-100 mt-auto">
             <Button
               asChild
               variant="link"
-              className="text-pac-primary hover:text-pac-primary-dark p-0 h-auto font-semibold text-sm cursor-pointer"
+              className="text-emerald-600 hover:text-emerald-700 p-0 h-auto font-bold text-sm w-full justify-between group/btn no-underline hover:no-underline"
             >
               <Link href={`/noticias/${noticia.slug}`}>
                 Ler Completo
-                <RiArrowRightLine className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+                <span className="bg-emerald-50 text-emerald-600 p-1.5 rounded-full group-hover/btn:bg-emerald-100 transition-colors">
+                  <RiArrowRightLine className="w-4 h-4 transition-transform group-hover/btn:-rotate-45" />
+                </span>
               </Link>
             </Button>
           </div>
@@ -160,15 +188,23 @@ function NewsCard({ noticia, index }: NewsCardProps) {
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
       {Array.from({ length: 8 }).map((_, i) => (
-        <Card key={i} className="border-gray-100 shadow-sm h-96">
-          <div className="h-48 bg-gray-200 animate-pulse" />
-          <CardContent className="p-5 space-y-3">
-            <div className="h-4 bg-gray-200 rounded w-1/3 animate-pulse" />
-            <div className="h-6 bg-gray-200 rounded w-full animate-pulse" />
-            <div className="h-6 bg-gray-200 rounded w-2/3 animate-pulse" />
-            <div className="h-20 bg-gray-200 rounded w-full animate-pulse mt-4" />
+        <Card
+          key={i}
+          className="border-none shadow-sm h-[450px] bg-white rounded-xl overflow-hidden"
+        >
+          {/* Imagem Skeleton */}
+          <div className="h-52 bg-slate-200 animate-pulse" />
+
+          <CardContent className="p-6 space-y-4">
+            <div className="flex justify-between">
+              <div className="h-4 bg-slate-200 rounded w-24 animate-pulse" />
+              <div className="h-4 bg-slate-200 rounded w-16 animate-pulse" />
+            </div>
+            <div className="h-7 bg-slate-200 rounded w-full animate-pulse" />
+            <div className="h-7 bg-slate-200 rounded w-2/3 animate-pulse" />
+            <div className="h-20 bg-slate-200 rounded w-full animate-pulse mt-4" />
           </CardContent>
         </Card>
       ))}
@@ -176,122 +212,138 @@ function SkeletonGrid() {
   );
 }
 
-// --- Componente Principal ---
+// --- PÁGINA PRINCIPAL ---
 
 export default function NoticiasPage() {
   const [localSearch, setLocalSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const {
     noticias,
     loading,
-    filtros,
-    totalCount,
-    categoriasDisponiveis,
-    setSearchTerm,
-    setCategoria,
-    setSortBy,
-    setItemsPerPage,
-    setCurrentPage,
-    clearFilters,
+    filters,
+    pagination,
+    categories,
+    setFilters,
+    setPagination,
     fetchNoticias,
-    fetchStats,
+    fetchCategories,
   } = useNoticiasBasico();
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(localSearch), 500);
-    return () => clearTimeout(timer);
-  }, [localSearch]);
-
-  // Sync search to store
-  useEffect(() => {
-    if (debouncedSearch !== filtros.searchTerm) {
-      setSearchTerm(debouncedSearch);
-      setCurrentPage(1);
-    }
-  }, [debouncedSearch, setSearchTerm, setCurrentPage, filtros.searchTerm]);
-
-  // Initial loads
+  // Inicialização
   useEffect(() => {
     fetchNoticias();
-    fetchStats();
+    fetchCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleCategoriaChange = useCallback(
-    (value: string) => {
-      setCategoria(value);
-      setCurrentPage(1);
-    },
-    [setCategoria, setCurrentPage],
-  );
+  // Debounce Search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== filters.search) {
+        setFilters({ search: localSearch });
+        fetchNoticias();
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localSearch]);
 
-  const handleSortChange = useCallback(
-    (value: string) => {
-      setSortBy(value as SortBy);
-      setCurrentPage(1);
-    },
-    [setSortBy, setCurrentPage],
-  );
+  const handleCategoriaChange = (value: string) => {
+    setFilters({ categoria: value });
+    fetchNoticias();
+  };
 
-  const handleItemsPerPageChange = useCallback(
-    (value: string) => {
-      setItemsPerPage(Number(value));
-      setCurrentPage(1);
-    },
-    [setItemsPerPage, setCurrentPage],
-  );
+  const handleSortChange = (value: string) => {
+    setFilters({ sortBy: value as SortBy });
+    fetchNoticias();
+  };
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(totalCount / (filtros.itemsPerPage || 10)),
-  );
+  const handleItemsPerPageChange = (value: string) => {
+    setPagination({ limit: Number(value), page: 1 });
+    fetchNoticias();
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPagination({ page: newPage });
+    fetchNoticias();
+  };
+
+  const handleClearFilters = () => {
+    setLocalSearch("");
+    setFilters({
+      search: "",
+      categoria: "all",
+      sortBy: "recent",
+    });
+    fetchNoticias();
+  };
+
   const hasActiveFilters =
-    filtros.searchTerm ||
-    filtros.categoria !== "all" ||
-    filtros.sortBy !== "recent";
+    filters.search ||
+    filters.categoria !== "all" ||
+    filters.sortBy !== "recent";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Simplificado e Limpo */}
-      <section className="bg-white border-b border-gray-200 pt-24 pb-12">
-        <div className="container mx-auto px-4 text-center">
-          <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 mb-4 tracking-tight">
-            Notícias e <span className="text-pac-primary">Atualizações</span>
-          </h1>
-          <p className="text-gray-600 max-w-2xl mx-auto text-lg">
-            Acompanhe as últimas operações, treinamentos e comunicados oficiais
-            da Patrulha Aérea Civil.
-          </p>
+    <div className="min-h-screen bg-slate-50">
+      {/* Header / Hero */}
+      <section className="relative bg-slate-900 py-20 lg:py-28 overflow-hidden">
+        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/90" />
+
+        <div className="container mx-auto px-4 relative z-10 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 mb-6 px-4 py-1.5 text-sm font-medium rounded-full">
+              Portal de Comunicação
+            </Badge>
+            <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-6 tracking-tight">
+              Notícias e{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+                Atualizações
+              </span>
+            </h1>
+            <p className="text-slate-400 max-w-2xl mx-auto text-lg md:text-xl leading-relaxed">
+              Fique por dentro das operações, treinamentos e comunicados
+              oficiais da Patrulha Aérea Civil.
+            </p>
+          </motion.div>
         </div>
       </section>
 
-      {/* Barra de Filtros */}
-      <div className="sticky top-[80px] z-20 bg-white/80 backdrop-blur-md border-b border-gray-200 py-4 shadow-sm">
+      {/* Barra de Ferramentas (Sticky) */}
+      <div className="sticky top-[70px] z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200 py-4 shadow-sm transition-all">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
-            <div className="relative w-full md:max-w-md">
-              <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <div className="flex flex-col lg:flex-row gap-4 justify-between items-center">
+            {/* Busca */}
+            <div className="relative w-full lg:max-w-md group">
+              <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-emerald-500 transition-colors" />
               <Input
-                placeholder="Pesquisar notícias..."
+                placeholder="Pesquisar por título, resumo..."
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
-                className="pl-10 bg-gray-50 border-gray-300 focus:border-pac-primary focus:ring-pac-primary/20"
+                className="pl-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-emerald-500/20 h-11 rounded-xl transition-all"
               />
             </div>
 
-            <div className="flex w-full md:w-auto gap-3 overflow-x-auto pb-2 md:pb-0">
+            {/* Filtros */}
+            <div className="flex w-full lg:w-auto gap-3 overflow-x-auto pb-2 lg:pb-0 items-center no-scrollbar">
               <Select
-                value={filtros.categoria}
+                value={filters.categoria}
                 onValueChange={handleCategoriaChange}
               >
-                <SelectTrigger className="w-[180px] bg-gray-50">
-                  <RiFilterLine className="w-4 h-4 mr-2 text-gray-500" />
-                  <SelectValue placeholder="Categoria" />
+                <SelectTrigger className="w-[160px] h-11 bg-white border-slate-200 rounded-xl hover:border-emerald-300 transition-colors">
+                  <div className="flex items-center gap-2 text-slate-600 truncate">
+                    <RiFilterLine className="w-4 h-4" />
+                    <SelectValue placeholder="Categoria" />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {categoriasDisponiveis.map((c: CategoryItem) => (
+                  <SelectItem value="all">Todas Categorias</SelectItem>
+                  {/* Correção do erro de tipagem no map */}
+                  {categories.map((c) => (
                     <SelectItem key={c.value} value={c.value}>
                       {c.label}
                     </SelectItem>
@@ -299,10 +351,12 @@ export default function NoticiasPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={filtros.sortBy} onValueChange={handleSortChange}>
-                <SelectTrigger className="w-[180px] bg-gray-50">
-                  <RiSortAsc className="w-4 h-4 mr-2 text-gray-500" />
-                  <SelectValue placeholder="Ordenar" />
+              <Select value={filters.sortBy} onValueChange={handleSortChange}>
+                <SelectTrigger className="w-[160px] h-11 bg-white border-slate-200 rounded-xl hover:border-emerald-300 transition-colors">
+                  <div className="flex items-center gap-2 text-slate-600">
+                    <RiSortAsc className="w-4 h-4" />
+                    <SelectValue placeholder="Ordenar" />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
                   {SORT_OPTIONS.map((opt) => (
@@ -314,11 +368,11 @@ export default function NoticiasPage() {
               </Select>
 
               <Select
-                value={String(filtros.itemsPerPage)}
+                value={String(pagination.limit)}
                 onValueChange={handleItemsPerPageChange}
               >
-                <SelectTrigger className="w-[140px] bg-gray-50">
-                  <SelectValue placeholder="Por página" />
+                <SelectTrigger className="w-[140px] h-11 bg-white border-slate-200 rounded-xl hover:border-emerald-300 transition-colors">
+                  <SelectValue placeholder="Qtd" />
                 </SelectTrigger>
                 <SelectContent>
                   {ITEMS_PER_PAGE_OPTIONS.map((opt) => (
@@ -332,10 +386,12 @@ export default function NoticiasPage() {
               {hasActiveFilters && (
                 <Button
                   variant="ghost"
-                  onClick={clearFilters}
-                  className="text-gray-500 hover:text-red-600"
+                  size="icon"
+                  onClick={handleClearFilters}
+                  className="h-11 w-11 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl flex-shrink-0"
+                  title="Limpar filtros"
                 >
-                  Limpar
+                  <RiCloseLine className="w-5 h-5" />
                 </Button>
               )}
             </div>
@@ -343,35 +399,37 @@ export default function NoticiasPage() {
         </div>
       </div>
 
-      {/* Grid de Notícias */}
-      <section className="py-12 container mx-auto px-4">
+      {/* Grid de Resultados */}
+      <section className="py-12 container mx-auto px-4 max-w-7xl min-h-[600px]">
         {loading ? (
           <SkeletonGrid />
         ) : noticias.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-16">
               {noticias.map((noticia, index) => (
                 <NewsCard key={noticia.id} noticia={noticia} index={index} />
               ))}
             </div>
 
             {/* Paginação */}
-            {totalPages > 1 && (
-              <div className="flex justify-center gap-2">
+            {pagination.totalPages > 1 && (
+              <div className="flex justify-center items-center gap-3 pb-12">
                 <Button
                   variant="outline"
-                  disabled={filtros.currentPage === 1}
-                  onClick={() => setCurrentPage(filtros.currentPage - 1)}
+                  disabled={pagination.page === 1}
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  className="w-32 border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-200 bg-white"
                 >
                   Anterior
                 </Button>
-                <span className="flex items-center px-4 font-medium text-gray-600">
-                  Página {filtros.currentPage} de {totalPages}
+                <span className="flex items-center px-4 py-2 font-bold text-sm text-slate-600 bg-white rounded-lg border border-slate-200 shadow-sm">
+                  {pagination.page} / {pagination.totalPages}
                 </span>
                 <Button
                   variant="outline"
-                  disabled={filtros.currentPage === totalPages}
-                  onClick={() => setCurrentPage(filtros.currentPage + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  className="w-32 border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-200 bg-white"
                 >
                   Próxima
                 </Button>
@@ -379,14 +437,24 @@ export default function NoticiasPage() {
             )}
           </>
         ) : (
-          <div className="text-center py-20">
-            <RiNewspaperLine className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-600">
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="bg-white p-8 rounded-full shadow-sm mb-6 border border-slate-100">
+              <RiNewspaperLine className="w-16 h-16 text-slate-300" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-700 mb-2">
               Nenhuma notícia encontrada
             </h3>
-            <p className="text-gray-500">
-              Tente buscar por outro termo ou limpar os filtros.
+            <p className="text-slate-500 max-w-md mx-auto mb-8">
+              Não encontramos resultados para sua busca. Tente ajustar os
+              filtros ou pesquisar por outro termo.
             </p>
+            <Button
+              variant="outline"
+              className="border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold px-8 h-12 rounded-xl"
+              onClick={handleClearFilters}
+            >
+              Limpar Filtros
+            </Button>
           </div>
         )}
       </section>
