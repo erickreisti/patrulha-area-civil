@@ -124,7 +124,6 @@ export default function AgentPerfil() {
     isAdmin,
     hasAdminSession,
     logout,
-    // initialize foi removido daqui pois usamos useAuthStore.getState().initialize()
   } = useAuthStore();
 
   const [showInactive, setShowInactive] = useState(false);
@@ -295,7 +294,7 @@ export default function AgentPerfil() {
                     <label className="text-[9px] sm:text-xs uppercase font-bold text-slate-400 tracking-wide ml-1">
                       Graduação
                     </label>
-                    <div className="p-2 sm:p-3.5 bg-white border border-slate-200 rounded-lg sm:rounded-xl text-xs sm:text-lg font-black text-slate-800 uppercase shadow-sm flex items-center justify-center text-center tracking-tight leading-tight">
+                    <div className="p-2 sm:p-3.5 bg-white border border-slate-200 rounded-lg sm:rounded-xl text-xs sm:text-lg font-black text-red-600 uppercase shadow-sm flex items-center justify-center text-center tracking-tight leading-tight">
                       {user.graduacao || "NÃO DEFINIDA"}
                     </div>
                   </div>

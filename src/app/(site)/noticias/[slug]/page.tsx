@@ -1,17 +1,17 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { notFound, useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import {
-  RiCalendarLine,
   RiTimeLine,
   RiArrowLeftLine,
   RiShareLine,
   RiErrorWarningLine,
   RiArrowRightLine,
+  RiUser3Line,
 } from "react-icons/ri";
 
 // Components
@@ -20,8 +20,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Hook
+// Hook & Actions
 import { useNoticiaDetalhe } from "@/lib/stores/useNoticiasStore";
+import { getNoticiasRelacionadas } from "@/app/actions/news/noticias";
 import type { NoticiaLista } from "@/app/actions/news/noticias";
 
 // --- TYPES ---
@@ -74,7 +75,7 @@ function ErrorState({
 }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <Card className="max-w-md mx-4 border-red-100 shadow-lg">
+      <Card className="max-w-md mx-4 border-red-100 shadow-lg bg-white">
         <CardContent className="pt-6 text-center">
           <RiErrorWarningLine className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-slate-800 mb-2">
@@ -87,7 +88,7 @@ function ErrorState({
             </Button>
             <Button
               onClick={onRetry}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-pac-primary hover:bg-pac-primary-dark text-white"
             >
               Tentar novamente
             </Button>
@@ -101,7 +102,6 @@ function ErrorState({
 // --- PÁGINA PRINCIPAL ---
 
 export default function NoticiaPage({ params }: PageProps) {
-  const router = useRouter();
   const [slug, setSlug] = useState<string>("");
   const [imageError, setImageError] = useState(false);
 
@@ -126,18 +126,17 @@ export default function NoticiaPage({ params }: PageProps) {
     }
   }, [slug, fetchNoticiaDetalhe]);
 
-  // 3. Buscar Relacionadas
+  // 3. Buscar Relacionadas (AGORA COM SERVER ACTION)
   const loadRelacionadas = useCallback(async () => {
     if (!noticiaDetalhe?.categoria || !noticiaDetalhe?.id) return;
 
     try {
-      // Simulação de fetch para relacionadas. Em produção, use sua API real.
-      const res = await fetch(
-        `/api/noticias?categoria=${noticiaDetalhe.categoria}&limit=3&exclude=${noticiaDetalhe.id}`,
+      const res = await getNoticiasRelacionadas(
+        noticiaDetalhe.categoria,
+        noticiaDetalhe.id,
       );
-      if (res.ok) {
-        const data = await res.json();
-        setNoticiasRelacionadas(data.data || []);
+      if (res.success && res.data) {
+        setNoticiasRelacionadas(res.data);
       }
     } catch (err) {
       console.error("Erro ao carregar relacionadas", err);
@@ -168,7 +167,7 @@ export default function NoticiaPage({ params }: PageProps) {
           url,
         });
       } catch {
-        // Ignora
+        // Ignora erro de compartilhamento
       }
     } else {
       navigator.clipboard.writeText(url);
@@ -190,68 +189,84 @@ export default function NoticiaPage({ params }: PageProps) {
   const readingTime = Math.ceil((noticiaDetalhe.conteudo?.length || 0) / 1000);
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Header Imersivo */}
-      <section className="relative bg-slate-900 text-white pt-32 pb-24 overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-10" />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-900/90" />
+    <div className="min-h-screen bg-white">
+      {/* --- HEADER CLEAN --- */}
+      <section className="relative pt-32 pb-16 lg:pt-40 lg:pb-20 border-b border-slate-100 overflow-hidden">
+        {/* Background Sutil */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-pac-primary/5 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
 
         <div className="container mx-auto px-4 relative z-10 max-w-4xl">
-          <Button
-            variant="ghost"
-            onClick={() => router.push("/noticias")}
-            className="mb-8 text-slate-300 hover:text-white hover:bg-white/10 px-0 pl-2 transition-all group"
+          {/* Botão Voltar */}
+          <Link
+            href="/noticias"
+            className="inline-flex items-center text-sm font-bold text-slate-500 hover:text-pac-primary transition-colors mb-8 group"
           >
-            <RiArrowLeftLine className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+            <RiArrowLeftLine className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
             Voltar para Notícias
-          </Button>
+          </Link>
 
-          <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 mb-6 hover:bg-emerald-500/30 px-3 py-1 text-sm font-medium">
-            {noticiaDetalhe.categoria || "Geral"}
-          </Badge>
-
-          <h1 className="text-3xl md:text-5xl font-extrabold mb-6 tracking-tight leading-tight text-white">
-            {noticiaDetalhe.titulo}
-          </h1>
-
-          <div className="flex flex-wrap items-center gap-6 text-slate-300 text-sm font-medium">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white border border-slate-600">
-                {noticiaDetalhe.autor?.full_name?.charAt(0) || "P"}
-              </div>
-              <span>{noticiaDetalhe.autor?.full_name || "Redação PAC"}</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <RiCalendarLine className="h-4 w-4 text-emerald-400" />
+          {/* Badge de Categoria */}
+          <div className="flex items-center gap-4 mb-6">
+            <Badge
+              variant="outline"
+              className="text-pac-primary border-pac-primary/30 bg-pac-primary/5 font-bold uppercase tracking-wider text-xs px-3 py-1 rounded-md"
+            >
+              {noticiaDetalhe.categoria || "Geral"}
+            </Badge>
+            <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">
               {new Date(noticiaDetalhe.data_publicacao).toLocaleDateString(
                 "pt-BR",
                 {
-                  day: "numeric",
+                  day: "2-digit",
                   month: "long",
                   year: "numeric",
                 },
               )}
+            </span>
+          </div>
+
+          {/* Título Principal */}
+          <h1 className="text-3xl md:text-5xl font-black text-slate-900 mb-8 tracking-tight leading-tight">
+            {noticiaDetalhe.titulo}
+          </h1>
+
+          {/* Metadados Autor/Tempo */}
+          <div className="flex flex-wrap items-center gap-6 py-6 border-t border-slate-100 text-sm font-medium text-slate-500">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200">
+                <RiUser3Line className="w-5 h-5" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs uppercase font-bold text-slate-400">
+                  Por
+                </span>
+                <span className="text-slate-900 font-bold">
+                  {noticiaDetalhe.autor?.full_name || "Redação PAC"}
+                </span>
+              </div>
             </div>
 
+            <div className="w-px h-8 bg-slate-200 hidden sm:block" />
+
             <div className="flex items-center gap-2">
-              <RiTimeLine className="h-4 w-4 text-emerald-400" />
-              {readingTime} min de leitura
+              <RiTimeLine className="h-4 w-4 text-pac-primary" />
+              <span>{readingTime} min de leitura</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Conteúdo Principal */}
-      <section className="py-16 -mt-20">
+      {/* --- CONTEÚDO PRINCIPAL --- */}
+      <section className="py-16">
         <div className="container mx-auto px-4 max-w-4xl">
-          {/* Mídia Principal */}
+          {/* Imagem de Destaque */}
           {imageUrl && !imageError && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="relative aspect-video w-full bg-slate-200 rounded-2xl shadow-2xl overflow-hidden mb-12 border-4 border-white z-20"
+              className="relative aspect-video w-full rounded-2xl overflow-hidden mb-12 shadow-lg ring-1 ring-slate-200"
             >
               <Image
                 src={imageUrl}
@@ -264,24 +279,26 @@ export default function NoticiaPage({ params }: PageProps) {
             </motion.div>
           )}
 
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 md:p-12 mb-12 relative z-10">
-            {/* Resumo / Lead (CORRIGIDO: Escaped Quotes) */}
+          <div className="relative z-10">
+            {/* Resumo / Lead */}
             {noticiaDetalhe.resumo && (
-              <div className="mb-10 p-6 bg-slate-50 border-l-4 border-emerald-500 rounded-r-lg">
-                <p className="text-xl text-slate-700 font-serif italic leading-relaxed">
+              <div className="mb-10 p-8 bg-slate-50 border-l-4 border-pac-primary rounded-r-xl">
+                <p className="text-xl text-slate-700 font-medium leading-relaxed italic">
                   &quot;{noticiaDetalhe.resumo}&quot;
                 </p>
               </div>
             )}
 
-            {/* Corpo do Texto */}
+            {/* Corpo do Texto (Tipografia Ajustada) */}
             <div
               className="prose prose-lg prose-slate max-w-none 
-              prose-headings:font-bold prose-headings:text-slate-900 
-              prose-a:text-emerald-600 prose-a:no-underline hover:prose-a:underline
-              prose-img:rounded-xl prose-img:shadow-lg
-              prose-blockquote:border-l-emerald-500 prose-blockquote:bg-slate-50 prose-blockquote:py-4 prose-blockquote:px-6 prose-blockquote:not-italic prose-blockquote:rounded-r-lg
-            "
+              prose-headings:font-black prose-headings:text-slate-900 prose-headings:tracking-tight
+              prose-p:text-slate-600 prose-p:leading-relaxed
+              prose-a:text-pac-primary prose-a:font-bold prose-a:no-underline hover:prose-a:underline
+              prose-strong:text-slate-900 prose-strong:font-bold
+              prose-img:rounded-xl prose-img:shadow-md
+              prose-blockquote:border-l-pac-primary prose-blockquote:bg-white prose-blockquote:text-slate-700 prose-blockquote:py-2 prose-blockquote:px-6 prose-blockquote:not-italic
+              "
             >
               <div
                 dangerouslySetInnerHTML={{ __html: noticiaDetalhe.conteudo }}
@@ -290,32 +307,35 @@ export default function NoticiaPage({ params }: PageProps) {
           </div>
 
           {/* Rodapé do Artigo */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-20">
-            <Button
-              variant="outline"
-              onClick={() => router.push("/noticias")}
-              className="border-slate-300 text-slate-700 hover:bg-slate-50 w-full sm:w-auto"
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-16 pt-8 border-t border-slate-200">
+            <Link
+              href="/noticias"
+              className="text-slate-500 hover:text-pac-primary font-bold text-sm flex items-center transition-colors"
             >
               <RiArrowLeftLine className="mr-2 h-4 w-4" />
-              Ler outras notícias
-            </Button>
+              Voltar para a lista
+            </Link>
 
             <Button
               onClick={handleShare}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto shadow-md shadow-emerald-200"
+              variant="outline"
+              className="border-pac-primary text-pac-primary hover:bg-pac-primary hover:text-white font-bold transition-all w-full sm:w-auto gap-2"
             >
-              <RiShareLine className="mr-2 h-4 w-4" />
+              <RiShareLine className="h-4 w-4" />
               Compartilhar Artigo
             </Button>
           </div>
 
-          {/* Notícias Relacionadas */}
+          {/* --- NOTÍCIAS RELACIONADAS --- */}
           {noticiasRelacionadas.length > 0 && (
-            <div className="border-t border-slate-200 pt-16">
-              <h3 className="text-2xl font-bold text-slate-900 mb-8 flex items-center gap-2">
-                <span className="w-1 h-8 bg-emerald-500 rounded-full" />
-                Veja Também
-              </h3>
+            <div className="mt-20 pt-16 border-t border-slate-100">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-1 h-8 bg-pac-primary rounded-full" />
+                <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">
+                  Veja Também
+                </h3>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {noticiasRelacionadas.map((relacionada: NoticiaLista) => (
                   <Link
@@ -323,16 +343,16 @@ export default function NoticiaPage({ params }: PageProps) {
                     key={relacionada.id}
                     className="group"
                   >
-                    <Card className="h-full hover:shadow-xl transition-all duration-300 border-none shadow-md overflow-hidden hover:-translate-y-1">
-                      <CardContent className="p-5">
-                        <div className="text-xs font-bold text-emerald-600 mb-2 uppercase tracking-wider">
+                    <Card className="h-full border border-slate-200 hover:border-pac-primary/30 hover:shadow-lg transition-all duration-300 bg-white overflow-hidden hover:-translate-y-1">
+                      <CardContent className="p-6 flex flex-col h-full">
+                        <div className="text-[10px] font-bold text-pac-primary mb-3 uppercase tracking-widest bg-pac-primary/5 w-fit px-2 py-1 rounded">
                           {relacionada.categoria || "Geral"}
                         </div>
-                        <h4 className="font-bold text-slate-800 mb-3 group-hover:text-emerald-600 transition-colors line-clamp-2 leading-snug">
+                        <h4 className="font-bold text-slate-800 mb-3 group-hover:text-pac-primary transition-colors line-clamp-3 leading-snug flex-grow">
                           {relacionada.titulo}
                         </h4>
-                        <div className="flex items-center text-xs text-slate-400 font-medium mt-auto">
-                          Ler mais{" "}
+                        <div className="flex items-center text-xs text-slate-400 font-bold uppercase tracking-wider mt-4">
+                          Ler Matéria{" "}
                           <RiArrowRightLine className="ml-1 w-3 h-3 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </CardContent>

@@ -75,11 +75,16 @@ export function AdminAuthModal({
 
       if (result.success) {
         toast.success("Identidade confirmada com sucesso!");
+
+        // Atualiza o estado global para garantir que as permissões de admin estejam ativas
         await initialize();
+
         if (onClose) onClose();
         setShowModal(false);
         setPassword("");
-        router.refresh();
+
+        // Redireciona direto para o dashboard
+        router.push("/admin/dashboard");
       } else {
         toast.error(result.error || "Senha incorreta");
       }

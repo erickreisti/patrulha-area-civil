@@ -219,7 +219,7 @@ export function GalleryShowcase() {
   return (
     <section className="w-full bg-white py-20 lg:py-32 relative overflow-hidden border-t border-slate-100">
       {/* Background Pattern Sutil */}
-      <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.03] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <SectionHeader />

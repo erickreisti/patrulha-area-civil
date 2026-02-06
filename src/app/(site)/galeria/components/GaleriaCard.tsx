@@ -4,41 +4,46 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, Variants } from "framer-motion";
+
+// UI Components
 import {
   Card,
   CardContent,
+  CardFooter,
   CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+// Icons
 import {
   RiImageLine,
   RiVideoLine,
-  RiEyeLine,
-  RiEyeOffLine,
   RiFolderLine,
   RiCalendarLine,
-  RiCheckLine,
   RiArrowRightLine,
   RiImage2Line,
+  RiEyeOffLine,
 } from "react-icons/ri";
+
+// Utils
 import { cn } from "@/lib/utils/cn";
 import type { Categoria } from "@/app/actions/gallery";
 
-// Tipagem estendida se necessário
+// --- TIPOS ---
 export interface ExtendedCategoria extends Categoria {
   capa_url?: string | null;
   itens_count?: number;
   tipo: "fotos" | "videos";
 }
 
+// --- CONFIGURAÇÃO VISUAL ---
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
+// --- HELPER ---
 const getImageUrl = (url: string | null | undefined): string | null => {
   if (!url || typeof url !== "string" || url.trim() === "") return null;
   if (url.startsWith("http")) return url;
@@ -50,140 +55,129 @@ const getImageUrl = (url: string | null | undefined): string | null => {
   return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
 };
 
+// --- COMPONENTE ---
 export function GaleriaCard({ categoria }: { categoria: ExtendedCategoria }) {
-  const [hasError, setHasError] = useState(false);
-  const imageUrl = getImageUrl(categoria.capa_url);
-  const shouldShowImage = !!imageUrl && !hasError;
+  const [imageError, setImageError] = useState(false);
 
-  // Lógica de ícones e cores
-  const IconTipo = categoria.tipo === "fotos" ? RiImageLine : RiVideoLine;
-  const isActive = categoria.status !== false && !categoria.arquivada;
+  const imageUrl = getImageUrl(categoria.capa_url);
+  const hasImage = !!imageUrl && !imageError;
   const hasItems = (categoria.itens_count || 0) > 0;
+  // Assumimos que na área pública só aparecem ativos, mas mantemos a lógica caso admin use o card
+  const isPrivate = categoria.status === false || categoria.arquivada;
+
+  const IconTipo = categoria.tipo === "videos" ? RiVideoLine : RiImageLine;
 
   return (
     <motion.div variants={cardVariants} className="h-full">
-      <Card className="group border-2 border-slate-200/60 hover:border-pac-primary/50 bg-white/60 backdrop-blur-sm shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden h-full flex flex-col">
-        {/* Imagem de Capa */}
-        <div className="relative h-48 overflow-hidden bg-slate-100">
-          {shouldShowImage ? (
+      <Card className="group h-full flex flex-col border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white overflow-hidden rounded-2xl">
+        {/* --- ÁREA DA IMAGEM --- */}
+        <div className="relative h-56 bg-slate-100 overflow-hidden">
+          {hasImage ? (
             <Image
-              src={imageUrl}
+              src={imageUrl!}
               alt={categoria.nome}
               fill
-              className="object-cover transition-all duration-700 group-hover:scale-110"
-              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-              loading="lazy"
-              onError={() => setHasError(true)}
+              className="object-cover transition-transform duration-700 group-hover:scale-110"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              onError={() => setImageError(true)}
             />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-300">
               <RiImage2Line className="w-12 h-12 mb-2 opacity-50" />
-              <span className="text-xs uppercase font-bold tracking-widest">
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
                 Sem Capa
               </span>
             </div>
           )}
 
-          {/* Badges Superiores */}
-          <div className="absolute top-3 left-3 flex flex-wrap gap-2">
-            <Badge
-              variant={isActive ? "default" : "secondary"}
-              className={cn(
-                "backdrop-blur-sm text-xs border-0",
-                isActive ? "bg-green-600 hover:bg-green-700" : "bg-slate-500",
-              )}
-            >
-              {isActive ? (
-                <RiEyeLine className="w-3 h-3 mr-1" />
-              ) : (
-                <RiEyeOffLine className="w-3 h-3 mr-1" />
-              )}
-              {isActive ? "Ativa" : "Indisponível"}
-            </Badge>
+          {/* Overlay Gradiente (Melhora leitura se tiver texto sobre a imagem) */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
 
+          {/* Badge de Tipo (Superior Esquerdo) */}
+          <div className="absolute top-3 left-3">
             <Badge
               className={cn(
-                "backdrop-blur-sm text-xs border-0 text-white",
+                "backdrop-blur-md border-0 text-white shadow-sm px-2.5 py-1 text-[10px] uppercase tracking-wider font-bold",
                 categoria.tipo === "videos"
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600"
-                  : "bg-gradient-to-r from-pac-primary to-blue-600",
+                  ? "bg-purple-600/90"
+                  : "bg-pac-primary/90",
               )}
             >
-              <IconTipo className="w-3 h-3 mr-1" />
-              {categoria.tipo === "videos" ? "Vídeos" : "Fotos"}
+              <IconTipo className="w-3.5 h-3.5 mr-1.5" />
+              {categoria.tipo === "videos" ? "Vídeo" : "Fotos"}
             </Badge>
           </div>
 
-          {/* Badge Inferior (Contador) */}
-          <Badge className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm text-slate-700 border-0 text-xs shadow-sm hover:bg-white">
-            <RiFolderLine className="w-3 h-3 mr-1" />
-            {categoria.itens_count || 0}{" "}
-            {categoria.itens_count === 1 ? "item" : "itens"}
-          </Badge>
+          {/* Badge Privado (Se necessário) */}
+          {isPrivate && (
+            <div className="absolute top-3 right-3">
+              <Badge
+                variant="destructive"
+                className="text-[10px] uppercase tracking-wider"
+              >
+                <RiEyeOffLine className="w-3 h-3 mr-1" /> Privado
+              </Badge>
+            </div>
+          )}
+
+          {/* Contador de Itens (Inferior Direito) */}
+          <div className="absolute bottom-3 right-3">
+            <Badge
+              variant="secondary"
+              className="bg-white/90 text-slate-700 backdrop-blur-md border-0 shadow-sm text-[10px] font-bold"
+            >
+              <RiFolderLine className="w-3.5 h-3.5 mr-1.5 text-pac-primary" />
+              {categoria.itens_count || 0}
+            </Badge>
+          </div>
         </div>
 
-        {/* Corpo do Card */}
-        <CardHeader className="pb-3 flex-grow px-5 pt-5">
-          <CardTitle className="text-lg font-bold text-slate-800 leading-tight line-clamp-2 group-hover:text-pac-primary transition-colors duration-300 uppercase tracking-tight">
-            {categoria.nome}
-          </CardTitle>
-          <CardDescription className="text-slate-500 leading-relaxed line-clamp-2 text-xs mt-2">
-            {categoria.descricao || "Sem descrição disponível."}
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="pt-0 mt-auto px-5 pb-5">
+        {/* --- CONTEÚDO --- */}
+        <CardHeader className="px-6 pt-5 pb-2">
           {/* Data */}
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-4">
-            <div className="flex items-center">
-              <RiCalendarLine className="w-3.5 h-3.5 mr-1" />
-              <span>
-                {new Date(categoria.created_at).toLocaleDateString("pt-BR")}
-              </span>
-            </div>
-            {categoria.ordem && (
-              <div className="bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                Ordem: {categoria.ordem}
-              </div>
-            )}
+          <div className="flex items-center text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">
+            <RiCalendarLine className="w-3.5 h-3.5 mr-1.5 text-pac-primary" />
+            {new Date(categoria.created_at).toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })}
           </div>
 
-          {/* Botão de Ação */}
+          <h3 className="text-lg font-black text-slate-800 leading-tight line-clamp-2 group-hover:text-pac-primary transition-colors uppercase tracking-tight">
+            {categoria.nome}
+          </h3>
+        </CardHeader>
+
+        <CardContent className="px-6 py-2 flex-grow">
+          <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
+            {categoria.descricao ||
+              "Confira os registros oficiais desta operação."}
+          </p>
+        </CardContent>
+
+        <CardFooter className="px-6 pb-6 pt-4 mt-auto">
           <Button
             asChild
             variant="outline"
-            size="sm"
             className={cn(
-              "w-full border-slate-200 text-slate-600 hover:bg-pac-primary hover:text-white hover:border-pac-primary transition-all duration-300 group/btn",
-              (!hasItems || !isActive) &&
-                "opacity-60 cursor-not-allowed bg-slate-50",
+              "w-full border-slate-200 text-slate-600 font-bold hover:bg-pac-primary hover:text-white hover:border-pac-primary transition-all duration-300 group/btn rounded-xl",
+              !hasItems && "opacity-50 cursor-not-allowed bg-slate-50",
             )}
-            disabled={!hasItems || !isActive}
+            disabled={!hasItems}
           >
-            <Link
-              href={hasItems && isActive ? `/galeria/${categoria.slug}` : "#"}
-              onClick={(e) => {
-                if (!hasItems || !isActive) e.preventDefault();
-              }}
-              className="flex items-center justify-center w-full"
-            >
-              {!hasItems ? (
+            <Link href={hasItems ? `/galeria/${categoria.slug}` : "#"}>
+              {hasItems ? (
                 <>
-                  <RiCheckLine className="w-4 h-4 mr-1.5" /> Vazia
-                </>
-              ) : !isActive ? (
-                <>
-                  <RiEyeOffLine className="w-4 h-4 mr-1.5" /> Privada
+                  Ver Álbum
+                  <RiArrowRightLine className="w-4 h-4 ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
                 </>
               ) : (
-                <>
-                  Ver Galeria
-                  <RiArrowRightLine className="w-4 h-4 ml-1.5 transition-transform duration-300 group-hover/btn:translate-x-1" />
-                </>
+                "Álbum Vazio"
               )}
             </Link>
           </Button>
-        </CardContent>
+        </CardFooter>
       </Card>
     </motion.div>
   );

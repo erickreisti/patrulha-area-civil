@@ -32,9 +32,7 @@ import {
   RiCloseLine,
   RiImageLine,
   RiVideoLine,
-  RiLayoutGridLine,
 } from "react-icons/ri";
-import type { IconType } from "react-icons"; // Importando tipo para os ícones
 
 // --- CONFIGURAÇÕES ---
 const SORT_OPTIONS = [
@@ -64,7 +62,6 @@ export function GaleriaContent() {
     error,
     pagination,
     fetchCategorias,
-    // setFiltros, // REMOVIDO: Não estamos usando filtragem via API, apenas local
     setPagination,
   } = useGaleriaPublica();
 
@@ -73,7 +70,7 @@ export function GaleriaContent() {
   const [selectedSort, setSelectedSort] = useState("recent");
   const debounceTimer = useRef<NodeJS.Timeout>();
 
-  // Debounce (apenas para evitar processamento excessivo na digitação)
+  // Debounce
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => {
@@ -113,14 +110,6 @@ export function GaleriaContent() {
     return 0;
   });
 
-  // Estatísticas
-  const totalFotos = categorias
-    .filter((c) => c.tipo === "fotos")
-    .reduce((acc, curr) => acc + (curr.itens_count || 0), 0);
-  const totalVideos = categorias
-    .filter((c) => c.tipo === "videos")
-    .reduce((acc, curr) => acc + (curr.itens_count || 0), 0);
-
   // Paginação Local
   const itemsPerPage = 12;
   const totalPages = Math.ceil(sortedCategorias.length / itemsPerPage);
@@ -146,80 +135,32 @@ export function GaleriaContent() {
 
   return (
     <>
-      {/* HEADER E STATS */}
-      <section className="bg-white border-b border-slate-100 pt-24 pb-12 lg:pt-32 lg:pb-16 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.03] pointer-events-none" />
-        <div className="container mx-auto px-4 relative z-10 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pac-primary/10 text-pac-primary text-xs font-bold uppercase tracking-widest mb-6">
-              <span className="w-2 h-2 rounded-full bg-pac-primary animate-pulse" />
-              Acervo Digital
-            </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 mb-6 uppercase tracking-tight">
-              Galeria <span className="text-pac-primary">PAC</span>
-            </h1>
-            <p className="max-w-2xl mx-auto text-slate-600 text-lg leading-relaxed mb-10">
-              Explore nossa coleção completa de registros fotográficos e
-              audiovisuais.
-            </p>
-
-            {/* Stats Bar */}
-            <div className="inline-flex flex-wrap justify-center gap-4 sm:gap-8 bg-slate-50 p-4 rounded-2xl border border-slate-100 shadow-sm">
-              <StatItem
-                icon={RiImageLine}
-                label="Fotos"
-                value={totalFotos}
-                color="text-blue-600"
-                bg="bg-blue-100"
-              />
-              <div className="w-px h-10 bg-slate-200 hidden sm:block" />
-              <StatItem
-                icon={RiVideoLine}
-                label="Vídeos"
-                value={totalVideos}
-                color="text-purple-600"
-                bg="bg-purple-100"
-              />
-              <div className="w-px h-10 bg-slate-200 hidden sm:block" />
-              <StatItem
-                icon={RiLayoutGridLine}
-                label="Álbuns"
-                value={pagination.total}
-                color="text-emerald-600"
-                bg="bg-emerald-100"
-              />
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* BARRA DE FILTROS */}
-      <div className="sticky top-20 z-40 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
-        <div className="container mx-auto px-4 py-4">
+      {/* BARRA DE FILTROS (Sticky) */}
+      <div className="sticky top-[80px] z-30 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm transition-all py-4">
+        <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full lg:max-w-md">
-              <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            {/* Busca */}
+            <div className="relative w-full lg:max-w-md group">
+              <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-pac-primary transition-colors" />
               <Input
                 placeholder="Buscar por nome ou descrição..."
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
-                className="pl-10 bg-white border-slate-200 focus:border-pac-primary focus:ring-pac-primary/20 rounded-xl h-11"
+                className="pl-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-pac-primary focus:ring-pac-primary/20 h-11 rounded-xl transition-all placeholder:text-slate-400"
               />
               {localSearch && (
                 <button
                   onClick={() => setLocalSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-1 transition-colors"
                 >
                   <RiCloseLine className="w-5 h-5" />
                 </button>
               )}
             </div>
 
+            {/* Filtros e Ordenação */}
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+              {/* Select Tipo */}
               <Select
                 value={selectedTipo}
                 onValueChange={(val) => {
@@ -227,9 +168,9 @@ export function GaleriaContent() {
                   setPagination({ page: 1 });
                 }}
               >
-                <SelectTrigger className="w-full sm:w-[160px] h-11 rounded-xl bg-white">
+                <SelectTrigger className="w-full sm:w-[180px] h-11 bg-white border-slate-200 rounded-xl hover:border-pac-primary/50 transition-colors">
                   <div className="flex items-center gap-2 text-slate-600">
-                    <RiFilterLine className="w-4 h-4" />
+                    <RiFilterLine className="w-4 h-4 shrink-0" />
                     <SelectValue />
                   </div>
                 </SelectTrigger>
@@ -245,10 +186,11 @@ export function GaleriaContent() {
                 </SelectContent>
               </Select>
 
+              {/* Select Ordenação */}
               <Select value={selectedSort} onValueChange={setSelectedSort}>
-                <SelectTrigger className="w-full sm:w-[160px] h-11 rounded-xl bg-white">
+                <SelectTrigger className="w-full sm:w-[180px] h-11 bg-white border-slate-200 rounded-xl hover:border-pac-primary/50 transition-colors">
                   <div className="flex items-center gap-2 text-slate-600">
-                    <RiSortAsc className="w-4 h-4" />
+                    <RiSortAsc className="w-4 h-4 shrink-0" />
                     <SelectValue />
                   </div>
                 </SelectTrigger>
@@ -261,11 +203,14 @@ export function GaleriaContent() {
                 </SelectContent>
               </Select>
 
-              {(localSearch || selectedTipo !== "all") && (
+              {/* Botão Limpar */}
+              {(localSearch ||
+                selectedTipo !== "all" ||
+                selectedSort !== "recent") && (
                 <Button
                   variant="ghost"
                   onClick={clearFilters}
-                  className="text-pac-primary hover:bg-pac-primary/10 h-11 px-4 rounded-xl"
+                  className="text-slate-500 hover:text-red-600 hover:bg-red-50 h-11 px-4 rounded-xl transition-colors font-medium"
                 >
                   Limpar
                 </Button>
@@ -276,30 +221,36 @@ export function GaleriaContent() {
       </div>
 
       {/* GRID DE RESULTADOS */}
-      <section className="py-12 container mx-auto px-4">
+      <section className="py-12 container mx-auto px-4 min-h-[600px]">
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {Array.from({ length: 8 }).map((_, i) => (
               <div
                 key={i}
-                className="rounded-2xl overflow-hidden border border-slate-200 bg-white"
+                className="rounded-xl overflow-hidden border border-slate-200 bg-white h-[300px]"
               >
-                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full bg-slate-100" />
                 <div className="p-5 space-y-3">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
+                  <Skeleton className="h-5 w-3/4 bg-slate-100" />
+                  <Skeleton className="h-4 w-1/2 bg-slate-100" />
                 </div>
               </div>
             ))}
           </div>
         ) : error ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-slate-200">
-            <RiGalleryLine className="w-16 h-16 text-red-200 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-slate-800">
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-red-50 p-4 rounded-full mb-4">
+              <RiGalleryLine className="w-10 h-10 text-red-400" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">
               Erro ao carregar galeria
             </h3>
             <p className="text-slate-500 mb-6">{error}</p>
-            <Button onClick={() => fetchCategorias()} variant="outline">
+            <Button
+              onClick={() => fetchCategorias()}
+              variant="outline"
+              className="border-red-200 text-red-600 hover:bg-red-50"
+            >
               Tentar Novamente
             </Button>
           </div>
@@ -312,7 +263,7 @@ export function GaleriaContent() {
                 initial="hidden"
                 animate="visible"
                 exit={{ opacity: 0 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-16"
               >
                 {currentData.map((categoria: ExtendedCategoria) => (
                   <GaleriaCard key={categoria.id} categoria={categoria} />
@@ -321,7 +272,7 @@ export function GaleriaContent() {
             </AnimatePresence>
 
             {totalPages > 1 && (
-              <Pagination>
+              <Pagination className="justify-center">
                 <PaginationContent>
                   <PaginationItem>
                     <PaginationPrevious
@@ -331,7 +282,7 @@ export function GaleriaContent() {
                       className={
                         pagination.page === 1
                           ? "pointer-events-none opacity-50"
-                          : "cursor-pointer"
+                          : "cursor-pointer hover:bg-slate-100 hover:text-pac-primary"
                       }
                     />
                   </PaginationItem>
@@ -348,9 +299,10 @@ export function GaleriaContent() {
                             isActive={page === pagination.page}
                             onClick={() => handlePageChange(page)}
                             className={cn(
-                              "cursor-pointer",
-                              page === pagination.page &&
-                                "bg-pac-primary text-white hover:bg-pac-primary-dark hover:text-white",
+                              "cursor-pointer transition-all",
+                              page === pagination.page
+                                ? "bg-pac-primary text-white hover:bg-pac-primary hover:text-white shadow-md"
+                                : "hover:bg-slate-100 hover:text-pac-primary",
                             )}
                           >
                             {page}
@@ -376,7 +328,7 @@ export function GaleriaContent() {
                       className={
                         pagination.page === totalPages
                           ? "pointer-events-none opacity-50"
-                          : "cursor-pointer"
+                          : "cursor-pointer hover:bg-slate-100 hover:text-pac-primary"
                       }
                     />
                   </PaginationItem>
@@ -385,52 +337,26 @@ export function GaleriaContent() {
             )}
           </>
         ) : (
-          <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-200">
-            <RiSearchLine className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-slate-800">
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="bg-white p-8 rounded-full shadow-sm mb-6 border border-slate-100">
+              <RiSearchLine className="w-16 h-16 text-slate-300" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-2">
               Nenhum resultado encontrado
             </h3>
-            <p className="text-slate-500 mb-6">
-              Tente ajustar seus termos de busca.
+            <p className="text-slate-500 max-w-md mx-auto mb-8">
+              Não encontramos álbuns com os termos pesquisados.
             </p>
-            <Button variant="outline" onClick={clearFilters}>
+            <Button
+              variant="outline"
+              onClick={clearFilters}
+              className="border-pac-primary text-pac-primary hover:bg-pac-primary/5"
+            >
               Limpar Filtros
             </Button>
           </div>
         )}
       </section>
     </>
-  );
-}
-
-// --- TIPAGEM E COMPONENTE AUXILIAR CORRIGIDOS ---
-
-interface StatItemProps {
-  icon: IconType;
-  label: string;
-  value: number;
-  color: string;
-  bg: string;
-}
-
-function StatItem({ icon: Icon, label, value, color, bg }: StatItemProps) {
-  return (
-    <div className="flex items-center gap-3 px-4">
-      <div
-        className={cn(
-          "w-10 h-10 rounded-full flex items-center justify-center",
-          bg,
-          color,
-        )}
-      >
-        <Icon className="w-5 h-5" />
-      </div>
-      <div className="text-left">
-        <p className="text-xs text-slate-500 font-bold uppercase">{label}</p>
-        <p className="text-lg font-black text-slate-800 leading-none">
-          {value}
-        </p>
-      </div>
-    </div>
   );
 }

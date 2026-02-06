@@ -137,7 +137,6 @@ async function getCurrentUserRole() {
     } = await supabase.auth.getUser();
 
     if (user) {
-      // Se autenticou via Supabase, verifica role
       const { data: profile } = await supabaseAdmin
         .from("profiles")
         .select("role")
@@ -146,21 +145,12 @@ async function getCurrentUserRole() {
       return { isAdmin: profile?.role === "admin", userId: user.id };
     }
 
-    // 2. TENTATIVA CUSTOMIZADA: Cookies do seu Login ('is_admin' / 'admin_session')
-    // Seus logs mostram que o login cria cookies 'admin_session' ou 'is_admin'
+    // 2. TENTATIVA CUSTOMIZADA: Cookies do seu Login
     const hasAdminCookie =
       cookieStore.has("is_admin") || cookieStore.has("admin_session");
 
     if (hasAdminCookie) {
-      console.log(
-        "🔓 [Auth Fallback] Sessão admin customizada detectada. Permitindo acesso.",
-      );
-
-      // Como não temos o ID do usuário fácil via cookie customizado (geralmente é criptografado),
-      // Vamos buscar o primeiro ADMIN do banco para usar como "autor" da ação (System Admin)
-      // OU se você tiver um cookie 'user_id', podemos usá-lo.
-
-      // Fallback: Busca o ID do perfil que é admin (ex: você mesmo) para atribuir a autoria
+      console.log("🔓 [Auth Fallback] Sessão admin customizada detectada.");
       const { data: adminProfile } = await supabaseAdmin
         .from("profiles")
         .select("id")
@@ -171,9 +161,6 @@ async function getCurrentUserRole() {
       return { isAdmin: true, userId: adminProfile?.id || null };
     }
 
-    console.log(
-      "⛔ [Auth] Nenhuma sessão encontrada (Nem Supabase, Nem Custom)",
-    );
     return { isAdmin: false, userId: null };
   } catch (e) {
     console.error("Erro na verificação de role:", e);
@@ -527,5 +514,37 @@ export async function getNoticiaById(
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Não encontrado";
     return { success: false, error: msg };
+  }
+}
+
+// ==================== NOVO: BUSCAR RELACIONADAS ====================
+export async function getNoticiasRelacionadas(
+  categoria: string,
+  excludeId: string,
+): Promise<ApiResponse<NoticiaLista[]>> {
+  try {
+    const supabaseAdmin = createAdminClient();
+
+    const { data, error } = await supabaseAdmin
+      .from("noticias")
+      .select(
+        `
+        id, titulo, slug, resumo, media_url, thumbnail_url, tipo_media,
+        categoria, destaque, data_publicacao, status, views, created_at,
+        autor:profiles!noticias_autor_id_fkey(full_name, avatar_url)
+      `,
+      )
+      .eq("status", "publicado")
+      .eq("categoria", categoria)
+      .neq("id", excludeId)
+      .order("data_publicacao", { ascending: false })
+      .limit(3);
+
+    if (error) throw error;
+
+    return { success: true, data: data as unknown as NoticiaLista[] };
+  } catch (error) {
+    console.error("Erro ao buscar relacionadas:", error);
+    return { success: false, error: "Erro ao buscar notícias relacionadas" };
   }
 }

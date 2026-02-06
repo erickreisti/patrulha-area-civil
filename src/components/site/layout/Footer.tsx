@@ -269,7 +269,7 @@ export function Footer() {
     // Fundo Branco (bg-white)
     <footer className="bg-white text-slate-600 relative overflow-hidden border-t border-slate-100">
       {/* Background Pattern Sutil (quase invisível para textura) */}
-      <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.02] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 relative z-10">
         <motion.div

@@ -19,7 +19,7 @@ import {
   RiImageLine,
   RiVideoLine,
   RiCloseLine,
-  RiLoader4Line, // Usando React Icons para consistência
+  RiLoader4Line,
 } from "react-icons/ri";
 import { cn } from "@/lib/utils/cn";
 
@@ -27,8 +27,8 @@ import { cn } from "@/lib/utils/cn";
 
 const TIPO_OPTIONS = [
   { value: "all", label: "Todos os Tipos", icon: RiStackLine },
-  { value: "fotos", label: "Fotos", icon: RiImageLine },
-  { value: "videos", label: "Vídeos", icon: RiVideoLine },
+  { value: "fotos", label: "Apenas Fotos", icon: RiImageLine },
+  { value: "videos", label: "Apenas Vídeos", icon: RiVideoLine },
 ] as const;
 
 // --- TIPOS ---
@@ -45,8 +45,8 @@ interface SearchAndFilterProps {
 export function SearchAndFilter({
   initialSearch = "",
   initialTipo = "all",
-  placeholder = "Buscar categorias...",
-  debounceDelay = 500, // Aumentei levemente para evitar muitas chamadas
+  placeholder = "Buscar na galeria...",
+  debounceDelay = 500,
   className = "",
   showActiveFilters = true,
 }: SearchAndFilterProps) {
@@ -76,24 +76,24 @@ export function SearchAndFilter({
     (newSearch: string, newType: string) => {
       const params = new URLSearchParams(searchParams.toString());
 
-      // Search Logic
+      // Lógica de Busca
       if (newSearch.trim()) {
         params.set("search", newSearch.trim());
       } else {
         params.delete("search");
       }
 
-      // Type Logic
+      // Lógica de Tipo
       if (newType && newType !== "all") {
         params.set("tipo", newType);
       } else {
         params.delete("tipo");
       }
 
-      // Reset Page
+      // Reseta paginação ao filtrar
       params.delete("page");
 
-      // Push to Router
+      // Atualiza Rota
       const queryString = params.toString();
       const newUrl = queryString ? `?${queryString}` : window.location.pathname;
 
@@ -146,21 +146,22 @@ export function SearchAndFilter({
   return (
     <section
       className={cn(
-        "py-6 bg-white/80 backdrop-blur-sm border-b border-slate-100",
+        // Design Sticky e Blur consistente com outras páginas
+        "sticky top-[80px] z-30 py-4 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm transition-all",
         className,
       )}
     >
       <div className="container mx-auto px-4">
         <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
           {/* BARRA DE BUSCA */}
-          <div className="relative flex-1 w-full max-w-2xl group">
+          <div className="relative flex-1 w-full lg:max-w-md group">
             <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 transition-colors group-focus-within:text-pac-primary" />
             <Input
               type="text"
               placeholder={placeholder}
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10 pr-10 py-5 rounded-xl border-slate-200 focus:border-pac-primary focus:ring-2 focus:ring-pac-primary/20 bg-white shadow-sm transition-all"
+              className="pl-10 pr-10 h-11 rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:border-pac-primary focus:ring-2 focus:ring-pac-primary/20 shadow-sm transition-all placeholder:text-slate-400"
             />
 
             {/* Ícone de Loading ou Botão Limpar */}
@@ -170,22 +171,23 @@ export function SearchAndFilter({
               ) : searchTerm ? (
                 <button
                   onClick={clearSearch}
-                  className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                  className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full p-1 transition-all"
                   aria-label="Limpar busca"
                 >
-                  <RiCloseLine className="w-5 h-5" />
+                  <RiCloseLine className="w-4 h-4" />
                 </button>
               ) : null}
             </div>
           </div>
 
           {/* FILTROS E AÇÕES */}
-          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
+            {/* SELECT TIPO: Largura Fixa para caber texto */}
             <Select value={selectedType} onValueChange={handleTypeChange}>
-              <SelectTrigger className="w-full sm:w-[200px] h-[44px] rounded-xl border-slate-200 bg-white shadow-sm focus:ring-pac-primary/20">
-                <div className="flex items-center gap-2 text-slate-700">
-                  <RiFilterLine className="w-4 h-4" />
-                  <SelectValue />
+              <SelectTrigger className="w-full sm:w-[200px] h-11 rounded-xl border-slate-200 bg-white shadow-sm hover:border-pac-primary/50 transition-colors focus:ring-pac-primary/20">
+                <div className="flex items-center gap-2 text-slate-600 truncate">
+                  <RiFilterLine className="w-4 h-4 shrink-0 text-slate-400" />
+                  <SelectValue placeholder="Filtrar por Tipo" />
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -196,7 +198,7 @@ export function SearchAndFilter({
                     className="cursor-pointer"
                   >
                     <div className="flex items-center gap-2">
-                      <option.icon className="w-4 h-4 text-slate-500" />
+                      <option.icon className="w-4 h-4 text-slate-400" />
                       {option.label}
                     </div>
                   </SelectItem>
@@ -204,13 +206,16 @@ export function SearchAndFilter({
               </SelectContent>
             </Select>
 
+            {/* BOTÃO LIMPAR TUDO */}
             {hasActiveFilters && (
               <Button
-                variant="outline"
+                variant="ghost"
                 onClick={clearAll}
-                className="h-[44px] rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-red-500 hover:border-red-200 transition-all"
+                size="icon"
+                className="h-11 w-11 rounded-xl border border-transparent text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-all flex-shrink-0"
+                title="Limpar todos os filtros"
               >
-                Limpar Filtros
+                <RiCloseLine className="w-5 h-5" />
               </Button>
             )}
           </div>
@@ -222,15 +227,15 @@ export function SearchAndFilter({
             {searchTerm && (
               <Badge
                 variant="secondary"
-                className="pl-3 pr-1 py-1 gap-2 bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors"
+                className="pl-3 pr-1 py-1.5 gap-2 bg-pac-primary/10 text-pac-primary border border-pac-primary/20 hover:bg-pac-primary/20 transition-colors rounded-lg font-medium"
               >
                 Busca: &quot;{searchTerm}&quot;
                 <button
                   onClick={clearSearch}
-                  className="hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                  className="hover:bg-white/50 rounded-md p-0.5 transition-colors text-pac-primary"
                   aria-label="Remover filtro de busca"
                 >
-                  <RiCloseLine className="w-3 h-3" />
+                  <RiCloseLine className="w-4 h-4" />
                 </button>
               </Badge>
             )}
@@ -238,16 +243,18 @@ export function SearchAndFilter({
             {selectedType !== "all" && (
               <Badge
                 variant="secondary"
-                className="pl-3 pr-1 py-1 gap-2 bg-green-50 text-green-700 border border-green-100 hover:bg-green-100 transition-colors"
+                className="pl-3 pr-1 py-1.5 gap-2 bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors rounded-lg font-medium"
               >
-                Tipo:{" "}
-                {TIPO_OPTIONS.find((t) => t.value === selectedType)?.label}
+                <span className="flex items-center gap-1.5">
+                  <RiFilterLine className="w-3.5 h-3.5 opacity-50" />
+                  {TIPO_OPTIONS.find((t) => t.value === selectedType)?.label}
+                </span>
                 <button
                   onClick={clearType}
-                  className="hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                  className="hover:bg-white/50 rounded-md p-0.5 transition-colors text-slate-500 hover:text-red-500"
                   aria-label="Remover filtro de tipo"
                 >
-                  <RiCloseLine className="w-3 h-3" />
+                  <RiCloseLine className="w-4 h-4" />
                 </button>
               </Badge>
             )}

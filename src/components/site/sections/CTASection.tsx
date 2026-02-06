@@ -17,7 +17,7 @@ export function CTASection() {
       className="w-full bg-white py-20 sm:py-24 lg:py-32 relative overflow-hidden border-t border-slate-100"
     >
       {/* Background Decorativo (Grid Sutil) */}
-      <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.03] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       {/* Elementos Decorativos de Fundo (Bolhas Suaves) */}
       <div className="absolute top-0 left-0 w-96 h-96 bg-pac-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2 pointer-events-none" />

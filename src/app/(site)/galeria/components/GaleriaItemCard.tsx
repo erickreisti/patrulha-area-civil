@@ -3,32 +3,34 @@
 import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
+
+// UI Components
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
+// Icons
 import {
   RiStarFill,
   RiPlayFill,
   RiVideoLine,
   RiImageLine,
-  RiCameraOffLine,
   RiCalendarLine,
   RiEyeLine,
   RiDownloadLine,
+  RiImage2Line,
 } from "react-icons/ri";
-import type { Item } from "@/app/actions/gallery/types";
 
-// --- CONSTANTES ---
-const FALLBACK_IMAGE_FOTO = "/images/defaults/photo.jpg";
-const FALLBACK_IMAGE_VIDEO = "/images/defaults/video.jpg";
+// Types & Utils
+import type { Item } from "@/app/actions/gallery/types";
+import { cn } from "@/lib/utils/cn";
 
 // --- HELPERS ---
 const formatDate = (dateString: string) => {
   try {
     return new Date(dateString).toLocaleDateString("pt-BR", {
       day: "2-digit",
-      month: "2-digit",
+      month: "long",
       year: "numeric",
     });
   } catch {
@@ -36,79 +38,89 @@ const formatDate = (dateString: string) => {
   }
 };
 
+const getImageUrl = (url: string | null | undefined) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return `${supabaseUrl}/storage/v1/object/public/galeria/${url}`;
+};
+
+// --- COMPONENTE ---
 export function GaleriaItemCard({ item }: { item: Item }) {
   const [imageError, setImageError] = useState(false);
 
   const isVideo = item.tipo === "video";
   const IconType = isVideo ? RiVideoLine : RiImageLine;
 
-  // Define a imagem final
-  const imageUrl =
-    item.thumbnail_url ||
-    item.arquivo_url ||
-    (isVideo ? FALLBACK_IMAGE_VIDEO : FALLBACK_IMAGE_FOTO);
+  // Tenta usar thumbnail, se não, arquivo direto (se for imagem)
+  const rawUrl = item.thumbnail_url || (!isVideo ? item.arquivo_url : null);
+  const imageUrl = getImageUrl(rawUrl);
+  const downloadUrl = getImageUrl(item.arquivo_url);
+
+  const hasImage = !!imageUrl && !imageError;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: true, margin: "-50px" }}
       transition={{ duration: 0.4 }}
       className="h-full"
     >
-      <Card className="group border-0 bg-white shadow-sm hover:shadow-xl transition-all duration-300 h-full flex flex-col overflow-hidden rounded-2xl hover:-translate-y-1 ring-1 ring-slate-200 hover:ring-pac-primary/30">
+      <Card className="group h-full flex flex-col border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white overflow-hidden rounded-2xl">
         {/* --- ÁREA DA MÍDIA --- */}
-        <div className="relative h-52 w-full bg-slate-100 flex items-center justify-center overflow-hidden">
-          {!imageError ? (
+        <div className="relative h-64 w-full bg-slate-100 overflow-hidden">
+          {hasImage ? (
             <>
               <Image
                 src={imageUrl}
                 alt={item.titulo}
                 fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover transition-transform duration-700 group-hover:scale-110"
+                className="object-cover transition-transform duration-700 group-hover:scale-105"
                 onError={() => setImageError(true)}
                 loading="lazy"
               />
 
               {/* Overlay Gradiente */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-              {/* Badge de Destaque */}
+              {/* Badge Destaque */}
               {item.destaque && (
                 <div className="absolute top-3 right-3 z-10">
-                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-lg px-2 py-1 uppercase tracking-wider text-[10px] font-bold">
-                    <RiStarFill className="w-3 h-3 mr-1" /> Destaque
+                  <Badge className="bg-amber-500 text-white border-0 shadow-md px-2 py-1 uppercase tracking-wider text-[10px] font-bold gap-1">
+                    <RiStarFill className="w-3 h-3" /> Destaque
                   </Badge>
                 </div>
               )}
 
-              {/* Botão de Play (Se Vídeo) */}
+              {/* Botão de Play (Overlay) */}
               {isVideo && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white/30 group-hover:scale-110 transition-transform duration-300">
-                    <RiPlayFill className="h-6 w-6 text-white ml-1" />
+                  <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white/30 group-hover:scale-110 transition-transform duration-300">
+                    <RiPlayFill className="h-6 w-6 text-white ml-0.5" />
                   </div>
                 </div>
               )}
             </>
           ) : (
-            // Fallback de Erro
-            <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
-              <RiCameraOffLine className="h-10 w-10 opacity-50" />
-              <span className="text-xs font-medium uppercase tracking-wider">
-                Mídia Indisponível
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-300">
+              <RiImage2Line className="w-12 h-12 mb-2 opacity-50" />
+              <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
+                Pré-visualização Indisponível
               </span>
             </div>
           )}
 
-          {/* Badge de Tipo (Canto Inferior Esquerdo) */}
-          <div className="absolute bottom-3 left-3 z-10">
+          {/* Badge de Tipo */}
+          <div className="absolute top-3 left-3 z-10">
             <Badge
-              variant="secondary"
-              className="bg-white/90 backdrop-blur-sm text-slate-800 shadow-sm text-[10px] uppercase font-bold tracking-wider hover:bg-white"
+              className={cn(
+                "backdrop-blur-md border-0 text-white shadow-sm px-2.5 py-1 text-[10px] uppercase tracking-wider font-bold gap-1.5",
+                isVideo ? "bg-purple-600/90" : "bg-pac-primary/90",
+              )}
             >
-              <IconType className="w-3 h-3 mr-1 text-pac-primary" />
+              <IconType className="w-3.5 h-3.5" />
               {isVideo ? "Vídeo" : "Foto"}
             </Badge>
           </div>
@@ -116,67 +128,59 @@ export function GaleriaItemCard({ item }: { item: Item }) {
 
         {/* --- CONTEÚDO --- */}
         <CardContent className="p-5 flex-grow flex flex-col">
-          <div className="flex-grow">
-            {/* Título */}
-            <h3 className="font-bold text-lg text-slate-800 mb-2 leading-tight line-clamp-1 group-hover:text-pac-primary transition-colors">
-              {item.titulo}
-            </h3>
-
-            {/* Descrição */}
-            {item.descricao && (
-              <p className="text-slate-500 text-sm leading-relaxed mb-4 line-clamp-2">
-                {item.descricao}
-              </p>
-            )}
+          <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <RiCalendarLine className="w-3.5 h-3.5 text-pac-primary" />
+            {formatDate(item.created_at)}
           </div>
 
-          {/* Metadados e Ações */}
-          <div className="mt-4 pt-4 border-t border-slate-100 space-y-4">
-            {/* Data */}
-            <div className="flex items-center text-xs font-medium text-slate-400">
-              <RiCalendarLine className="h-3.5 w-3.5 mr-1.5 text-pac-primary" />
-              {formatDate(item.created_at)}
-            </div>
+          <h3 className="font-black text-lg text-slate-800 mb-2 leading-tight line-clamp-2 group-hover:text-pac-primary transition-colors uppercase tracking-tight">
+            {item.titulo}
+          </h3>
 
-            {/* Botões */}
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full text-slate-600 hover:text-pac-primary hover:border-pac-primary/30 hover:bg-pac-primary/5 transition-colors text-xs font-semibold"
-                asChild
-              >
-                <a
-                  href={item.arquivo_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center"
-                >
-                  <RiEyeLine className="mr-2 w-3.5 h-3.5" />
-                  Visualizar
-                </a>
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-slate-500 hover:text-green-600 hover:bg-green-50 transition-colors text-xs font-semibold"
-                asChild
-              >
-                <a
-                  href={item.arquivo_url}
-                  download
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center"
-                >
-                  <RiDownloadLine className="mr-2 w-3.5 h-3.5" />
-                  Baixar
-                </a>
-              </Button>
-            </div>
-          </div>
+          {item.descricao && (
+            <p className="text-slate-500 text-sm leading-relaxed line-clamp-2 mb-4">
+              {item.descricao}
+            </p>
+          )}
         </CardContent>
+
+        {/* --- RODAPÉ COM AÇÕES --- */}
+        <CardFooter className="p-5 pt-0 mt-auto grid grid-cols-2 gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full border-slate-200 text-slate-600 font-bold hover:bg-pac-primary hover:text-white hover:border-pac-primary transition-all duration-300 rounded-xl"
+            asChild
+            disabled={!downloadUrl}
+          >
+            <a
+              href={downloadUrl || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <RiEyeLine className="mr-2 w-4 h-4" />
+              Ver
+            </a>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full bg-slate-100 text-slate-700 font-bold hover:bg-slate-200 transition-all duration-300 rounded-xl"
+            asChild
+            disabled={!downloadUrl}
+          >
+            <a
+              href={downloadUrl || "#"}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <RiDownloadLine className="mr-2 w-4 h-4" />
+              Baixar
+            </a>
+          </Button>
+        </CardFooter>
       </Card>
     </motion.div>
   );

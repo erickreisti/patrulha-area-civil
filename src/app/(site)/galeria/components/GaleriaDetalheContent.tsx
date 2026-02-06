@@ -1,288 +1,228 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { useGaleriaDetalhe } from "@/lib/stores/useGaleriaStore";
-// CORREÇÃO: Caminho absoluto para evitar erro 'Cannot find module'
-import { GaleriaItemCard } from "@/app/(site)/galeria/components/GaleriaItemCard";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationEllipsis,
-} from "@/components/ui/pagination";
-import {
-  RiArrowLeftLine,
-  RiImageLine,
-  RiVideoLine,
-  RiErrorWarningLine,
-} from "react-icons/ri";
-import { cn } from "@/lib/utils/cn";
-import type { Item } from "@/app/actions/gallery/types";
+import Image from "next/image";
+import { motion } from "framer-motion";
+import { RiArrowLeftLine, RiCalendarLine, RiImage2Line } from "react-icons/ri";
 
-export function GaleriaDetalheContent({ slug }: { slug: string }) {
+// UI Components
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+
+// Store
+import { useGaleriaDetalhe } from "@/lib/stores/useGaleriaStore";
+
+// --- TIPAGEM LOCAL (Para resolver conflitos de tipos) ---
+interface ExtendedCategoria {
+  titulo?: string;
+  nome?: string; // Algumas versões do banco usam nome
+  data_evento?: string;
+  created_at: string;
+  descricao?: string;
+}
+
+interface ExtendedItem {
+  id: string;
+  titulo?: string;
+  url?: string; // Fallback 1
+  media_url?: string; // Fallback 2
+  imagem_url?: string; // Fallback 3
+}
+
+// --- HELPERS ---
+const getImageUrl = (url: string | null | undefined) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return `${supabaseUrl}/storage/v1/object/public/galeria/${url}`;
+};
+
+interface GaleriaDetalheContentProps {
+  slug: string;
+}
+
+export function GaleriaDetalheContent({ slug }: GaleriaDetalheContentProps) {
   const {
     categoria,
     itens,
     loading,
-    error,
-    pagination,
     fetchCategoria,
     fetchItens,
     setFiltros,
-    setPagination,
     clearError,
   } = useGaleriaDetalhe();
 
-  // Inicialização
+  const [mounted, setMounted] = useState(false);
+
+  // Efeito de montagem (apenas no cliente)
   useEffect(() => {
-    const init = async () => {
-      clearError();
-      await fetchCategoria(slug);
-      // Configura o filtro com o slug para buscar os itens corretos
-      setFiltros({ categoriaSlug: slug, page: 1, limit: 12 });
-    };
-    init();
-  }, [slug, fetchCategoria, setFiltros, clearError]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
-  // Carregar itens quando filtro/paginação mudar
+  // Efeito de busca de dados
   useEffect(() => {
-    // Só busca itens se já tivermos a categoria carregada (para ter o ID se necessário no back, ou apenas slug)
-    if (categoria?.id) {
-      fetchItens();
-    }
-  }, [categoria?.id, pagination.page, fetchItens]);
+    if (!mounted) return;
 
-  const handlePageChange = (page: number) => {
-    setPagination({ page });
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
+    // 1. Busca os detalhes da categoria
+    fetchCategoria(slug);
 
-  // --- RENDERIZAÇÃO ---
+    // 2. Configura o filtro e busca os itens
+    setFiltros({
+      categoriaSlug: slug,
+      page: 1,
+      limit: 50,
+    });
+    fetchItens();
 
-  // Loading Inicial
-  if (loading && !categoria) {
+    // Limpeza ao desmontar
+    return () => clearError();
+  }, [slug, mounted, fetchCategoria, fetchItens, setFiltros, clearError]);
+
+  if (!mounted) return null;
+
+  // --- LOADING STATE ---
+  if (loading || !categoria) {
     return (
-      <div className="min-h-screen bg-slate-50 pt-32 pb-20 container mx-auto px-4">
-        <Skeleton className="h-8 w-32 mb-8" />
-        <div className="space-y-4 mb-12">
-          <Skeleton className="h-10 w-3/4 max-w-xl" />
-          <Skeleton className="h-4 w-1/2 max-w-lg" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-64 w-full rounded-2xl" />
+      <div className="pt-32 pb-20 container mx-auto px-4">
+        <Skeleton className="h-8 w-32 mb-8 bg-slate-200" />
+        <Skeleton className="h-12 w-3/4 mb-4 bg-slate-200" />
+        <Skeleton className="h-4 w-1/2 mb-12 bg-slate-200" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton
+              key={i}
+              className="aspect-video w-full rounded-2xl bg-slate-200"
+            />
           ))}
         </div>
       </div>
     );
   }
 
-  // Erro
-  if (error && !categoria) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
-        <div className="bg-white p-10 rounded-3xl shadow-sm border border-slate-200 text-center max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <RiErrorWarningLine className="w-8 h-8 text-red-500" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">
-            Não foi possível carregar
-          </h2>
-          <p className="text-slate-500 mb-6">{error}</p>
-          <Button asChild variant="outline">
-            <Link href="/galeria">Voltar para a Galeria</Link>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!categoria) return null;
-
-  const totalPages = pagination.totalPages || 1;
+  // Cast seguro usando as interfaces locais
+  const safeCategoria = categoria as unknown as ExtendedCategoria;
+  const categoriaNome =
+    safeCategoria.nome || safeCategoria.titulo || "Sem Título";
+  const categoriaData = safeCategoria.data_evento || safeCategoria.created_at;
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* HEADER DA CATEGORIA */}
-      <section className="bg-white border-b border-slate-100 pt-24 pb-12 lg:pt-32 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.03] pointer-events-none" />
+    <>
+      {/* --- HERO SECTION --- */}
+      <section className="relative pt-32 pb-16 lg:pt-40 lg:pb-20 border-b border-slate-100 overflow-hidden bg-white">
+        {/* Background Patterns */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-pac-primary/5 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
 
-        <div className="container mx-auto px-4 relative z-10">
+        <div className="container mx-auto px-4 relative z-10 max-w-6xl">
           <Link
             href="/galeria"
-            className="inline-flex items-center gap-2 mb-8 group text-sm font-bold text-slate-500 hover:text-pac-primary transition-colors"
+            className="inline-flex items-center text-sm font-bold text-slate-500 hover:text-pac-primary transition-colors mb-8 group"
           >
-            <RiArrowLeftLine className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-            Voltar para Galeria
+            <RiArrowLeftLine className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
+            Voltar para Álbuns
           </Link>
 
           <div className="max-w-4xl">
-            <div className="flex items-center gap-3 mb-4">
-              <Badge
-                variant="secondary"
-                className="bg-slate-100 text-slate-600 border-0 gap-1.5 px-3 py-1 rounded-full"
-              >
-                {categoria.tipo === "fotos" ? (
-                  <RiImageLine className="w-3.5 h-3.5" />
-                ) : (
-                  <RiVideoLine className="w-3.5 h-3.5" />
-                )}
-                {categoria.tipo === "fotos"
-                  ? "Álbum de Fotos"
-                  : "Galeria de Vídeos"}
-              </Badge>
-              {categoria.itens_count && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <div className="flex flex-wrap items-center gap-4 mb-6">
                 <Badge
                   variant="outline"
-                  className="text-slate-400 border-slate-200 font-normal rounded-full"
+                  className="text-pac-primary border-pac-primary/30 bg-pac-primary/5 font-bold uppercase tracking-wider text-xs px-3 py-1 rounded-md"
                 >
-                  {categoria.itens_count}{" "}
-                  {categoria.itens_count === 1 ? "item" : "itens"}
+                  Álbum Oficial
                 </Badge>
+                {categoriaData && (
+                  <span className="flex items-center text-slate-400 text-xs font-bold uppercase tracking-wider">
+                    <RiCalendarLine className="mr-1.5 h-3.5 w-3.5" />
+                    {new Date(categoriaData).toLocaleDateString("pt-BR")}
+                  </span>
+                )}
+              </div>
+
+              <h1 className="text-3xl md:text-5xl font-black text-slate-900 mb-6 tracking-tight leading-tight uppercase">
+                {categoriaNome}
+              </h1>
+
+              {safeCategoria.descricao && (
+                <p className="text-lg text-slate-600 leading-relaxed font-medium max-w-2xl border-l-4 border-pac-primary pl-6">
+                  {safeCategoria.descricao}
+                </p>
               )}
-            </div>
-
-            <h1 className="text-3xl md:text-5xl font-black text-slate-900 mb-4 uppercase tracking-tight leading-tight">
-              {categoria.nome}
-            </h1>
-
-            {categoria.descricao && (
-              <p className="text-lg text-slate-600 max-w-3xl leading-relaxed">
-                {categoria.descricao}
-              </p>
-            )}
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* LISTA DE ITENS */}
-      <section className="py-12 lg:py-16 container mx-auto px-4">
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="space-y-3">
-                  <Skeleton className="h-52 w-full rounded-2xl bg-slate-200" />
-                  <Skeleton className="h-4 w-3/4 bg-slate-200" />
-                </div>
-              ))}
-            </div>
-          ) : itens.length > 0 ? (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12"
-              >
-                {itens.map((item: Item, idx: number) => (
+      {/* --- GRID DE FOTOS --- */}
+      <section className="py-16 bg-slate-50">
+        <div className="container mx-auto px-4 max-w-6xl">
+          {itens.length > 0 ? (
+            <div className="columns-1 sm:columns-2 lg:columns-3 gap-6 space-y-6">
+              {itens.map((item, index) => {
+                // Cast item para acessar propriedades variáveis
+                const safeItem = item as unknown as ExtendedItem;
+                const rawUrl =
+                  safeItem.url || safeItem.media_url || safeItem.imagem_url;
+                const imgUrl = getImageUrl(rawUrl);
+
+                if (!imgUrl) return null;
+
+                return (
                   <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.05 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                    className="break-inside-avoid"
                   >
-                    <GaleriaItemCard item={item} />
+                    <Card className="group border-none shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden bg-white rounded-2xl cursor-pointer">
+                      <div className="relative">
+                        <Image
+                          src={imgUrl}
+                          alt={safeItem.titulo || categoriaNome}
+                          width={600}
+                          height={400}
+                          className="w-full h-auto object-cover transition-transform duration-700 group-hover:scale-105"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                          {safeItem.titulo && (
+                            <p className="text-white font-bold text-sm translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                              {safeItem.titulo}
+                            </p>
+                          )}
+                          <div className="w-8 h-1 bg-pac-primary mt-3 rounded-full translate-y-4 group-hover:translate-y-0 transition-transform duration-300 delay-75" />
+                        </div>
+                      </div>
+                    </Card>
                   </motion.div>
-                ))}
-              </motion.div>
-
-              {/* PAGINAÇÃO */}
-              {totalPages > 1 && (
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        onClick={() =>
-                          handlePageChange(Math.max(1, pagination.page - 1))
-                        }
-                        className={
-                          pagination.page === 1
-                            ? "pointer-events-none opacity-50"
-                            : "cursor-pointer"
-                        }
-                      />
-                    </PaginationItem>
-
-                    {Array.from({ length: pagination.totalPages }).map(
-                      (_, i) => {
-                        const page = i + 1;
-                        if (
-                          page === 1 ||
-                          page === pagination.totalPages ||
-                          Math.abs(page - pagination.page) <= 1
-                        ) {
-                          return (
-                            <PaginationItem key={page}>
-                              <PaginationLink
-                                isActive={page === pagination.page}
-                                onClick={() => handlePageChange(page)}
-                                className={cn(
-                                  "cursor-pointer",
-                                  page === pagination.page &&
-                                    "bg-pac-primary text-white hover:bg-pac-primary-dark hover:text-white",
-                                )}
-                              >
-                                {page}
-                              </PaginationLink>
-                            </PaginationItem>
-                          );
-                        }
-                        if (Math.abs(page - pagination.page) === 2) {
-                          return (
-                            <PaginationItem key={page}>
-                              <PaginationEllipsis />
-                            </PaginationItem>
-                          );
-                        }
-                        return null;
-                      },
-                    )}
-
-                    <PaginationItem>
-                      <PaginationNext
-                        onClick={() =>
-                          handlePageChange(
-                            Math.min(
-                              pagination.totalPages,
-                              pagination.page + 1,
-                            ),
-                          )
-                        }
-                        className={
-                          pagination.page === pagination.totalPages
-                            ? "pointer-events-none opacity-50"
-                            : "cursor-pointer"
-                        }
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              )}
-            </>
+                );
+              })}
+            </div>
           ) : (
-            <div className="text-center py-32 bg-white rounded-3xl border border-dashed border-slate-200">
-              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                <RiImageLine className="w-8 h-8 text-slate-300" />
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                <RiImage2Line className="w-10 h-10 text-slate-300" />
               </div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">
-                Esta galeria está vazia
+              <h3 className="text-xl font-bold text-slate-700 mb-2">
+                Álbum Vazio
               </h3>
               <p className="text-slate-500">
-                Nenhum item foi adicionado ainda.
+                Ainda não há fotos publicadas nesta galeria.
               </p>
             </div>
           )}
-        </AnimatePresence>
+        </div>
       </section>
-    </div>
+    </>
   );
 }

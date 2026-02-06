@@ -252,11 +252,6 @@ const IdentificationButton = () => {
               <p className="text-xs text-slate-500 leading-none">
                 {profile.matricula || user.email}
               </p>
-              {isAdmin && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 w-fit mt-1">
-                  Administrador
-                </span>
-              )}
             </div>
           </DropdownMenuLabel>
 

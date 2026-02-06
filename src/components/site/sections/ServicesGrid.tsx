@@ -192,9 +192,7 @@ export function ServicesGrid() {
       id="services-section"
       className="py-20 sm:py-24 lg:py-32 bg-slate-50 relative overflow-hidden"
     >
-      {/* Background Decorativo */}
-      {/* OBS: Se não tiver o SVG, pode remover ou trocar pelo CSS Grid Puro usado no Hero */}
-      <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.03] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <SectionHeader />
