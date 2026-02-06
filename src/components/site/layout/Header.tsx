@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -30,6 +30,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 
+// --- DADOS ---
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
   { name: "SERVIÇOS", href: "/servicos" },
@@ -73,135 +74,90 @@ interface MobileMenuProps {
   id?: string;
 }
 
-const TopBar = () => {
-  const [scrolled, setScrolled] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+// --- SUB-COMPONENTES ---
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
-    };
+const TopBar = () => (
+  // z-index alto para garantir visibilidade, mas o header sticky terá um maior se sobrepor
+  <div
+    className="bg-pac-primary w-full py-1.5 text-white relative z-40"
+    role="complementary"
+    aria-label="Barra superior institucional"
+  >
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex justify-between items-center">
+        {/* Identificação Brasil */}
+        <div className="flex items-center gap-2">
+          <Image
+            src="/images/logos/flag-br.webp"
+            alt="Bandeira do Brasil"
+            width={22}
+            height={15}
+            className="rounded-[2px] shadow-sm w-auto h-auto"
+            priority
+          />
+          <span className="text-[10px] xs:text-xs font-semibold tracking-wider uppercase opacity-90">
+            República Federativa do Brasil
+          </span>
+        </div>
 
-    const debouncedScroll = () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(handleScroll, 10);
-    };
-
-    window.addEventListener("scroll", debouncedScroll);
-    return () => {
-      window.removeEventListener("scroll", debouncedScroll);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  return (
-    <div
-      className={cn(
-        "bg-pac-primary py-1.5 xs:py-2 transition-all duration-300", // Corrigido para pac-primary
-        scrolled ? "shadow-md" : "",
-      )}
-      role="complementary"
-      aria-label="Barra superior"
-    >
-      <div className="container mx-auto px-3 xs:px-4 sm:px-6">
-        <div className="flex justify-between items-center text-white text-xs xs:text-sm">
-          <div className="flex md:hidden items-center gap-1.5 xs:gap-2">
-            <Image
-              src="/images/logos/flag-br.webp"
-              alt="Bandeira do Brasil"
-              width={20}
-              height={14}
-              className="rounded-sm w-auto h-auto min-w-[20px]"
-              priority
-            />
-            <span className="text-white/90 font-medium truncate text-[10px] xs:text-xs">
-              Brasil
-            </span>
-          </div>
-
-          <div className="hidden md:flex items-center gap-2 lg:gap-3">
-            <Image
-              src="/images/logos/flag-br.webp"
-              alt="Bandeira do Brasil"
-              width={22}
-              height={15}
-              className="rounded-sm w-auto h-auto"
-              priority
-            />
-            <span className="text-white/90 font-medium font-sans text-xs lg:text-sm xl:text-base">
-              República Federativa do Brasil
-            </span>
-          </div>
-
-          <div
-            className="flex gap-1 xs:gap-1.5 sm:gap-2"
-            role="list"
-            aria-label="Redes sociais"
-          >
-            {SOCIAL_ICONS.map((social) => {
-              const IconComponent = social.icon;
-              return (
-                <a
-                  key={social.label}
-                  href={social.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    "w-5 h-5 xs:w-6 xs:h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8",
-                    "bg-white/10 rounded-full flex items-center justify-center text-white",
-                    "no-underline transition-all duration-300 border border-white/20",
-                    social.hoverColor,
-                    "hover:border-transparent hover:scale-110 hover:shadow-lg",
-                    "touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50",
-                  )}
-                  aria-label={social.label}
-                  role="listitem"
-                >
-                  <IconComponent className="w-2 h-2 xs:w-2.5 xs:h-2.5 sm:w-3 sm:h-3" />
-                </a>
-              );
-            })}
-          </div>
+        {/* Redes Sociais */}
+        <div className="flex gap-2" role="list" aria-label="Redes sociais">
+          {SOCIAL_ICONS.map((social) => {
+            const IconComponent = social.icon;
+            return (
+              <a
+                key={social.label}
+                href={social.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn(
+                  "w-5 h-5 flex items-center justify-center rounded-full bg-white/10 text-white transition-all duration-300",
+                  social.hoverColor,
+                  "hover:scale-110 hover:shadow-md border border-white/10 hover:border-transparent",
+                )}
+                aria-label={social.label}
+              >
+                <IconComponent className="w-2.5 h-2.5" />
+              </a>
+            );
+          })}
         </div>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
-const Logo = () => {
-  return (
-    <Link
-      href="/"
-      className="flex items-center group transition-all duration-300 gap-1.5 xs:gap-2 md:gap-3 lg:gap-4"
-      aria-label="Página inicial da Patrulha Aérea Civil"
-      role="banner"
-    >
-      <div className="relative w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 lg:w-12 lg:h-12 transition-all duration-300 flex-shrink-0">
-        <Image
-          src="/images/logos/logo.webp"
-          alt="Patrulha Aérea Civil"
-          width={48}
-          height={48}
-          className="object-contain drop-shadow-md transition-all duration-300 group-hover:scale-105 w-full h-full"
-          priority
-        />
-      </div>
+const Logo = () => (
+  <Link
+    href="/"
+    className="flex items-center gap-4 group py-2"
+    aria-label="Ir para página inicial"
+  >
+    {/* BRASÃO MAIOR E DESTACADO */}
+    <div className="relative h-14 xs:h-16 sm:h-20 md:h-24 w-auto aspect-[3/4] transition-transform duration-300 group-hover:scale-105 drop-shadow-lg filter">
+      <Image
+        src="/images/logos/logo.webp"
+        alt="Brasão da Patrulha Aérea Civil"
+        width={0}
+        height={0}
+        sizes="100vw"
+        className="object-contain"
+        style={{ width: "auto", height: "100%" }}
+        priority
+      />
+    </div>
 
-      <div className="text-left transition-all duration-300 min-w-0 flex-1">
-        <h1 className="font-extrabold bg-gradient-to-r from-pac-primary to-pac-primary-light bg-clip-text text-transparent tracking-tight uppercase leading-tight transition-all duration-300 text-sm xs:text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl truncate">
-          PATRULHA AÉREA CIVIL
-        </h1>
-        <p className="text-gray-600 leading-tight mt-0.5 font-sans transition-all duration-300 text-[9px] xs:text-[10px] sm:text-xs md:text-sm truncate">
-          COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
-        </p>
-      </div>
-    </Link>
-  );
-};
+    {/* TEXTO MAIS COMPACTO E PROFISSIONAL */}
+    <div className="flex flex-col justify-center border-l-2 border-slate-100 pl-4 h-12">
+      <h1 className="font-black text-slate-800 tracking-tighter leading-none uppercase text-base xs:text-lg sm:text-xl lg:text-2xl transition-colors group-hover:text-pac-primary">
+        Patrulha Aérea Civil
+      </h1>
+      <p className="font-bold text-slate-500 tracking-[0.2em] uppercase text-[8px] xs:text-[9px] sm:text-[10px] leading-tight mt-1">
+        Comando Operacional RJ
+      </p>
+    </div>
+  </Link>
+);
 
 const NavigationItem = ({
   item,
@@ -212,74 +168,36 @@ const NavigationItem = ({
   isActive: boolean;
   onClick?: () => void;
 }) => (
-  <li className="relative" role="none">
+  <li className="relative h-full flex items-center">
     <Link
       href={item.href}
       onClick={onClick}
       className={cn(
-        "no-underline text-gray-700 font-medium py-1.5 xs:py-2 px-1 transition-all duration-300",
-        "uppercase tracking-wider font-sans relative group/navlink w-fit",
-        isActive
-          ? "text-pac-primary font-bold"
-          : "text-gray-600 hover:text-pac-primary hover:font-semibold",
-        "touch-optimize active:scale-95",
-        "text-xs xs:text-sm sm:text-base",
+        "text-sm font-bold uppercase tracking-wider py-2 px-2 relative transition-colors duration-300",
+        isActive ? "text-pac-primary" : "text-slate-600 hover:text-pac-primary",
       )}
       aria-current={isActive ? "page" : undefined}
-      role="menuitem"
     >
-      <span className="relative z-10 transition-colors duration-300">
-        {item.name}
-      </span>
-      <div
+      {item.name}
+      <span
         className={cn(
-          "absolute -bottom-1 left-0 w-0 h-0.5 bg-pac-primary transition-all duration-300",
-          isActive ? "w-full" : "group-hover/navlink:w-full",
+          "absolute bottom-0 left-0 h-0.5 bg-pac-primary transition-all duration-300 rounded-full",
+          isActive ? "w-full" : "w-0 hover:w-full",
         )}
-        aria-hidden="true"
       />
     </Link>
   </li>
 );
 
-const DesktopNavigation = ({ pathname }: { pathname: string }) => (
-  <nav
-    className="flex items-center transition-all duration-300"
-    aria-label="Navegação principal"
-    role="navigation"
+const LoadingButton = () => (
+  <Button
+    className="bg-slate-100 text-slate-400 font-medium px-4 py-2 h-10 rounded-full text-xs uppercase tracking-wide cursor-wait"
+    disabled
   >
-    <ul
-      className="flex list-none gap-1.5 xs:gap-2 sm:gap-3 md:gap-4 lg:gap-5 xl:gap-6 m-0 p-0 transition-all duration-300 flex-wrap justify-center"
-      role="menubar"
-    >
-      {NAVIGATION.map((item) => (
-        <NavigationItem
-          key={item.name}
-          item={item}
-          isActive={pathname.startsWith(item.href)}
-        />
-      ))}
-    </ul>
-  </nav>
+    <div className="animate-spin rounded-full h-3 w-3 border-2 border-slate-300 border-t-transparent mr-2" />
+    Carregando...
+  </Button>
 );
-
-const LoadingButton = () => {
-  return (
-    <Button
-      className="bg-pac-primary hover:bg-pac-primary-dark text-white font-medium px-3 xs:px-4 py-2 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 font-sans border-0 min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] relative overflow-hidden cursor-not-allowed shadow-md"
-      disabled
-      aria-label="Carregando..."
-      aria-busy="true"
-    >
-      <div className="flex items-center justify-center gap-1.5 xs:gap-2 relative z-10">
-        <div className="animate-spin rounded-full h-3 xs:h-4 w-3 xs:w-4 border-2 border-white border-t-transparent" />
-        <span className="text-white font-medium text-[10px] xs:text-xs sm:text-sm">
-          Carregando...
-        </span>
-      </div>
-    </Button>
-  );
-};
 
 const IdentificationButton = () => {
   const { user, profile, isAdmin, isLoading, logout } = useAuthStore();
@@ -291,13 +209,11 @@ const IdentificationButton = () => {
       await logout();
       window.location.href = "/";
     } catch (error) {
-      console.error("Erro ao fazer logout:", error);
+      console.error("Erro logout:", error);
     }
   }, [logout]);
 
-  if (isLoading) {
-    return <LoadingButton />;
-  }
+  if (isLoading) return <LoadingButton />;
 
   if (user && profile) {
     return (
@@ -305,90 +221,72 @@ const IdentificationButton = () => {
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            className="bg-pac-primary hover:bg-pac-primary-dark text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-sans border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
-            aria-label="Menu do usuário"
-            role="button"
+            className="rounded-full border-slate-200 pl-1 pr-4 py-1 h-11 hover:bg-slate-50 hover:border-pac-primary/30 transition-all shadow-sm group"
           >
-            <span className="relative z-10 text-white text-[10px] xs:text-xs sm:text-sm truncate">
-              IDENTIFICAÇÃO
-            </span>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
+            <Avatar className="h-8 w-8 border border-slate-200 mr-2 group-hover:scale-105 transition-transform">
+              <AvatarImage
+                src={profile.avatar_url || ""}
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-pac-primary text-white text-[10px]">
+                {profile.full_name?.substring(0, 2).toUpperCase() || "AG"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col items-start text-left">
+              <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-0.5">
+                Olá, Agente
+              </span>
+              <span className="text-xs font-bold text-pac-primary leading-none truncate max-w-[100px]">
+                {profile.full_name?.split(" ")[0]}
+              </span>
+            </div>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="w-56 xs:w-60 sm:w-64 max-w-[90vw]"
-          align="end"
-          sideOffset={6}
-          collisionPadding={12}
-          role="menu"
-        >
-          <DropdownMenuLabel className="p-3 xs:p-4 border-b border-gray-200">
-            <div className="flex items-center gap-2 xs:gap-3">
-              <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-pac-primary/20 flex-shrink-0">
-                <AvatarImage
-                  src={profile?.avatar_url || ""}
-                  alt={`Avatar de ${profile?.full_name || "Agente"}`}
-                  className="object-cover object-center"
-                  sizes="40px"
-                />
-                <AvatarFallback className="bg-pac-primary text-white text-xs">
-                  <RiUserLine className="w-4 h-4 xs:w-5 xs:h-5" />
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs xs:text-sm font-semibold text-gray-800 truncate">
-                  {profile?.full_name || "Agente PAC"}
-                </p>
-                <p className="text-[10px] xs:text-xs text-gray-600 truncate">
-                  {profile?.matricula
-                    ? `Matrícula: ${profile.matricula}`
-                    : user.email}
-                </p>
-                <p className="text-[10px] xs:text-xs text-pac-primary font-medium capitalize truncate">
-                  {profile?.graduacao || "Agente"} {isAdmin ? "• Admin" : ""}
-                </p>
-              </div>
+
+        <DropdownMenuContent className="w-60 p-2" align="end">
+          <DropdownMenuLabel className="font-normal p-3 bg-slate-50 rounded-md mb-2">
+            <div className="flex flex-col space-y-1">
+              <p className="text-sm font-bold text-slate-800 leading-none">
+                {profile.full_name}
+              </p>
+              <p className="text-xs text-slate-500 leading-none">
+                {profile.matricula || user.email}
+              </p>
+              {isAdmin && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700 w-fit mt-1">
+                  Administrador
+                </span>
+              )}
             </div>
           </DropdownMenuLabel>
 
-          <DropdownMenuGroup className="p-1.5 xs:p-2" role="group">
+          <DropdownMenuGroup>
             {!isOnProfilePage && (
-              <DropdownMenuItem asChild role="menuitem">
-                <Link
-                  href="/perfil"
-                  className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-gray-100 py-2"
-                >
-                  <RiUserLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 text-blue-600 flex-shrink-0" />
-                  <span className="truncate">Ver Meu Perfil</span>
-                </Link>
+              <DropdownMenuItem
+                onClick={() => (window.location.href = "/perfil")}
+                className="cursor-pointer font-medium text-slate-600"
+              >
+                <RiUserLine className="mr-2 h-4 w-4" /> Meu Perfil
               </DropdownMenuItem>
             )}
-
             {isAdmin && (
-              <DropdownMenuItem asChild role="menuitem">
-                <Link
-                  href="/admin/dashboard"
-                  className="cursor-pointer text-xs xs:text-sm focus:outline-none focus:bg-gray-100 py-2"
-                >
-                  <RiBarChartLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 text-purple-600 flex-shrink-0" />
-                  <span className="truncate">Ir ao Dashboard</span>
-                </Link>
+              <DropdownMenuItem
+                onClick={() => (window.location.href = "/admin/dashboard")}
+                className="cursor-pointer font-medium text-purple-600 focus:text-purple-700 focus:bg-purple-50"
+              >
+                <RiBarChartLine className="mr-2 h-4 w-4" /> Dashboard
               </DropdownMenuItem>
             )}
           </DropdownMenuGroup>
 
           <DropdownMenuSeparator />
 
-          <DropdownMenuGroup className="p-1.5 xs:p-2" role="group">
-            <DropdownMenuItem
-              onClick={handleSignOut}
-              className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50 text-xs xs:text-sm focus:outline-none py-2"
-              role="menuitem"
-            >
-              <RiLogoutBoxRLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 flex-shrink-0" />
-              <span className="truncate">Sair do Sistema</span>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
+          <DropdownMenuItem
+            onClick={handleSignOut}
+            className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50 font-medium"
+          >
+            <RiLogoutBoxRLine className="mr-2 h-4 w-4" /> Sair
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -396,15 +294,10 @@ const IdentificationButton = () => {
 
   return (
     <Button
-      className="bg-pac-primary hover:bg-pac-primary-dark text-white font-medium px-3 xs:px-4 py-1.5 xs:py-2.5 text-xs xs:text-sm uppercase tracking-wider transition-all duration-300 hover:shadow-lg font-sans border-0 group/button relative overflow-hidden shadow-md min-h-[36px] xs:min-h-[40px] sm:min-h-[44px] touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
+      className="rounded-full bg-pac-primary hover:bg-pac-primary-dark text-white font-bold text-xs uppercase tracking-wider px-6 h-10 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
       asChild
     >
-      <Link href="/login" aria-label="Fazer login" role="button">
-        <span className="relative z-10 text-white text-[10px] xs:text-xs sm:text-sm truncate">
-          IDENTIFICAÇÃO
-        </span>
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
-      </Link>
+      <Link href="/login">Identificação</Link>
     </Button>
   );
 };
@@ -415,41 +308,13 @@ const MobileMenu = ({
   pathname,
   id = "mobile-menu",
 }: MobileMenuProps) => {
-  const { user, profile, isAdmin, logout } = useAuthStore();
-  const isOnProfilePage = pathname === "/perfil";
+  const { user, logout } = useAuthStore();
 
-  const handleSignOut = useCallback(async () => {
-    try {
-      await logout();
-      onClose();
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Erro ao fazer logout:", error);
-    }
-  }, [logout, onClose]);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      document.body.style.touchAction = "none";
-      document.addEventListener("keydown", handleKeyDown);
-    } else {
-      document.body.style.overflow = "";
-      document.body.style.touchAction = "";
-    }
-
-    return () => {
-      document.body.style.overflow = "";
-      document.body.style.touchAction = "";
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  const handleSignOut = async () => {
+    await logout();
+    onClose();
+    window.location.href = "/";
+  };
 
   return (
     <AnimatePresence>
@@ -460,185 +325,76 @@ const MobileMenu = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 z-40 xl:hidden"
-            aria-hidden="true"
-            role="presentation"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 xl:hidden"
           />
-
           <motion.div
-            initial={{ y: "-100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "-100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed top-0 left-0 right-0 w-full bg-white z-50 xl:hidden overflow-y-auto shadow-xl"
-            style={{ maxHeight: "100vh" }}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Menu de navegação"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed top-0 right-0 h-full w-[80%] max-w-sm bg-white z-[60] xl:hidden shadow-2xl flex flex-col"
             id={id}
           >
-            <div className="flex flex-col h-full">
-              <div className="flex items-center justify-between p-3 xs:p-4 border-b border-gray-200 bg-white">
-                <h2 className="text-lg xs:text-xl font-semibold text-pac-primary">
-                  Menu
-                </h2>
-                <button
-                  onClick={onClose}
-                  className="p-1.5 xs:p-2 rounded-lg hover:bg-gray-100 transition-colors touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
-                  aria-label="Fechar menu"
-                  type="button"
-                >
-                  <RiCloseLine className="w-5 h-5 xs:w-6 xs:h-6 text-gray-700" />
-                </button>
-              </div>
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <span className="font-black text-slate-800 text-lg uppercase">
+                Menu
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="rounded-full hover:bg-slate-100"
+              >
+                <RiCloseLine className="w-6 h-6 text-slate-500" />
+              </Button>
+            </div>
 
-              <div className="flex-1 overflow-y-auto p-3 xs:p-4">
-                <h3 className="text-xs xs:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
-                  Navegação
-                </h3>
-                <nav className="space-y-1" role="navigation">
-                  {NAVIGATION.map((item) => (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      onClick={onClose}
-                      className={cn(
-                        "flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium rounded-md transition-colors duration-200",
-                        "focus:outline-none focus:ring-2 focus:ring-pac-primary/50",
-                        pathname.startsWith(item.href)
-                          ? "bg-pac-primary/10 text-pac-primary border-r-2 border-pac-primary"
-                          : "text-gray-700 hover:bg-gray-100 hover:text-gray-900",
-                      )}
-                      role="menuitem"
-                    >
-                      {item.name}
-                    </Link>
-                  ))}
-                </nav>
-
-                {user ? (
-                  <div className="border-t border-gray-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
-                    <div className="flex items-center gap-2 xs:gap-3 px-2 xs:px-3 py-2 xs:py-3 bg-gray-50 rounded-lg mb-2 xs:mb-3">
-                      <Avatar className="w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 border-2 border-pac-primary/20 flex-shrink-0">
-                        <AvatarImage
-                          src={profile?.avatar_url || ""}
-                          alt={`Avatar de ${profile?.full_name || "Agente"}`}
-                          className="object-cover object-center"
-                          sizes="40px"
-                        />
-                        <AvatarFallback className="bg-pac-primary text-white text-xs">
-                          <RiUserLine className="w-4 h-4 xs:w-5 xs:h-5" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs xs:text-sm font-semibold text-gray-800 truncate">
-                          {profile?.full_name || "Agente PAC"}
-                        </p>
-                        <p className="text-[10px] xs:text-xs text-gray-600 truncate">
-                          {profile?.matricula
-                            ? `Matrícula: ${profile.matricula}`
-                            : user.email}
-                        </p>
-                        <p className="text-[10px] xs:text-xs text-pac-primary font-medium capitalize">
-                          {profile?.graduacao || "Agente"}{" "}
-                          {isAdmin ? "• Admin" : ""}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      {!isOnProfilePage && (
-                        <Link
-                          href="/perfil"
-                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
-                          onClick={onClose}
-                          role="menuitem"
-                        >
-                          <RiUserLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 xs:mr-3 text-blue-600 flex-shrink-0" />
-                          Ver Meu Perfil
-                        </Link>
-                      )}
-
-                      {isAdmin && (
-                        <Link
-                          href="/admin/dashboard"
-                          className="flex items-center px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
-                          onClick={onClose}
-                          role="menuitem"
-                        >
-                          <RiBarChartLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 xs:mr-3 text-purple-600 flex-shrink-0" />
-                          Ir ao Dashboard
-                        </Link>
-                      )}
-
-                      <button
-                        onClick={handleSignOut}
-                        className="flex items-center w-full px-2 xs:px-3 py-2 xs:py-3 text-xs xs:text-sm font-medium text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 text-left focus:outline-none focus:ring-2 focus:ring-red-500/50"
-                        role="menuitem"
-                        type="button"
-                      >
-                        <RiLogoutBoxRLine className="w-3.5 h-3.5 xs:w-4 xs:h-4 mr-2 xs:mr-3 flex-shrink-0" />
-                        Sair do Sistema
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="border-t border-gray-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
-                    <Button
-                      className="w-full bg-pac-primary hover:bg-pac-primary-dark text-white font-medium py-2 xs:py-3 text-xs xs:text-sm uppercase tracking-wider font-sans border-0 group/button relative overflow-hidden shadow-md transition-all duration-300 touch-optimize focus:outline-none focus:ring-2 focus:ring-white/50"
-                      asChild
-                    >
-                      <Link href="/login" onClick={onClose} role="button">
-                        <span className="relative z-10 text-xs xs:text-sm">
-                          IDENTIFICAÇÃO
-                        </span>
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-1000" />
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-
-                <div className="border-t border-gray-200 pt-4 xs:pt-6 mt-4 xs:mt-6">
-                  <h3 className="text-xs xs:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 xs:mb-3 px-2">
-                    Redes Sociais
-                  </h3>
-                  <div
-                    className="flex justify-center gap-1.5 xs:gap-2 px-2"
-                    role="list"
-                    aria-label="Redes sociais"
+            <div className="flex-1 overflow-y-auto p-5">
+              <nav className="flex flex-col space-y-2">
+                {NAVIGATION.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={onClose}
+                    className={cn(
+                      "flex items-center p-3 rounded-xl text-sm font-bold uppercase tracking-wide transition-colors",
+                      pathname.startsWith(item.href)
+                        ? "bg-pac-primary/10 text-pac-primary"
+                        : "text-slate-600 hover:bg-slate-50",
+                    )}
                   >
-                    {SOCIAL_ICONS.map((social) => {
-                      const IconComponent = social.icon;
-                      return (
-                        <a
-                          key={social.label}
-                          href={social.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={cn(
-                            "w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 bg-gray-100 rounded-full flex items-center justify-center text-gray-700 no-underline transition-all duration-300 hover:shadow-lg",
-                            "focus:outline-none focus:ring-2 focus:ring-pac-primary/50",
-                            social.hoverColor,
-                            "hover:text-white hover:scale-110 touch-optimize",
-                          )}
-                          aria-label={social.label}
-                          onClick={onClose}
-                          role="listitem"
-                        >
-                          <IconComponent className="w-3.5 h-3.5 xs:w-4 xs:h-4" />
-                        </a>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+            </div>
 
-              <div className="border-t border-gray-200 p-3 xs:p-4 bg-gray-50">
-                <div className="text-center text-[10px] xs:text-xs text-gray-500">
-                  <p>© {new Date().getFullYear()} Patrulha Aérea Civil</p>
-                  <p className="mt-0.5 xs:mt-1">Todos os direitos reservados</p>
+            <div className="p-5 border-t border-slate-100 bg-slate-50">
+              {user ? (
+                <div className="flex flex-col gap-3">
+                  <Link href="/perfil" onClick={onClose}>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start border-slate-200 bg-white hover:bg-white hover:border-pac-primary text-slate-700"
+                    >
+                      <RiUserLine className="mr-2 h-4 w-4" /> Meu Perfil
+                    </Button>
+                  </Link>
+                  <Button
+                    onClick={handleSignOut}
+                    variant="ghost"
+                    className="w-full justify-start text-red-600 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <RiLogoutBoxRLine className="mr-2 h-4 w-4" /> Sair
+                  </Button>
                 </div>
-              </div>
+              ) : (
+                <Link href="/login" onClick={onClose}>
+                  <Button className="w-full bg-pac-primary hover:bg-pac-primary-dark text-white font-bold uppercase rounded-xl h-12 shadow-md">
+                    Acesso Restrito
+                  </Button>
+                </Link>
+              )}
             </div>
           </motion.div>
         </>
@@ -647,138 +403,88 @@ const MobileMenu = ({
   );
 };
 
+// --- COMPONENTE PRINCIPAL ---
+
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [initLoading, setInitLoading] = useState(true);
   const pathname = usePathname();
-  const timeoutRef = useRef<NodeJS.Timeout>();
   const { initialize } = useAuthStore();
 
-  const toggleMenu = useCallback(() => setIsMenuOpen((prev) => !prev), []);
-  const closeMenu = useCallback(() => setIsMenuOpen(false), []);
-
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        await initialize();
-      } catch (error) {
-        console.error("Erro ao inicializar autenticação:", error);
-      } finally {
-        setInitLoading(false);
-      }
+    initialize();
+
+    const handleScroll = () => {
+      // Pequeno offset para ativar a sombra
+      setScrolled(window.scrollY > 10);
     };
 
-    initAuth();
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, [initialize]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-    };
-
-    const debouncedScroll = () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      timeoutRef.current = setTimeout(handleScroll, 10);
-    };
-
-    window.addEventListener("scroll", debouncedScroll);
-    return () => {
-      window.removeEventListener("scroll", debouncedScroll);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  if (initLoading) {
-    return (
-      <header
-        className={cn(
-          "bg-white sticky top-0 left-0 right-0 z-50 min-h-[80px] xs:min-h-[85px] md:min-h-[90px] lg:min-h-[100px] xl:min-h-[120px] shadow-sm",
-        )}
-        role="banner"
-        aria-label="Cabeçalho principal"
-      >
-        <TopBar />
-        <div className="bg-white border-b border-gray-200">
-          <div className="container mx-auto px-3 xs:px-4 sm:px-6">
-            <div className="flex items-center justify-between w-full py-2 xs:py-3">
-              <Logo />
-              <LoadingButton />
-            </div>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
   return (
-    <header
-      className={cn(
-        "bg-white sticky top-0 left-0 right-0 z-50 min-h-[80px] xs:min-h-[85px] md:min-h-[90px] lg:min-h-[100px] xl:min-h-[120px] transition-all duration-300",
-        scrolled ? "shadow-lg" : "shadow-sm",
-      )}
-      role="banner"
-      aria-label="Cabeçalho principal"
-    >
+    <>
+      {/* TopBar estática (rola com a página) */}
       <TopBar />
 
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-3 xs:px-4 sm:px-6">
-          <div className="flex md:hidden items-center justify-between w-full py-2 xs:py-3">
-            <Logo />
-            <div className="flex items-center gap-1.5 xs:gap-2">
+      {/* Header Sticky - Adicionado 'top-0' explicitamente e 'z-50' para ficar acima de tudo */}
+      <header
+        className={cn(
+          "bg-white sticky top-0 left-0 right-0 z-50 w-full border-b border-gray-100",
+          // Adicionamos transição suave para a sombra
+          "transition-shadow duration-300 ease-in-out",
+          scrolled ? "shadow-md" : "shadow-sm",
+        )}
+      >
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20 md:h-24">
+            {/* Logo */}
+            <div className="flex-shrink-0">
+              <Logo />
+            </div>
+
+            {/* Desktop Nav */}
+            <div className="hidden xl:flex items-center gap-8 h-full">
+              <nav className="h-full">
+                <ul className="flex gap-6 h-full items-center">
+                  {NAVIGATION.map((item) => (
+                    <NavigationItem
+                      key={item.name}
+                      item={item}
+                      isActive={pathname.startsWith(item.href)}
+                    />
+                  ))}
+                </ul>
+              </nav>
+              <div className="pl-6 border-l border-gray-200 h-10 flex items-center">
+                <IdentificationButton />
+              </div>
+            </div>
+
+            {/* Mobile Toggle */}
+            <div className="xl:hidden flex items-center gap-4">
+              <div className="hidden md:block">
+                <IdentificationButton />
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={toggleMenu}
-                className="text-gray-700 hover:bg-gray-100 w-8 h-8 xs:w-9 xs:h-9 sm:w-10 sm:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
-                aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
-                aria-expanded={isMenuOpen}
-                aria-controls="mobile-menu"
-                role="button"
+                onClick={() => setIsMenuOpen(true)}
+                className="text-slate-800 hover:bg-slate-100 rounded-full w-12 h-12"
               >
-                <RiMenuLine className="h-4 w-4 xs:h-5 xs:w-5" />
+                <RiMenuLine className="w-6 h-6" />
               </Button>
             </div>
-          </div>
-
-          <div className="hidden md:flex xl:hidden items-center justify-between w-full py-2.5 xs:py-3">
-            <Logo />
-            <div className="flex items-center gap-2 xs:gap-3">
-              <IdentificationButton />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleMenu}
-                className="text-gray-700 hover:bg-gray-100 w-9 h-9 xs:w-10 xs:h-10 transition-all duration-300 hover:scale-110 touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
-                aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"}
-                aria-expanded={isMenuOpen}
-                aria-controls="mobile-menu"
-                role="button"
-              >
-                <RiMenuLine className="h-4 w-4 xs:h-5 xs:w-5" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="hidden xl:flex items-center justify-between w-full py-3 xs:py-4">
-            <Logo />
-            <DesktopNavigation pathname={pathname} />
-            <IdentificationButton />
           </div>
         </div>
-      </div>
 
-      <MobileMenu
-        isOpen={isMenuOpen}
-        onClose={closeMenu}
-        pathname={pathname}
-        id="mobile-menu"
-      />
-    </header>
+        <MobileMenu
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+          pathname={pathname}
+        />
+      </header>
+    </>
   );
 }

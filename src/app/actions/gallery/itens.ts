@@ -1,455 +1,464 @@
 "use server";
 
-import { getAdminClient } from "@/lib/supabase/admin";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { type SupabaseClient } from "@supabase/supabase-js";
-import {
-  type Database,
-  type GaleriaItemInsert,
-  type GaleriaItemUpdate,
-} from "@/lib/supabase/types";
-import { logActivity } from "./shared";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { GaleriaItemUpdate } from "@/lib/supabase/types";
 import {
   CreateItemSchema,
   UpdateItemSchema,
-  ListItensSchema,
-  type Item,
-  type ItensListResponse,
+  Item,
+  TipoItemFilter,
+  StatusFilter,
 } from "./types";
-import {
-  uploadFile,
-  deleteFileByUrl,
-  validateUploadByType,
-} from "@/lib/supabase/storage";
+import { verifyAdminSession, generateSlug, logActivity } from "./shared";
 
-// ==========================================
-// HELPERS
-// ==========================================
-
-async function getTypedAdminClient() {
-  return (await getAdminClient()) as SupabaseClient<Database>;
-}
-
-async function checkAdminPermission() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
-  );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    const adminClient = await getTypedAdminClient();
-    const { data: profile } = await adminClient
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role === "admin") return { success: true, userId: user.id };
-  }
-
-  const hasAdminCookie =
-    cookieStore.has("is_admin") || cookieStore.has("admin_session");
-
-  if (hasAdminCookie) {
-    const adminClient = await getTypedAdminClient();
-    const { data: sysAdmin } = await adminClient
-      .from("profiles")
-      .select("id")
-      .eq("role", "admin")
-      .limit(1)
-      .single();
-    return { success: true, userId: sysAdmin?.id || "system" };
-  }
-
-  return { success: false, error: "Acesso negado." };
+interface AdminItemFilters {
+  search?: string;
+  tipo?: TipoItemFilter;
+  categoria_id?: string;
+  status?: StatusFilter;
+  page?: number;
+  limit?: number;
 }
 
 // ==========================================
-// ACTIONS DE LEITURA
+// CREATE (Upload & Insert)
 // ==========================================
-
-export async function getPublicItens(
-  categoriaSlug?: string,
-  limit = 12,
-  page = 1,
-): Promise<ItensListResponse> {
+export async function createItem(formData: FormData) {
   try {
-    const adminClient = await getTypedAdminClient();
-    const offset = (page - 1) * limit;
-
-    let query = adminClient
-      .from("galeria_itens")
-      .select("*, galeria_categorias!inner(id, slug, nome, tipo)", {
-        count: "exact",
-      })
-      .eq("status", true);
-
-    if (categoriaSlug && categoriaSlug !== "all") {
-      query = query.eq("galeria_categorias.slug", categoriaSlug);
+    const session = await verifyAdminSession();
+    if (!session.success) {
+      return { success: false, error: "Sessão inválida ou expirada." };
     }
 
-    const { data, count, error } = await query
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+    const catId = formData.get("categoria_id");
+    const validCatId =
+      catId && catId !== "null" && catId !== "" ? catId.toString() : null;
 
-    if (error) throw error;
-
-    return {
-      success: true,
-      data: data as unknown as Item[],
-      pagination: {
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit),
-      },
-    };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
-  }
-}
-
-export async function getItensPorCategoria(
-  categoriaId: string,
-): Promise<ItensListResponse> {
-  try {
-    const adminClient = await getTypedAdminClient();
-    const { data, count, error } = await adminClient
-      .from("galeria_itens")
-      .select(`*, galeria_categorias(id, nome, tipo)`, { count: "exact" })
-      .eq("categoria_id", categoriaId)
-      .eq("status", true)
-      .order("ordem", { ascending: true })
-      .order("created_at", { ascending: false });
-
-    if (error) throw error;
-
-    return {
-      success: true,
-      data: (data || []) as unknown as Item[],
-      pagination: {
-        total: count || 0,
-        page: 1,
-        limit: count || 0,
-        totalPages: 1,
-      },
-    };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
-  }
-}
-
-export async function getItemById(
-  id: string,
-): Promise<{ success: boolean; data?: Item; error?: string }> {
-  try {
-    const auth = await checkAdminPermission();
-    if (!auth.success) return { success: false, error: auth.error };
-
-    const adminClient = await getTypedAdminClient();
-    const { data, error } = await adminClient
-      .from("galeria_itens")
-      .select(`*, galeria_categorias(id, nome, tipo)`)
-      .eq("id", id)
-      .single();
-
-    if (error || !data) return { success: false, error: "Item não encontrado" };
-    return { success: true, data: data as unknown as Item };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
-  }
-}
-
-export async function getItensAdmin(
-  filters?: Partial<z.infer<typeof ListItensSchema>>,
-): Promise<ItensListResponse> {
-  try {
-    const auth = await checkAdminPermission();
-    if (!auth.success) return { success: false, error: auth.error };
-
-    const {
-      search,
-      categoria_id,
-      tipo,
-      status,
-      destaque,
-      page,
-      limit,
-      sortBy,
-      sortOrder,
-    } = ListItensSchema.parse(filters || {});
-
-    const offset = (page - 1) * limit;
-    const adminClient = await getTypedAdminClient();
-
-    let query = adminClient
-      .from("galeria_itens")
-      .select(`*, galeria_categorias(id, nome, tipo)`, { count: "exact" });
-
-    if (search) query = query.ilike("titulo", `%${search}%`);
-    if (categoria_id !== "all") query = query.eq("categoria_id", categoria_id);
-    if (tipo !== "all") query = query.eq("tipo", tipo);
-    if (status !== "all") query = query.eq("status", status === "ativo");
-    if (destaque !== "all") query = query.eq("destaque", destaque === "true");
-
-    const { data, count, error } = await query
-      .order(sortBy, { ascending: sortOrder === "asc" })
-      .range(offset, offset + limit - 1);
-
-    if (error) throw error;
-
-    return {
-      success: true,
-      data: data as unknown as Item[],
-      pagination: {
-        total: count || 0,
-        page,
-        limit,
-        totalPages: Math.ceil((count || 0) / limit),
-      },
-    };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
-  }
-}
-
-// ==========================================
-// ACTIONS DE ESCRITA
-// ==========================================
-
-export async function createItem(
-  formData: FormData,
-): Promise<{ success: boolean; data?: Item; error?: string }> {
-  let arquivoUrl: string | null = null;
-  let thumbnailUrl: string | null = null;
-
-  try {
-    const auth = await checkAdminPermission();
-    if (!auth.success) return { success: false, error: auth.error };
-
-    const raw = {
+    const rawData = {
       titulo: formData.get("titulo"),
       descricao: formData.get("descricao"),
       tipo: formData.get("tipo"),
-      categoria_id: formData.get("categoria_id"),
-      ordem: Number(formData.get("ordem") || 0),
+      categoria_id: validCatId,
+      ordem: Number(formData.get("ordem")),
       status: formData.get("status") === "true",
       destaque: formData.get("destaque") === "true",
+      arquivo_url: "http://temp.com",
     };
 
-    const arquivoFile = formData.get("arquivo_file") as File;
-    const thumbnailFile = formData.get("thumbnail_file") as File;
+    const validatedFields = CreateItemSchema.safeParse(rawData);
 
-    if (!arquivoFile) return { success: false, error: "Arquivo obrigatório" };
-
-    const uploadType = raw.tipo === "foto" ? "image" : "video";
-    const validation = validateUploadByType(arquivoFile, uploadType);
-    if (!validation.valid) return { success: false, error: validation.error };
-
-    const bucket = raw.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
-    const uploadRes = await uploadFile(arquivoFile, bucket, {
-      folder: "galeria",
-    });
-
-    if (!uploadRes.success) throw new Error(uploadRes.error);
-    arquivoUrl = uploadRes.data!.url;
-
-    if (raw.tipo === "video" && thumbnailFile) {
-      const thumbValidation = validateUploadByType(thumbnailFile, "image");
-      if (!thumbValidation.valid) throw new Error(thumbValidation.error);
-
-      const thumbRes = await uploadFile(thumbnailFile, "galeria-fotos", {
-        folder: "thumbnails",
-      });
-      if (!thumbRes.success) throw new Error(thumbRes.error);
-      thumbnailUrl = thumbRes.data!.url;
+    if (!validatedFields.success) {
+      console.error("Erro validação Zod:", validatedFields.error.flatten());
+      return { success: false, error: "Dados inválidos. Verifique os campos." };
     }
 
-    const validated = CreateItemSchema.parse({
-      ...raw,
-      arquivo_url: arquivoUrl,
-      thumbnail_url: thumbnailUrl,
-    });
+    const { titulo, descricao, tipo, categoria_id, ordem, status, destaque } =
+      validatedFields.data;
 
-    const adminClient = await getTypedAdminClient();
+    const file = formData.get("arquivo_file") as File;
+    if (!file || file.size === 0) {
+      return { success: false, error: "Arquivo principal obrigatório." };
+    }
 
-    // Objeto tipado para Insert
-    const insertData: GaleriaItemInsert = {
-      titulo: validated.titulo,
-      descricao: validated.descricao || null,
-      tipo: validated.tipo,
-      categoria_id: validated.categoria_id,
-      ordem: validated.ordem,
-      status: validated.status,
-      destaque: validated.destaque,
-      arquivo_url: validated.arquivo_url,
-      thumbnail_url: validated.thumbnail_url || null,
-      autor_id: auth.userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    const fileExt = file.name.split(".").pop();
 
-    const { data: newItem, error } = await adminClient
+    const slug = await generateSlug(titulo);
+    const fileName = `${Date.now()}_${slug}.${fileExt}`;
+
+    const bucketName = tipo === "foto" ? "galeria-fotos" : "galeria-videos";
+    const supabaseAdmin = createAdminClient();
+
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(bucketName)
+      .upload(fileName, fileBuffer, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("Erro Upload Storage:", uploadError);
+      return {
+        success: false,
+        error: `Erro no upload: ${uploadError.message}`,
+      };
+    }
+
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from(bucketName)
+      .getPublicUrl(fileName);
+
+    const finalArquivoUrl = publicUrlData.publicUrl;
+    let finalThumbnailUrl = null;
+
+    const thumbFile = formData.get("thumbnail_file") as File;
+    if (thumbFile && thumbFile.size > 0) {
+      const thumbBuffer = Buffer.from(await thumbFile.arrayBuffer());
+      const thumbName = `thumb_${fileName.split(".")[0]}.jpg`;
+
+      const { error: thumbError } = await supabaseAdmin.storage
+        .from("galeria-fotos")
+        .upload(thumbName, thumbBuffer, {
+          contentType: thumbFile.type,
+          upsert: false,
+        });
+
+      if (!thumbError) {
+        const { data: thumbUrlData } = supabaseAdmin.storage
+          .from("galeria-fotos")
+          .getPublicUrl(thumbName);
+        finalThumbnailUrl = thumbUrlData.publicUrl;
+      }
+    }
+
+    const { data: newItem, error: dbError } = await supabaseAdmin
       .from("galeria_itens")
-      .insert(insertData)
-      .select(`*, galeria_categorias(id, nome, tipo)`)
+      .insert({
+        titulo,
+        descricao,
+        tipo,
+        categoria_id,
+        ordem,
+        status,
+        destaque,
+        arquivo_url: finalArquivoUrl,
+        thumbnail_url: finalThumbnailUrl,
+        autor_id: session.userId,
+        views: 0,
+      })
+      .select()
       .single();
 
-    if (error) throw error;
+    if (dbError) {
+      await supabaseAdmin.storage.from(bucketName).remove([fileName]);
+      console.error("Erro DB Insert:", dbError);
+      return {
+        success: false,
+        error: `Erro ao salvar no banco: ${dbError.message}`,
+      };
+    }
 
     await logActivity(
-      adminClient,
-      auth.userId!,
-      "item_created",
-      `Item ${newItem.titulo} criado`,
-      "galeria_item",
+      supabaseAdmin,
+      session.userId || "sistema",
+      "criar_item_galeria",
+      `Criou item: ${titulo}`,
+      "galeria_itens",
       newItem.id,
     );
 
     revalidatePath("/admin/galeria");
     revalidatePath("/galeria");
 
-    return { success: true, data: newItem as unknown as Item };
-  } catch (error: unknown) {
-    if (arquivoUrl) await deleteFileByUrl(arquivoUrl);
-    if (thumbnailUrl) await deleteFileByUrl(thumbnailUrl);
-
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
+    return { success: true, data: newItem };
+  } catch (error) {
+    console.error("Erro fatal createItem:", error);
+    return { success: false, error: "Erro interno no servidor." };
   }
 }
 
-export async function updateItem(
-  id: string,
-  input: Partial<z.infer<typeof UpdateItemSchema>> & {
-    arquivo_file?: File;
-    thumbnail_file?: File;
-  },
-) {
+// ==========================================
+// READ (Admin List)
+// ==========================================
+export async function getItensAdmin(filtros: AdminItemFilters = {}) {
   try {
-    const auth = await checkAdminPermission();
-    if (!auth.success) return { success: false, error: auth.error };
+    const supabaseAdmin = createAdminClient();
 
-    const adminClient = await getTypedAdminClient();
+    const page = filtros.page || 1;
+    const limit = filtros.limit || 10;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
 
-    const { data: current } = await adminClient
+    let query = supabaseAdmin.from("galeria_itens").select(
+      `
+        *,
+        galeria_categorias (id, nome, slug, tipo)
+      `,
+      { count: "exact" },
+    );
+
+    if (filtros.search) {
+      query = query.ilike("titulo", `%${filtros.search}%`);
+    }
+    if (filtros.tipo && filtros.tipo !== "all") {
+      query = query.eq("tipo", filtros.tipo);
+    }
+    if (filtros.categoria_id && filtros.categoria_id !== "all") {
+      query = query.eq("categoria_id", filtros.categoria_id);
+    }
+    if (filtros.status && filtros.status !== "all") {
+      query = query.eq("status", filtros.status === "ativo");
+    }
+
+    query = query
+      .order("ordem", { ascending: true })
+      .order("created_at", { ascending: false });
+    query = query.range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: data as Item[],
+      pagination: {
+        total: count || 0,
+        page,
+        limit,
+        totalPages: Math.ceil((count || 0) / limit),
+      },
+    };
+  } catch (error) {
+    console.error("Erro getItensAdmin:", error);
+    return { success: false, error: "Erro ao buscar itens" };
+  }
+}
+
+// ==========================================
+// GET BY ID
+// ==========================================
+export async function getItemById(id: string) {
+  try {
+    const supabaseAdmin = createAdminClient();
+    const { data, error } = await supabaseAdmin
       .from("galeria_itens")
       .select("*")
       .eq("id", id)
       .single();
 
-    if (!current) return { success: false, error: "Item não encontrado" };
-
-    const updateData: GaleriaItemUpdate = {
-      updated_at: new Date().toISOString(),
-    };
-
-    if (input.titulo !== undefined) updateData.titulo = input.titulo;
-    if (input.descricao !== undefined)
-      updateData.descricao = input.descricao || null;
-    if (input.categoria_id !== undefined)
-      updateData.categoria_id = input.categoria_id;
-    if (input.status !== undefined) updateData.status = input.status;
-    if (input.destaque !== undefined) updateData.destaque = input.destaque;
-    if (input.ordem !== undefined) updateData.ordem = input.ordem;
-
-    if (input.arquivo_file) {
-      const bucket =
-        (input.tipo || current.tipo) === "foto"
-          ? "galeria-fotos"
-          : "galeria-videos";
-      const res = await uploadFile(input.arquivo_file, bucket, {
-        folder: "galeria",
-      });
-      if (!res.success) throw new Error(res.error);
-
-      updateData.arquivo_url = res.data!.url;
-      if (current.arquivo_url) await deleteFileByUrl(current.arquivo_url);
-    }
-
-    if (input.thumbnail_file) {
-      const res = await uploadFile(input.thumbnail_file, "galeria-fotos", {
-        folder: "thumbnails",
-      });
-      if (!res.success) throw new Error(res.error);
-
-      updateData.thumbnail_url = res.data!.url;
-      if (current.thumbnail_url) await deleteFileByUrl(current.thumbnail_url);
-    }
-
-    const { data: updated, error } = await adminClient
-      .from("galeria_itens")
-      .update(updateData)
-      .eq("id", id)
-      .select(`*, galeria_categorias(id, nome, tipo)`)
-      .single();
-
-    if (error) throw error;
-
-    revalidatePath("/admin/galeria");
-    return { success: true, data: updated as unknown as Item };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
+    if (error) return { success: false, error: "Item não encontrado" };
+    return { success: true, data: data as Item };
+  } catch {
+    return { success: false, error: "Erro ao buscar item" };
   }
 }
 
+// ==========================================
+// UPDATE
+// ==========================================
+export async function updateItem(id: string, formData: FormData) {
+  try {
+    const session = await verifyAdminSession();
+    if (!session.success) return { success: false, error: "Sem permissão" };
+
+    const catId = formData.get("categoria_id");
+    const validCatId =
+      catId && catId !== "null" && catId !== "" ? catId.toString() : null;
+
+    const rawData = {
+      id,
+      titulo: formData.get("titulo"),
+      descricao: formData.get("descricao"),
+      tipo: formData.get("tipo"),
+      categoria_id: validCatId,
+      ordem: Number(formData.get("ordem")),
+      status: formData.get("status") === "true",
+      destaque: formData.get("destaque") === "true",
+    };
+
+    const validated = UpdateItemSchema.safeParse(rawData);
+    if (!validated.success) {
+      console.error("Zod Validation Error:", validated.error.flatten());
+      return {
+        success: false,
+        error: "Dados inválidos enviadados para atualização.",
+      };
+    }
+
+    const updates = validated.data;
+    const supabaseAdmin = createAdminClient();
+
+    const newFile = formData.get("arquivo_file") as File;
+    const newThumb = formData.get("thumbnail_file") as File;
+    const tipo = formData.get("tipo") as string;
+
+    // ✅ CORREÇÃO: Removido 'updated_at' pois a coluna não existe no banco
+    const updatePayload: GaleriaItemUpdate = {
+      ...updates,
+      // updated_at: new Date().toISOString() // <-- LINHA REMOVIDA
+    };
+
+    // 1. Upload de novo arquivo principal
+    if (newFile && newFile.size > 0) {
+      const fileBuffer = Buffer.from(await newFile.arrayBuffer());
+      const fileExt = newFile.name.split(".").pop();
+      const slug = await generateSlug(updates.titulo || "edit");
+      const fileName = `${Date.now()}_${slug}.${fileExt}`;
+      const bucketName = tipo === "foto" ? "galeria-fotos" : "galeria-videos";
+
+      const { error: upErr } = await supabaseAdmin.storage
+        .from(bucketName)
+        .upload(fileName, fileBuffer, { contentType: newFile.type });
+      if (!upErr) {
+        const { data: pub } = supabaseAdmin.storage
+          .from(bucketName)
+          .getPublicUrl(fileName);
+        updatePayload.arquivo_url = pub.publicUrl;
+      } else {
+        console.error("Erro upload update:", upErr);
+      }
+    }
+
+    // 2. Upload de nova thumbnail
+    if (newThumb && newThumb.size > 0) {
+      const thumbBuffer = Buffer.from(await newThumb.arrayBuffer());
+      const thumbName = `thumb_edit_${Date.now()}.jpg`;
+      const { error: tErr } = await supabaseAdmin.storage
+        .from("galeria-fotos")
+        .upload(thumbName, thumbBuffer, { contentType: newThumb.type });
+      if (!tErr) {
+        const { data: pubT } = supabaseAdmin.storage
+          .from("galeria-fotos")
+          .getPublicUrl(thumbName);
+        updatePayload.thumbnail_url = pubT.publicUrl;
+      }
+    }
+
+    // 3. Update no Banco
+    console.log("🛠️ Tentando atualizar DB com payload:", updatePayload);
+
+    const { error: dbError } = await supabaseAdmin
+      .from("galeria_itens")
+      .update(updatePayload)
+      .eq("id", id);
+
+    if (dbError) {
+      console.error("❌ ERRO CRÍTICO SUPABASE:", dbError);
+      return { success: false, error: `Erro Banco: ${dbError.message}` };
+    }
+
+    await logActivity(
+      supabaseAdmin,
+      session.userId!,
+      "editar_item",
+      `Editou: ${updates.titulo}`,
+      "galeria_itens",
+      id,
+    );
+    revalidatePath("/admin/galeria");
+    return { success: true };
+  } catch (error) {
+    console.error("🔥 Erro update (Catch):", error);
+    return { success: false, error: "Erro interno não tratado." };
+  }
+}
+
+// ==========================================
+// DELETE
+// ==========================================
 export async function deleteItem(id: string) {
   try {
-    const auth = await checkAdminPermission();
-    if (!auth.success) return { success: false, error: auth.error };
+    const session = await verifyAdminSession();
+    if (!session.success) return { success: false, error: "Sem permissão" };
 
-    const adminClient = await getTypedAdminClient();
-    const { data: item } = await adminClient
+    const supabaseAdmin = createAdminClient();
+
+    const { data: item, error: fetchError } = await supabaseAdmin
       .from("galeria_itens")
-      .select("arquivo_url, thumbnail_url")
+      .select("*")
       .eq("id", id)
       .single();
 
-    if (!item) return { success: false, error: "Item não encontrado" };
+    if (fetchError || !item)
+      return { success: false, error: "Item não encontrado" };
 
-    if (item.arquivo_url) await deleteFileByUrl(item.arquivo_url);
-    if (item.thumbnail_url) await deleteFileByUrl(item.thumbnail_url);
+    const bucketName =
+      item.tipo === "foto" ? "galeria-fotos" : "galeria-videos";
 
-    const { error } = await adminClient
+    const extractPath = (url: string) => {
+      try {
+        const parts = url.split(`${bucketName}/`);
+        return parts.length > 1 ? parts[1] : null;
+      } catch {
+        return null;
+      }
+    };
+
+    const mainFilePath = extractPath(item.arquivo_url);
+
+    if (mainFilePath) {
+      await supabaseAdmin.storage.from(bucketName).remove([mainFilePath]);
+    }
+
+    if (item.thumbnail_url) {
+      const thumbPathParts = item.thumbnail_url.split("galeria-fotos/");
+      if (thumbPathParts.length > 1) {
+        await supabaseAdmin.storage
+          .from("galeria-fotos")
+          .remove([thumbPathParts[1]]);
+      }
+    }
+
+    const { error: deleteError } = await supabaseAdmin
       .from("galeria_itens")
       .delete()
       .eq("id", id);
 
-    if (error) throw error;
+    if (deleteError) throw deleteError;
+
+    await logActivity(
+      supabaseAdmin,
+      session.userId || "sistema",
+      "excluir_item",
+      `Excluiu item ID: ${id}`,
+      "galeria_itens",
+      id,
+    );
 
     revalidatePath("/admin/galeria");
     return { success: true };
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Erro desconhecido";
-    return { success: false, error: message };
+  } catch (error) {
+    console.error("Erro deleteItem:", error);
+    return { success: false, error: "Erro ao excluir item" };
   }
 }
 
-export async function toggleItemStatus(id: string, currentStatus: boolean) {
-  return updateItem(id, { status: !currentStatus });
+// ==========================================
+// PUBLIC READ
+// ==========================================
+export async function getPublicItens(limit = 6) {
+  const supabaseAdmin = createAdminClient();
+
+  const { data } = await supabaseAdmin
+    .from("galeria_itens")
+    .select(`*, galeria_categorias(nome, slug)`)
+    .eq("status", true)
+    .order("destaque", { ascending: false })
+    .order("ordem", { ascending: true })
+    .limit(limit);
+
+  return { success: true, data: data as Item[] };
 }
 
-export async function toggleItemDestaque(id: string, currentDestaque: boolean) {
-  return updateItem(id, { destaque: !currentDestaque });
+export async function getItensPorCategoria(categoriaSlug: string) {
+  const supabaseAdmin = createAdminClient();
+
+  const { data: cat } = await supabaseAdmin
+    .from("galeria_categorias")
+    .select("id, nome")
+    .eq("slug", categoriaSlug)
+    .single();
+
+  if (!cat) return { success: false, data: [] };
+
+  const { data } = await supabaseAdmin
+    .from("galeria_itens")
+    .select("*")
+    .eq("categoria_id", cat.id)
+    .eq("status", true)
+    .order("ordem", { ascending: true });
+
+  return { success: true, data: data as Item[], categoria: cat };
+}
+
+// ==========================================
+// STUBS
+// ==========================================
+export async function toggleItemStatus() {
+  return { success: false };
+}
+export async function toggleItemDestaque() {
+  return { success: false };
 }

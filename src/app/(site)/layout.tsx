@@ -1,5 +1,3 @@
-// src/app/(site)/layout.tsx
-
 "use client";
 
 import { Header } from "@/components/site/layout/Header";
@@ -11,11 +9,9 @@ export default function SiteLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col w-full">
+    <div className="flex flex-col min-h-screen bg-white">
       <Header />
-      <main className="flex-1 w-full">
-        <div className="w-full max-w-none">{children}</div>
-      </main>
+      <main className="flex-1 w-full flex flex-col">{children}</main>
       <Footer />
     </div>
   );

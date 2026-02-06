@@ -2,6 +2,8 @@
 
 import { cookies } from "next/headers";
 import { type SupabaseClient } from "@supabase/supabase-js";
+// Ajuste o import abaixo conforme o local real do seu arquivo de tipos do banco
+// Geralmente é @/lib/supabase/types ou similar
 import { type Database } from "@/lib/supabase/types";
 
 // ============================================
@@ -10,7 +12,6 @@ import { type Database } from "@/lib/supabase/types";
 
 /**
  * Verificar sessão admin (Verificação simples de cookie)
- * Útil para proteção básica em server actions
  */
 export async function verifyAdminSession(): Promise<{
   success: boolean;
@@ -69,9 +70,10 @@ export async function verifyAdminSession(): Promise<{
 
 /**
  * Registrar atividade no sistema
+ * OBS: Requer o cliente Supabase (Admin ou Auth) passado como argumento
  */
 export async function logActivity(
-  adminClient: SupabaseClient<Database>,
+  adminClient: SupabaseClient<Database>, // Cliente injetado
   userId: string,
   actionType: string,
   description: string,
@@ -87,24 +89,29 @@ export async function logActivity(
       resource_type: resourceType,
       resource_id: resourceId,
       metadata: metadata ? JSON.stringify(metadata) : null,
-      created_at: new Date().toISOString(),
+      // created_at é automático no banco, mas pode forçar se quiser
     });
   } catch (error) {
+    // Não paramos o fluxo se o log falhar, apenas avisamos no console
     console.error("❌ Erro ao registrar atividade:", error);
   }
 }
 
 /**
  * Gerar slug a partir de uma string
+ * Marcada como ASYNC para consistência e evitar problemas de Promise no caller
  */
 export async function generateSlug(text: string): Promise<string> {
+  if (!text) return "";
+
   return text
+    .toString()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
+    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .replace(/[^a-z0-9\s-]/g, "") // Remove caracteres especiais
+    .replace(/\s+/g, "-") // Espaços viram hífens
+    .replace(/-+/g, "-") // Remove hífens duplicados
     .trim();
 }
 

@@ -1,5 +1,7 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  // 1. Otimização de Imagens
   images: {
     remotePatterns: [
       {
@@ -15,23 +17,27 @@ const nextConfig = {
     ],
     formats: ["image/webp", "image/avif"],
     dangerouslyAllowSVG: true,
+    contentDispositionType: "attachment",
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 
-  // Configurações Experimentais e Server Actions
+  // 2. Configurações Experimentais e Server Actions
   experimental: {
-    optimizeCss: true,
-    // CORREÇÃO CRÍTICA PARA UPLOADS:
     serverActions: {
-      bodySizeLimit: "50mb",
+      bodySizeLimit: "100mb", // Aumentado para suportar vídeos
     },
-    // Removido cpus: 1 e workerThreads: false a menos que seu ambiente de build seja muito limitado
+    optimizeCss: true,
   },
 
+  // 3. Configurações de Compilação
   compiler: {
-    removeConsole: process.env.NODE_ENV === "production",
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? { exclude: ["error", "warn"] }
+        : false,
   },
 
-  // Suas preferências de Build
+  // 4. Preferências de Build
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -39,8 +45,10 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
+  // 5. Otimização
   poweredByHeader: false,
 
+  // 6. Headers de Segurança
   async headers() {
     return [
       {
@@ -58,15 +66,17 @@ const nextConfig = {
     ];
   },
 
+  // 7. Webpack
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
       config.optimization.splitChunks = {
         chunks: "all",
         maxSize: 244000,
+        minSize: 20000,
       };
     }
     return config;
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

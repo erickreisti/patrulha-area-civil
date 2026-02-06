@@ -5,326 +5,166 @@ import Link from "next/link";
 import { motion, Variants } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 import { RiArrowRightLine, RiAlarmWarningLine } from "react-icons/ri";
-import { useEffect, useState } from "react";
 import Image from "next/image";
+
+// --- VARIANTES DE ANIMAÇÃO ---
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.15,
-      delayChildren: 0.2,
-    },
+    transition: { staggerChildren: 0.2, delayChildren: 0.3 },
   },
 };
 
-const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 25 },
+const fadeInUp: Variants = {
+  hidden: { opacity: 0, y: 30 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      type: "spring",
-      damping: 25,
-      stiffness: 120,
-      duration: 0.8,
-    },
+    transition: { type: "spring", stiffness: 50, duration: 0.8 },
   },
 };
 
-const scaleInVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: {
-      type: "spring",
-      damping: 20,
-      stiffness: 100,
-      duration: 1,
-    },
-  },
-};
+// --- COMPONENTE PRINCIPAL ---
 
-const buttonVariants: Variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: "spring",
-      damping: 25,
-      stiffness: 120,
-      duration: 0.6,
-    },
-  },
-  hover: {
-    scale: 1.05,
-    transition: { duration: 0.2 },
-  },
-  tap: { scale: 0.95 },
-};
-
-const BackgroundImage = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0">
-        <Image
-          src="/images/site/hero-bg.webp"
-          alt="Patrulha Aérea Civil - Operações Aéreas"
-          fill
-          priority
-          // CORREÇÃO: Qualidade padrão do Next.js é 75. Removido 85 para evitar warning.
-          quality={75}
-          className="object-cover object-center"
-          sizes="100vw"
-          style={{
-            objectPosition: "center 30%",
-          }}
-          loading="eager"
-          decoding="async"
-        />
-      </div>
-
-      {/* Overlay gradients - usando cores do tema PAC */}
-      <div className="absolute inset-0 bg-gradient-to-b from-pac-primary-dark/70 via-pac-primary/50 to-pac-primary-dark/60"></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-pac-primary-dark/70 via-pac-primary/40 to-transparent"></div>
-      <div className="absolute inset-0 bg-gradient-to-r from-pac-primary-dark/30 via-pac-primary/20 to-pac-primary-dark/40"></div>
-
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]"></div>
-      </div>
-    </div>
-  );
-};
-
-const Subtitle = () => (
-  <motion.div className="mb-4 sm:mb-5 md:mb-6 lg:mb-8" variants={itemVariants}>
-    <p
-      className={cn(
-        "font-medium text-white mb-0 leading-relaxed drop-shadow-lg text-center",
-        "text-base sm:text-lg md:text-xl lg:text-2xl px-4 mx-auto max-w-3xl",
-        "bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent",
-      )}
-    >
-      Excelência em Resgate Aéreo & Proteção Civil
-    </p>
-  </motion.div>
-);
-
-const Description = () => (
-  <motion.div
-    className={cn(
-      "mb-6 sm:mb-8 md:mb-10 lg:mb-12 mx-auto px-4 sm:px-6",
-      "max-w-xl sm:max-w-2xl md:max-w-3xl lg:max-w-4xl",
-    )}
-    variants={scaleInVariants}
-  >
-    <div
-      className={cn(
-        "text-white leading-relaxed sm:leading-loose bg-slate-900/80 backdrop-blur-md",
-        "rounded-xl lg:rounded-2xl border border-white/20 shadow-2xl",
-        "font-medium text-center text-sm sm:text-base md:text-lg",
-        "p-4 sm:p-6 md:p-8 relative overflow-hidden",
-      )}
-    >
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-pac-primary-light/10 to-transparent transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-      <p className="mb-0">
-        Organização civil especializada em operações aéreas de resgate, busca e
-        proteção civil. Comprometidos com a segurança e bem-estar da população,
-        atuamos com profissionalismo e dedicação em situações de emergência.
-      </p>
-    </div>
-  </motion.div>
-);
-
-const ActionButtons = () => (
-  <motion.div
-    className={cn(
-      "flex flex-col sm:flex-row gap-3 sm:gap-4 md:gap-6 justify-center items-stretch",
-      "px-4 sm:px-6 w-full mx-auto max-w-xs sm:max-w-md md:max-w-lg lg:max-w-xl",
-      "mb-4 sm:mb-6",
-    )}
-    variants={containerVariants}
-  >
-    <motion.div
-      variants={buttonVariants}
-      whileHover="hover"
-      whileTap="tap"
-      className="w-full sm:w-auto sm:flex-1 touch-optimize"
-    >
-      <Button
-        size="lg"
-        className={cn(
-          "w-full font-bold uppercase tracking-wider transition-all duration-300 border-0",
-          "relative overflow-hidden shadow-lg hover:shadow-xl group/button",
-          "bg-pac-primary hover:bg-pac-primary-light text-white text-sm sm:text-base", // Cores do tema
-          "px-4 sm:px-6 md:px-8 py-3 sm:py-4 h-auto min-h-[48px] sm:min-h-[56px]",
-          "active:scale-95",
-        )}
-        asChild
-      >
-        <Link href="/sobre">
-          <span className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
-            <span className="text-sm sm:text-base md:text-lg">
-              INICIAR MISSÃO
-            </span>
-            <motion.div
-              animate={{ x: [0, 4, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="flex items-center"
-            >
-              <RiArrowRightLine className="w-4 h-4 sm:w-5 sm:h-5" />
-            </motion.div>
-          </span>
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover/button:translate-x-[100%] transition-transform duration-700" />
-        </Link>
-      </Button>
-    </motion.div>
-
-    <motion.div
-      variants={buttonVariants}
-      whileHover="hover"
-      whileTap="tap"
-      className="w-full sm:w-auto sm:flex-1 touch-optimize"
-    >
-      <Button
-        variant="outline"
-        size="lg"
-        className={cn(
-          "w-full font-bold uppercase tracking-wider transition-all duration-300",
-          "relative overflow-hidden shadow-lg hover:shadow-xl group/outline",
-          "border-2 border-white bg-white/10 backdrop-blur-sm",
-          "text-white hover:bg-white hover:text-pac-primary-dark text-sm sm:text-base", // Hover com cor do tema
-          "px-4 sm:px-6 md:px-8 py-3 sm:py-4 h-auto min-h-[48px] sm:min-h-[56px]",
-          "active:scale-95",
-        )}
-        asChild
-      >
-        <Link href="/contato">
-          <span className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
-            <motion.div
-              animate={{ scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="flex items-center text-pac-alert-light" // Cor de alerta do tema
-            >
-              <RiAlarmWarningLine className="w-4 h-4 sm:w-5 sm:h-5" />
-            </motion.div>
-            <span className="text-sm sm:text-base md:text-lg">EMERGÊNCIA</span>
-          </span>
-          <div className="absolute inset-0 bg-white scale-x-0 group-hover/outline:scale-x-100 transition-transform duration-500 origin-left -z-10" />
-        </Link>
-      </Button>
-    </motion.div>
-  </motion.div>
-);
-
-const ScrollIndicator = () => {
+export function HeroSection() {
   const scrollToAbout = () => {
     const aboutSection = document.getElementById("about-section");
     if (aboutSection) {
-      const offsetTop = aboutSection.offsetTop - 80;
-      window.scrollTo({
-        top: offsetTop,
-        behavior: "smooth",
-      });
+      aboutSection.scrollIntoView({ behavior: "smooth" });
     }
   };
 
   return (
-    <motion.div
-      className="hidden sm:block cursor-pointer group/scroll mb-4 sm:mb-6"
-      variants={itemVariants}
-      onClick={scrollToAbout}
-      whileHover={{ y: 5 }}
-      aria-label="Role para baixo para saber mais"
-    >
-      <div className="flex flex-col items-center mt-8 sm:mt-10 gap-2 sm:gap-3">
-        <span className="text-sm text-white/80 uppercase tracking-wider group-hover/scroll:text-white transition-colors duration-300">
-          Saiba Mais
-        </span>
-        <div className="w-6 h-10 sm:w-7 sm:h-12 border-2 border-white/50 rounded-full flex justify-center group-hover/scroll:border-white transition-colors duration-300">
-          <motion.div
-            className="w-1 h-3 sm:h-4 bg-white/70 rounded-full mt-2 sm:mt-3"
-            animate={{ y: [0, 10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </div>
+    <section className="relative w-full h-[calc(100vh-80px)] min-h-[600px] flex items-center justify-center overflow-hidden bg-slate-900">
+      {/* 1. Imagem de Fundo */}
+      <div className="absolute inset-0 z-0 select-none">
+        <Image
+          src="/images/site/hero-bg.webp"
+          alt="Operação da Patrulha Aérea Civil"
+          fill
+          priority
+          className="object-cover object-center"
+          quality={75}
+        />
+
+        {/* Overlays */}
+        <div className="absolute inset-0 bg-pac-primary/80 mix-blend-multiply" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent" />
+
+        {/* Grid CSS Puro */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] opacity-20 pointer-events-none" />
       </div>
-    </motion.div>
-  );
-};
 
-export function HeroSection() {
-  const [height, setHeight] = useState("calc(100vh - 90px)");
-
-  useEffect(() => {
-    const updateHeight = () => {
-      if (window.innerWidth < 640) {
-        setHeight("calc(100vh - 90px)");
-      } else if (window.innerWidth < 1024) {
-        setHeight("calc(100vh - 100px)");
-      } else {
-        setHeight("calc(100vh - 120px)");
-      }
-    };
-
-    updateHeight();
-    window.addEventListener("resize", updateHeight);
-    return () => window.removeEventListener("resize", updateHeight);
-  }, []);
-
-  return (
-    <section
-      className="relative bg-pac-primary-dark text-white overflow-hidden ios-h-screen" // Cor de fundo do tema
-      style={{
-        height,
-        minHeight: "600px",
-      }}
-      id="hero-section"
-      aria-label="Seção principal da Patrulha Aérea Civil"
-    >
-      <BackgroundImage />
-
-      <motion.div
-        className="container mx-auto px-4 sm:px-6 md:px-8 relative z-10 h-full"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <div
-          className={cn(
-            "mx-auto w-full h-full flex flex-col justify-end items-center",
-            "pb-12 sm:pb-16 md:pb-20 lg:pb-24 pt-16 sm:pt-20",
-            "min-h-[600px]",
-          )}
+      {/* 2. Conteúdo Central */}
+      <div className="container relative z-10 px-4 sm:px-6 lg:px-8 mx-auto h-full flex flex-col justify-center">
+        <motion.div
+          className="w-full max-w-[95vw] xl:max-w-7xl mx-auto text-center"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
         >
-          <div className="text-center w-full">
-            <motion.div
-              className="mb-3 sm:mb-4 md:mb-5 lg:mb-6"
-              variants={itemVariants}
+          {/* TÍTULO PRINCIPAL */}
+          <motion.h1
+            variants={fadeInUp}
+            className={cn(
+              "font-black text-white uppercase tracking-tighter leading-[1.1] mb-6 drop-shadow-2xl",
+              "whitespace-nowrap text-[min(5.8vw,5.5rem)]",
+            )}
+          >
+            PATRULHA{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400">
+              AÉREA CIVIL
+            </span>
+          </motion.h1>
+
+          {/* Descrição */}
+          <motion.p
+            variants={fadeInUp}
+            className="text-lg sm:text-xl md:text-2xl text-slate-200 font-medium leading-relaxed max-w-3xl mx-auto mb-10 text-shadow-sm px-4"
+          >
+            Atuando com excelência em operações aéreas de busca, resgate e apoio
+            a desastres. O braço civil voluntário da aviação brasileira.
+          </motion.p>
+
+          {/* Botões de Ação */}
+          <motion.div
+            variants={fadeInUp}
+            className="flex flex-col sm:flex-row gap-5 justify-center items-center w-full"
+          >
+            {/* Botão Primário */}
+            <Button
+              size="lg"
+              className={cn(
+                "group bg-pac-primary text-white border-0",
+                "hover:bg-pac-primary-light hover:shadow-[0_10px_20px_rgba(0,0,0,0.3)] hover:-translate-y-1",
+                "font-bold uppercase tracking-wider h-14 px-10 rounded-full",
+                "transition-all duration-300 w-full sm:w-auto text-base sm:text-lg",
+              )}
+              asChild
             >
-              <h1
-                className={cn(
-                  "font-extrabold text-white leading-tight drop-shadow-2xl uppercase tracking-tight text-center", // Removido font-bebas
-                  "text-4xl xs:text-5xl leading-[0.9] px-2",
-                  "sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl",
-                  "mx-auto max-w-[90vw]",
-                )}
-              >
-                PATRULHA AÉREA CIVIL
-              </h1>
-            </motion.div>
-            <Subtitle />
-            <Description />
-            <ActionButtons />
-            <ScrollIndicator />
+              <Link href="/sobre">
+                <span>Conheça Nossa Missão</span>
+                <RiArrowRightLine className="ml-2 w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
+              </Link>
+            </Button>
+
+            {/* Botão Secundário */}
+            <Button
+              variant="outline"
+              size="lg"
+              className={cn(
+                "group border-2 border-white/30 bg-transparent text-white backdrop-blur-sm",
+                "hover:bg-white hover:text-slate-900 hover:border-white hover:shadow-lg",
+                "font-bold uppercase tracking-wider h-14 px-10 rounded-full",
+                "transition-all duration-300 w-full sm:w-auto text-base sm:text-lg",
+              )}
+              asChild
+            >
+              <Link href="/contato">
+                <RiAlarmWarningLine className="mr-2 w-5 h-5 text-red-500 transition-transform duration-300 group-hover:scale-110" />
+                Emergência
+              </Link>
+            </Button>
+          </motion.div>
+        </motion.div>
+      </div>
+
+      {/* 3. Indicador de Scroll Responsivo */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.2, duration: 0.8 }}
+        className="absolute bottom-2 sm:bottom-10  -translate-x-1/2 z-20 cursor-pointer group p-4"
+        onClick={scrollToAbout}
+      >
+        <div className="flex flex-col items-center gap-2 sm:gap-3 transition-transform duration-300 group-hover:translate-y-1">
+          {/* Texto oculto no mobile para economizar espaço */}
+          <span className="hidden sm:block text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold group-hover:text-white transition-colors">
+            Saiba Mais
+          </span>
+
+          {/* Mouse menor no mobile (w-22px), maior no desktop (w-26px) */}
+          <div className="w-[22px] h-[36px] sm:w-[26px] sm:h-[44px] border-2 border-slate-400 rounded-full flex justify-center p-1 group-hover:border-white transition-colors bg-black/10 backdrop-blur-sm">
+            <motion.div
+              className="w-1 sm:w-1.5 h-2 sm:h-2.5 bg-white rounded-full"
+              animate={{
+                y: [0, 12, 0],
+                opacity: [1, 0.5, 1],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
           </div>
         </div>
       </motion.div>
 
-      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-28 lg:h-32 bg-gradient-to-t from-pac-primary-dark/80 via-pac-primary-dark/40 to-transparent pointer-events-none"></div>
+      {/* Gradiente de Fusão Inferior */}
+      <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-white via-white/60 to-transparent z-10 pointer-events-none" />
     </section>
   );
 }

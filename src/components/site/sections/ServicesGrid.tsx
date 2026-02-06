@@ -2,6 +2,9 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { motion, Variants } from "framer-motion"; // ADICIONADO: Tipo Variants
+import { cn } from "@/lib/utils/cn"; // AGORA SENDO USADO
 import {
   RiCrosshairLine,
   RiShieldCheckLine,
@@ -11,12 +14,12 @@ import {
   RiTimeLine,
   RiBroadcastLine,
   RiRadarLine,
-  RiCheckboxCircleLine,
+  RiCheckboxCircleFill,
   RiPhoneLine,
+  RiArrowRightLine,
 } from "react-icons/ri";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils/cn";
+
+// --- TIPAGEM ---
 
 type IconType = React.ComponentType<{ className?: string }>;
 
@@ -24,172 +27,154 @@ interface Service {
   icon: IconType;
   title: string;
   description: string;
-  fullDescription: string;
   features: string[];
 }
 
-// Dados dos serviços
+// --- DADOS ---
+
 const SERVICES: Service[] = [
   {
     icon: RiCrosshairLine,
-    title: "RESGATE AÉREO TÁTICO",
+    title: "Resgate Aéreo Tático",
     description:
-      "Operações de busca e salvamento em áreas hostis com equipe de elite.",
-    fullDescription:
-      "Executamos operações de busca e salvamento em ambientes de difícil acesso, utilizando aeronaves equipadas com tecnologia de ponta.",
-    features: [
-      "Equipe de elite",
-      "Tecnologia de ponta",
-      "Resposta 24/7",
-      "Áreas difíceis",
-    ],
+      "Operações de busca e salvamento em áreas hostis com equipe de elite e aeronaves especializadas.",
+    features: ["Busca e Salvamento", "Áreas de Risco", "Resposta 24/7"],
   },
   {
     icon: RiShieldCheckLine,
-    title: "PROTEÇÃO CIVIL",
+    title: "Proteção Civil",
     description:
-      "Resposta estratégica a desastres naturais e situações críticas.",
-    fullDescription:
-      "Atuamos em cenários complexos com cobertura estratégica e suporte integrado para garantir o sucesso operacional.",
-    features: [
-      "Protocolos prontos",
-      "Prevenção de desastres",
-      "Coordenação ágil",
-      "Planos de contingência",
-    ],
+      "Resposta estratégica a desastres naturais, suporte logístico e gerenciamento de crises.",
+    features: ["Gestão de Crises", "Apoio Logístico", "Prevenção"],
   },
   {
     icon: RiFocusLine,
-    title: "OPERAÇÕES ESPECIAIS",
+    title: "Operações Especiais",
     description:
-      "Missões de alto risco com planejamento tático e execução precisa.",
-    fullDescription:
-      "Missões que exigem planejamento e execução precisos. Atuação em cenários complexos com suporte para o sucesso operacional.",
-    features: [
-      "Planejamento tático",
-      "Execução precisa",
-      "Cobertura estratégica",
-      "Cenários complexos",
-    ],
+      "Missões de alto risco que exigem planejamento tático detalhado e execução cirúrgica.",
+    features: ["Planejamento Tático", "Alta Precisão", "Sigilo Operacional"],
   },
   {
     icon: RiUserLine,
-    title: "CAPACITAÇÃO",
-    description: "Treinamento tático em procedimentos de emergência e resgate.",
-    fullDescription:
-      "Programas de capacitação em procedimentos de emergência, técnicas de resgate e resposta em crises.",
-    features: [
-      "Programas especializados",
-      "Técnicas de resgate",
-      "Resposta a crises",
-      "Treinamento contínuo",
-    ],
+    title: "Capacitação & Treino",
+    description:
+      "Formação rigorosa em procedimentos de emergência, primeiros socorros e sobrevivência.",
+    features: ["Cursos Técnicos", "Sobrevivência", "Primeiros Socorros"],
   },
   {
     icon: RiMapPinLine,
-    title: "BUSCA TERRITORIAL",
-    description: "Operações de localização e extração em terreno hostil.",
-    fullDescription:
-      "Operações de busca em terrenos hostis com tecnologia de geolocalização e equipes especializadas.",
-    features: [
-      "Geolocalização",
-      "Terrenos hostis",
-      "Reconhecimento",
-      "Equipes especializadas",
-    ],
+    title: "Busca e Localização",
+    description:
+      "Rastreamento e extração em terrenos de difícil acesso com tecnologia de geolocalização.",
+    features: ["Varredura Terrestre", "Geolocalização", "Extração"],
   },
   {
     icon: RiTimeLine,
-    title: "RESPOSTA RÁPIDA",
-    description: "Equipe de prontidão imediata para emergências críticas.",
-    fullDescription:
-      "Equipes de prontidão para emergências críticas com tempo mínimo de resposta. Estrutura operacional ágil.",
-    features: [
-      "Prontidão imediata",
-      "Tempo mínimo",
-      "Estrutura operacional",
-      "Situações urgentes",
-    ],
+    title: "Prontidão Rápida",
+    description:
+      "Equipes em stand-by para acionamento imediato em situações críticas.",
+    features: ["Tempo de Resposta", "Disponibilidade", "Agilidade"],
   },
   {
     icon: RiBroadcastLine,
-    title: "COMUNICAÇÕES",
+    title: "Comunicações",
     description:
-      "Sistema integrado de comunicações para coordenação operacional.",
-    fullDescription:
-      "Sistemas de comunicação tática para coordenação eficiente e troca de informações em tempo real entre as equipes.",
-    features: [
-      "Sistemas integrados",
-      "Coordenação eficiente",
-      "Tempo real",
-      "Infraestrutura robusta",
-    ],
+      "Estabelecimento de redes de comunicação tática em áreas remotas ou colapsadas.",
+    features: ["Redes de Rádio", "Coordenação", "Áreas Remotas"],
   },
   {
     icon: RiRadarLine,
-    title: "VIGILÂNCIA AÉREA",
+    title: "Vigilância Aérea",
     description:
-      "Monitoramento e reconhecimento aéreo para apoio às operações.",
-    fullDescription:
-      "Monitoramento aéreo para apoio às operações em solo, fornecendo informações estratégicas e suporte visual.",
-    features: [
-      "Monitoramento aéreo",
-      "Reconhecimento",
-      "Suporte visual",
-      "Tomada de decisão",
-    ],
+      "Monitoramento e reconhecimento aéreo para suporte visual e inteligência.",
+    features: ["Reconhecimento", "Apoio Visual", "Monitoramento"],
   },
 ];
 
-const containerVariants = {
+// --- VARIANTES DE ANIMAÇÃO CORRIGIDAS ---
+
+// Adicionada a tipagem ': Variants' para corrigir o erro de TypeScript
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
+    transition: { staggerChildren: 0.1 },
   },
 };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 30 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5 },
+    transition: { duration: 0.5, ease: "easeOut" },
   },
 };
 
-// Removido o prop 'index' que não estava sendo usado
+// --- SUB-COMPONENTES ---
+
+const SectionHeader = () => (
+  <div className="text-center mb-16 space-y-4">
+    {/* Badge Estático */}
+    <div className="flex items-center justify-center gap-4 mb-2">
+      <div className="w-8 sm:w-12 h-[2px] bg-pac-primary/30" />
+      <span className="text-pac-primary font-bold uppercase tracking-[0.2em] text-xs sm:text-sm">
+        Nossas Capacidades
+      </span>
+      <div className="w-8 sm:w-12 h-[2px] bg-pac-primary/30" />
+    </div>
+
+    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 uppercase tracking-tight">
+      Operações & <span className="text-pac-primary">Serviços</span>
+    </h2>
+
+    <p className="max-w-2xl mx-auto text-slate-600 text-base sm:text-lg leading-relaxed">
+      Atuamos com protocolos rigorosos e equipamentos de ponta para garantir a
+      eficiência em missões de resgate e proteção à vida.
+    </p>
+  </div>
+);
+
 const ServiceCard = ({ service }: { service: Service }) => {
-  const IconComponent = service.icon;
+  const Icon = service.icon;
 
   return (
     <motion.div
-      variants={itemVariants}
-      className="bg-white border border-gray-200 rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 group flex flex-col h-full"
+      variants={cardVariants}
+      // CORREÇÃO: Usando 'cn' para envelopar as classes
+      className={cn(
+        "group relative flex flex-col h-full bg-white rounded-2xl p-6 sm:p-8",
+        "border border-slate-100 shadow-sm transition-all duration-300",
+        "hover:shadow-xl hover:-translate-y-1 hover:border-pac-primary/20",
+      )}
     >
-      <div className="flex items-center gap-4 mb-4">
-        <div className="w-12 h-12 rounded-xl bg-pac-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-pac-primary transition-colors duration-300">
-          <IconComponent className="h-6 w-6 text-pac-primary group-hover:text-white transition-colors duration-300" />
+      {/* Icon Header */}
+      <div className="mb-6 flex items-start justify-between">
+        <div className="w-14 h-14 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-pac-primary transition-colors duration-300">
+          <Icon className="w-7 h-7 text-slate-500 group-hover:text-white transition-colors duration-300" />
         </div>
-        <h3 className="font-bold text-gray-800 text-lg leading-tight uppercase tracking-tight">
-          {service.title}
-        </h3>
+        {/* Decorative Line */}
+        <div className="w-12 h-1 bg-slate-100 rounded-full mt-2 group-hover:bg-pac-primary/20 transition-colors" />
       </div>
 
-      <p className="text-gray-600 text-sm leading-relaxed mb-6 flex-grow">
+      {/* Content */}
+      <h3 className="text-xl font-bold text-slate-800 uppercase tracking-tight mb-3 group-hover:text-pac-primary transition-colors">
+        {service.title}
+      </h3>
+
+      <p className="text-slate-500 leading-relaxed mb-6 flex-grow text-sm sm:text-base">
         {service.description}
       </p>
 
-      <div className="pt-4 border-t border-gray-100 mt-auto">
+      {/* Features List */}
+      <div className="pt-6 border-t border-slate-50 mt-auto">
         <ul className="space-y-2">
-          {service.features.slice(0, 3).map((feature, idx) => (
+          {service.features.map((feature, idx) => (
             <li
               key={idx}
-              className="flex items-center gap-2 text-xs text-gray-500 font-medium"
+              className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600"
             >
-              <RiCheckboxCircleLine className="text-pac-secondary w-4 h-4 flex-shrink-0" />
+              <RiCheckboxCircleFill className="w-4 h-4 text-pac-primary/40 group-hover:text-pac-primary transition-colors" />
               {feature}
             </li>
           ))}
@@ -199,81 +184,75 @@ const ServiceCard = ({ service }: { service: Service }) => {
   );
 };
 
+// --- COMPONENTE PRINCIPAL ---
+
 export function ServicesGrid() {
   return (
     <section
       id="services-section"
-      className="w-full bg-white py-12 sm:py-16 lg:py-20 overflow-hidden"
+      className="py-20 sm:py-24 lg:py-32 bg-slate-50 relative overflow-hidden"
     >
-      <div className="container mx-auto px-4 sm:px-6">
-        {/* Header */}
-        <motion.div
-          className="text-center mb-12 sm:mb-16"
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-        >
-          <h1
-            className={cn(
-              "text-3xl sm:text-4xl md:text-5xl lg:text-6xl",
-              "font-extrabold text-gray-800 mb-4 sm:mb-6 tracking-tight uppercase mx-auto px-2",
-              "max-w-[90vw]",
-            )}
-          >
-            NOSSOS <span className="text-pac-primary">SERVIÇOS</span>
-          </h1>
+      {/* Background Decorativo */}
+      {/* OBS: Se não tiver o SVG, pode remover ou trocar pelo CSS Grid Puro usado no Hero */}
+      <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.03] pointer-events-none" />
 
-          <p
-            className={cn(
-              // Corrigido conflito de classes: removido sm:text-lg duplicado
-              "text-sm sm:text-base md:text-lg text-gray-600 mx-auto leading-relaxed font-medium px-3 sm:px-4",
-              "max-w-2xl",
-            )}
-          >
-            Conheça nossos serviços especializados executados com padrões
-            operacionais e compromisso com a excelência em resgate e proteção.
-          </p>
-        </motion.div>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <SectionHeader />
 
-        {/* Grid de Serviços */}
+        {/* Grid Principal */}
         <motion.div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12"
+          className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-16 lg:mb-24"
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
+          viewport={{ once: true, margin: "-100px" }}
         >
           {SERVICES.map((service, index) => (
             <ServiceCard key={index} service={service} />
           ))}
         </motion.div>
 
-        {/* CTA */}
+        {/* CTA Card (Chamada para Ação) */}
         <motion.div
-          className="text-center"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
+          transition={{ duration: 0.6 }}
           viewport={{ once: true }}
+          className="max-w-4xl mx-auto"
         >
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 sm:p-8 max-w-3xl mx-auto shadow-sm">
-            <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">
-              Precisa de apoio operacional?
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-xl mx-auto">
-              Nossa equipe está pronta para atuar em situações de emergência ou
-              para consultoria técnica especializada.
-            </p>
-            <Button
-              className="bg-pac-primary hover:bg-pac-primary-dark text-white font-bold px-8 py-6 rounded-xl text-base shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
-              asChild
-            >
-              <Link href="/contato" className="flex items-center gap-2">
-                <RiPhoneLine className="w-5 h-5" />
-                SOLICITAR ATENDIMENTO
-              </Link>
-            </Button>
+          <div className="relative bg-white rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-2xl overflow-hidden text-center">
+            {/* Efeito de Fundo do Card */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-pac-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="w-16 h-16 bg-pac-primary/10 rounded-full flex items-center justify-center mb-6">
+                <RiPhoneLine className="w-8 h-8 text-pac-primary" />
+              </div>
+
+              <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mb-3 uppercase">
+                Precisa de Apoio Operacional?
+              </h3>
+
+              <p className="text-slate-600 text-base sm:text-lg max-w-xl mx-auto mb-8">
+                Nossa equipe está pronta para atuar em situações de emergência
+                ou fornecer consultoria técnica especializada para sua
+                organização.
+              </p>
+
+              <Button
+                size="lg"
+                className={cn(
+                  "bg-pac-primary hover:bg-pac-primary-dark text-white rounded-full px-10 h-14",
+                  "shadow-lg hover:shadow-pac-primary/30 transition-all font-bold tracking-wide text-base sm:text-lg group",
+                )}
+                asChild
+              >
+                <Link href="/contato">
+                  Solicitar Atendimento
+                  <RiArrowRightLine className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </Link>
+              </Button>
+            </div>
           </div>
         </motion.div>
       </div>

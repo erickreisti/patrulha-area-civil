@@ -1,10 +1,8 @@
-// src/app/(app)/admin/dashboard/components/dashboard/RecentActivities.tsx - VERSÃO CORRIGIDA
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 import {
@@ -13,7 +11,6 @@ import {
   RiImageLine,
   RiSettingsLine,
   RiCalendarLine,
-  RiExternalLinkLine,
   RiTimeLine,
   RiUserAddLine,
   RiDeleteBinLine,
@@ -22,8 +19,9 @@ import {
   RiDatabaseLine,
   RiArrowRightLine,
 } from "react-icons/ri";
+import { cn } from "@/lib/utils/cn";
 
-// Interface compatível com DashboardRecentActivity
+// Tipagem
 export interface DashboardActivity {
   id: string;
   action_type: string;
@@ -37,15 +35,103 @@ interface RecentActivitiesProps {
   loading: boolean;
 }
 
-const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5,
-    },
-  },
+// Helpers de UI
+const getActivityConfig = (type: string) => {
+  const baseIconClass = "w-5 h-5";
+
+  switch (type) {
+    case "user_login":
+    case "user_created":
+    case "user_registered":
+      return {
+        icon: <RiUserLine className={baseIconClass} />,
+        color: "text-sky-600",
+        bg: "bg-sky-50",
+      };
+
+    case "agent_creation":
+    case "agent_update":
+      return {
+        icon: <RiUserAddLine className={baseIconClass} />,
+        color: "text-blue-600",
+        bg: "bg-blue-50",
+      };
+
+    case "news_created":
+    case "news_updated":
+    case "news_published":
+      return {
+        icon: <RiArticleLine className={baseIconClass} />,
+        color: "text-emerald-600",
+        bg: "bg-emerald-50",
+      };
+
+    case "gallery_upload":
+    case "gallery_item_created":
+      return {
+        icon: <RiImageLine className={baseIconClass} />,
+        color: "text-amber-600",
+        bg: "bg-amber-50",
+      };
+
+    case "settings_update":
+    case "permission_updated":
+      return {
+        icon: <RiSettingsLine className={baseIconClass} />,
+        color: "text-purple-600",
+        bg: "bg-purple-50",
+      };
+
+    case "event_created":
+      return {
+        icon: <RiCalendarLine className={baseIconClass} />,
+        color: "text-indigo-600",
+        bg: "bg-indigo-50",
+      };
+
+    case "agent_deleted":
+    case "user_deleted":
+      return {
+        icon: <RiDeleteBinLine className={baseIconClass} />,
+        color: "text-red-600",
+        bg: "bg-red-50",
+      };
+
+    case "system_start":
+    case "system_update":
+      return {
+        icon: <RiDatabaseLine className={baseIconClass} />,
+        color: "text-slate-600",
+        bg: "bg-slate-50",
+      };
+
+    case "permission_updated":
+      return {
+        icon: <RiShieldLine className={baseIconClass} />,
+        color: "text-rose-600",
+        bg: "bg-rose-50",
+      };
+
+    default:
+      return {
+        icon: <RiFileLine className={baseIconClass} />,
+        color: "text-slate-500",
+        bg: "bg-slate-50",
+      };
+  }
+};
+
+const formatTimeAgo = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+
+  if (diffInMinutes < 1) return "Agora mesmo";
+  if (diffInMinutes < 60) return `${diffInMinutes} min atrás`;
+  if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h atrás`;
+  if (diffInMinutes < 10080)
+    return `${Math.floor(diffInMinutes / 1440)}d atrás`;
+  return date.toLocaleDateString("pt-BR");
 };
 
 export function RecentActivities({
@@ -54,268 +140,111 @@ export function RecentActivities({
 }: RecentActivitiesProps) {
   const router = useRouter();
 
-  const getActivityIcon = (type: string) => {
-    const iconClass = "w-4 h-4 flex-shrink-0";
-    switch (type) {
-      case "user_login":
-      case "agent_creation":
-      case "agent_update":
-        return <RiUserLine className={`${iconClass} text-blue-600`} />;
-      case "news_created":
-      case "news_updated":
-      case "news_published":
-        return <RiArticleLine className={`${iconClass} text-green-600`} />;
-      case "gallery_upload":
-      case "gallery_item_created":
-      case "gallery_item_updated":
-        return <RiImageLine className={`${iconClass} text-orange-600`} />;
-      case "settings_update":
-        return <RiSettingsLine className={`${iconClass} text-purple-600`} />;
-      case "event_created":
-        return <RiCalendarLine className={`${iconClass} text-cyan-600`} />;
-      case "user_created":
-      case "user_registered":
-        return <RiUserAddLine className={`${iconClass} text-green-600`} />;
-      case "agent_deleted":
-      case "user_deleted":
-        return <RiDeleteBinLine className={`${iconClass} text-red-600`} />;
-      case "system_start":
-      case "system_update":
-        return <RiDatabaseLine className={`${iconClass} text-gray-600`} />;
-      case "permission_updated":
-        return <RiShieldLine className={`${iconClass} text-purple-600`} />;
-      default:
-        return <RiFileLine className={`${iconClass} text-gray-600`} />;
-    }
-  };
-
-  const getActionTypeLabel = (type: string) => {
-    const types: Record<string, string> = {
-      user_login: "Login",
-      agent_creation: "Criação de Agente",
-      agent_update: "Atualização de Agente",
-      agent_deleted: "Agente Excluído",
-      user_created: "Usuário Criado",
-      user_deleted: "Usuário Excluído",
-      news_created: "Notícia Criada",
-      news_updated: "Notícia Atualizada",
-      news_published: "Notícia Publicada",
-      gallery_upload: "Upload na Galeria",
-      gallery_item_created: "Item da Galeria Criado",
-      gallery_item_updated: "Item da Galeria Atualizado",
-      settings_update: "Configuração Atualizada",
-      event_created: "Evento Criado",
-      permission_updated: "Permissão Atualizada",
-      system_start: "Sistema Iniciado",
-      system_update: "Sistema Atualizado",
-    };
-    return types[type] || type.replace(/_/g, " ");
-  };
-
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case "user_login":
-      case "agent_creation":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "news_created":
-      case "news_published":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "gallery_upload":
-      case "gallery_item_created":
-        return "bg-orange-100 text-orange-800 border-orange-200";
-      case "settings_update":
-      case "permission_updated":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "event_created":
-        return "bg-cyan-100 text-cyan-800 border-cyan-200";
-      case "agent_deleted":
-      case "user_deleted":
-        return "bg-red-100 text-red-800 border-red-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
-
-    if (diffInMinutes < 1) return "Agora mesmo";
-    if (diffInMinutes < 60) return `Há ${diffInMinutes} min`;
-    if (diffInMinutes < 1440) return `Há ${Math.floor(diffInMinutes / 60)} h`;
-    if (diffInMinutes < 10080)
-      return `Há ${Math.floor(diffInMinutes / 1440)} dias`;
-    return date.toLocaleDateString("pt-BR");
-  };
-
-  const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const handleViewAllActivities = () => {
-    // Navegação que passa pelo middleware
-    router.push("/admin/atividades");
-  };
-
   if (loading) {
     return (
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={fadeInUp}
-        transition={{ delay: 0.2 }}
-      >
-        <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RiTimeLine className="h-5 w-5 text-blue-600" />
-              Atividades Recentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div
-                  key={i}
-                  className="flex items-start space-x-3 p-3 border rounded-lg"
-                >
-                  <Skeleton className="h-10 w-10 rounded-lg bg-gray-200" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-full bg-gray-200" />
-                    <Skeleton className="h-3 w-3/4 bg-gray-200" />
-                  </div>
-                </div>
-              ))}
+      <Card className="border-none shadow-sm h-full">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <RiTimeLine className="text-sky-600" /> Atividades Recentes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-4">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-1/4" />
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+          ))}
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={fadeInUp}
-      transition={{ delay: 0.2 }}
-    >
-      <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <RiTimeLine className="h-5 w-5 text-blue-600" />
-              Atividades Recentes
-            </div>
-            {activities.length > 0 && (
-              <Badge
-                variant="outline"
-                className="bg-blue-50 text-blue-700 border-blue-200"
-              >
-                {activities.length}
-              </Badge>
-            )}
+    <Card className="border-none shadow-sm h-full flex flex-col">
+      <CardHeader className="pb-2 border-b border-slate-50">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <RiTimeLine className="text-sky-600" /> Atividades Recentes
           </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {activities.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5 }}
-              className="text-center py-8"
-            >
-              <RiTimeLine className="h-12 w-12 mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">Nenhuma atividade recente</p>
-              <p className="text-sm text-gray-400 mt-1">
-                As atividades do sistema aparecerão aqui
-              </p>
-            </motion.div>
-          ) : (
-            <>
-              <div className="space-y-4 mb-6">
-                <AnimatePresence>
-                  {activities.slice(0, 5).map((activity, index) => (
+          <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+            {activities.length} novas
+          </span>
+        </div>
+      </CardHeader>
+
+      <CardContent className="pt-0 flex-1 flex flex-col">
+        {activities.length === 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 py-12 text-center">
+            <div className="p-4 rounded-full bg-slate-50 mb-3">
+              <RiTimeLine className="h-8 w-8 text-slate-300" />
+            </div>
+            <p className="text-slate-500 font-medium">
+              Nenhuma atividade recente
+            </p>
+            <p className="text-xs text-slate-400 mt-1">
+              As ações do sistema aparecerão aqui
+            </p>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-hidden">
+            <div className="divide-y divide-slate-50">
+              <AnimatePresence>
+                {activities.slice(0, 6).map((activity, index) => {
+                  const config = getActivityConfig(activity.action_type);
+
+                  return (
                     <motion.div
                       key={activity.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                      whileHover={{ scale: 1.02 }}
-                      className="flex items-start gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-all duration-300 group"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="group flex items-start gap-3 py-4 hover:bg-slate-50/50 transition-colors rounded-lg px-2 -mx-2 cursor-default"
                     >
-                      <motion.div
-                        className="mt-1 transition-transform duration-300 group-hover:scale-125"
-                        whileHover={{ rotate: 10 }}
+                      <div
+                        className={cn(
+                          "p-2 rounded-full flex-shrink-0 mt-0.5",
+                          config.bg,
+                          config.color,
+                        )}
                       >
-                        {getActivityIcon(activity.action_type)}
-                      </motion.div>
+                        {config.icon}
+                      </div>
+
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-blue-700 transition-colors duration-300">
-                              {activity.description}
-                            </p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge
-                                variant="outline"
-                                className={`text-xs ${getActivityColor(
-                                  activity.action_type
-                                )} transition-colors duration-300`}
-                              >
-                                {getActionTypeLabel(activity.action_type)}
-                              </Badge>
-                              <span className="text-xs text-gray-500">
-                                por {activity.user_name || "Sistema"}
-                              </span>
-                            </div>
-                          </div>
-                          <motion.span
-                            whileHover={{ scale: 1.1 }}
-                            className="text-xs text-gray-400 whitespace-nowrap"
-                            title={formatDateTime(activity.created_at)}
-                          >
-                            {formatTimeAgo(activity.created_at)}
-                          </motion.span>
+                        <p className="text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors line-clamp-1">
+                          {activity.description}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
+                          <span className="font-medium text-slate-500">
+                            {activity.user_name || "Sistema"}
+                          </span>
+                          <span>•</span>
+                          <span>{formatTimeAgo(activity.created_at)}</span>
                         </div>
                       </div>
                     </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
 
-              {activities.length > 0 && (
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <Button
-                    onClick={handleViewAllActivities}
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-600 transition-all duration-300 group"
-                  >
-                    <div className="flex items-center justify-center">
-                      <RiExternalLinkLine className="h-4 w-4 mr-2 transition-transform duration-300 group-hover:translate-x-1" />
-                      Ver todas as atividades
-                      <RiArrowRightLine className="h-4 w-4 ml-1 opacity-0 -translate-x-2 transition-all duration-300 group-hover:opacity-100 group-hover:translate-x-0" />
-                    </div>
-                  </Button>
-                </motion.div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </motion.div>
+        <div className="pt-4 mt-auto border-t border-slate-50">
+          <Button
+            variant="ghost"
+            className="w-full justify-between text-slate-500 hover:text-sky-700 hover:bg-sky-50 group"
+            onClick={() => router.push("/admin/atividades")}
+          >
+            <span className="text-sm font-medium">Ver histórico completo</span>
+            <RiArrowRightLine className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -45,7 +45,6 @@ export default function LoginPage() {
   }, [initialize]);
 
   // 2. Carregar Matrícula Salva
-  // ✅ CORREÇÃO: Envolvido em setTimeout para evitar o erro "setState synchronously"
   useEffect(() => {
     const loadSavedData = () => {
       if (typeof window !== "undefined") {
@@ -66,7 +65,6 @@ export default function LoginPage() {
   }, []);
 
   // 3. Redirecionamento se já autenticado
-  // ✅ CORREÇÃO: Envolvido em setTimeout para evitar o erro "setState synchronously"
   useEffect(() => {
     if (isInitialized && isAuthenticated && !isRedirecting) {
       const handleRedirect = () => {
@@ -122,7 +120,9 @@ export default function LoginPage() {
           icon: <CheckCircle2 className="h-5 w-5 text-green-600" />,
         });
 
-        if (result.data?.profile && !result.data.profile.status) {
+        // ✅ CORREÇÃO: Acessar result.data.user em vez de result.data.profile
+        // No AuthResponse do Store, definimos data: { session: ..., user: Profile }
+        if (result.data?.user && !result.data.user.status) {
           toast.warning("Atenção: Conta Inativa", {
             description: "Entre em contato com o comando para regularizar.",
             duration: 5000,
@@ -170,8 +170,6 @@ export default function LoginPage() {
           className="flex flex-col items-center"
         >
           <div className="relative w-24 h-24 mb-6 animate-pulse">
-            {/* Usamos <img> normal aqui para evitar warnings de preload do Next.js
-                em componentes que desmontam muito rápido */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/logos/logo.webp"
@@ -205,7 +203,6 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
             <div className="relative w-32 h-32 sm:w-40 sm:h-40 drop-shadow-xl filter">
-              {/* Esta é a imagem principal LCP, usamos Next Image com priority */}
               <Image
                 src="/images/logos/logo.webp"
                 alt="Brasão Patrulha Aérea Civil"

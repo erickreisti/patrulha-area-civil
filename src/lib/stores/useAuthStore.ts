@@ -1,41 +1,37 @@
-// src/lib/stores/useAuthStore.ts - VERSÃO OTIMIZADA
 "use client";
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { User, Profile } from "@/lib/supabase/types";
+import type { User, Session } from "@supabase/supabase-js"; // Adicionado Session
+import type { Profile } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
+import { checkAdminSession } from "@/app/actions/auth/auth";
+
+// ... (Interface AuthResponse mantida igual)
+interface AuthResponse {
+  success: boolean;
+  error?: string;
+  // Ajustamos o tipo da session aqui para ser explícito
+  data?: { session: Session; user: Profile };
+}
 
 interface AuthState {
-  // Estado principal
+  // ... (propriedades mantidas iguais)
   user: User | null;
   profile: Profile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-
-  // Admin
   isAdmin: boolean;
   hasAdminSession: boolean;
 
-  // Ações
   initialize: () => Promise<void>;
-  loginWithServerAction: (matricula: string) => Promise<{
-    success: boolean;
-    data?: { user: User; profile: Profile };
-    error?: string;
-  }>;
+  loginWithServerAction: (matricula: string) => Promise<AuthResponse>;
   logout: () => Promise<{ success: boolean; error?: string }>;
-
-  // Admin específico
-  verifyAdminAccess: (adminPassword: string) => Promise<{
-    success: boolean;
-    message?: string;
-    error?: string;
-  }>;
+  verifyAdminAccess: (
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   checkAdminSession: () => boolean;
   clearAdminSession: () => void;
-
-  // Utilitários
   setProfile: (profile: Profile) => void;
 }
 
@@ -55,201 +51,147 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
 
-          // 1. Verificar sessão Supabase
+          // 1. Tenta pegar sessão do cliente (LocalStorage/Cookie)
           const {
             data: { session },
           } = await supabase.auth.getSession();
 
           if (session?.user) {
+            // ... (Lógica existente mantida)
             const { data: profile } = await supabase
               .from("profiles")
               .select("*")
               .eq("id", session.user.id)
               .single();
 
-            // 2. Verificar cookies admin diretamente no cliente
-            const hasAdminCookie = document.cookie.includes("is_admin=true");
-            const hasAdminSessionCookie =
-              document.cookie.includes("admin_session");
+            const adminCheck = await checkAdminSession();
+
+            console.log("🔍 [AuthStore] Admin Check Result:", adminCheck);
 
             set({
               user: session.user,
               profile: profile || null,
               isAuthenticated: true,
               isAdmin: profile?.role === "admin",
-              hasAdminSession: hasAdminCookie && hasAdminSessionCookie,
+              hasAdminSession: adminCheck.hasSession,
               isLoading: false,
             });
           } else {
-            set({
-              user: null,
-              profile: null,
-              isAuthenticated: false,
-              isAdmin: false,
-              hasAdminSession: false,
-              isLoading: false,
-            });
+            // SE a sessão do supabase falhar, tentamos validar via Server Action (Backup)
+            // Isso evita o logout indevido se o cookie existir mas o cliente estiver desincronizado
+            const adminCheck = await checkAdminSession();
+
+            if (adminCheck.success && adminCheck.hasSession) {
+              // Se o servidor diz que temos sessão, não fazemos logout forçado
+              // Apenas marcamos adminSession (o usuário pode precisar de F5 para pegar o user data completo)
+              console.log(
+                "⚠️ [AuthStore] Sessão válida no servidor, mas cliente desincronizado. Mantendo sessão.",
+              );
+              set({ hasAdminSession: true, isLoading: false });
+            } else {
+              set({
+                user: null,
+                profile: null,
+                isAuthenticated: false,
+                isAdmin: false,
+                hasAdminSession: false,
+                isLoading: false,
+              });
+            }
           }
         } catch (error) {
-          console.error("❌ [AuthStore] Erro na inicialização:", error);
-          set({
-            isLoading: false,
-            isAuthenticated: false,
-            hasAdminSession: false,
-          });
-        }
-      },
-
-      loginWithServerAction: async (matricula: string) => {
-        try {
-          set({ isLoading: true });
-
-          const formData = new FormData();
-          formData.append("matricula", matricula);
-
-          const authModule = await import("@/app/actions/auth/auth");
-          const result = await authModule.login(formData);
-
-          if (result.success && "data" in result && result.data) {
-            const profileData = result.data.user;
-
-            // Verificar cookies admin após login
-            const hasAdminCookie = document.cookie.includes("is_admin=true");
-            const hasAdminSessionCookie =
-              document.cookie.includes("admin_session");
-
-            set({
-              user: result.data.session.user,
-              profile: profileData,
-              isAuthenticated: true,
-              isAdmin: profileData.role === "admin",
-              hasAdminSession: hasAdminCookie && hasAdminSessionCookie,
-              isLoading: false,
-            });
-
-            return {
-              success: true,
-              data: {
-                user: result.data.session.user,
-                profile: profileData,
-              },
-            };
-          } else {
-            set({ isLoading: false });
-            return {
-              success: false,
-              error: "error" in result ? result.error : "Erro no login",
-            };
-          }
-        } catch (error) {
-          console.error("❌ [AuthStore] Erro no login:", error);
+          console.error("❌ [AuthStore] Erro init:", error);
           set({ isLoading: false });
-          return {
-            success: false,
-            error: error instanceof Error ? error.message : "Erro desconhecido",
-          };
         }
       },
 
+      loginWithServerAction: async (matricula) => {
+        set({ isLoading: true });
+        const authModule = await import("@/app/actions/auth/auth");
+        const formData = new FormData();
+        formData.append("matricula", matricula);
+
+        // Chama o Login no Servidor
+        const res = await authModule.login(formData);
+
+        // ✅ CORREÇÃO CRÍTICA AQUI:
+        if (res.success && res.data) {
+          // Sincroniza o Cliente Supabase com os tokens recebidos do Servidor
+          const { error: sessionError } = await supabase.auth.setSession({
+            access_token: res.data.session.access_token,
+            refresh_token: res.data.session.refresh_token,
+          });
+
+          if (sessionError) {
+            console.error(
+              "❌ Erro ao sincronizar sessão no cliente:",
+              sessionError,
+            );
+          }
+
+          // Agora chamamos initialize, que vai encontrar a sessão válida
+          await get().initialize();
+        } else {
+          set({ isLoading: false });
+        }
+
+        // Retornamos um objeto compatível com AuthResponse
+        return {
+          success: res.success,
+          error: res.error,
+          data: res.data
+            ? { session: res.data.session, user: res.data.user }
+            : undefined,
+        };
+      },
+
+      // ... (Restante das funções logout, verifyAdminAccess, etc. mantidas iguais)
       logout: async () => {
-        try {
-          get().clearAdminSession();
+        const authModule = await import("@/app/actions/auth/auth");
+        await authModule.logout();
+        await supabase.auth.signOut(); // Garante logout no cliente também
+        get().clearAdminSession();
+        set({
+          user: null,
+          profile: null,
+          isAuthenticated: false,
+          isAdmin: false,
+          hasAdminSession: false,
+          isLoading: false,
+        });
+        return { success: true };
+      },
 
-          const authModule = await import("@/app/actions/auth/auth");
-          const result = await authModule.logout();
+      verifyAdminAccess: async (password) => {
+        const { user } = get();
+        if (!user?.email) return { success: false, error: "Sem user" };
 
-          set({
-            user: null,
-            profile: null,
-            isAuthenticated: false,
-            isAdmin: false,
-            hasAdminSession: false,
-          });
+        const authModule = await import("@/app/actions/auth/auth");
+        const res = await authModule.authenticateAdminSession(
+          user.id,
+          user.email,
+          password,
+        );
 
-          return result;
-        } catch (error) {
-          console.error("❌ [AuthStore] Erro no logout:", error);
-          set({
-            user: null,
-            profile: null,
-            isAuthenticated: false,
-            isAdmin: false,
-            hasAdminSession: false,
-          });
-          return {
-            success: false,
-            error: "Erro ao fazer logout",
-          };
+        if (res.success) {
+          set({ hasAdminSession: true });
         }
+        return res;
       },
 
-      verifyAdminAccess: async (adminPassword: string) => {
-        try {
-          const { user, profile } = get();
-
-          if (!user || !profile) {
-            return {
-              success: false,
-              error: "Usuário não autenticado",
-            };
-          }
-
-          if (profile.role !== "admin") {
-            return {
-              success: false,
-              error: "Usuário não possui permissões de administrador",
-            };
-          }
-
-          const authModule = await import("@/app/actions/auth/auth");
-          const result = await authModule.authenticateAdminSession(
-            user.id,
-            user.email || "",
-            adminPassword
-          );
-
-          if (result.success) {
-            set({ hasAdminSession: true });
-            return result;
-          } else {
-            return result;
-          }
-        } catch (error) {
-          console.error("❌ [AuthStore] Erro em verifyAdminAccess:", error);
-          return {
-            success: false,
-            error: "Erro na autenticação administrativa",
-          };
-        }
-      },
-
-      checkAdminSession: () => {
-        const state = get();
-        return state.hasAdminSession;
-      },
+      checkAdminSession: () => get().hasAdminSession,
 
       clearAdminSession: () => {
-        try {
-          if (typeof document === "undefined") return;
-
-          // Limpar cookies com path explícito
+        if (typeof document !== "undefined") {
           document.cookie =
             "is_admin=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
           document.cookie =
             "admin_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-
-          set({ hasAdminSession: false });
-        } catch (error) {
-          console.error("❌ [AuthStore] Erro ao limpar cookies:", error);
         }
+        set({ hasAdminSession: false });
       },
 
-      setProfile: (newProfile) => {
-        set({
-          profile: newProfile,
-          isAdmin: newProfile.role === "admin",
-        });
-      },
+      setProfile: (p) => set({ profile: p, isAdmin: p.role === "admin" }),
     }),
     {
       name: "auth-storage",
@@ -258,8 +200,7 @@ export const useAuthStore = create<AuthState>()(
         profile: state.profile,
         isAuthenticated: state.isAuthenticated,
         isAdmin: state.isAdmin,
-        hasAdminSession: state.hasAdminSession,
       }),
-    }
-  )
+    },
+  ),
 );

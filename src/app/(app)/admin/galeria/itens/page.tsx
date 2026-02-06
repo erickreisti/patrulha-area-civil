@@ -139,6 +139,8 @@ const ImageThumbnail = ({
         src={src}
         alt="Thumbnail"
         fill
+        // ✅ CORREÇÃO: Informa ao Next.js que a imagem é pequena (64px)
+        sizes="64px"
         className="object-cover transition-transform duration-500 group-hover:scale-110"
         onError={() => setError(true)}
       />

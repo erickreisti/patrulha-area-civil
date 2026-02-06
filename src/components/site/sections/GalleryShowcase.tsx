@@ -3,75 +3,101 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 
 // UI Components
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 
 // Icons
 import {
   RiGalleryLine,
   RiArrowRightLine,
-  RiEyeLine,
   RiVideoLine,
   RiImageLine,
   RiFolderLine,
-  RiCameraOffLine,
   RiImage2Line,
-  RiVideoAddLine,
 } from "react-icons/ri";
 
 // Action & Types
 import { getCategoriasDestaquePublico } from "@/app/actions/gallery/public";
 import type { CategoriaShowcase } from "@/app/actions/gallery/types";
 
-// --- Sub-componentes ---
+// --- VARIANTES DE ANIMAÇÃO ---
+
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.15 },
+  },
+};
+
+const cardVariants: Variants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.6, ease: "easeOut" },
+  },
+};
+
+// --- FUNÇÕES AUXILIARES ---
+
+const getImageUrl = (url: string | null | undefined): string | null => {
+  if (!url || typeof url !== "string" || url.trim() === "") return null;
+  if (url.startsWith("http") || url.startsWith("https")) return url;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const bucket = "galerias";
+
+  if (!supabaseUrl) return null;
+
+  if (url.includes(bucket)) {
+    return `${supabaseUrl}/storage/v1/object/public/${url}`;
+  } else {
+    return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
+  }
+};
+
+// --- SUB-COMPONENTES ---
 
 const SectionHeader = () => (
-  <motion.div
-    className="text-center mb-8 sm:mb-12 lg:mb-16"
-    initial={{ opacity: 0, y: 30 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.6 }}
-    viewport={{ once: true, margin: "-100px" }}
-  >
-    <h1
-      className={cn(
-        "font-extrabold text-gray-800 mb-4 sm:mb-6 tracking-tight uppercase mx-auto px-2",
-        "text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-6xl",
-        "max-w-[90vw]",
-      )}
-    >
-      GALERIA EM <span className="text-pac-primary">DESTAQUE</span>
-    </h1>
-    <p className="text-gray-700 mx-auto leading-relaxed font-medium px-4 text-sm sm:text-base lg:text-xl max-w-4xl">
+  <div className="text-center mb-16 space-y-4">
+    {/* Badge Estático */}
+    <div className="flex items-center justify-center gap-4 mb-2">
+      <div className="w-8 sm:w-12 h-[2px] bg-pac-primary/30" />
+      <span className="text-pac-primary font-bold uppercase tracking-[0.2em] text-xs sm:text-sm">
+        Acervo Visual
+      </span>
+      <div className="w-8 sm:w-12 h-[2px] bg-pac-primary/30" />
+    </div>
+
+    <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 uppercase tracking-tight">
+      Galeria em <span className="text-pac-primary">Destaque</span>
+    </h2>
+
+    <p className="max-w-2xl mx-auto text-slate-600 text-base sm:text-lg leading-relaxed">
       Registros visuais das nossas operações, treinamentos e atividades
-      especiais
+      especiais em prol da sociedade.
     </p>
-  </motion.div>
+  </div>
 );
 
-const PlaceholderMedia = ({ tipo }: { tipo: "fotos" | "videos" }) => (
-  <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center gap-3 p-4">
-    <div className="relative">
-      <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
-        {tipo === "fotos" ? (
-          <RiImage2Line className="w-8 h-8 text-gray-400" />
-        ) : (
-          <RiVideoAddLine className="w-8 h-8 text-gray-400" />
-        )}
+const SkeletonCard = () => (
+  <Card className="border-0 bg-white rounded-2xl overflow-hidden h-full flex flex-col shadow-sm">
+    <div className="h-56 bg-slate-100 animate-pulse" />
+    <div className="p-5 space-y-3 flex-1">
+      <div className="h-6 bg-slate-100 rounded w-3/4 animate-pulse" />
+      <div className="h-4 bg-slate-100 rounded w-full animate-pulse" />
+      <div className="h-4 bg-slate-100 rounded w-1/2 animate-pulse" />
+      <div className="pt-4 mt-auto">
+        <div className="h-9 bg-slate-100 rounded-lg w-full animate-pulse" />
       </div>
-      <RiCameraOffLine className="w-6 h-6 text-gray-500 absolute -bottom-1 -right-1 bg-gray-100 rounded-full p-1 shadow-sm" />
     </div>
-    <div className="text-center">
-      <span className="text-xs uppercase tracking-widest text-gray-500 font-bold block mb-1">
-        Sem {tipo === "fotos" ? "Fotos" : "Vídeos"}
-      </span>
-      <span className="text-[10px] text-gray-400">Em breve disponível</span>
-    </div>
-  </div>
+  </Card>
 );
 
 const GalleryCard = ({
@@ -81,116 +107,87 @@ const GalleryCard = ({
   categoria: CategoriaShowcase;
   index: number;
 }) => {
-  const [imageError, setImageError] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const IconTipo = categoria.tipo === "fotos" ? RiImageLine : RiVideoLine;
-  const isDisabled = !categoria.itens_count || categoria.arquivada;
-
-  // Função para obter URL da imagem
-  const getImageUrl = (url: string | null | undefined) => {
-    if (!url) return null;
-
-    if (url.startsWith("http")) return url;
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const bucket = "galerias";
-
-    if (url.includes(bucket)) {
-      return `${supabaseUrl}/storage/v1/object/public/${url}`;
-    } else {
-      return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
-    }
-  };
-
-  const imageUrl = categoria.capa_url ? getImageUrl(categoria.capa_url) : null;
-  const hasImage = !!imageUrl && !imageError;
+  const imageUrl = getImageUrl(categoria.capa_url);
+  const shouldShowImage = !!imageUrl && !hasError;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: index * 0.1 }}
-      viewport={{ once: true, margin: "-100px" }}
-      className="h-full"
-    >
-      <Card className="border-gray-200 bg-white overflow-hidden hover:shadow-xl transition-all duration-300 group h-full flex flex-col hover:scale-[1.02]">
-        <div className="h-32 sm:h-40 lg:h-48 relative overflow-hidden">
-          {hasImage ? (
-            <>
-              <Image
-                src={imageUrl}
-                alt={categoria.nome}
-                fill
-                className="object-cover transition-transform duration-700 group-hover:scale-110"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                onError={() => setImageError(true)}
-                priority={index < 2}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-60 group-hover:opacity-40 transition-opacity" />
-            </>
-          ) : (
-            <PlaceholderMedia tipo={categoria.tipo} />
-          )}
+    <motion.div variants={cardVariants} className="h-full">
+      <Link href={`/galeria/${categoria.slug}`} className="group h-full block">
+        <Card className="border-0 bg-white overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 h-full flex flex-col hover:-translate-y-1 rounded-2xl">
+          {/* Área da Imagem */}
+          <div className="h-56 relative overflow-hidden bg-slate-100">
+            {shouldShowImage ? (
+              <>
+                <Image
+                  src={imageUrl}
+                  alt={categoria.nome || "Galeria"}
+                  fill
+                  className="object-cover transition-transform duration-700 group-hover:scale-110"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  onError={() => setHasError(true)}
+                  priority={index < 2}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+              </>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-300">
+                <RiImage2Line className="w-12 h-12 mb-2 opacity-50" />
+                <span className="text-xs uppercase font-bold tracking-widest">
+                  Sem Capa
+                </span>
+              </div>
+            )}
 
-          <div className="absolute top-3 right-3 z-10">
-            <span className="bg-white/90 backdrop-blur-sm text-pac-primary text-xs font-bold px-2 py-1 rounded-full shadow-sm flex items-center gap-1">
-              <IconTipo className="w-3 h-3" />
-              {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
-            </span>
-          </div>
-
-          {/* Contador de itens */}
-          {categoria.itens_count > 0 && (
-            <div className="absolute bottom-3 left-3 z-10">
-              <span className="bg-black/60 backdrop-blur-sm text-white text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
-                {categoria.itens_count}{" "}
-                {categoria.tipo === "fotos" ? "fotos" : "vídeos"}
-              </span>
+            {/* Badge de Tipo */}
+            <div className="absolute top-4 right-4 z-10">
+              <Badge className="bg-white/90 text-slate-900 backdrop-blur-md border-0 shadow-sm font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5 hover:bg-white">
+                <IconTipo className="w-3.5 h-3.5 text-pac-primary" />
+                {categoria.tipo === "fotos" ? "Fotos" : "Vídeos"}
+              </Badge>
             </div>
-          )}
-        </div>
 
-        <CardContent className="p-4 sm:p-5 lg:p-6 flex-1 flex flex-col">
-          <div className="flex-1">
-            <h3 className="font-bold text-gray-800 text-sm sm:text-base lg:text-lg leading-tight line-clamp-1 group-hover:text-pac-primary transition-colors mb-2">
-              {categoria.nome}
-            </h3>
-
-            {categoria.descricao && (
-              <p className="text-gray-600 text-xs sm:text-sm line-clamp-2">
-                {categoria.descricao}
-              </p>
+            {/* Contador */}
+            {categoria.itens_count > 0 && (
+              <div className="absolute bottom-4 left-4 z-10">
+                <span className="text-white text-xs font-bold bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20">
+                  {categoria.itens_count} itens
+                </span>
+              </div>
             )}
           </div>
 
-          <div className="w-full mt-4 pt-2 border-t border-gray-100">
-            <Button
-              variant="outline"
-              size="sm"
-              className={cn(
-                "w-full border-pac-primary text-pac-primary hover:bg-pac-primary hover:text-white font-semibold text-xs sm:text-sm transition-all",
-                isDisabled &&
-                  "opacity-50 cursor-not-allowed bg-gray-50 text-gray-400 hover:bg-gray-50 hover:text-gray-400 border-gray-200",
+          {/* Conteúdo */}
+          <div className="p-6 flex-1 flex flex-col bg-white">
+            <div className="flex-1 mb-4">
+              <h3 className="font-bold text-lg text-slate-800 leading-snug mb-2 group-hover:text-pac-primary transition-colors line-clamp-1">
+                {categoria.nome}
+              </h3>
+              {categoria.descricao && (
+                <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">
+                  {categoria.descricao}
+                </p>
               )}
-              disabled={isDisabled}
-              asChild={!isDisabled}
-            >
-              {isDisabled ? (
-                <span className="flex items-center justify-center gap-1">
-                  <RiCameraOffLine className="w-3 h-3" />
-                  {categoria.arquivada ? "Arquivada" : "Em breve"}
-                </span>
-              ) : (
-                <Link href={`/galeria/${categoria.slug}`}>
-                  <RiEyeLine className="w-4 h-4 mr-2" /> Visualizar Galeria
-                </Link>
-              )}
-            </Button>
+            </div>
+
+            {/* Footer do Card */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-pac-primary transition-colors">
+                Ver Detalhes
+              </span>
+              <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-pac-primary group-hover:text-white transition-all">
+                <RiArrowRightLine className="w-4 h-4" />
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </Card>
+      </Link>
     </motion.div>
   );
 };
+
+// --- COMPONENTE PRINCIPAL ---
 
 export function GalleryShowcase() {
   const [categorias, setCategorias] = useState<CategoriaShowcase[]>([]);
@@ -209,7 +206,7 @@ export function GalleryShowcase() {
       }
     } catch (err) {
       console.error("Erro no showcase da galeria:", err);
-      setError("Não foi possível carregar os destaques no momento.");
+      setError("Galeria temporariamente indisponível.");
     } finally {
       setLoading(false);
     }
@@ -219,66 +216,85 @@ export function GalleryShowcase() {
     loadData();
   }, []);
 
-  if (loading)
-    return (
-      <section className="py-20 container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="h-80 bg-gray-100 animate-pulse rounded-xl"
-            />
-          ))}
-        </div>
-      </section>
-    );
-
   return (
-    <section className="w-full bg-gradient-to-b from-white to-gray-50 py-12 sm:py-24">
-      <div className="container mx-auto px-4 sm:px-8">
+    <section className="w-full bg-white py-20 lg:py-32 relative overflow-hidden border-t border-slate-100">
+      {/* Background Pattern Sutil */}
+      <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.03] pointer-events-none" />
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <SectionHeader />
 
-        {error ? (
-          <div className="text-center py-10">
-            <p className="text-red-500 mb-4">{error}</p>
-            <Button variant="outline" onClick={loadData}>
-              Tentar Novamente
-            </Button>
-          </div>
-        ) : categorias.length > 0 ? (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-              {categorias.map((cat, idx) => (
-                <GalleryCard key={cat.id} categoria={cat} index={idx} />
+        <div className="min-h-[300px]">
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3].map((i) => (
+                <SkeletonCard key={i} />
               ))}
             </div>
-            <div className="text-center">
-              <Button
-                size="lg"
-                asChild
-                className="bg-pac-primary hover:bg-pac-primary-dark rounded-xl px-8 py-6 text-lg shadow-lg transition-transform hover:scale-105"
-              >
-                <Link href="/galeria" className="flex items-center gap-2">
-                  <RiFolderLine className="w-5 h-5" /> Explorar Galeria Completa{" "}
-                  <RiArrowRightLine />
-                </Link>
+          ) : error ? (
+            <div className="text-center py-16 bg-slate-50 rounded-3xl border border-slate-200">
+              <RiImage2Line className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 mb-4">{error}</p>
+              <Button variant="outline" onClick={loadData}>
+                Tentar Novamente
               </Button>
             </div>
-          </>
-        ) : (
-          <div className="text-center py-20 bg-white border border-dashed rounded-3xl max-w-lg mx-auto">
-            <RiGalleryLine className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-            <h3 className="text-gray-800 font-bold text-xl">
-              Galeria em atualização
-            </h3>
-            <p className="text-gray-500 mb-6">
-              Em breve teremos novos registros para você.
-            </p>
-            <Button variant="outline" asChild>
-              <Link href="/galeria">Ver todas as categorias</Link>
-            </Button>
-          </div>
-        )}
+          ) : categorias.length > 0 ? (
+            <>
+              <motion.div
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16"
+                variants={containerVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-100px" }}
+              >
+                {categorias.map((cat, idx) => (
+                  <GalleryCard key={cat.id} categoria={cat} index={idx} />
+                ))}
+              </motion.div>
+
+              <motion.div
+                className="text-center"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                viewport={{ once: true }}
+              >
+                <Button
+                  size="lg"
+                  asChild
+                  className={cn(
+                    "bg-pac-primary hover:bg-pac-primary-dark text-white rounded-full px-10 h-14",
+                    "shadow-lg hover:shadow-pac-primary/30 transition-all font-bold tracking-wide text-base group",
+                  )}
+                >
+                  <Link href="/galeria" className="flex items-center gap-3">
+                    <RiFolderLine className="w-5 h-5" />
+                    Explorar Galeria Completa
+                    <RiArrowRightLine className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+                  </Link>
+                </Button>
+              </motion.div>
+            </>
+          ) : (
+            <motion.div
+              className="text-center py-16 bg-slate-50 rounded-3xl border border-dashed border-slate-200 max-w-2xl mx-auto"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+            >
+              <RiGalleryLine className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-slate-800 font-bold text-xl mb-2">
+                Galeria em Atualização
+              </h3>
+              <p className="text-slate-500 mb-6">
+                Estamos preparando novos registros visuais para você.
+              </p>
+              <Button variant="outline" asChild>
+                <Link href="/galeria">Ver Arquivo Completo</Link>
+              </Button>
+            </motion.div>
+          )}
+        </div>
       </div>
     </section>
   );

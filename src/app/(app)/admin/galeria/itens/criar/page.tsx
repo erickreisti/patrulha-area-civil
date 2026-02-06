@@ -7,7 +7,6 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
-// UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +21,6 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-
-// Icons
 import {
   RiArrowLeftLine,
   RiSaveLine,
@@ -40,13 +37,11 @@ import {
   RiAlertLine,
 } from "react-icons/ri";
 
-// Actions & Store
 import { createItem } from "@/app/actions/gallery";
 import { useCategoriasAdmin } from "@/lib/stores/useGaleriaStore";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import type { Categoria } from "@/app/actions/gallery/types";
 
-// Tipagem Local
 interface ItemFormData {
   titulo: string;
   descricao: string;
@@ -69,11 +64,10 @@ const itemVariants = {
 
 export default function CriarItemGaleriaPage() {
   const router = useRouter();
-  const { isAdmin, hasAdminSession } = useAuthStore();
-
-  // Hook do Store para listar categorias
+  const { isAdmin, hasAdminSession, initialize: initAuth } = useAuthStore();
   const { categorias, fetchCategorias } = useCategoriasAdmin();
 
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [loading, setLoading] = useState(false);
   const [arquivoFile, setArquivoFile] = useState<File | null>(null);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -89,39 +83,65 @@ export default function CriarItemGaleriaPage() {
     destaque: false,
   });
 
-  // Carrega categorias ao montar
+  // Inicialização
   useEffect(() => {
-    fetchCategorias();
-  }, [fetchCategorias]);
+    let mounted = true;
+    const init = async () => {
+      console.log("🔄 [Criar] Iniciando verificação de autenticação...");
+      try {
+        await initAuth();
+        if (mounted) await fetchCategorias();
+      } catch (error) {
+        console.error("❌ [Criar] Erro na inicialização:", error);
+      } finally {
+        if (mounted) {
+          console.log("✅ [Criar] Verificação concluída.");
+          setCheckingAuth(false);
+        }
+      }
+    };
+    init();
+    return () => {
+      mounted = false;
+    };
+  }, [initAuth, fetchCategorias]);
 
-  // Proteção de Rota
+  // Proteção
   useEffect(() => {
-    if (isAdmin === false || !hasAdminSession) {
+    if (checkingAuth) return;
+    console.log("🛡️ [Criar] Auth Status:", { isAdmin, hasAdminSession });
+    if (!isAdmin && !hasAdminSession) {
+      console.warn("🚫 [Criar] Acesso negado. Redirecionando...");
       toast.error("Acesso negado");
-      router.push("/admin/galeria/itens");
+      router.replace("/login");
     }
-  }, [isAdmin, hasAdminSession, router]);
+  }, [checkingAuth, isAdmin, hasAdminSession, router]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validação Client-Side
+    console.log(
+      "📁 [Criar] Arquivo selecionado:",
+      file.name,
+      "Tipo:",
+      file.type,
+      "Tamanho:",
+      file.size,
+    );
+
     const maxSize =
-      formData.tipo === "video" ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
-    const maxSizeLabel = formData.tipo === "video" ? "50MB" : "10MB";
+      formData.tipo === "video" ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    const maxSizeLabel = formData.tipo === "video" ? "100MB" : "10MB";
 
     if (file.size > maxSize) {
-      toast.error(
-        `Arquivo muito grande. Limite para ${formData.tipo}: ${maxSizeLabel}`,
-      );
-      e.target.value = ""; // Limpa o input
+      toast.error(`Arquivo muito grande. Limite: ${maxSizeLabel}`);
+      e.target.value = "";
       return;
     }
 
     setArquivoFile(file);
 
-    // Preview apenas para imagens
     if (formData.tipo === "foto") {
       setPreviewUrl(URL.createObjectURL(file));
     } else {
@@ -131,13 +151,26 @@ export default function CriarItemGaleriaPage() {
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setThumbnailFile(file);
+    if (file) {
+      console.log("🖼️ [Criar] Thumbnail selecionada:", file.name);
+      setThumbnailFile(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!arquivoFile) return toast.error("Selecione um arquivo para upload");
-    if (!formData.titulo.trim()) return toast.error("O título é obrigatório");
+    console.group("🚀 [Criar] Iniciando Submit");
+
+    if (!arquivoFile) {
+      console.error("❌ Sem arquivo selecionado");
+      console.groupEnd();
+      return toast.error("Selecione um arquivo para upload");
+    }
+    if (!formData.titulo.trim()) {
+      console.error("❌ Título vazio");
+      console.groupEnd();
+      return toast.error("O título é obrigatório");
+    }
 
     setLoading(true);
 
@@ -155,35 +188,56 @@ export default function CriarItemGaleriaPage() {
       data.append("arquivo_file", arquivoFile);
       if (thumbnailFile) data.append("thumbnail_file", thumbnailFile);
 
+      // Log do que está sendo enviado
+      console.log("📤 Enviando FormData:");
+      for (const pair of data.entries()) {
+        console.log(
+          `   ${pair[0]}:`,
+          pair[1] instanceof File ? `File(${pair[1].name})` : pair[1],
+        );
+      }
+
       const res = await createItem(data);
+      console.log("📥 Resposta do Server Action:", res);
 
       if (res.success) {
         toast.success("Mídia enviada com sucesso!");
         router.push("/admin/galeria/itens");
       } else {
+        console.error("❌ Erro retornado pela API:", res.error);
         toast.error(res.error || "Erro ao criar item");
       }
     } catch (error) {
-      console.error(error);
+      console.error("🔥 Erro Crítico (Catch):", error);
       toast.error("Erro interno ao processar upload");
     } finally {
       setLoading(false);
+      console.groupEnd();
     }
   };
 
-  // Filtra categorias compatíveis com o tipo selecionado
   const categoriasCompativeis = categorias.filter(
     (c: Categoria) =>
       (c.tipo === "fotos" && formData.tipo === "foto") ||
       (c.tipo === "videos" && formData.tipo === "video"),
   );
 
-  if (!hasAdminSession) return null;
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
+        <RiLoader4Line className="w-10 h-10 animate-spin text-emerald-600" />
+        <p className="text-slate-500 font-medium animate-pulse">
+          Verificando permissões...
+        </p>
+      </div>
+    );
+  }
+
+  if (!isAdmin && !hasAdminSession) return null;
 
   return (
     <div className="min-h-screen bg-slate-50/50 py-10 font-sans">
       <div className="container mx-auto px-4 max-w-5xl">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -214,12 +268,10 @@ export default function CriarItemGaleriaPage() {
           onSubmit={handleSubmit}
           className="grid grid-cols-1 lg:grid-cols-3 gap-8"
         >
-          {/* Coluna Principal */}
           <motion.div
             variants={itemVariants}
             className="lg:col-span-2 space-y-6"
           >
-            {/* Card de Upload */}
             <Card className="border-none shadow-lg bg-white overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
                 <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -228,7 +280,6 @@ export default function CriarItemGaleriaPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
-                {/* Seleção de Tipo */}
                 <div className="grid grid-cols-2 gap-4">
                   <div
                     onClick={() => {
@@ -270,7 +321,6 @@ export default function CriarItemGaleriaPage() {
                   </div>
                 </div>
 
-                {/* Área de Drop/Input */}
                 <div className="relative group">
                   <input
                     type="file"
@@ -293,6 +343,7 @@ export default function CriarItemGaleriaPage() {
                           src={previewUrl}
                           alt="Preview"
                           fill
+                          sizes="(max-width: 768px) 100vw, 50vw"
                           className="object-contain rounded-lg"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
@@ -330,14 +381,13 @@ export default function CriarItemGaleriaPage() {
                         <p className="text-xs text-slate-400">
                           {formData.tipo === "foto"
                             ? "JPG, PNG, WEBP (Max 10MB)"
-                            : "MP4, MOV (Max 50MB)"}
+                            : "MP4, MOV (Max 100MB)"}
                         </p>
                       </div>
                     )}
                   </Label>
                 </div>
 
-                {/* Thumbnail para Vídeo */}
                 {formData.tipo === "video" && (
                   <div className="pt-4 border-t border-slate-100 animate-in slide-in-from-top-2">
                     <Label className="mb-2 block text-slate-700 font-medium">
@@ -361,7 +411,6 @@ export default function CriarItemGaleriaPage() {
               </CardContent>
             </Card>
 
-            {/* Card de Detalhes */}
             <Card className="border-none shadow-lg bg-white overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
                 <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -413,8 +462,8 @@ export default function CriarItemGaleriaPage() {
                     </Select>
                     {categoriasCompativeis.length === 0 && (
                       <p className="text-xs text-amber-600 font-medium bg-amber-50 p-2 rounded mt-1 flex items-center gap-1">
-                        <RiAlertLine className="w-3 h-3" />
-                        Nenhuma categoria deste tipo disponível.
+                        <RiAlertLine className="w-3 h-3" /> Nenhuma categoria
+                        deste tipo disponível.
                       </p>
                     )}
                   </div>
@@ -451,7 +500,6 @@ export default function CriarItemGaleriaPage() {
             </Card>
           </motion.div>
 
-          {/* Coluna Lateral (Configurações) */}
           <motion.div variants={itemVariants} className="space-y-6">
             <Card className="border-none shadow-lg bg-white overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-4">
@@ -482,9 +530,7 @@ export default function CriarItemGaleriaPage() {
                     className="data-[state=checked]:bg-emerald-500"
                   />
                 </div>
-
                 <div className="h-px bg-slate-100" />
-
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">

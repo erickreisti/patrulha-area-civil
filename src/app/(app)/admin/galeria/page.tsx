@@ -128,6 +128,7 @@ const ImageThumbnail = ({
         src={src}
         alt="Thumbnail"
         fill
+        sizes="100px"
         className="object-cover transition-transform duration-500 group-hover:scale-110"
         onError={() => setError(true)}
       />
@@ -762,7 +763,6 @@ export default function GaleriaPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ✅ CORREÇÃO: Removido AnimatePresence que envolvia TabsContent */}
           <div className="mt-6">
             <TabsContent value="itens" className="mt-0 outline-none">
               <motion.div
@@ -805,6 +805,7 @@ export default function GaleriaPage() {
         </Tabs>
 
         {/* Dialog de Exclusão */}
+        {/* ✅ CORREÇÃO AQUI: Estrutura HTML válida (sem div dentro de p) */}
         <Dialog
           open={deleteDialog.open}
           onOpenChange={(open) =>
@@ -817,21 +818,27 @@ export default function GaleriaPage() {
                 <RiAlertLine className="w-6 h-6" /> Confirmar Exclusão
               </DialogTitle>
               <DialogDescription className="pt-2 text-base text-slate-600">
-                Você está prestes a excluir:
-                <div className="bg-red-50 border border-red-100 p-3 rounded-lg my-3 font-medium text-red-800">
-                  {deleteDialog.type === "item"
-                    ? (deleteDialog.item as Item)?.titulo
-                    : (deleteDialog.item as Categoria)?.nome}
-                </div>
-                Esta ação é irreversível.
-                {deleteDialog.type === "categoria" && (
-                  <p className="mt-3 text-amber-600 bg-amber-50 p-2 rounded-md border border-amber-200 text-sm font-medium flex gap-2 items-center">
-                    <RiAlertLine /> A categoria só pode ser excluída se estiver
-                    vazia.
-                  </p>
-                )}
+                Você está prestes a excluir este item.
               </DialogDescription>
             </DialogHeader>
+
+            <div className="py-2">
+              <div className="bg-red-50 border border-red-100 p-3 rounded-lg mb-3 font-medium text-red-800">
+                {deleteDialog.type === "item"
+                  ? (deleteDialog.item as Item)?.titulo
+                  : (deleteDialog.item as Categoria)?.nome}
+              </div>
+              <p className="text-sm text-slate-600 mb-2">
+                Esta ação é irreversível.
+              </p>
+              {deleteDialog.type === "categoria" && (
+                <div className="mt-3 text-amber-600 bg-amber-50 p-2 rounded-md border border-amber-200 text-sm font-medium flex gap-2 items-center">
+                  <RiAlertLine /> A categoria só pode ser excluída se estiver
+                  vazia.
+                </div>
+              )}
+            </div>
+
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 variant="outline"

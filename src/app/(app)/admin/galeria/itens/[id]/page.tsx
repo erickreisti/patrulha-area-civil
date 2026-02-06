@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image"; // ✅ Import do Image garantido
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
@@ -45,7 +46,7 @@ import {
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import type { Item, Categoria } from "@/app/actions/gallery/types";
 
-interface FormData {
+interface FormDataState {
   titulo: string;
   descricao: string;
   tipo: "foto" | "video";
@@ -70,18 +71,20 @@ const itemVariants = {
 export default function EditarItemPage() {
   const params = useParams();
   const router = useRouter();
-  const { isAdmin, hasAdminSession } = useAuthStore();
+  // ✅ CORREÇÃO 1: Pegando o initialize do store
+  const { isAdmin, hasAdminSession, initialize: initAuth } = useAuthStore();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // ✅ CORREÇÃO 2: Estado de checagem de auth
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [loading, setLoading] = useState(false); // Loading de dados (fetch)
+  const [saving, setSaving] = useState(false); // Loading de salvamento
 
   const [item, setItem] = useState<Item | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-
   const [novoArquivo, setNovoArquivo] = useState<File | null>(null);
   const [novaThumbnail, setNovaThumbnail] = useState<File | null>(null);
 
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<FormDataState>({
     titulo: "",
     descricao: "",
     tipo: "foto",
@@ -94,18 +97,46 @@ export default function EditarItemPage() {
 
   const itemId = params.id as string;
 
-  // 1. Permissões
+  // ✅ CORREÇÃO 3: Effect de Inicialização Robusta
   useEffect(() => {
-    if (isAdmin === false || !hasAdminSession) {
-      toast.error("Acesso negado.");
-      router.push("/admin/galeria/itens");
-    }
-  }, [isAdmin, hasAdminSession, router]);
+    let mounted = true;
+    const init = async () => {
+      console.log("🔄 [Editar] Iniciando verificação de autenticação...");
+      try {
+        await initAuth();
+      } catch (error) {
+        console.error("❌ [Editar] Erro na inicialização:", error);
+      } finally {
+        if (mounted) {
+          console.log("✅ [Editar] Verificação concluída.");
+          setCheckingAuth(false);
+        }
+      }
+    };
+    init();
+    return () => {
+      mounted = false;
+    };
+  }, [initAuth]);
 
-  // 2. Data Fetching
+  // ✅ CORREÇÃO 4: Proteção de Rota (Só roda se !checkingAuth)
+  useEffect(() => {
+    if (checkingAuth) return;
+
+    console.log("🛡️ [Editar] Auth Status:", { isAdmin, hasAdminSession });
+    if (!isAdmin && !hasAdminSession) {
+      console.warn("🚫 [Editar] Acesso negado. Redirecionando...");
+      toast.error("Acesso negado.");
+      router.replace("/admin/galeria/itens");
+    }
+  }, [checkingAuth, isAdmin, hasAdminSession, router]);
+
+  // Data Fetching
   const fetchData = useCallback(async () => {
     if (!itemId) return;
     setLoading(true);
+    console.log("🔄 [Editar] Buscando dados para ID:", itemId);
+
     try {
       const [itemRes, catRes] = await Promise.all([
         getItemById(itemId),
@@ -113,6 +144,7 @@ export default function EditarItemPage() {
       ]);
 
       if (itemRes.success && itemRes.data) {
+        console.log("✅ [Editar] Item carregado:", itemRes.data);
         const d = itemRes.data;
         setItem(d);
         setFormData({
@@ -127,6 +159,7 @@ export default function EditarItemPage() {
           thumbnail_url: d.thumbnail_url || undefined,
         });
       } else {
+        console.error("❌ [Editar] Item não encontrado:", itemRes.error);
         toast.error("Item não encontrado");
         router.push("/admin/galeria/itens");
       }
@@ -135,80 +168,95 @@ export default function EditarItemPage() {
         setCategorias(catRes.data);
       }
     } catch (error) {
-      console.error(error);
+      console.error("🔥 [Editar] Erro fetch:", error);
       toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
   }, [itemId, router]);
 
+  // Carrega dados assim que a auth for confirmada
   useEffect(() => {
-    if (hasAdminSession) fetchData();
-  }, [fetchData, hasAdminSession]);
+    if (!checkingAuth && (isAdmin || hasAdminSession)) {
+      fetchData();
+    }
+  }, [checkingAuth, isAdmin, hasAdminSession, fetchData]);
 
-  // 3. Handlers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.group("🚀 [Editar] Iniciando Update");
     setSaving(true);
 
     if (!formData.titulo.trim()) {
       toast.error("Título é obrigatório");
       setSaving(false);
+      console.groupEnd();
       return;
     }
 
     try {
-      const payload = {
-        titulo: formData.titulo,
-        descricao: formData.descricao,
-        categoria_id: formData.categoria_id,
-        status: formData.status,
-        destaque: formData.destaque,
-        ordem: formData.ordem,
-        // Arquivos são opcionais na edição
-        arquivo_file: novoArquivo || undefined,
-        thumbnail_file: novaThumbnail || undefined,
-      };
+      const data = new FormData();
+      data.append("titulo", formData.titulo);
+      data.append("descricao", formData.descricao);
+      data.append("tipo", formData.tipo);
+      if (formData.categoria_id)
+        data.append("categoria_id", formData.categoria_id);
+      data.append("ordem", String(formData.ordem));
+      data.append("status", String(formData.status));
+      data.append("destaque", String(formData.destaque));
 
-      const res = await updateItem(itemId, payload);
+      if (novoArquivo) {
+        console.log("📂 Anexando novo arquivo:", novoArquivo.name);
+        data.append("arquivo_file", novoArquivo);
+      }
+      if (novaThumbnail) {
+        console.log("🖼️ Anexando nova thumb:", novaThumbnail.name);
+        data.append("thumbnail_file", novaThumbnail);
+      }
+
+      const res = await updateItem(itemId, data);
+      console.log("📥 Resposta:", res);
 
       if (res.success) {
         toast.success("Item atualizado com sucesso!");
         router.push("/admin/galeria/itens");
       } else {
+        console.error("❌ Erro update:", res.error);
         toast.error(res.error || "Erro ao salvar");
       }
     } catch (error) {
-      console.error(error);
+      console.error("🔥 Erro crítico:", error);
       toast.error("Erro interno");
     } finally {
       setSaving(false);
+      console.groupEnd();
     }
   };
 
-  // Filtra categorias compatíveis
   const categoriasCompativeis = categorias.filter(
     (c) =>
       (c.tipo === "fotos" && formData.tipo === "foto") ||
       (c.tipo === "videos" && formData.tipo === "video"),
   );
 
-  if (loading)
+  // ✅ CORREÇÃO 5: Tela de loading enquanto verifica Auth ou carrega dados
+  if (checkingAuth || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <RiLoader4Line className="animate-spin w-10 h-10 text-emerald-600" />
-          <p className="text-slate-500 font-medium">Carregando dados...</p>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
+        <RiLoader4Line className="w-10 h-10 animate-spin text-emerald-600" />
+        <p className="text-slate-500 font-medium animate-pulse">
+          {checkingAuth ? "Verificando permissões..." : "Carregando dados..."}
+        </p>
       </div>
     );
+  }
 
+  // Se não tem item carregado após loading, retorna null (o useEffect de erro já cuidou do redirect)
   if (!item) return null;
 
   return (
     <div className="min-h-screen bg-slate-50/50 py-10 font-sans">
       <div className="container mx-auto px-4 max-w-5xl">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -251,7 +299,7 @@ export default function EditarItemPage() {
           onSubmit={handleSubmit}
           className="grid grid-cols-1 lg:grid-cols-3 gap-8"
         >
-          {/* Principal */}
+          {/* Coluna Principal */}
           <motion.div
             variants={itemVariants}
             className="lg:col-span-2 space-y-6"
@@ -264,8 +312,9 @@ export default function EditarItemPage() {
               </CardHeader>
               <CardContent className="p-6 space-y-6">
                 <div className="space-y-2">
-                  <Label>Título</Label>
+                  <Label htmlFor="titulo">Título</Label>
                   <Input
+                    id="titulo"
                     value={formData.titulo}
                     onChange={(e) =>
                       setFormData({ ...formData, titulo: e.target.value })
@@ -277,7 +326,7 @@ export default function EditarItemPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label>Tipo</Label>
-                    <div className="flex items-center gap-2 h-11 px-3 border rounded-md bg-slate-50 text-slate-500">
+                    <div className="flex items-center gap-2 h-11 px-3 border rounded-md bg-slate-50 text-slate-500 cursor-not-allowed">
                       {formData.tipo === "foto" ? (
                         <RiImageLine />
                       ) : (
@@ -332,7 +381,6 @@ export default function EditarItemPage() {
               </CardContent>
             </Card>
 
-            {/* Mídia */}
             <Card className="border-none shadow-lg bg-white overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-6">
                 <CardTitle className="text-lg font-bold text-slate-800">
@@ -341,9 +389,19 @@ export default function EditarItemPage() {
               </CardHeader>
               <CardContent className="p-6 space-y-6">
                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-4">
-                  <div className="w-16 h-16 bg-white rounded-lg border flex items-center justify-center text-slate-400">
+                  <div className="w-16 h-16 bg-white rounded-lg border flex items-center justify-center text-slate-400 overflow-hidden relative">
                     {formData.tipo === "foto" ? (
-                      <RiImageLine size={24} />
+                      <Image
+                        src={formData.arquivo_url || "/placeholder.png"}
+                        alt="Atual"
+                        fill
+                        sizes="64px"
+                        className="object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                        }}
+                      />
                     ) : (
                       <RiVideoLine size={24} />
                     )}
@@ -368,9 +426,14 @@ export default function EditarItemPage() {
                     <Input
                       type="file"
                       accept={formData.tipo === "foto" ? "image/*" : "video/*"}
-                      onChange={(e) =>
-                        setNovoArquivo(e.target.files?.[0] || null)
-                      }
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        console.log(
+                          "📂 [Editar] Arquivo selecionado:",
+                          file?.name,
+                        );
+                        setNovoArquivo(file);
+                      }}
                       className="file:text-emerald-700 file:bg-emerald-50 file:border-0 file:rounded-md file:px-2 file:py-1 file:mr-3 file:text-sm file:font-semibold hover:file:bg-emerald-100 cursor-pointer"
                     />
                     {novoArquivo && (
@@ -381,7 +444,6 @@ export default function EditarItemPage() {
                   </div>
                 </div>
 
-                {/* Thumbnail para Vídeo */}
                 {formData.tipo === "video" && (
                   <div className="space-y-2 pt-2 border-t border-slate-100 mt-4">
                     <Label className="block mb-1">Thumbnail (Opcional)</Label>
@@ -394,9 +456,14 @@ export default function EditarItemPage() {
                       <Input
                         type="file"
                         accept="image/*"
-                        onChange={(e) =>
-                          setNovaThumbnail(e.target.files?.[0] || null)
-                        }
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          console.log(
+                            "🖼️ [Editar] Thumbnail selecionada:",
+                            file?.name,
+                          );
+                          setNovaThumbnail(file);
+                        }}
                         className="file:text-purple-700 file:bg-purple-50 file:border-0 file:rounded-md file:px-2 file:py-1 file:mr-3 file:text-sm file:font-semibold hover:file:bg-purple-100 cursor-pointer"
                       />
                       {novaThumbnail && (
@@ -411,7 +478,7 @@ export default function EditarItemPage() {
             </Card>
           </motion.div>
 
-          {/* Configurações */}
+          {/* Coluna Lateral */}
           <motion.div variants={itemVariants} className="space-y-6">
             <Card className="border-none shadow-lg bg-white overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 p-4">
@@ -442,9 +509,7 @@ export default function EditarItemPage() {
                     className="data-[state=checked]:bg-emerald-500"
                   />
                 </div>
-
                 <div className="h-px bg-slate-100" />
-
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
@@ -489,7 +554,7 @@ export default function EditarItemPage() {
             <Button
               type="submit"
               disabled={saving}
-              className="w-full h-12 text-lg font-bold bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-100 transition-all hover:translate-y-[-1px]"
+              className="w-full h-12 text-lg font-bold bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-100 transition-all hover:translate-y-[-1px] disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {saving ? (
                 <>

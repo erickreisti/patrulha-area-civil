@@ -444,7 +444,10 @@ export interface Database {
   };
 }
 
-// Helpers de Tipagem
+// ============================================
+// HELPERS DE TIPAGEM (Essenciais para o Supabase)
+// ============================================
+
 export type Tables<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Row"];
 export type TablesInsert<T extends keyof Database["public"]["Tables"]> =
@@ -452,10 +455,30 @@ export type TablesInsert<T extends keyof Database["public"]["Tables"]> =
 export type TablesUpdate<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Update"];
 
-// Tipos Específicos Exportados
+// ============================================
+// TIPOS EXPORTADOS ESPECÍFICOS (Resolvem seus erros de import)
+// ============================================
+
 export type GaleriaItem = Tables<"galeria_itens">;
 export type GaleriaItemInsert = TablesInsert<"galeria_itens">;
 export type GaleriaItemUpdate = TablesUpdate<"galeria_itens">;
+
 export type GaleriaCategoria = Tables<"galeria_categorias">;
+export type GaleriaCategoriaInsert = TablesInsert<"galeria_categorias">;
+export type GaleriaCategoriaUpdate = TablesUpdate<"galeria_categorias">;
+
 export type Profile = Tables<"profiles">;
-export type SystemActivityInsert = TablesInsert<"system_activities">;
+export type Notification = Tables<"notifications">;
+export type SystemActivity = Tables<"system_activities">;
+
+// ============================================
+// TIPOS DE AUTENTICAÇÃO E SESSÃO
+// ============================================
+
+export interface AdminSessionData {
+  userId: string;
+  userEmail: string;
+  sessionToken: string;
+  expiresAt: string;
+  createdAt: string;
+}

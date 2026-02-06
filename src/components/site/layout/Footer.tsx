@@ -12,186 +12,162 @@ import {
   RiMapPinLine,
   RiAlertLine,
   RiTwitterXLine,
-  RiCopyrightLine,
-  RiShieldCheckLine,
+  RiArrowRightSLine,
 } from "react-icons/ri";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
 import { IconType } from "react-icons";
-import { useRef } from "react";
 import { cn } from "@/lib/utils/cn";
+
+// --- DADOS ---
 
 const SOCIAL_LINKS = [
   {
     icon: RiFacebookFill,
     url: "https://facebook.com/patrulhaaereacivil",
-    color: "hover:bg-blue-600",
     label: "Facebook",
+    // Cores exatas das marcas para o hover
+    hoverClass: "hover:bg-[#1877F2] hover:text-white hover:border-[#1877F2]",
   },
   {
     icon: RiTwitterXLine,
     url: "https://twitter.com/patrulhaaereacivil",
-    color: "hover:bg-black",
     label: "Twitter",
+    hoverClass: "hover:bg-black hover:text-white hover:border-black",
   },
   {
     icon: RiInstagramLine,
     url: "https://instagram.com/patrulhaaereacivil",
-    color: "hover:bg-pink-600",
     label: "Instagram",
+    hoverClass: "hover:bg-[#E4405F] hover:text-white hover:border-[#E4405F]",
   },
   {
     icon: RiWhatsappLine,
     url: "https://wa.me/5521999999999",
-    color: "hover:bg-green-600",
     label: "WhatsApp",
+    hoverClass: "hover:bg-[#25D366] hover:text-white hover:border-[#25D366]",
   },
 ];
 
 const NAVIGATION_LINKS = [
-  { href: "/sobre", label: "SOBRE NÓS" },
-  { href: "/servicos", label: "SERVIÇOS" },
-  { href: "/atividades", label: "ATIVIDADES" },
-  { href: "/noticias", label: "NOTÍCIAS" },
-  { href: "/galeria", label: "GALERIA" },
-  { href: "/contato", label: "CONTATO" },
+  { href: "/sobre", label: "Sobre Nós" },
+  { href: "/servicos", label: "Serviços Operacionais" },
+  { href: "/atividades", label: "Registro de Atividades" },
+  { href: "/noticias", label: "Notícias & Avisos" },
+  { href: "/galeria", label: "Galeria Multimídia" },
+  { href: "/contato", label: "Fale Conosco" },
 ];
 
 const LEGAL_LINKS = [
-  { href: "/legislacao", label: "Legislação", icon: RiShieldCheckLine },
-  { href: "/privacidade", label: "Privacidade", icon: RiShieldCheckLine },
-  { href: "/termos", label: "Termos de Uso", icon: RiCopyrightLine },
+  { href: "/legislacao", label: "Legislação" },
+  { href: "/privacidade", label: "Privacidade" },
+  { href: "/termos", label: "Termos de Uso" },
 ];
 
-const BrandSection = () => {
-  const ref = useRef(null);
+// --- VARIANTES DE ANIMAÇÃO ---
 
+const containerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
+  },
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5 },
+  },
+};
+
+// --- SUB-COMPONENTES ---
+
+const BrandSection = () => {
   return (
     <motion.div
-      ref={ref}
-      className="col-span-1 md:col-span-2 lg:col-span-2"
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      viewport={{ once: true, margin: "-100px" }}
+      variants={itemVariants}
+      className="col-span-1 lg:col-span-2 pr-0 lg:pr-12"
     >
       <Link
         href="/"
-        className="flex items-center space-x-2 sm:space-x-3 mb-3 sm:mb-4 group"
-        aria-label="Página inicial da Patrulha Aérea Civil"
+        className="flex items-center gap-4 mb-6 group w-fit"
+        aria-label="Ir para página inicial"
       >
-        <motion.div
-          className="relative w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14"
-          whileHover={{ scale: 1.05 }}
-          transition={{ duration: 0.3 }}
-        >
+        <div className="relative w-16 h-16 transition-transform duration-300 group-hover:scale-105">
           <Image
             src="/images/logos/logo.webp"
-            alt="Patrulha Aérea Civil"
-            width={56}
-            height={56}
-            className="object-contain group-hover:scale-105 transition-transform duration-300"
-            style={{ width: "auto", height: "auto" }}
-            sizes="(max-width: 640px) 40px, (max-width: 768px) 48px, 56px"
+            alt="Brasão Patrulha Aérea Civil"
+            width={64}
+            height={64}
+            className="object-contain drop-shadow-lg"
           />
-        </motion.div>
-        <div className="min-w-0">
-          {/* CORRIGIDO: Removido font-bold, mantido font-extrabold */}
-          <h2 className="text-lg sm:text-xl text-gray-800 font-extrabold uppercase tracking-tight truncate">
-            Patrulha Aérea Civil
+        </div>
+        <div className="flex flex-col">
+          {/* Texto Escuro para Fundo Branco */}
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tight leading-none mb-1">
+            Patrulha Aérea <span className="text-pac-primary">Civil</span>
           </h2>
-          <p className="text-pac-primary font-medium text-xs sm:text-sm truncate">
-            COMANDO OPERACIONAL NO ESTADO DO RIO DE JANEIRO
+          <p className="text-[10px] sm:text-xs font-bold text-pac-primary/80 uppercase tracking-[0.15em]">
+            Comando Operacional RJ
           </p>
         </div>
       </Link>
-      <motion.p
-        className="text-gray-700 max-w-md leading-relaxed text-xs sm:text-sm mt-2"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        transition={{ duration: 0.6, delay: 0.2 }}
-        viewport={{ once: true }}
-      >
+
+      <p className="text-slate-600 text-sm leading-relaxed mb-8 max-w-md font-medium">
         Organização civil dedicada ao serviço aéreo humanitário, resgate e apoio
-        às comunidades em situações de emergência. Comprometidos com a segurança
-        e o bem-estar da população.
-      </motion.p>
-      <SocialLinks />
-    </motion.div>
-  );
-};
+        às comunidades. Atuamos com honra e disciplina para garantir a segurança
+        e o bem-estar da população brasileira.
+      </p>
 
-const SocialLinks = () => {
-  const ref = useRef(null);
-
-  return (
-    <motion.div
-      ref={ref}
-      className="mt-4 sm:mt-6 flex space-x-2 sm:space-x-3"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.4 }}
-      viewport={{ once: true }}
-    >
-      {SOCIAL_LINKS.map((social, index) => (
-        <motion.a
-          key={index}
-          href={social.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            "text-gray-700 transition-all duration-300 hover:scale-110",
-            "bg-gray-100 rounded-full p-1.5 sm:p-2 border border-gray-200",
-            social.color,
-            "hover:text-white",
-            "touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-pac-primary/50",
-          )}
-          title={social.label}
-          aria-label={social.label}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          initial={{ opacity: 0, scale: 0.8 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: index * 0.1 }}
-          viewport={{ once: true }}
-        >
-          <social.icon className="w-3 h-3 sm:w-4 sm:h-4" />
-        </motion.a>
-      ))}
+      {/* Social Links */}
+      <div className="flex gap-3">
+        {SOCIAL_LINKS.map((social, index) => (
+          <a
+            key={index}
+            href={social.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              // Estilo Light: Fundo branco, borda cinza, ícone cinza
+              "w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-500 border border-slate-200 transition-all duration-300 shadow-sm",
+              social.hoverClass,
+              "hover:-translate-y-1 hover:shadow-md",
+            )}
+            title={social.label}
+          >
+            <social.icon className="w-5 h-5 transition-colors" />
+          </a>
+        ))}
+      </div>
     </motion.div>
   );
 };
 
 const NavigationSection = () => {
-  const ref = useRef(null);
-
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, x: -30 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.6, delay: 0.2 }}
-      viewport={{ once: true, margin: "-100px" }}
-    >
-      <SectionTitle title="Navegação" />
-      <ul className="space-y-1 sm:space-y-2">
-        {NAVIGATION_LINKS.map((link, index) => (
-          <motion.li
-            key={link.href}
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.05 + 0.3 }}
-            viewport={{ once: true }}
-          >
+    <motion.div variants={itemVariants} className="col-span-1">
+      <h3 className="text-slate-900 font-bold uppercase tracking-wider text-sm mb-6 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-pac-primary" />
+        Navegação
+      </h3>
+      <ul className="space-y-3">
+        {NAVIGATION_LINKS.map((link) => (
+          <li key={link.href} className="w-fit">
             <Link
               href={link.href}
-              className="text-gray-700 text-xs sm:text-sm font-medium py-1 sm:py-1.5 transition-all duration-300 uppercase tracking-wider hover:text-pac-primary hover:font-semibold block relative group/navlink w-fit touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
+              // --- ANIMAÇÃO DO RISCO AZUL ---
+              className="group relative flex items-center text-sm font-medium text-slate-600 hover:text-pac-primary transition-colors duration-300"
             >
-              <span className="relative z-10 transition-colors duration-300">
+              <span className="relative z-10 flex items-center">
+                <RiArrowRightSLine className="w-4 h-4 mr-2 text-slate-400 group-hover:text-pac-primary group-hover:translate-x-1 transition-all" />
                 {link.label}
               </span>
-              <div className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-pac-primary transition-all duration-300 group-hover/navlink:w-full" />
+              {/* O Risco (Underline) que cresce */}
+              <span className="absolute left-6 bottom-0 h-[1.5px] w-0 bg-pac-primary transition-all duration-300 group-hover:w-[calc(100%-1.5rem)]" />
             </Link>
-          </motion.li>
+          </li>
         ))}
       </ul>
     </motion.div>
@@ -199,242 +175,117 @@ const NavigationSection = () => {
 };
 
 const ContactSection = () => {
-  const ref = useRef(null);
-
   return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, x: 30 }}
-      whileInView={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.6, delay: 0.3 }}
-      viewport={{ once: true, margin: "-100px" }}
-    >
-      <SectionTitle title="Contato & Emergência" />
-      <ContactInfo />
-      <EmergencyButton />
-    </motion.div>
-  );
-};
+    <motion.div variants={itemVariants} className="col-span-1">
+      <h3 className="text-slate-900 font-bold uppercase tracking-wider text-sm mb-6 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-pac-primary" />
+        Contato
+      </h3>
 
-const SectionTitle = ({ title }: { title: string }) => {
-  const ref = useRef(null);
+      <ul className="space-y-4 mb-8">
+        <ContactItem
+          icon={RiMailLine}
+          text="contato@patrulhaaereacivil.org.br"
+        />
+        <ContactItem icon={RiPhoneLine} text="(21) 99999-9999" />
+        <ContactItem icon={RiMapPinLine} text="Rio de Janeiro, Brasil" />
+      </ul>
 
-  return (
-    <motion.h3
-      ref={ref}
-      // CORRIGIDO: Removido font-bold, mantido font-extrabold
-      className="text-base sm:text-lg text-gray-800 mb-2 sm:mb-3 font-extrabold uppercase tracking-tight border-b border-pac-primary pb-1 sm:pb-2"
-      initial={{ opacity: 0, y: -10 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      viewport={{ once: true }}
-    >
-      {title}
-    </motion.h3>
-  );
-};
-
-const ContactInfo = () => {
-  const ref = useRef(null);
-
-  return (
-    <ul
-      ref={ref}
-      className="space-y-1.5 sm:space-y-2 text-gray-700 text-xs sm:text-sm"
-    >
-      <ContactItem
-        icon={RiMailLine}
-        text="contato@patrulhaaereacivil.org.br"
-        index={0}
-      />
-      <ContactItem icon={RiPhoneLine} text="(21) 99999-9999" index={1} />
-      <ContactItem
-        icon={RiAlertLine}
-        text="Emergência: 24/7"
-        isEmergency
-        index={2}
-      />
-      <ContactItem
-        icon={RiMapPinLine}
-        text="Rio de Janeiro, Brasil"
-        index={3}
-      />
-    </ul>
-  );
-};
-
-interface ContactItemProps {
-  icon: IconType;
-  text: string;
-  isEmergency?: boolean;
-  index: number;
-}
-
-const ContactItem = ({
-  icon: Icon,
-  text,
-  isEmergency = false,
-  index,
-}: ContactItemProps) => (
-  <motion.li
-    className={`flex items-start space-x-1.5 sm:space-x-2 transition-colors duration-300 ${
-      isEmergency ? "hover:text-pac-alert" : "hover:text-pac-primary"
-    }`}
-    initial={{ opacity: 0, y: 10 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4, delay: index * 0.1 + 0.4 }}
-    viewport={{ once: true }}
-  >
-    <Icon
-      className={`w-3 h-3 sm:w-4 sm:h-4 mt-0.5 flex-shrink-0 ${
-        isEmergency ? "text-pac-alert" : "text-pac-primary"
-      }`}
-    />
-    <span
-      className={`text-xs sm:text-sm ${
-        isEmergency ? "font-semibold text-pac-alert" : "text-gray-700"
-      }`}
-    >
-      {text}
-    </span>
-  </motion.li>
-);
-
-const EmergencyButton = () => {
-  const ref = useRef(null);
-
-  return (
-    <motion.div
-      ref={ref}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.6 }}
-      viewport={{ once: true }}
-    >
+      {/* Botão Emergência Light */}
       <Button
-        className="w-full mt-2 sm:mt-3 bg-pac-alert hover:bg-pac-alert-dark text-white font-bold py-2 sm:py-2.5 transition-all duration-300 hover:scale-105 shadow border-0 group/emergency relative overflow-hidden text-xs sm:text-sm touch-optimize active:scale-95 focus:outline-none focus:ring-2 focus:ring-white/50"
         asChild
+        className={cn(
+          "w-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700",
+          "border-2 border-red-100 hover:border-red-200",
+          "font-bold uppercase tracking-wide h-12 rounded-xl transition-all duration-300 group shadow-sm",
+        )}
       >
-        <Link
-          href="/contato"
-          aria-label="Página de contato de emergência"
-          className="focus:outline-none"
-        >
-          <span className="relative z-10 flex items-center justify-center">
-            <RiAlertLine className="mr-1 sm:mr-2 w-3 h-3 sm:w-3.5 sm:h-3.5" />
-            EMERGÊNCIA
-          </span>
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover/emergency:translate-x-[100%] transition-transform duration-1000" />
+        <Link href="/contato">
+          <RiAlertLine className="mr-2 w-5 h-5 animate-pulse text-red-500" />
+          Plantão de Emergência
         </Link>
       </Button>
     </motion.div>
   );
 };
 
-const BottomFooter = () => {
-  const ref = useRef(null);
+const ContactItem = ({
+  icon: Icon,
+  text,
+}: {
+  icon: IconType;
+  text: string;
+}) => (
+  <li className="flex items-start gap-3 text-slate-600 group">
+    {/* Ícone com fundo claro */}
+    <div className="w-8 h-8 rounded bg-pac-primary/5 flex items-center justify-center shrink-0 group-hover:bg-pac-primary transition-colors border border-pac-primary/10 group-hover:border-pac-primary">
+      <Icon className="w-4 h-4 text-pac-primary group-hover:text-white transition-colors" />
+    </div>
+    <span className="text-sm pt-1.5 font-medium group-hover:text-slate-900 transition-colors">
+      {text}
+    </span>
+  </li>
+);
 
+const BottomFooter = () => {
   return (
-    <motion.div
-      ref={ref}
-      className="border-t border-gray-200 mt-4 sm:mt-6 pt-3 sm:pt-4 flex flex-col md:flex-row justify-between items-center"
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.2 }}
-      viewport={{ once: true }}
-    >
-      <div className="flex items-center space-x-2 sm:space-x-3 mb-2 sm:mb-3 md:mb-0">
-        <div className="relative">
-          <Image
-            src="/images/logos/flag-br.webp"
-            alt="Bandeira do Brasil"
-            width={28}
-            height={24}
-            style={{ width: "auto", height: "auto" }}
-          />
-        </div>
-        <p className="text-gray-700 text-xs whitespace-nowrap">
+    // Borda clara para separar
+    <div className="border-t border-slate-200 mt-16 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div className="flex items-center gap-3">
+        <Image
+          src="/images/logos/flag-br.webp"
+          alt="Brasil"
+          width={24}
+          height={16}
+          className="opacity-90 shadow-sm"
+        />
+        <p className="text-slate-500 text-xs font-medium">
           © {new Date().getFullYear()} Patrulha Aérea Civil. Todos os direitos
           reservados.
         </p>
       </div>
 
-      <LegalLinks />
-    </motion.div>
-  );
-};
-
-const LegalLinks = () => {
-  const ref = useRef(null);
-
-  return (
-    <motion.div
-      ref={ref}
-      className="flex flex-wrap justify-center gap-1 sm:gap-2 md:gap-3"
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      transition={{ duration: 0.6, delay: 0.4 }}
-      viewport={{ once: true }}
-    >
-      {LEGAL_LINKS.map((link, index) => (
-        <motion.div
-          key={link.href}
-          initial={{ opacity: 0, y: 10 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: index * 0.1 + 0.5 }}
-          viewport={{ once: true }}
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            asChild
-            className="text-gray-700 hover:text-pac-primary hover:bg-pac-primary-pale text-xs transition-all duration-300 h-7 sm:h-8 px-2 sm:px-3 touch-optimize focus:outline-none focus:ring-2 focus:ring-pac-primary/50"
+      <div className="flex gap-6">
+        {LEGAL_LINKS.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="text-xs font-medium text-slate-500 hover:text-pac-primary transition-colors relative group"
           >
-            <Link
-              href={link.href}
-              className="flex items-center gap-1 focus:outline-none"
-            >
-              {link.icon && <link.icon className="w-3 h-3" />}
-              {link.label}
-            </Link>
-          </Button>
-        </motion.div>
-      ))}
-    </motion.div>
+            <span className="relative z-10">{link.label}</span>
+            {/* Risco Azul também nos links legais */}
+            <span className="absolute left-0 -bottom-0.5 w-0 h-[1px] bg-pac-primary transition-all duration-300 group-hover:w-full" />
+          </Link>
+        ))}
+      </div>
+    </div>
   );
 };
+
+// --- COMPONENTE PRINCIPAL ---
 
 export function Footer() {
-  const ref = useRef(null);
-
   return (
-    <footer
-      ref={ref}
-      className="bg-white text-gray-700 border-t border-pac-primary"
-      role="contentinfo"
-    >
-      <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
+    // Fundo Branco (bg-white)
+    <footer className="bg-white text-slate-600 relative overflow-hidden border-t border-slate-100">
+      {/* Background Pattern Sutil (quase invisível para textura) */}
+      <div className="absolute inset-0 bg-[url('/images/patterns/grid.svg')] opacity-[0.02] pointer-events-none" />
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 relative z-10">
         <motion.div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6"
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-12"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
           viewport={{ once: true, margin: "-100px" }}
         >
           <BrandSection />
           <NavigationSection />
           <ContactSection />
         </motion.div>
+
         <BottomFooter />
       </div>
-
-      {/* Accessibilidade - Skip to content */}
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-pac-primary focus:text-white focus:px-4 focus:py-2 focus:rounded"
-      >
-        Pular para conteúdo principal
-      </a>
     </footer>
   );
 }
