@@ -7,7 +7,7 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
-// UI Components
+// UI
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,18 +47,27 @@ import {
 } from "react-icons/ri";
 
 // Store & Types
-import { useItensAdmin, useGaleriaStats } from "@/lib/stores/useGaleriaStore";
-import { deleteItem } from "@/app/actions/gallery";
-import type {
-  Item,
+import {
+  useItensAdmin,
+  useGaleriaStats,
+  GaleriaItem,
   TipoItemFilter,
   StatusFilter,
-  Categoria,
-} from "@/app/actions/gallery/types";
+} from "@/lib/stores/useGaleriaStore";
 
 // ============================================
 // COMPONENTES LOCAIS
 // ============================================
+
+// ✅ Interface definida para substituir o 'any'
+interface StatCardProps {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  description: string;
+  color: "blue" | "green" | "purple" | "indigo";
+  loading: boolean;
+}
 
 const StatCard = ({
   title,
@@ -67,14 +76,7 @@ const StatCard = ({
   description,
   color,
   loading,
-}: {
-  title: string;
-  value: number;
-  icon: React.ReactNode;
-  description: string;
-  color: "blue" | "green" | "purple" | "indigo";
-  loading: boolean;
-}) => {
+}: StatCardProps) => {
   const colorStyles = {
     blue: "bg-blue-50/50 text-blue-700 border-blue-100",
     green: "bg-emerald-50/50 text-emerald-700 border-emerald-100",
@@ -139,7 +141,6 @@ const ImageThumbnail = ({
         src={src}
         alt="Thumbnail"
         fill
-        // ✅ CORREÇÃO: Informa ao Next.js que a imagem é pequena (64px)
         sizes="64px"
         className="object-cover transition-transform duration-500 group-hover:scale-110"
         onError={() => setError(true)}
@@ -167,15 +168,15 @@ export default function ItensGaleriaPage() {
     setFiltros,
     resetFiltros,
     setPagination,
+    deleteItem,
   } = useItensAdmin();
 
   const { stats, loading: loadingStats, fetchStats } = useGaleriaStats();
 
-  // Estado Local
   const [refreshing, setRefreshing] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<{
     open: boolean;
-    item: Item | null;
+    item: GaleriaItem | null;
     loading: boolean;
   }>({
     open: false,
@@ -183,7 +184,6 @@ export default function ItensGaleriaPage() {
     loading: false,
   });
 
-  // Carregar dados iniciais
   useEffect(() => {
     fetchItens();
     fetchCategorias();
@@ -191,7 +191,10 @@ export default function ItensGaleriaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handler de Refresh
+  useEffect(() => {
+    fetchItens();
+  }, [filtros, pagination.page, fetchItens]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([fetchItens(), fetchStats()]);
@@ -199,25 +202,17 @@ export default function ItensGaleriaPage() {
     toast.success("Dados atualizados com sucesso");
   };
 
-  // Handler de Deleção
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.item) return;
-
     setDeleteDialog((prev) => ({ ...prev, loading: true }));
-
-    try {
-      const res = await deleteItem(deleteDialog.item.id);
-      if (res.success) {
-        toast.success("Item excluído com sucesso");
-        fetchItens();
-        fetchStats();
-        setDeleteDialog({ open: false, item: null, loading: false });
-      } else {
-        toast.error(res.error || "Erro ao excluir item");
-        setDeleteDialog((prev) => ({ ...prev, loading: false }));
-      }
-    } catch {
-      toast.error("Erro desconhecido ao excluir");
+    const res = await deleteItem(deleteDialog.item.id);
+    if (res.success) {
+      toast.success("Item excluído com sucesso");
+      fetchItens();
+      fetchStats();
+      setDeleteDialog({ open: false, item: null, loading: false });
+    } else {
+      toast.error(res.error || "Erro ao excluir item");
       setDeleteDialog((prev) => ({ ...prev, loading: false }));
     }
   };
@@ -251,7 +246,7 @@ export default function ItensGaleriaPage() {
             >
               <RiRefreshLine
                 className={`mr-2 ${refreshing ? "animate-spin" : ""}`}
-              />
+              />{" "}
               Atualizar
             </Button>
             <Link href="/admin/galeria/itens/criar">
@@ -266,7 +261,7 @@ export default function ItensGaleriaPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
             title="Total Itens"
-            value={stats?.total_itens || 0}
+            value={stats?.totalItens || 0}
             icon={<RiGridLine className="w-5 h-5" />}
             color="blue"
             description="Mídias cadastradas"
@@ -274,7 +269,7 @@ export default function ItensGaleriaPage() {
           />
           <StatCard
             title="Ativos"
-            value={stats?.itens_ativos || 0}
+            value={stats?.itensAtivos || 0}
             icon={<RiImageLine className="w-5 h-5" />}
             color="green"
             description="Visíveis no site"
@@ -282,7 +277,7 @@ export default function ItensGaleriaPage() {
           />
           <StatCard
             title="Vídeos"
-            value={stats?.total_videos || 0}
+            value={stats?.totalVideos || 0}
             icon={<RiVideoLine className="w-5 h-5" />}
             color="purple"
             description="Vídeos na galeria"
@@ -290,7 +285,7 @@ export default function ItensGaleriaPage() {
           />
           <StatCard
             title="Destaques"
-            value={stats?.itens_destaque || 0}
+            value={stats?.itensDestaque || 0}
             icon={<RiStarFill className="w-5 h-5" />}
             color="indigo"
             description="Itens na home"
@@ -302,7 +297,6 @@ export default function ItensGaleriaPage() {
         <Card className="border-none shadow-md bg-white mb-6">
           <CardContent className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-              {/* Busca */}
               <div className="relative md:col-span-4 lg:col-span-5">
                 <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <Input
@@ -312,8 +306,6 @@ export default function ItensGaleriaPage() {
                   className="pl-10 border-slate-200 bg-slate-50/50 focus:bg-white h-10 transition-colors"
                 />
               </div>
-
-              {/* Selects */}
               <div className="md:col-span-8 lg:col-span-7 flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
                 <Select
                   value={filtros.categoria_id}
@@ -327,14 +319,13 @@ export default function ItensGaleriaPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todas</SelectItem>
-                    {listaCategorias.map((c: Categoria) => (
+                    {listaCategorias.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.nome}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-
                 <Select
                   value={filtros.tipo}
                   onValueChange={(v) =>
@@ -353,7 +344,6 @@ export default function ItensGaleriaPage() {
                     <SelectItem value="video">Vídeos</SelectItem>
                   </SelectContent>
                 </Select>
-
                 <Select
                   value={filtros.status}
                   onValueChange={(v) =>
@@ -369,7 +359,6 @@ export default function ItensGaleriaPage() {
                     <SelectItem value="inativo">Inativos</SelectItem>
                   </SelectContent>
                 </Select>
-
                 <Button
                   variant="ghost"
                   size="icon"
@@ -393,7 +382,7 @@ export default function ItensGaleriaPage() {
                 variant="secondary"
                 className="bg-white border-slate-200 text-slate-600 shadow-sm"
               >
-                {pagination.total}
+                {pagination.totalItems}
               </Badge>
             </div>
             <Link href="/admin/galeria/itens/criar">
@@ -438,7 +427,7 @@ export default function ItensGaleriaPage() {
           ) : (
             <div className="divide-y divide-slate-50">
               <AnimatePresence mode="popLayout">
-                {itens.map((item: Item) => (
+                {itens.map((item: GaleriaItem) => (
                   <motion.div
                     key={item.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -447,10 +436,9 @@ export default function ItensGaleriaPage() {
                     className="group p-4 flex flex-col sm:flex-row gap-5 items-center hover:bg-slate-50/80 transition-all duration-200"
                   >
                     <ImageThumbnail
-                      src={item.thumbnail_url || item.arquivo_url}
+                      src={item.thumbnail_url || item.url}
                       tipo={item.tipo}
                     />
-
                     <div className="flex-1 min-w-0 text-center sm:text-left space-y-1.5">
                       <div className="flex items-center justify-center sm:justify-start gap-2">
                         <h4 className="font-bold text-slate-800 truncate text-base">
@@ -470,7 +458,6 @@ export default function ItensGaleriaPage() {
                           </Badge>
                         )}
                       </div>
-
                       <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs text-slate-500 font-medium">
                         <span className="flex items-center gap-1.5">
                           {item.tipo === "foto" ? (
@@ -480,7 +467,6 @@ export default function ItensGaleriaPage() {
                           )}
                           {item.tipo === "foto" ? "Foto" : "Vídeo"}
                         </span>
-
                         {item.galeria_categorias && (
                           <>
                             <span className="text-slate-300">•</span>
@@ -490,7 +476,6 @@ export default function ItensGaleriaPage() {
                             </span>
                           </>
                         )}
-
                         <span className="text-slate-300">•</span>
                         <span className="text-slate-400">
                           {new Date(item.created_at).toLocaleDateString(
@@ -499,7 +484,6 @@ export default function ItensGaleriaPage() {
                         </span>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                       <Link href={`/admin/galeria/itens/${item.id}`}>
                         <Button

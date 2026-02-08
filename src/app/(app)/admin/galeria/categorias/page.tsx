@@ -49,12 +49,10 @@ import {
 import {
   useCategoriasAdmin,
   useGaleriaStats,
+  Categoria, // Importar interface da Store para compatibilidade
+  TipoCategoriaFilter,
 } from "@/lib/stores/useGaleriaStore";
 import { deleteCategoria } from "@/app/actions/gallery";
-import type {
-  Categoria,
-  TipoCategoriaFilter,
-} from "@/app/actions/gallery/types";
 
 // ============================================
 // COMPONENTES LOCAIS
@@ -115,7 +113,7 @@ const StatCard = ({
 export default function CategoriasGaleriaPage() {
   const router = useRouter();
 
-  // Store Hooks
+  // Store Hooks (Agora completos com as propriedades que faltavam)
   const {
     categorias,
     loading: loadingList,
@@ -147,9 +145,8 @@ export default function CategoriasGaleriaPage() {
     fetchCategorias();
     fetchStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Dependências vazias para rodar apenas na montagem ou use [fetchCategorias, fetchStats] se usar useCallback na store
 
-  // Handler de Refresh
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([fetchCategorias(), fetchStats()]);
@@ -157,7 +154,6 @@ export default function CategoriasGaleriaPage() {
     toast.success("Dados atualizados com sucesso");
   };
 
-  // Handler de Deleção
   const handleDeleteConfirm = async () => {
     if (!deleteDialog.categoria) return;
 
@@ -180,7 +176,6 @@ export default function CategoriasGaleriaPage() {
     }
   };
 
-  // Handler de Status
   const handleToggleStatus = async (id: string, currentStatus: boolean) => {
     const res = await toggleStatus(id, currentStatus);
     if (res.success) {
@@ -230,11 +225,11 @@ export default function CategoriasGaleriaPage() {
           </div>
         </div>
 
-        {/* Estatísticas */}
+        {/* Estatísticas (Corrigido acesso às props camelCase) */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatCard
             title="Total"
-            value={stats?.total_categorias || 0}
+            value={stats?.totalCategorias || 0}
             icon={<RiFolderLine className="w-5 h-5" />}
             color="blue"
             description="Categorias cadastradas"
@@ -242,7 +237,7 @@ export default function CategoriasGaleriaPage() {
           />
           <StatCard
             title="Ativas"
-            value={stats?.categorias_ativas || 0}
+            value={stats?.categoriasAtivas || 0}
             icon={<RiEyeLine className="w-5 h-5" />}
             color="green"
             description="Visíveis no site"
@@ -250,7 +245,7 @@ export default function CategoriasGaleriaPage() {
           />
           <StatCard
             title="Fotos"
-            value={stats?.categorias_por_tipo.fotos || 0}
+            value={stats?.categoriasPorTipo.fotos || 0}
             icon={<RiImageLine className="w-5 h-5" />}
             color="indigo"
             description="Álbuns de fotos"
@@ -258,7 +253,7 @@ export default function CategoriasGaleriaPage() {
           />
           <StatCard
             title="Vídeos"
-            value={stats?.categorias_por_tipo.videos || 0}
+            value={stats?.categoriasPorTipo.videos || 0}
             icon={<RiVideoLine className="w-5 h-5" />}
             color="purple"
             description="Álbuns de vídeos"

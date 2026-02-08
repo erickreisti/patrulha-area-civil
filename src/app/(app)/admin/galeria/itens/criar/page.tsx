@@ -83,21 +83,26 @@ export default function CriarItemGaleriaPage() {
     destaque: false,
   });
 
+  // Limpeza de memória do preview ao desmontar ou mudar o arquivo
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
   // Inicialização
   useEffect(() => {
     let mounted = true;
     const init = async () => {
-      console.log("🔄 [Criar] Iniciando verificação de autenticação...");
       try {
         await initAuth();
         if (mounted) await fetchCategorias();
       } catch (error) {
-        console.error("❌ [Criar] Erro na inicialização:", error);
+        console.error("Erro na inicialização:", error);
       } finally {
-        if (mounted) {
-          console.log("✅ [Criar] Verificação concluída.");
-          setCheckingAuth(false);
-        }
+        if (mounted) setCheckingAuth(false);
       }
     };
     init();
@@ -109,9 +114,7 @@ export default function CriarItemGaleriaPage() {
   // Proteção
   useEffect(() => {
     if (checkingAuth) return;
-    console.log("🛡️ [Criar] Auth Status:", { isAdmin, hasAdminSession });
     if (!isAdmin && !hasAdminSession) {
-      console.warn("🚫 [Criar] Acesso negado. Redirecionando...");
       toast.error("Acesso negado");
       router.replace("/login");
     }
@@ -120,15 +123,6 @@ export default function CriarItemGaleriaPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    console.log(
-      "📁 [Criar] Arquivo selecionado:",
-      file.name,
-      "Tipo:",
-      file.type,
-      "Tamanho:",
-      file.size,
-    );
 
     const maxSize =
       formData.tipo === "video" ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
@@ -143,7 +137,8 @@ export default function CriarItemGaleriaPage() {
     setArquivoFile(file);
 
     if (formData.tipo === "foto") {
-      setPreviewUrl(URL.createObjectURL(file));
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
     } else {
       setPreviewUrl(null);
     }
@@ -151,26 +146,14 @@ export default function CriarItemGaleriaPage() {
 
   const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      console.log("🖼️ [Criar] Thumbnail selecionada:", file.name);
-      setThumbnailFile(file);
-    }
+    if (file) setThumbnailFile(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.group("🚀 [Criar] Iniciando Submit");
 
-    if (!arquivoFile) {
-      console.error("❌ Sem arquivo selecionado");
-      console.groupEnd();
-      return toast.error("Selecione um arquivo para upload");
-    }
-    if (!formData.titulo.trim()) {
-      console.error("❌ Título vazio");
-      console.groupEnd();
-      return toast.error("O título é obrigatório");
-    }
+    if (!arquivoFile) return toast.error("Selecione um arquivo para upload");
+    if (!formData.titulo.trim()) return toast.error("O título é obrigatório");
 
     setLoading(true);
 
@@ -179,8 +162,8 @@ export default function CriarItemGaleriaPage() {
       data.append("titulo", formData.titulo);
       data.append("descricao", formData.descricao);
       data.append("tipo", formData.tipo);
-      if (formData.categoria_id)
-        data.append("categoria_id", formData.categoria_id);
+      // Envia string vazia se null, o backend deve tratar isso
+      data.append("categoria_id", formData.categoria_id || "");
       data.append("ordem", String(formData.ordem));
       data.append("status", String(formData.status));
       data.append("destaque", String(formData.destaque));
@@ -188,31 +171,19 @@ export default function CriarItemGaleriaPage() {
       data.append("arquivo_file", arquivoFile);
       if (thumbnailFile) data.append("thumbnail_file", thumbnailFile);
 
-      // Log do que está sendo enviado
-      console.log("📤 Enviando FormData:");
-      for (const pair of data.entries()) {
-        console.log(
-          `   ${pair[0]}:`,
-          pair[1] instanceof File ? `File(${pair[1].name})` : pair[1],
-        );
-      }
-
       const res = await createItem(data);
-      console.log("📥 Resposta do Server Action:", res);
 
       if (res.success) {
         toast.success("Mídia enviada com sucesso!");
         router.push("/admin/galeria/itens");
       } else {
-        console.error("❌ Erro retornado pela API:", res.error);
         toast.error(res.error || "Erro ao criar item");
       }
     } catch (error) {
-      console.error("🔥 Erro Crítico (Catch):", error);
+      console.error("Erro Crítico:", error);
       toast.error("Erro interno ao processar upload");
     } finally {
       setLoading(false);
-      console.groupEnd();
     }
   };
 
@@ -515,7 +486,7 @@ export default function CriarItemGaleriaPage() {
                         <RiEyeLine className="text-emerald-500" />
                       ) : (
                         <RiEyeOffLine className="text-slate-400" />
-                      )}
+                      )}{" "}
                       Status Ativo
                     </Label>
                     <p className="text-xs text-slate-500">
@@ -540,7 +511,7 @@ export default function CriarItemGaleriaPage() {
                             ? "text-amber-500"
                             : "text-slate-400"
                         }
-                      />
+                      />{" "}
                       Destaque
                     </Label>
                     <p className="text-xs text-slate-500">

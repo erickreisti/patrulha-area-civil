@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image"; // ✅ Import do Image garantido
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 
-// UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,7 +22,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 
-// Icons
 import {
   RiArrowLeftLine,
   RiSaveLine,
@@ -37,7 +35,6 @@ import {
   RiLoader4Line,
 } from "react-icons/ri";
 
-// Actions & Store
 import {
   getItemById,
   updateItem,
@@ -71,13 +68,11 @@ const itemVariants = {
 export default function EditarItemPage() {
   const params = useParams();
   const router = useRouter();
-  // ✅ CORREÇÃO 1: Pegando o initialize do store
   const { isAdmin, hasAdminSession, initialize: initAuth } = useAuthStore();
 
-  // ✅ CORREÇÃO 2: Estado de checagem de auth
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [loading, setLoading] = useState(false); // Loading de dados (fetch)
-  const [saving, setSaving] = useState(false); // Loading de salvamento
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [item, setItem] = useState<Item | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -97,20 +92,15 @@ export default function EditarItemPage() {
 
   const itemId = params.id as string;
 
-  // ✅ CORREÇÃO 3: Effect de Inicialização Robusta
   useEffect(() => {
     let mounted = true;
     const init = async () => {
-      console.log("🔄 [Editar] Iniciando verificação de autenticação...");
       try {
         await initAuth();
       } catch (error) {
-        console.error("❌ [Editar] Erro na inicialização:", error);
+        console.error("Erro na inicialização:", error);
       } finally {
-        if (mounted) {
-          console.log("✅ [Editar] Verificação concluída.");
-          setCheckingAuth(false);
-        }
+        if (mounted) setCheckingAuth(false);
       }
     };
     init();
@@ -119,23 +109,17 @@ export default function EditarItemPage() {
     };
   }, [initAuth]);
 
-  // ✅ CORREÇÃO 4: Proteção de Rota (Só roda se !checkingAuth)
   useEffect(() => {
     if (checkingAuth) return;
-
-    console.log("🛡️ [Editar] Auth Status:", { isAdmin, hasAdminSession });
     if (!isAdmin && !hasAdminSession) {
-      console.warn("🚫 [Editar] Acesso negado. Redirecionando...");
       toast.error("Acesso negado.");
       router.replace("/admin/galeria/itens");
     }
   }, [checkingAuth, isAdmin, hasAdminSession, router]);
 
-  // Data Fetching
   const fetchData = useCallback(async () => {
     if (!itemId) return;
     setLoading(true);
-    console.log("🔄 [Editar] Buscando dados para ID:", itemId);
 
     try {
       const [itemRes, catRes] = await Promise.all([
@@ -144,7 +128,6 @@ export default function EditarItemPage() {
       ]);
 
       if (itemRes.success && itemRes.data) {
-        console.log("✅ [Editar] Item carregado:", itemRes.data);
         const d = itemRes.data;
         setItem(d);
         setFormData({
@@ -159,7 +142,6 @@ export default function EditarItemPage() {
           thumbnail_url: d.thumbnail_url || undefined,
         });
       } else {
-        console.error("❌ [Editar] Item não encontrado:", itemRes.error);
         toast.error("Item não encontrado");
         router.push("/admin/galeria/itens");
       }
@@ -168,14 +150,13 @@ export default function EditarItemPage() {
         setCategorias(catRes.data);
       }
     } catch (error) {
-      console.error("🔥 [Editar] Erro fetch:", error);
+      console.error("Erro fetch:", error);
       toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
   }, [itemId, router]);
 
-  // Carrega dados assim que a auth for confirmada
   useEffect(() => {
     if (!checkingAuth && (isAdmin || hasAdminSession)) {
       fetchData();
@@ -184,13 +165,11 @@ export default function EditarItemPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.group("🚀 [Editar] Iniciando Update");
     setSaving(true);
 
     if (!formData.titulo.trim()) {
       toast.error("Título é obrigatório");
       setSaving(false);
-      console.groupEnd();
       return;
     }
 
@@ -199,37 +178,28 @@ export default function EditarItemPage() {
       data.append("titulo", formData.titulo);
       data.append("descricao", formData.descricao);
       data.append("tipo", formData.tipo);
-      if (formData.categoria_id)
-        data.append("categoria_id", formData.categoria_id);
+      // ✅ CORREÇÃO: Envia string vazia se null para que o backend saiba que deve remover a categoria
+      data.append("categoria_id", formData.categoria_id || "");
       data.append("ordem", String(formData.ordem));
       data.append("status", String(formData.status));
       data.append("destaque", String(formData.destaque));
 
-      if (novoArquivo) {
-        console.log("📂 Anexando novo arquivo:", novoArquivo.name);
-        data.append("arquivo_file", novoArquivo);
-      }
-      if (novaThumbnail) {
-        console.log("🖼️ Anexando nova thumb:", novaThumbnail.name);
-        data.append("thumbnail_file", novaThumbnail);
-      }
+      if (novoArquivo) data.append("arquivo_file", novoArquivo);
+      if (novaThumbnail) data.append("thumbnail_file", novaThumbnail);
 
       const res = await updateItem(itemId, data);
-      console.log("📥 Resposta:", res);
 
       if (res.success) {
         toast.success("Item atualizado com sucesso!");
         router.push("/admin/galeria/itens");
       } else {
-        console.error("❌ Erro update:", res.error);
         toast.error(res.error || "Erro ao salvar");
       }
     } catch (error) {
-      console.error("🔥 Erro crítico:", error);
+      console.error("Erro crítico:", error);
       toast.error("Erro interno");
     } finally {
       setSaving(false);
-      console.groupEnd();
     }
   };
 
@@ -239,7 +209,6 @@ export default function EditarItemPage() {
       (c.tipo === "videos" && formData.tipo === "video"),
   );
 
-  // ✅ CORREÇÃO 5: Tela de loading enquanto verifica Auth ou carrega dados
   if (checkingAuth || loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
@@ -251,7 +220,6 @@ export default function EditarItemPage() {
     );
   }
 
-  // Se não tem item carregado após loading, retorna null (o useEffect de erro já cuidou do redirect)
   if (!item) return null;
 
   return (
@@ -398,8 +366,7 @@ export default function EditarItemPage() {
                         sizes="64px"
                         className="object-cover"
                         onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = "none";
+                          (e.target as HTMLImageElement).style.display = "none";
                         }}
                       />
                     ) : (
@@ -428,10 +395,6 @@ export default function EditarItemPage() {
                       accept={formData.tipo === "foto" ? "image/*" : "video/*"}
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
-                        console.log(
-                          "📂 [Editar] Arquivo selecionado:",
-                          file?.name,
-                        );
                         setNovoArquivo(file);
                       }}
                       className="file:text-emerald-700 file:bg-emerald-50 file:border-0 file:rounded-md file:px-2 file:py-1 file:mr-3 file:text-sm file:font-semibold hover:file:bg-emerald-100 cursor-pointer"
@@ -447,21 +410,12 @@ export default function EditarItemPage() {
                 {formData.tipo === "video" && (
                   <div className="space-y-2 pt-2 border-t border-slate-100 mt-4">
                     <Label className="block mb-1">Thumbnail (Opcional)</Label>
-                    {formData.thumbnail_url && !novaThumbnail && (
-                      <p className="text-xs text-slate-500 mb-2">
-                        Possui capa personalizada.
-                      </p>
-                    )}
                     <div className="flex items-center gap-3">
                       <Input
                         type="file"
                         accept="image/*"
                         onChange={(e) => {
                           const file = e.target.files?.[0] || null;
-                          console.log(
-                            "🖼️ [Editar] Thumbnail selecionada:",
-                            file?.name,
-                          );
                           setNovaThumbnail(file);
                         }}
                         className="file:text-purple-700 file:bg-purple-50 file:border-0 file:rounded-md file:px-2 file:py-1 file:mr-3 file:text-sm file:font-semibold hover:file:bg-purple-100 cursor-pointer"
@@ -494,7 +448,7 @@ export default function EditarItemPage() {
                         <RiEyeLine className="text-emerald-500" />
                       ) : (
                         <RiEyeOffLine className="text-slate-400" />
-                      )}
+                      )}{" "}
                       Status Ativo
                     </Label>
                     <p className="text-xs text-slate-500">
@@ -519,7 +473,7 @@ export default function EditarItemPage() {
                             ? "text-amber-500"
                             : "text-slate-400"
                         }
-                      />
+                      />{" "}
                       Destaque
                     </Label>
                     <p className="text-xs text-slate-500">
