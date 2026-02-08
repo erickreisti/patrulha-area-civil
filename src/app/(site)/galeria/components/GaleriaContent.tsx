@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useGaleriaPublica } from "@/lib/stores/useGaleriaStore";
-import { GaleriaCard, ExtendedCategoria } from "./GaleriaCard";
+import { useGaleriaPublica, Categoria } from "@/lib/stores/useGaleriaStore";
+import { GaleriaCard } from "./GaleriaCard";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,6 @@ import {
   RiVideoLine,
 } from "react-icons/ri";
 
-// --- CONFIGURAÇÕES ---
 const SORT_OPTIONS = [
   { value: "recent", label: "Mais Recentes" },
   { value: "oldest", label: "Mais Antigas" },
@@ -53,8 +52,6 @@ const containerVariants = {
   visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
 };
 
-// --- COMPONENTE PRINCIPAL ---
-
 export function GaleriaContent() {
   const {
     categorias,
@@ -64,18 +61,14 @@ export function GaleriaContent() {
     fetchCategorias,
     setPagination,
   } = useGaleriaPublica();
-
   const [localSearch, setLocalSearch] = useState("");
   const [selectedTipo, setSelectedTipo] = useState("all");
   const [selectedSort, setSelectedSort] = useState("recent");
   const debounceTimer = useRef<NodeJS.Timeout>();
 
-  // Debounce
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      // Lógica futura se precisar enviar busca para API
-    }, 500);
+    debounceTimer.current = setTimeout(() => {}, 500);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
@@ -85,8 +78,7 @@ export function GaleriaContent() {
     fetchCategorias();
   }, [fetchCategorias]);
 
-  // Filtragem Local
-  const filteredCategorias = categorias.filter((cat: ExtendedCategoria) => {
+  const filteredCategorias = categorias.filter((cat: Categoria) => {
     const matchesSearch = localSearch
       ? cat.nome.toLowerCase().includes(localSearch.toLowerCase())
       : true;
@@ -95,7 +87,6 @@ export function GaleriaContent() {
     return matchesSearch && matchesTipo;
   });
 
-  // Ordenação Local
   const sortedCategorias = [...filteredCategorias].sort((a, b) => {
     if (selectedSort === "recent")
       return (
@@ -110,7 +101,6 @@ export function GaleriaContent() {
     return 0;
   });
 
-  // Paginação Local
   const itemsPerPage = 12;
   const totalPages = Math.ceil(sortedCategorias.length / itemsPerPage);
   const currentData = sortedCategorias.slice(
@@ -135,11 +125,9 @@ export function GaleriaContent() {
 
   return (
     <>
-      {/* BARRA DE FILTROS (Sticky) */}
       <div className="sticky top-[80px] z-30 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm transition-all py-4">
         <div className="container mx-auto px-4">
           <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            {/* Busca */}
             <div className="relative w-full lg:max-w-md group">
               <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-pac-primary transition-colors" />
               <Input
@@ -157,10 +145,7 @@ export function GaleriaContent() {
                 </button>
               )}
             </div>
-
-            {/* Filtros e Ordenação */}
             <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-              {/* Select Tipo */}
               <Select
                 value={selectedTipo}
                 onValueChange={(val) => {
@@ -185,8 +170,6 @@ export function GaleriaContent() {
                   ))}
                 </SelectContent>
               </Select>
-
-              {/* Select Ordenação */}
               <Select value={selectedSort} onValueChange={setSelectedSort}>
                 <SelectTrigger className="w-full sm:w-[180px] h-11 bg-white border-slate-200 rounded-xl hover:border-pac-primary/50 transition-colors">
                   <div className="flex items-center gap-2 text-slate-600">
@@ -202,8 +185,6 @@ export function GaleriaContent() {
                   ))}
                 </SelectContent>
               </Select>
-
-              {/* Botão Limpar */}
               {(localSearch ||
                 selectedTipo !== "all" ||
                 selectedSort !== "recent") && (
@@ -220,7 +201,6 @@ export function GaleriaContent() {
         </div>
       </div>
 
-      {/* GRID DE RESULTADOS */}
       <section className="py-12 container mx-auto px-4 min-h-[600px]">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -265,12 +245,17 @@ export function GaleriaContent() {
                 exit={{ opacity: 0 }}
                 className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 mb-16"
               >
-                {currentData.map((categoria: ExtendedCategoria) => (
-                  <GaleriaCard key={categoria.id} categoria={categoria} />
+                {currentData.map((categoria) => (
+                  <GaleriaCard
+                    key={categoria.id}
+                    categoria={{
+                      ...categoria,
+                      descricao: categoria.descricao || undefined,
+                    }}
+                  />
                 ))}
               </motion.div>
             </AnimatePresence>
-
             {totalPages > 1 && (
               <Pagination className="justify-center">
                 <PaginationContent>

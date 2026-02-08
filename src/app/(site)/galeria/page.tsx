@@ -7,9 +7,9 @@ import { RiImage2Line } from "react-icons/ri";
 export default function GaleriaPage() {
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* --- HERO SECTION (Consistente com o Header) --- */}
+      {/* --- HERO SECTION --- */}
       <section className="relative bg-white pt-32 pb-20 lg:pt-40 lg:pb-24 border-b border-slate-100 overflow-hidden">
-        {/* Background Grid Sutil (CSS Puro) */}
+        {/* Background Grid Sutil */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
         {/* Elemento Decorativo (Blob Azul) */}
@@ -47,12 +47,7 @@ export default function GaleriaPage() {
         </div>
       </section>
 
-      {/* --- CONTEÚDO DA GALERIA --- */}
-      <section className="py-12 lg:py-16">
-        <div className="container mx-auto px-4">
-          <GaleriaContent />
-        </div>
-      </section>
+      <GaleriaContent />
     </div>
   );
 }

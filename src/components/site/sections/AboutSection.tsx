@@ -34,19 +34,19 @@ const VALUES = [
     description:
       "Promover segurança e resgate voluntário com excelência técnica.",
     icon: RiGlobalLine,
-    color: "bg-blue-50 text-blue-600",
+    color: "bg-blue-50 text-blue-700",
   },
   {
     title: "Visão",
     description: "Ser referência nacional em proteção civil e cidadania.",
     icon: RiShieldCheckLine,
-    color: "bg-green-50 text-green-600",
+    color: "bg-red-50 text-red-700",
   },
   {
     title: "Valores",
     description: "Honra, Disciplina, Lealdade e Compromisso com a Pátria.",
     icon: RiBookLine,
-    color: "bg-amber-50 text-amber-600",
+    color: "bg-slate-100 text-slate-800",
   },
 ];
 

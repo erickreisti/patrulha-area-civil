@@ -1,11 +1,9 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { cookies } from "next/headers";
+import { verifyAdminSession } from "../activities";
 
-// ============================================
-// TYPES
-// ============================================
+// --- TYPES ---
 
 export interface DashboardStats {
   summary: {
@@ -59,47 +57,21 @@ export interface DashboardResponse {
   timestamp?: string;
 }
 
-interface AdminSessionData {
-  expiresAt: string;
-}
+// --- HELPERS ---
 
-// ============================================
-// HELPERS
-// ============================================
+const calculatePercentage = (part: number, total: number) =>
+  total === 0 ? 0 : Math.round((part / total) * 100);
 
-const calculatePercentage = (part: number, total: number): number => {
-  if (total === 0) return 0;
-  return Math.round((part / total) * 100);
-};
-
-// ============================================
-// MAIN ACTION
-// ============================================
+// --- MAIN ACTION ---
 
 export async function getDashboardStats(): Promise<DashboardResponse> {
   try {
-    const cookieStore = await cookies();
-    const adminSession = cookieStore.get("admin_session");
-    const isAdminCookie = cookieStore.get("is_admin")?.value === "true";
+    const sessionCheck = await verifyAdminSession();
+    if (!sessionCheck.success)
+      return { success: false, error: sessionCheck.error || "Acesso negado" };
 
-    // 1. Verificação de Segurança (Camada Admin)
-    if (!isAdminCookie || !adminSession) {
-      return { success: false, error: "AUTH_REQUIRED" }; // Código de erro específico
-    }
-
-    try {
-      const sessionData = JSON.parse(adminSession.value) as AdminSessionData;
-      if (new Date(sessionData.expiresAt) < new Date()) {
-        return { success: false, error: "AUTH_EXPIRED" };
-      }
-    } catch {
-      return { success: false, error: "AUTH_INVALID" };
-    }
-
-    // 2. Inicializar Cliente Admin
     const supabase = createAdminClient();
 
-    // 3. Executar Queries em Paralelo (Performance Otimizada)
     const [profilesRes, newsRes, galleryRes, activitiesRes, categoriesRes] =
       await Promise.all([
         supabase.from("profiles").select("id, status, role, full_name"),
@@ -109,6 +81,7 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
           .from("system_activities")
           .select(
             `id, action_type, description, created_at, profiles(full_name)`,
+            { count: "exact" },
           )
           .order("created_at", { ascending: false })
           .limit(10),
@@ -118,47 +91,45 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
           .eq("status", true),
       ]);
 
-    // 4. Processamento de Dados
     const profiles = profilesRes.data || [];
     const news = newsRes.data || [];
     const gallery = galleryRes.data || [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const activitiesRaw = activitiesRes.data || ([] as any[]);
 
-    // Agentes
+    // Processamento
     const totalAgents = profiles.length;
     const activeAgents = profiles.filter((p) => p.status).length;
     const admins = profiles.filter((p) => p.role === "admin").length;
 
-    // Notícias
     const totalNews = news.length;
     const publishedNews = news.filter((n) => n.status === "publicado").length;
     const featuredNews = news.filter(
       (n) => n.destaque && n.status === "publicado",
     ).length;
 
-    // Galeria
     const totalGallery = gallery.length;
     const photos = gallery.filter((g) => g.tipo === "foto").length;
     const videos = gallery.filter((g) => g.tipo === "video").length;
 
-    // Atividades
-    const recentActivities: DashboardActivity[] = activitiesRaw.map((a) => ({
-      id: a.id,
-      action_type: a.action_type,
-      description: a.description,
-      created_at: a.created_at,
-      user_name: a.profiles?.full_name || "Sistema",
-    }));
+    const activitiesRaw = activitiesRes.data || [];
+    const recentActivities: DashboardActivity[] = activitiesRaw.map((a) => {
+      const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
+      return {
+        id: a.id,
+        action_type: a.action_type,
+        description: a.description,
+        created_at: a.created_at,
+        user_name: profile?.full_name || "Sistema",
+      };
+    });
 
     const last24h = recentActivities.filter(
       (a) =>
         new Date(a.created_at).getTime() > Date.now() - 24 * 60 * 60 * 1000,
     ).length;
 
-    // 5. Retorno
     return {
       success: true,
+      timestamp: new Date().toISOString(),
       data: {
         summary: {
           agents: {
@@ -182,7 +153,7 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
             categories: categoriesRes.count || 0,
           },
           system: {
-            totalActivities: recentActivities.length, // Total buscado
+            totalActivities: activitiesRes.count || 0,
             recentActivities: last24h,
             activeUsers: activeAgents,
           },
@@ -195,7 +166,6 @@ export async function getDashboardStats(): Promise<DashboardResponse> {
           featuredPercentage: calculatePercentage(featuredNews, totalNews),
         },
       },
-      timestamp: new Date().toISOString(),
     };
   } catch (error) {
     console.error("Erro Dashboard:", error);

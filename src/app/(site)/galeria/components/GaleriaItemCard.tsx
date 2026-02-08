@@ -3,13 +3,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-
-// UI Components
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-// Icons
 import {
   RiStarFill,
   RiPlayFill,
@@ -20,12 +16,9 @@ import {
   RiDownloadLine,
   RiImage2Line,
 } from "react-icons/ri";
-
-// Types & Utils
-import type { Item } from "@/app/actions/gallery/types";
+import { GaleriaItem } from "@/lib/stores/useGaleriaStore";
 import { cn } from "@/lib/utils/cn";
 
-// --- HELPERS ---
 const formatDate = (dateString: string) => {
   try {
     return new Date(dateString).toLocaleDateString("pt-BR", {
@@ -42,21 +35,27 @@ const getImageUrl = (url: string | null | undefined) => {
   if (!url) return null;
   if (url.startsWith("http")) return url;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return `${supabaseUrl}/storage/v1/object/public/galeria/${url}`;
+  const cleanUrl = url.startsWith("/") ? url.slice(1) : url;
+  const path = cleanUrl.includes("galeria/") ? cleanUrl : `galeria/${cleanUrl}`;
+  return `${supabaseUrl}/storage/v1/object/public/${path}`;
 };
 
-// --- COMPONENTE ---
-export function GaleriaItemCard({ item }: { item: Item }) {
+export function GaleriaItemCard({ item }: { item: GaleriaItem }) {
   const [imageError, setImageError] = useState(false);
-
   const isVideo = item.tipo === "video";
   const IconType = isVideo ? RiVideoLine : RiImageLine;
 
-  // Tenta usar thumbnail, se não, arquivo direto (se for imagem)
-  const rawUrl = item.thumbnail_url || (!isVideo ? item.arquivo_url : null);
-  const imageUrl = getImageUrl(rawUrl);
-  const downloadUrl = getImageUrl(item.arquivo_url);
+  // Lógica para definir a imagem de capa
+  let rawDisplayUrl: string | null | undefined = null;
+  if (isVideo) {
+    // Se for vídeo, usa a thumbnail. Se não tiver, fica null.
+    rawDisplayUrl = item.thumbnail_url;
+  } else {
+    rawDisplayUrl = item.url;
+  }
 
+  const imageUrl = getImageUrl(rawDisplayUrl);
+  const downloadUrl = getImageUrl(item.url);
   const hasImage = !!imageUrl && !imageError;
 
   return (
@@ -73,19 +72,16 @@ export function GaleriaItemCard({ item }: { item: Item }) {
           {hasImage ? (
             <>
               <Image
-                src={imageUrl}
-                alt={item.titulo}
+                src={imageUrl!}
+                alt={item.titulo || "Item da galeria"}
                 fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 className="object-cover transition-transform duration-700 group-hover:scale-105"
                 onError={() => setImageError(true)}
                 loading="lazy"
               />
-
-              {/* Overlay Gradiente */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-              {/* Badge Destaque */}
               {item.destaque && (
                 <div className="absolute top-3 right-3 z-10">
                   <Badge className="bg-amber-500 text-white border-0 shadow-md px-2 py-1 uppercase tracking-wider text-[10px] font-bold gap-1">
@@ -94,7 +90,6 @@ export function GaleriaItemCard({ item }: { item: Item }) {
                 </div>
               )}
 
-              {/* Botão de Play (Overlay) */}
               {isVideo && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-white/30 group-hover:scale-110 transition-transform duration-300">
@@ -105,14 +100,17 @@ export function GaleriaItemCard({ item }: { item: Item }) {
             </>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-300">
-              <RiImage2Line className="w-12 h-12 mb-2 opacity-50" />
+              {isVideo ? (
+                <RiVideoLine className="w-12 h-12 mb-2 opacity-50" />
+              ) : (
+                <RiImage2Line className="w-12 h-12 mb-2 opacity-50" />
+              )}
               <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">
-                Pré-visualização Indisponível
+                {isVideo ? "Vídeo sem Capa" : "Imagem Indisponível"}
               </span>
             </div>
           )}
 
-          {/* Badge de Tipo */}
           <div className="absolute top-3 left-3 z-10">
             <Badge
               className={cn(
@@ -132,11 +130,11 @@ export function GaleriaItemCard({ item }: { item: Item }) {
             <RiCalendarLine className="w-3.5 h-3.5 text-pac-primary" />
             {formatDate(item.created_at)}
           </div>
-
-          <h3 className="font-black text-lg text-slate-800 mb-2 leading-tight line-clamp-2 group-hover:text-pac-primary transition-colors uppercase tracking-tight">
-            {item.titulo}
-          </h3>
-
+          {item.titulo && (
+            <h3 className="font-black text-lg text-slate-800 mb-2 leading-tight line-clamp-2 group-hover:text-pac-primary transition-colors uppercase tracking-tight">
+              {item.titulo}
+            </h3>
+          )}
           {item.descricao && (
             <p className="text-slate-500 text-sm leading-relaxed line-clamp-2 mb-4">
               {item.descricao}
@@ -144,7 +142,7 @@ export function GaleriaItemCard({ item }: { item: Item }) {
           )}
         </CardContent>
 
-        {/* --- RODAPÉ COM AÇÕES --- */}
+        {/* --- RODAPÉ --- */}
         <CardFooter className="p-5 pt-0 mt-auto grid grid-cols-2 gap-3">
           <Button
             variant="outline"
@@ -158,11 +156,9 @@ export function GaleriaItemCard({ item }: { item: Item }) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <RiEyeLine className="mr-2 w-4 h-4" />
-              Ver
+              <RiEyeLine className="mr-2 w-4 h-4" /> Ver
             </a>
           </Button>
-
           <Button
             variant="secondary"
             size="sm"
@@ -176,8 +172,7 @@ export function GaleriaItemCard({ item }: { item: Item }) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <RiDownloadLine className="mr-2 w-4 h-4" />
-              Baixar
+              <RiDownloadLine className="mr-2 w-4 h-4" /> Baixar
             </a>
           </Button>
         </CardFooter>

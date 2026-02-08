@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import Image from "next/image"; // ✅ Import obrigatório
 import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { toast } from "sonner";
@@ -33,7 +33,6 @@ export default function LoginPage() {
     let mounted = true;
     const init = async () => {
       await initialize();
-      // setTimeout garante que a atualização ocorra após a montagem
       setTimeout(() => {
         if (mounted) setIsInitialized(true);
       }, 0);
@@ -80,9 +79,14 @@ export default function LoginPage() {
 
   // Handlers
   const handleMatriculaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const valor = e.target.value;
+    const inputValue = e.target.value;
+    const numericValue = inputValue.replace(/\D/g, "");
+
+    // Limite de 11 dígitos
+    if (numericValue.length > 11) return;
+
     if (error) setError(null);
-    setMatricula(formatMatricula(valor));
+    setMatricula(formatMatricula(inputValue));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,7 +95,6 @@ export default function LoginPage() {
 
     const matriculaNumerica = extractMatriculaNumbers(matricula);
 
-    // Validação Local
     if (!validateMatricula(matriculaNumerica)) {
       setError("A matrícula deve conter 11 dígitos numéricos.");
       toast.error("Formato inválido", {
@@ -103,7 +106,6 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Persistência do "Lembrar-me"
       if (typeof window !== "undefined") {
         if (rememberMe) {
           localStorage.setItem("saved_matricula", matricula);
@@ -112,20 +114,19 @@ export default function LoginPage() {
         }
       }
 
-      // Chamada de Login
       const result = await loginWithServerAction(matriculaNumerica);
 
       if (result?.success) {
-        toast.success("Bem-vindo de volta!", {
-          icon: <CheckCircle2 className="h-5 w-5 text-green-600" />,
-        });
+        const isInactive = result.data?.user && !result.data.user.status;
 
-        // ✅ CORREÇÃO: Acessar result.data.user em vez de result.data.profile
-        // No AuthResponse do Store, definimos data: { session: ..., user: Profile }
-        if (result.data?.user && !result.data.user.status) {
+        if (isInactive) {
           toast.warning("Atenção: Conta Inativa", {
             description: "Entre em contato com o comando para regularizar.",
             duration: 5000,
+          });
+        } else {
+          toast.success("Bem-vindo de volta!", {
+            icon: <CheckCircle2 className="h-5 w-5 text-green-600" />,
           });
         }
 
@@ -159,7 +160,7 @@ export default function LoginPage() {
   };
 
   // ---------------------------------------------------------
-  // TELA DE LOADING
+  // TELA DE LOADING (CORRIGIDA E MELHORADA)
   // ---------------------------------------------------------
   if (!isInitialized || isRedirecting) {
     return (
@@ -169,24 +170,37 @@ export default function LoginPage() {
           animate={{ opacity: 1, scale: 1 }}
           className="flex flex-col items-center"
         >
-          <div className="relative w-24 h-24 mb-6 animate-pulse">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+          {/* ✅ CORREÇÃO ESLINT: Trocado <img> por <Image />
+             ✅ MELHORIA: Aumentado para w-32 (128px), adicionado drop-shadow
+             ✅ ANIMAÇÃO: Adicionado efeito de "respiração" (scale)
+          */}
+          <motion.div
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+            className="relative w-32 h-32 mb-8 filter drop-shadow-xl"
+          >
+            <Image
               src="/images/logos/logo.webp"
-              alt="Carregando..."
-              className="object-contain w-full h-full"
+              alt="Brasão Patrulha Aérea Civil"
+              fill
+              className="object-contain"
+              priority // Garante carregamento imediato
+              sizes="(max-width: 768px) 128px, 128px"
             />
-          </div>
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-2" />
-          <p className="text-sm font-medium text-slate-500">
-            {isRedirecting ? "Entrando..." : "Iniciando sistema..."}
+          </motion.div>
+
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-3" />
+
+          <p className="text-sm font-semibold text-slate-500 tracking-wide uppercase">
+            {isRedirecting ? "Autenticando..." : "Carregando Sistema..."}
           </p>
         </motion.div>
       </div>
     );
   }
 
-  const isFormValid = extractMatriculaNumbers(matricula).length === 11;
+  const matriculaNumerica = extractMatriculaNumbers(matricula);
+  const isFormValid = matriculaNumerica.length === 11;
 
   // ---------------------------------------------------------
   // TELA DE LOGIN (Principal)
@@ -202,7 +216,7 @@ export default function LoginPage() {
         {/* Cabeçalho */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <div className="relative w-32 h-32 sm:w-40 sm:h-40 drop-shadow-xl filter">
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 drop-shadow-xl filter hover:scale-105 transition-transform duration-300">
               <Image
                 src="/images/logos/logo.webp"
                 alt="Brasão Patrulha Aérea Civil"
@@ -235,7 +249,6 @@ export default function LoginPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-5">
-              {/* Input Matrícula */}
               <div className="space-y-2">
                 <label
                   htmlFor="matricula"
@@ -254,6 +267,7 @@ export default function LoginPage() {
                     disabled={isLoading}
                     value={matricula}
                     onChange={handleMatriculaChange}
+                    maxLength={14}
                     placeholder="000.000.000-00"
                     className={`
                       w-full px-4 py-3.5 bg-slate-50 border rounded-xl text-slate-900 text-lg font-medium tracking-wide
@@ -275,7 +289,6 @@ export default function LoginPage() {
                   )}
                 </div>
 
-                {/* Mensagem de Erro Inline */}
                 <AnimatePresence>
                   {error && (
                     <motion.div
@@ -291,7 +304,6 @@ export default function LoginPage() {
                 </AnimatePresence>
               </div>
 
-              {/* Checkbox Lembrar-me */}
               <div className="flex items-center">
                 <div className="flex items-center h-5">
                   <input
@@ -314,7 +326,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Botão de Ação */}
               <button
                 type="submit"
                 disabled={isLoading || !isFormValid}
@@ -335,7 +346,6 @@ export default function LoginPage() {
             </form>
           </div>
 
-          {/* Rodapé do Card */}
           <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
             <Link
               href="/"
@@ -349,7 +359,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Rodapé da Página */}
         <p className="mt-8 text-center text-xs font-medium text-slate-400">
           &copy; {new Date().getFullYear()} Patrulha Aérea Civil - Todos os
           direitos reservados.

@@ -3,9 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, Variants } from "framer-motion";
-
-// UI Components
+import { motion } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -15,35 +13,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-// Icons
 import {
   RiImageLine,
   RiVideoLine,
-  RiFolderLine,
   RiCalendarLine,
   RiArrowRightLine,
   RiImage2Line,
   RiEyeOffLine,
 } from "react-icons/ri";
-
-// Utils
 import { cn } from "@/lib/utils/cn";
-import type { Categoria } from "@/app/actions/gallery";
+import { Categoria } from "@/lib/stores/useGaleriaStore";
 
-// --- TIPOS ---
-export interface ExtendedCategoria extends Categoria {
-  capa_url?: string | null;
-  itens_count?: number;
-  tipo: "fotos" | "videos";
-}
-
-// --- CONFIGURAÇÃO VISUAL ---
-const cardVariants: Variants = {
+const cardVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
-// --- HELPER ---
 const getImageUrl = (url: string | null | undefined): string | null => {
   if (!url || typeof url !== "string" || url.trim() === "") return null;
   if (url.startsWith("http")) return url;
@@ -55,22 +40,17 @@ const getImageUrl = (url: string | null | undefined): string | null => {
   return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
 };
 
-// --- COMPONENTE ---
-export function GaleriaCard({ categoria }: { categoria: ExtendedCategoria }) {
+export function GaleriaCard({ categoria }: { categoria: Categoria }) {
   const [imageError, setImageError] = useState(false);
-
   const imageUrl = getImageUrl(categoria.capa_url);
   const hasImage = !!imageUrl && !imageError;
-  const hasItems = (categoria.itens_count || 0) > 0;
-  // Assumimos que na área pública só aparecem ativos, mas mantemos a lógica caso admin use o card
-  const isPrivate = categoria.status === false || categoria.arquivada;
 
+  const isPrivate = !categoria.status || categoria.arquivada;
   const IconTipo = categoria.tipo === "videos" ? RiVideoLine : RiImageLine;
 
   return (
     <motion.div variants={cardVariants} className="h-full">
       <Card className="group h-full flex flex-col border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-white overflow-hidden rounded-2xl">
-        {/* --- ÁREA DA IMAGEM --- */}
         <div className="relative h-56 bg-slate-100 overflow-hidden">
           {hasImage ? (
             <Image
@@ -89,11 +69,8 @@ export function GaleriaCard({ categoria }: { categoria: ExtendedCategoria }) {
               </span>
             </div>
           )}
-
-          {/* Overlay Gradiente (Melhora leitura se tiver texto sobre a imagem) */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-60" />
 
-          {/* Badge de Tipo (Superior Esquerdo) */}
           <div className="absolute top-3 left-3">
             <Badge
               className={cn(
@@ -108,7 +85,6 @@ export function GaleriaCard({ categoria }: { categoria: ExtendedCategoria }) {
             </Badge>
           </div>
 
-          {/* Badge Privado (Se necessário) */}
           {isPrivate && (
             <div className="absolute top-3 right-3">
               <Badge
@@ -119,22 +95,9 @@ export function GaleriaCard({ categoria }: { categoria: ExtendedCategoria }) {
               </Badge>
             </div>
           )}
-
-          {/* Contador de Itens (Inferior Direito) */}
-          <div className="absolute bottom-3 right-3">
-            <Badge
-              variant="secondary"
-              className="bg-white/90 text-slate-700 backdrop-blur-md border-0 shadow-sm text-[10px] font-bold"
-            >
-              <RiFolderLine className="w-3.5 h-3.5 mr-1.5 text-pac-primary" />
-              {categoria.itens_count || 0}
-            </Badge>
-          </div>
         </div>
 
-        {/* --- CONTEÚDO --- */}
         <CardHeader className="px-6 pt-5 pb-2">
-          {/* Data */}
           <div className="flex items-center text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">
             <RiCalendarLine className="w-3.5 h-3.5 mr-1.5 text-pac-primary" />
             {new Date(categoria.created_at).toLocaleDateString("pt-BR", {
@@ -143,7 +106,6 @@ export function GaleriaCard({ categoria }: { categoria: ExtendedCategoria }) {
               year: "numeric",
             })}
           </div>
-
           <h3 className="text-lg font-black text-slate-800 leading-tight line-clamp-2 group-hover:text-pac-primary transition-colors uppercase tracking-tight">
             {categoria.nome}
           </h3>
@@ -160,21 +122,11 @@ export function GaleriaCard({ categoria }: { categoria: ExtendedCategoria }) {
           <Button
             asChild
             variant="outline"
-            className={cn(
-              "w-full border-slate-200 text-slate-600 font-bold hover:bg-pac-primary hover:text-white hover:border-pac-primary transition-all duration-300 group/btn rounded-xl",
-              !hasItems && "opacity-50 cursor-not-allowed bg-slate-50",
-            )}
-            disabled={!hasItems}
+            className="w-full border-slate-200 text-slate-600 font-bold hover:bg-pac-primary hover:text-white hover:border-pac-primary transition-all duration-300 group/btn rounded-xl"
           >
-            <Link href={hasItems ? `/galeria/${categoria.slug}` : "#"}>
-              {hasItems ? (
-                <>
-                  Ver Álbum
-                  <RiArrowRightLine className="w-4 h-4 ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
-                </>
-              ) : (
-                "Álbum Vazio"
-              )}
+            <Link href={`/galeria/${categoria.slug}`}>
+              Ver Álbum
+              <RiArrowRightLine className="w-4 h-4 ml-2 transition-transform duration-300 group-hover/btn:translate-x-1" />
             </Link>
           </Button>
         </CardFooter>

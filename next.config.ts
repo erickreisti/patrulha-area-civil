@@ -1,18 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // 1. Otimização de Imagens
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "lcnudonuslqefbxzghjt.supabase.co",
-        pathname: "/storage/v1/object/public/**",
+        hostname: "**.supabase.co",
       },
       {
         protocol: "https",
         hostname: "images.unsplash.com",
-        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "example.com",
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co",
       },
     ],
     formats: ["image/webp", "image/avif"],
@@ -21,15 +26,12 @@ const nextConfig: NextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 
-  // 2. Configurações Experimentais e Server Actions
   experimental: {
     serverActions: {
-      bodySizeLimit: "100mb", // Aumentado para suportar vídeos
+      bodySizeLimit: "100mb",
     },
-    optimizeCss: true,
   },
 
-  // 3. Configurações de Compilação
   compiler: {
     removeConsole:
       process.env.NODE_ENV === "production"
@@ -37,18 +39,16 @@ const nextConfig: NextConfig = {
         : false,
   },
 
-  // 4. Preferências de Build
   eslint: {
     ignoreDuringBuilds: true,
   },
+
   typescript: {
     ignoreBuildErrors: true,
   },
 
-  // 5. Otimização
   poweredByHeader: false,
 
-  // 6. Headers de Segurança
   async headers() {
     return [
       {
@@ -64,18 +64,6 @@ const nextConfig: NextConfig = {
         ],
       },
     ];
-  },
-
-  // 7. Webpack
-  webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      config.optimization.splitChunks = {
-        chunks: "all",
-        maxSize: 244000,
-        minSize: 20000,
-      };
-    }
-    return config;
   },
 };
 

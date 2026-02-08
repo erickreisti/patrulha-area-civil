@@ -24,7 +24,7 @@ const ADMIN_ROUTES = [
   "/admin/*", // Captura todas as sub-rotas de /admin
 ] as const;
 
-// Rotas que requerem SESSÃO ADMIN ATIVA (2ª camada) - especificas
+// Rotas que requerem SESSÃO ADMIN ATIVA (2ª camada - Cookie Criptografado)
 const ADMIN_SESSION_ROUTES = [
   "/admin/dashboard",
   "/admin/agentes",
@@ -37,25 +37,20 @@ const ADMIN_SESSION_ROUTES = [
   "/admin/atividades/*",
 ] as const;
 
-// Rota de perfil do agente
+// Rota de perfil do agente (Dashboard do usuário comum)
 const AGENT_PROFILE_ROUTE = "/perfil";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const requestId = Math.random().toString(36).substring(7);
 
-  console.log(
-    `\n🔍 [Middleware ${requestId}] Iniciando para rota: ${pathname}`,
-  );
-
-  // Ignorar arquivos estáticos e rotas da API
+  // Ignorar arquivos estáticos e rotas da API internas do Next
   if (
     pathname.startsWith("/_next") ||
     pathname.includes(".") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/actions/")
   ) {
-    console.log(`⚡ [Middleware ${requestId}] Rota estática/API, ignorando...`);
     return NextResponse.next();
   }
 
@@ -63,7 +58,7 @@ export async function middleware(request: NextRequest) {
 
   try {
     // ============================================
-    // CONFIGURAÇÃO DO CLIENTE SUPABASE
+    // 1. CONFIGURAÇÃO DO CLIENTE SUPABASE (SSR)
     // ============================================
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -75,9 +70,6 @@ export async function middleware(request: NextRequest) {
           },
           setAll(cookiesToSet) {
             cookiesToSet.forEach(({ name, value, options }) => {
-              console.log(
-                `📝 [Middleware ${requestId}] Configurando cookie: ${name}`,
-              );
               response.cookies.set({
                 name,
                 value,
@@ -93,23 +85,14 @@ export async function middleware(request: NextRequest) {
       },
     );
 
-    console.log(`🔐 [Middleware ${requestId}] Obtendo sessão Supabase...`);
+    // ============================================
+    // 2. VERIFICAÇÃO DE AUTENTICAÇÃO BÁSICA
+    // ============================================
     const {
       data: { session },
-      error: sessionError,
     } = await supabase.auth.getSession();
 
-    if (sessionError) {
-      console.error(
-        `❌ [Middleware ${requestId}] Erro ao obter sessão:`,
-        sessionError,
-      );
-    }
-
     const userId = session?.user?.id;
-    console.log(
-      `👤 [Middleware ${requestId}] Usuário ID: ${userId || "NÃO AUTENTICADO"}`,
-    );
 
     // ============================================
     // CASO 1: ROTA PÚBLICA
@@ -118,43 +101,25 @@ export async function middleware(request: NextRequest) {
       (route) => pathname === route || pathname.startsWith(`${route}/`),
     );
 
-    console.log(
-      `📊 [Middleware ${requestId}] É rota pública? ${
-        isPublicRoute ? "SIM" : "NÃO"
-      }`,
-    );
-
     if (isPublicRoute) {
-      // Se estiver tentando acessar login já estando logado, redireciona para perfil
+      // Se usuário logado tentar acessar login, manda para o perfil
       if (pathname.startsWith("/login") && userId) {
-        console.log(
-          `🔄 [Middleware ${requestId}] Usuário logado tentando login → redirecionando para perfil`,
-        );
         return NextResponse.redirect(new URL(AGENT_PROFILE_ROUTE, request.url));
       }
-      console.log(`✅ [Middleware ${requestId}] Rota pública permitida`);
       return response;
     }
 
-    // ============================================
-    // CASO 2: USUÁRIO NÃO AUTENTICADO
-    // ============================================
+    // Se não é pública e não tem usuário -> Login
     if (!userId) {
-      console.log(
-        `❌ [Middleware ${requestId}] Usuário não autenticado para rota protegida`,
-      );
       const url = new URL("/login", request.url);
       url.searchParams.set("redirect", pathname);
-      console.log(
-        `🔄 [Middleware ${requestId}] Redirecionando para login com redirect: ${pathname}`,
-      );
       return NextResponse.redirect(url);
     }
 
     // ============================================
-    // CASO 3: VERIFICAR PERFIL DO USUÁRIO
+    // 3. BUSCA DE PERFIL (Role & Status)
     // ============================================
-    console.log(`📋 [Middleware ${requestId}] Buscando perfil do usuário...`);
+    // "Zero Trust": Buscamos o perfil em toda requisição protegida
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role, status, admin_2fa_enabled, full_name")
@@ -162,26 +127,39 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (profileError || !profile) {
-      console.error(
-        `❌ [Middleware ${requestId}] Erro ao buscar perfil:`,
-        profileError,
-      );
-      console.log(
-        `🔄 [Middleware ${requestId}] Perfil não encontrado → redirecionando para login`,
-      );
+      console.error(`[Middleware ${requestId}] Erro perfil ou não encontrado.`);
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    console.log(`📋 [Middleware ${requestId}] Perfil encontrado:`, {
-      nome: profile.full_name,
-      role: profile.role,
-      status: profile.status,
-      admin_2fa_enabled: profile.admin_2fa_enabled,
-    });
+    // ============================================
+    // CASO 4.1: AGENTE COMUM (Não-Admin)
+    // ============================================
+    if (profile.role !== "admin") {
+      // Agente INATIVO: Só acessa perfil (para ver aviso) ou logout
+      if (!profile.status) {
+        if (pathname !== AGENT_PROFILE_ROUTE) {
+          return NextResponse.redirect(
+            new URL(AGENT_PROFILE_ROUTE, request.url),
+          );
+        }
+        return response;
+      }
+
+      // Agente ATIVO: Acessa perfil
+      if (pathname === AGENT_PROFILE_ROUTE) {
+        return response;
+      }
+
+      // Bloquear acesso a qualquer rota administrativa ou desconhecida
+      // Redireciona de volta para o perfil seguro
+      return NextResponse.redirect(new URL(AGENT_PROFILE_ROUTE, request.url));
+    }
 
     // ============================================
-    // CASO 4: VERIFICAR SE É ROTA ADMIN
+    // CASO 5: ADMINISTRADOR
     // ============================================
+
+    // Verificar se a rota atual é uma rota administrativa
     const isAdminRoute = ADMIN_ROUTES.some((route) => {
       if (route.endsWith("/*")) {
         const baseRoute = route.slice(0, -2);
@@ -190,116 +168,28 @@ export async function middleware(request: NextRequest) {
       return pathname === route || pathname.startsWith(`${route}/`);
     });
 
-    console.log(
-      `📊 [Middleware ${requestId}] É rota admin? ${
-        isAdminRoute ? "SIM" : "NÃO"
-      }`,
-    );
-
-    // ============================================
-    // CASO 4.1: AGENTE COMUM (não-admin)
-    // ============================================
-    if (profile.role !== "admin") {
-      console.log(
-        `👤 [Middleware ${requestId}] Agente comum (${profile.role})`,
-      );
-
-      // 1. Verificar se é rota pública do site (qualquer agente pode ver)
-      const isPublicSiteRoute =
-        pathname === "/" ||
-        pathname.startsWith("/noticias") ||
-        pathname.startsWith("/galeria") ||
-        pathname.startsWith("/about") ||
-        pathname.startsWith("/contact");
-
-      // Agentes comuns (ativos ou inativos) podem ver rotas públicas do site
-      if (isPublicSiteRoute) {
-        console.log(
-          `✅ [Middleware ${requestId}] Agente comum permitido em rota pública do site`,
-        );
-        return response;
-      }
-
-      // 2. Agente INATIVO só pode ver seu perfil (além das rotas públicas já validadas acima)
-      if (!profile.status) {
-        if (pathname !== AGENT_PROFILE_ROUTE) {
-          console.log(
-            `⚠️ [Middleware ${requestId}] Agente INATIVO tentou acessar ${pathname} → redirecionando para perfil`,
-          );
-          return NextResponse.redirect(
-            new URL(AGENT_PROFILE_ROUTE, request.url),
-          );
-        }
-        console.log(
-          `✅ [Middleware ${requestId}] Agente INATIVO permitido no perfil`,
-        );
-        return response;
-      }
-
-      // 3. Agente ATIVO pode acessar seu perfil
-      if (pathname === AGENT_PROFILE_ROUTE) {
-        console.log(
-          `✅ [Middleware ${requestId}] Agente ativo permitido no perfil`,
-        );
-        return response;
-      }
-
-      // 4. Agente ativo tentando acessar outra rota protegida
-      console.log(
-        `❌ [Middleware ${requestId}] Agente ativo tentou acessar área restrita: ${pathname}`,
-      );
-      return NextResponse.redirect(new URL(AGENT_PROFILE_ROUTE, request.url));
-    }
-
-    // ============================================
-    // CASO 5: ADMINISTRADOR
-    // ============================================
-    console.log(`👑 [Middleware ${requestId}] Administrador detectado`);
-
-    // Se não é rota admin, permitir acesso (admin pode acessar qualquer rota autenticada)
+    // Se admin está navegando em rotas normais (ex: /perfil), permitir
     if (!isAdminRoute) {
-      console.log(
-        `✅ [Middleware ${requestId}] Admin em rota não-admin permitida`,
-      );
       return response;
     }
 
-    console.log(
-      `🔧 [Middleware ${requestId}] Verificando acesso admin para: ${pathname}`,
-    );
-
     // ============================================
-    // CASO 6: ROTA ADMIN ESPECÍFICA
+    // CASO 6: SETUP DE SENHA ADMIN
     // ============================================
-
-    // 6.1: Para /admin/setup-password, permitir acesso sem senha configurada
-    if (pathname === "/admin/setup-password") {
-      console.log(
-        `✅ [Middleware ${requestId}] Setup password permitido para admin`,
-      );
-      return response;
-    }
-
-    // 6.2: Verificar se configurou senha admin (para outras rotas admin)
+    // Se admin ainda não configurou a senha secundária
     if (!profile.admin_2fa_enabled) {
-      console.log(
-        `⚠️ [Middleware ${requestId}] Admin sem senha configurada para: ${pathname}`,
-      );
-      console.log(
-        `🔄 [Middleware ${requestId}] Redirecionando para setup-password`,
-      );
-      return NextResponse.redirect(
-        new URL("/admin/setup-password", request.url),
-      );
+      if (pathname !== "/admin/setup-password") {
+        return NextResponse.redirect(
+          new URL("/admin/setup-password", request.url),
+        );
+      }
+      return response; // Permite acessar a tela de setup
     }
 
-    console.log(
-      `🔐 [Middleware ${requestId}] Admin tem senha configurada: SIM`,
-    );
-
     // ============================================
-    // CASO 7: VERIFICAR SESSÃO ADMIN (2ª CAMADA)
+    // CASO 7: VERIFICAÇÃO DE SESSÃO ADMIN (2ª Camada)
     // ============================================
+    // Rotas críticas exigem o cookie 'admin_session' válido
     const requiresAdminSession = ADMIN_SESSION_ROUTES.some((route) => {
       if (route.endsWith("/*")) {
         const baseRoute = route.slice(0, -2);
@@ -308,85 +198,62 @@ export async function middleware(request: NextRequest) {
       return pathname === route || pathname.startsWith(`${route}/`);
     });
 
-    console.log(
-      `📊 [Middleware ${requestId}] Requer sessão admin? ${
-        requiresAdminSession ? "SIM" : "NÃO"
-      }`,
-    );
-
     if (requiresAdminSession) {
-      console.log(
-        `🔐 [Middleware ${requestId}] Verificando sessão admin (2ª camada)...`,
-      );
-
-      // Verificar cookies de sessão admin
       const adminSessionCookie = request.cookies.get("admin_session");
       const isAdminCookie = request.cookies.get("is_admin");
 
-      // Se não tem cookies admin válidos, redireciona para perfil
+      // Validar existência dos cookies
       if (
         !adminSessionCookie ||
         !isAdminCookie ||
         isAdminCookie.value !== "true"
       ) {
-        console.log(`❌ [Middleware ${requestId}] FALTAM COOKIES ADMIN!`);
-        console.log(`🔄 [Middleware ${requestId}] Redirecionando para /perfil`);
+        // Sem sessão admin -> Manda para o "login" da área admin (que é o perfil/dashboard inicial ou modal)
+        // Aqui optamos por mandar para o perfil, onde ele pode clicar em "Acessar Painel" novamente
         return NextResponse.redirect(new URL(AGENT_PROFILE_ROUTE, request.url));
       }
 
-      // Verificar se sessão admin expirou
+      // Validar expiração da sessão
       try {
         const sessionData = JSON.parse(adminSessionCookie.value);
-
         if (sessionData.expiresAt) {
           const expiresAt = new Date(sessionData.expiresAt);
-          const now = new Date();
-
-          if (expiresAt < now) {
-            console.log(`❌ [Middleware ${requestId}] Sessão admin EXPIRADA!`);
-            // Limpar cookies expirados
+          if (expiresAt < new Date()) {
+            // Expirou: Limpar e redirecionar
             response.cookies.delete("admin_session");
             response.cookies.delete("is_admin");
-            console.log(
-              `🔄 [Middleware ${requestId}] Redirecionando para /perfil (sessão expirada)`,
-            );
             return NextResponse.redirect(
               new URL(AGENT_PROFILE_ROUTE, request.url),
             );
           }
         }
-
-        console.log(
-          `✅ [Middleware ${requestId}] Sessão admin VÁLIDA para: ${pathname}`,
-        );
-        return response;
-      } catch (error) {
-        console.error(
-          `❌ [Middleware ${requestId}] Erro ao parsear cookie admin:`,
-          error,
-        );
-        // Limpar cookies inválidos
+      } catch {
+        // Cookie inválido/corrompido
         response.cookies.delete("admin_session");
         response.cookies.delete("is_admin");
         return NextResponse.redirect(new URL(AGENT_PROFILE_ROUTE, request.url));
       }
     }
 
-    // ============================================
-    // CASO 8: OUTRAS ROTAS ADMIN (sem sessão requerida)
-    // ============================================
-    console.log(
-      `✅ [Middleware ${requestId}] Rota admin básica permitida: ${pathname}`,
-    );
+    // Acesso permitido à rota administrativa
     return response;
   } catch (error) {
-    console.error(`❌ [Middleware ${requestId}] ERRO CRÍTICO:`, error);
+    console.error(`[Middleware ${requestId}] ERRO CRÍTICO:`, error);
+    // Em caso de pânico no middleware, falhar seguro para login
     return NextResponse.redirect(new URL("/login", request.url));
   }
 }
 
 export const config = {
   matcher: [
+    /*
+     * Corresponde a todas as rotas de requisição exceto:
+     * 1. /api/ (rotas de API)
+     * 2. /_next/ (arquivos estáticos do Next.js)
+     * 3. /_static (arquivos estáticos dentro da pasta public)
+     * 4. /_vercel (arquivos internos do Vercel)
+     * 5. Arquivos com extensão (imagens, etc)
+     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|webm|mp4)$).*)",
   ],
 };
