@@ -10,7 +10,7 @@ export interface Categoria {
   nome: string; // Alias
   slug: string;
   descricao: string | null;
-  capa_url?: string;
+  capa_url?: string | null;
   data_evento: string;
   created_at: string;
   updated_at: string;
@@ -22,6 +22,12 @@ export interface Categoria {
   itens_count?: number;
   qtd_fotos?: number;
   qtd_videos?: number;
+  // Adicionado para suportar a capa automática
+  itens?: {
+    arquivo_url: string;
+    thumbnail_url: string | null;
+    tipo: "foto" | "video";
+  }[];
 }
 
 export interface GaleriaItem {
@@ -59,6 +65,7 @@ interface CategoriaDB {
   nome: string;
   slug: string;
   descricao: string | null;
+  capa_url: string | null;
   tipo: "fotos" | "videos";
   ordem: number;
   status: boolean;
@@ -82,7 +89,6 @@ interface GaleriaItemDB {
   updated_at: string;
 }
 
-// ✅ Tipo auxiliar para lidar com o Join sem usar 'any'
 type GaleriaItemWithJoin = GaleriaItemDB & {
   galeria_categorias: { nome: string } | null;
 };
@@ -217,9 +223,20 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
 
     try {
       const supabase = createClient();
+
+      // ✅ CORREÇÃO: Busca os itens junto com as categorias para gerar a capa
       let query = supabase
         .from("galeria_categorias")
-        .select("*")
+        .select(
+          `
+          *,
+          itens:galeria_itens(
+            arquivo_url,
+            thumbnail_url,
+            tipo
+          )
+        `,
+        )
         .eq("status", true)
         .eq("arquivada", false)
         .order("created_at", { ascending: false });
@@ -244,7 +261,6 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
   },
 
   // --- PUBLIC: Fetch Itens ---
-  // ✅ CORRIGIDO: Agora usa o 'slug' e o helper 'mapCategoriaDBtoUI'
   fetchItens: async (slug: string) => {
     const { filtrosItens } = get();
     set({
@@ -341,7 +357,6 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
         pagination: { ...state.pagination, totalPages, totalItems },
       }));
 
-      // ✅ Helper usado aqui
       const categoriasMapeadas: Categoria[] = (data as CategoriaDB[]).map(
         mapCategoriaDBtoUI,
       );
@@ -395,7 +410,6 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
         pagination: { ...state.pagination, totalPages, totalItems },
       }));
 
-      // ✅ CORRIGIDO: Uso do tipo WithJoin para evitar 'any'
       const itensMapeados = (data as GaleriaItemWithJoin[]).map((item) => ({
         ...mapItemDBtoUI(item),
         galeria_categorias: item.galeria_categorias
@@ -453,7 +467,7 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
     }
   },
 
-  // --- ACTIONS (Corrigido: Removeu mocks, implementou lógica e usa variáveis) ---
+  // --- ACTIONS ---
 
   toggleCategoriaStatus: async (id, currentStatus) => {
     try {
@@ -461,7 +475,7 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
       const { error } = await supabase
         .from("galeria_categorias")
         .update({ status: !currentStatus })
-        .eq("id", id); // ✅ Variável 'id' usada
+        .eq("id", id);
 
       if (error) throw error;
 
@@ -471,7 +485,6 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
         ),
         stats: {
           ...state.stats,
-          // ✅ Variável 'currentStatus' usada para lógica otimista
           categoriasAtivas: !currentStatus
             ? state.stats.categoriasAtivas + 1
             : state.stats.categoriasAtivas - 1,
@@ -492,7 +505,7 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
       const { error } = await supabase
         .from("galeria_categorias")
         .delete()
-        .eq("id", id); // ✅ Variável 'id' usada
+        .eq("id", id);
       if (error) throw error;
 
       set((state) => ({
@@ -516,7 +529,7 @@ const useGaleriaStoreBase = create<GaleriaState>((set, get) => ({
       const { error } = await supabase
         .from("galeria_itens")
         .delete()
-        .eq("id", id); // ✅ Variável 'id' usada
+        .eq("id", id);
       if (error) throw error;
 
       set((state) => ({
@@ -557,15 +570,18 @@ function mapCategoriaDBtoUI(cat: CategoriaDB): Categoria {
     nome: cat.nome,
     slug: cat.slug,
     descricao: cat.descricao,
+    capa_url: cat.capa_url,
     status: cat.status,
     data_evento: cat.created_at,
     created_at: cat.created_at,
     updated_at: cat.updated_at,
     destaque: !cat.arquivada,
     arquivada: cat.arquivada,
-    capa_url: undefined,
     tipo: cat.tipo,
     ordem: cat.ordem,
+    // ✅ CORREÇÃO: Garante que os itens vindos do Join sejam passados para a UI
+    // @ts-expect-error: itens vem do join, não está no tipo base do DB, mas está no retorno da query
+    itens: cat.itens,
   };
 }
 

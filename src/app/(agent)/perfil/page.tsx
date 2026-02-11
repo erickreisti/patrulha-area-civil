@@ -142,13 +142,14 @@ export default function AgentPerfil() {
   const unidadeLength = (user.unidade || "").length;
   const unidadeTextSize =
     unidadeLength > 30
-      ? "text-[9px]"
+      ? "text-[8px]"
       : unidadeLength > 20
-        ? "text-[10px]"
-        : "text-sm";
+        ? "text-[9px]"
+        : "text-[11px]";
 
   return (
-    <div className="min-h-[100dvh] bg-[#1e3a8a] relative flex items-center justify-center p-1 font-sans overflow-hidden">
+    // Aumentei o padding (p-6) para mostrar mais fundo azul
+    <div className="min-h-[100dvh] bg-[#1e3a8a] relative flex items-center justify-center p-6 font-sans overflow-hidden">
       <InactiveDialog
         isOpen={showInactive}
         onClose={() => {
@@ -164,53 +165,55 @@ export default function AgentPerfil() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[340px] relative z-10"
+        // Reduzi a largura máxima de 340px para 300px
+        className="w-full max-w-[300px] relative z-10"
       >
         <Card className="border-none shadow-2xl bg-white overflow-hidden rounded-[14px]">
           {/* --- HEADER --- */}
-          <div className="bg-white px-4 flex flex-col items-center text-center">
+          <div className="bg-white px-4 pt-3 pb-1 flex flex-col items-center text-center">
             <div className="mb-1">
               <Image
                 src="/images/logos/logo.webp"
                 alt="PAC Logo"
-                width={90}
-                height={90}
+                width={80} // Levemente menor
+                height={80}
                 className="object-contain"
                 style={{ width: "auto", height: "auto" }}
                 priority
               />
             </div>
 
-            <h1 className="text-[#1a237e] font-roboto font-bold text-md uppercase leading-none tracking-wide mb-0.5">
+            <h1 className="text-[#1a237e] font-roboto font-bold text-sm uppercase leading-none tracking-wide mb-0.5">
               Patrulha Aérea Civil
             </h1>
-            <span className="text-[8px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-1 block leading-none">
+            <span className="text-[7px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-1 block leading-none">
               Comando Operacional no Estado do Rio de Janeiro
             </span>
 
             <div className="flex flex-col items-center gap-0">
-              <span className="text-[8px] font-roboto font-bold text-black uppercase tracking-wider leading-none mb-1 mt-0.5">
+              <span className="text-[7px] font-roboto font-bold text-black uppercase tracking-wider leading-none mb-1 mt-0.5">
                 Identificação
               </span>
               <Image
                 src="/images/logos/flag-br.webp"
                 alt="Brasil"
-                width={24}
-                height={16}
+                width={22}
+                height={15}
                 style={{ width: "auto", height: "auto" }}
                 className="shadow-sm rounded-[2px]"
               />
             </div>
           </div>
 
-          <CardContent className="pt-1 mt-[-10px] space-y-1.4">
+          <CardContent className="pt-1 mt-[-5px] space-y-1">
             {/* 1. NOME */}
             <div className="space-y-[-2px]">
-              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 block">
+              <label className="text-[7px] font-sans font-bold text-slate-400 uppercase ml-4 block">
                 Nome
               </label>
-              <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[50px] justify-center items-center flex">
-                <p className="text-lg font-roboto text-slate-800 uppercase leading-none truncate">
+              {/* Reduzi min-h de 50px para 42px */}
+              <div className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[42px] justify-center items-center flex">
+                <p className="text-base font-roboto text-slate-800 uppercase leading-none truncate">
                   {user.full_name || "NOME DO AGENTE"}
                 </p>
               </div>
@@ -218,28 +221,30 @@ export default function AgentPerfil() {
 
             {/* 2. MATRÍCULA */}
             <div className="space-y-[-2px]">
-              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 block mt-1.5">
+              <label className="text-[7px] font-sans font-bold text-slate-400 uppercase ml-4 block mt-1">
                 Matrícula
               </label>
-              <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[50px] justify-center items-center flex">
-                <p className="text-xl font-roboto  text-slate-800 tracking-wider leading-none">
+              {/* Reduzi min-h de 50px para 42px */}
+              <div className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[42px] justify-center items-center flex">
+                <p className="text-lg font-roboto text-slate-800 tracking-wider leading-none">
                   {formatMatricula(user.matricula)}
                 </p>
               </div>
             </div>
 
             {/* 3. GRID (Dados + Foto) */}
-            <div className="grid grid-cols-2 gap-3 items-stretch">
+            <div className="grid grid-cols-2 gap-2 items-stretch mt-1">
               {/* Coluna Esquerda: Dados */}
-              <div className="flex flex-col gap-2 h-full">
+              <div className="flex flex-col gap-1.5 h-full">
                 {/* UNIDADE (Adaptativo) */}
                 <div className="flex-1 flex flex-col space-y-[-2px]">
-                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 mt-1.5">
+                  <label className="text-[7px] font-sans font-bold text-slate-400 uppercase ml-4 mt-0.5">
                     Unidade
                   </label>
-                  <div className="flex-1 flex items-center justify-center p-1 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[50px]">
+                  {/* Reduzi min-h de 50px para 42px */}
+                  <div className="flex-1 flex items-center justify-center p-1 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[42px]">
                     <span
-                      className={`${unidadeTextSize} text-[19px] font-roboto text-slate-800 uppercase text-center leading-tight`}
+                      className={`${unidadeTextSize} font-roboto text-slate-800 uppercase text-center leading-tight`}
                     >
                       {user.unidade || "SEDE DA PAC"}
                     </span>
@@ -248,11 +253,11 @@ export default function AgentPerfil() {
 
                 {/* Tipo Sanguíneo */}
                 <div className="flex-1 flex flex-col space-y-[-2px]">
-                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5">
+                  <label className="text-[7px] font-sans font-bold text-slate-400 uppercase ml-4">
                     Tipo Sanguíneo
                   </label>
-                  <div className="flex-1 flex items-center justify-center p-2 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[50px]">
-                    <span className="text-xl font-roboto text-[#d32f2f] uppercase">
+                  <div className="flex-1 flex items-center justify-center p-1 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[42px]">
+                    <span className="text-lg font-roboto text-[#d32f2f] uppercase">
                       {user.tipo_sanguineo || "AB+"}
                     </span>
                   </div>
@@ -260,11 +265,11 @@ export default function AgentPerfil() {
 
                 {/* Validade */}
                 <div className="flex-1 flex flex-col space-y-[-2px]">
-                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 mt-1.5">
+                  <label className="text-[7px] font-sans font-bold text-slate-400 uppercase ml-4 mt-0.5">
                     Validade
                   </label>
-                  <div className="flex-1 flex items-center justify-center p-2 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[50px]">
-                    <span className="text-xl font-roboto  text-slate-800">
+                  <div className="flex-1 flex items-center justify-center p-1 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[42px]">
+                    <span className="text-lg font-roboto text-slate-800">
                       {formatDate(user.validade_certificacao)}
                     </span>
                   </div>
@@ -273,19 +278,20 @@ export default function AgentPerfil() {
 
               {/* Coluna Direita: Foto */}
               <div className="flex flex-col h-full">
-                <div className="mt-[24px] relative w-full aspect-[3/4] rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
+                {/* Ajustei a margem superior para alinhar com os labels */}
+                <div className="mt-[14px] relative w-full aspect-[3/4] rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
                   {user.avatar_url ? (
                     <Image
                       src={user.avatar_url}
                       alt="Foto"
                       fill
                       className="object-cover object-top"
-                      sizes="200px"
+                      sizes="150px"
                       priority
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full text-slate-300">
-                      <span className="text-[10px] font-sans font-bold uppercase">
+                      <span className="text-[9px] font-sans font-bold uppercase">
                         Sem Foto
                       </span>
                     </div>
@@ -295,36 +301,37 @@ export default function AgentPerfil() {
             </div>
 
             {/* 4. GRADUAÇÃO (Antiga Unidade) */}
-            <div className="space-y-[-2px] pt-2">
-              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 block">
+            <div className="space-y-[-2px] pt-1">
+              <label className="text-[7px] font-sans font-bold text-slate-400 uppercase ml-4 block">
                 Graduação
               </label>
-              <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[50px] justify-center items-center flex">
-                <p className="text-lg font-roboto font-black text-[#d32f2f] uppercase leading-none truncate">
+              {/* Reduzi min-h de 50px para 42px */}
+              <div className="p-1.5 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[42px] justify-center items-center flex">
+                <p className="text-base font-roboto font-black text-[#d32f2f] uppercase leading-none truncate">
                   {user.graduacao || "MAJOR"}
                 </p>
               </div>
             </div>
 
             {/* 5. SITUAÇÃO */}
-            <div className="pt-4">
-              <span className="text-[8px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-1 leading-none flex justify-center">
+            <div className="pt-3">
+              <span className="text-[7px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-1 leading-none flex justify-center">
                 Situação do Patrulheiro
               </span>
               <div
-                className={`w-full h-14 flex justify-center items-center py-2 rounded-lg text-center shadow-sm ${
+                className={`w-full h-10 flex justify-center items-center py-1 rounded-lg text-center shadow-sm ${
                   user.status ? "bg-[#2e7d32]" : "bg-[#c62828]"
                 }`}
               >
-                <h2 className="text-base font-roboto font-black text-white uppercase flex items-center justify-center gap-1.5">
+                <h2 className="text-sm font-roboto font-black text-white uppercase flex items-center justify-center gap-1.5">
                   {user.status ? (
                     <>
-                      <RiCheckboxCircleLine className="text-white w-3.5 h-3.5" />
+                      <RiCheckboxCircleLine className="text-white w-3 h-3" />
                       ATIVO
                     </>
                   ) : (
                     <>
-                      <RiForbidLine className="text-white w-3.5 h-3.5" />
+                      <RiForbidLine className="text-white w-3 h-3" />
                       INATIVO
                     </>
                   )}
@@ -333,20 +340,20 @@ export default function AgentPerfil() {
             </div>
 
             {/* 6. AÇÕES */}
-            <div className="mt-4 pt-2 grid grid-cols-2 gap-2 border-t border-slate-100">
+            <div className="mt-3 pt-2 grid grid-cols-2 gap-2 border-t border-slate-100">
               <Button
                 asChild
                 variant="outline"
                 size="sm"
-                className="h-8 text-[10px] font-sans font-bold uppercase tracking-wide border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg"
+                className="h-7 text-[9px] font-sans font-bold uppercase tracking-wide border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 rounded-lg"
               >
                 <Link href="/">
-                  <RiHomeLine className="mr-1.5 w-3 h-3" /> Site
+                  <RiHomeLine className="mr-1 w-3 h-3" /> Site
                 </Link>
               </Button>
 
               {isAdmin && (
-                <div className="flex gap-2">
+                <div className="flex gap-1">
                   <Button
                     size="sm"
                     onClick={() => {
@@ -355,13 +362,13 @@ export default function AgentPerfil() {
                       else if (hasAdminSession) router.push("/admin/dashboard");
                       else setShowAdminAuth(true);
                     }}
-                    className={`flex-1 h-8 text-[10px] font-sans font-bold uppercase tracking-wide text-white shadow-md transition-all rounded-lg ${
+                    className={`flex-1 h-7 text-[9px] font-sans font-bold uppercase tracking-wide text-white shadow-md transition-all rounded-lg ${
                       !user.admin_2fa_enabled
                         ? "bg-amber-600 hover:bg-amber-700"
                         : "bg-slate-900 hover:bg-slate-800"
                     }`}
                   >
-                    <RiShieldStarLine className="mr-1.5 w-3 h-3" />
+                    <RiShieldStarLine className="mr-1 w-3 h-3" />
                     {!user.admin_2fa_enabled ? "Config" : "Admin"}
                   </Button>
 
@@ -370,7 +377,7 @@ export default function AgentPerfil() {
                       variant="outline"
                       size="sm"
                       onClick={() => router.push("/admin/setup-password")}
-                      className="h-8 w-8 p-0 rounded-lg border-slate-200 hover:bg-slate-50 text-slate-600"
+                      className="h-7 w-7 p-0 rounded-lg border-slate-200 hover:bg-slate-50 text-slate-600"
                     >
                       <RiSettings3Line className="w-3 h-3" />
                     </Button>
@@ -382,9 +389,9 @@ export default function AgentPerfil() {
                 variant="ghost"
                 size="sm"
                 onClick={logout}
-                className="col-span-2 h-8 text-[10px] font-sans font-bold uppercase tracking-widest text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                className="col-span-2 h-7 text-[9px] font-sans font-bold uppercase tracking-widest text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
               >
-                <RiLogoutBoxLine className="mr-1.5 w-3 h-3" /> Encerrar Sessão
+                <RiLogoutBoxLine className="mr-1 w-3 h-3" /> Encerrar Sessão
               </Button>
             </div>
           </CardContent>

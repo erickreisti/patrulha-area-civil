@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { type SupabaseClient } from "@supabase/supabase-js";
-import { type Database } from "@/lib/supabase/types";
+import { type Database, type GaleriaCategoria } from "@/lib/supabase/types";
 import { logActivity, generateSlug, validateSlug } from "./shared";
 import {
   CreateCategoriaSchema,
@@ -21,6 +21,11 @@ import {
 // ==========================================
 // HELPERS
 // ==========================================
+
+// ✅ Tipo auxiliar para lidar com o retorno cru do Supabase com Join
+type CategoriaRawDB = GaleriaCategoria & {
+  itens: { count: number }[];
+};
 
 async function getTypedAdminClient() {
   return (await getAdminClient()) as SupabaseClient<Database>;
@@ -83,7 +88,6 @@ export async function getPublicCategorias() {
   try {
     const adminClient = await getTypedAdminClient();
 
-    // select com count de itens (foreign table)
     const { data, error } = await adminClient
       .from("galeria_categorias")
       .select("*, itens:galeria_itens(count)")
@@ -93,13 +97,17 @@ export async function getPublicCategorias() {
 
     if (error) throw error;
 
-    // Formata o retorno para incluir o count plano
-    const formattedData = data.map((cat) => ({
-      ...cat,
-      itens_count: cat.itens?.[0]?.count || 0,
-    }));
+    const rawData = data as unknown as CategoriaRawDB[];
 
-    return { success: true, data: formattedData as Categoria[] };
+    const formattedData: Categoria[] = rawData.map((cat) => {
+      const { itens, ...rest } = cat;
+      return {
+        ...rest,
+        itens_count: itens?.[0]?.count || 0,
+      };
+    });
+
+    return { success: true, data: formattedData };
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Erro desconhecido";
@@ -119,12 +127,15 @@ export async function getCategoriaPorSlug(slug: string) {
     if (error || !data)
       return { success: false, error: "Categoria não encontrada" };
 
-    const formattedData = {
-      ...data,
-      itens_count: data.itens?.[0]?.count || 0,
+    const rawData = data as unknown as CategoriaRawDB;
+    const { itens, ...rest } = rawData;
+
+    const formattedData: Categoria = {
+      ...rest,
+      itens_count: itens?.[0]?.count || 0,
     };
 
-    return { success: true, data: formattedData as Categoria };
+    return { success: true, data: formattedData };
   } catch (error: unknown) {
     const message =
       error instanceof Error ? error.message : "Erro desconhecido";
@@ -161,14 +172,19 @@ export async function getCategoriasAdmin(
 
     if (error) throw error;
 
-    const formattedData = data.map((cat) => ({
-      ...cat,
-      itens_count: cat.itens?.[0]?.count || 0,
-    }));
+    const rawData = data as unknown as CategoriaRawDB[];
+
+    const formattedData: Categoria[] = rawData.map((cat) => {
+      const { itens, ...rest } = cat;
+      return {
+        ...rest,
+        itens_count: itens?.[0]?.count || 0,
+      };
+    });
 
     return {
       success: true,
-      data: formattedData as Categoria[],
+      data: formattedData,
       pagination: {
         total: count || 0,
         page,

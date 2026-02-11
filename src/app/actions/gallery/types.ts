@@ -24,6 +24,8 @@ export const CategoriaSchema = z.object({
     .max(500, "Descrição não pode ter mais de 500 caracteres")
     .optional()
     .nullable(),
+  // ✅ ADICIONADO: Campo capa_url
+  capa_url: z.string().url().optional().nullable(),
   tipo: z.enum(["fotos", "videos"]),
   status: z.boolean().default(true),
   ordem: z.number().min(0).max(999).default(0),
@@ -34,6 +36,7 @@ export const CreateCategoriaSchema = CategoriaSchema.pick({
   nome: true,
   slug: true,
   descricao: true,
+  capa_url: true, // ✅ Incluir no Create
   tipo: true,
   status: true,
   ordem: true,
@@ -41,7 +44,7 @@ export const CreateCategoriaSchema = CategoriaSchema.pick({
 });
 
 export const UpdateCategoriaSchema = CategoriaSchema.partial().extend({
-  id: z.string().uuid("ID inválido").optional(), // ID opcional no input do form, obrigatório na action
+  id: z.string().uuid("ID inválido").optional(),
 });
 
 export const ListCategoriasSchema = z.object({
@@ -115,12 +118,12 @@ export type Item = GaleriaItem & {
   galeria_categorias?: {
     id: string;
     nome: string;
-    slug: string; // Adicionado slug, geralmente útil no front
+    slug: string;
     tipo: string;
   } | null;
 };
 
-// Alias para consistência com outros arquivos
+// Alias para consistência
 export type ItemGaleria = Item;
 
 // Filtros

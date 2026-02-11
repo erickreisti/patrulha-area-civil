@@ -15,6 +15,8 @@ export interface Database {
           nome: string;
           slug: string;
           descricao: string | null;
+          // ADICIONADO: Necessário para a lógica de capa dos álbuns
+          capa_url: string | null;
           tipo: "fotos" | "videos";
           ordem: number;
           status: boolean;
@@ -27,6 +29,8 @@ export interface Database {
           nome: string;
           slug: string;
           descricao?: string | null;
+          // ADICIONADO
+          capa_url?: string | null;
           tipo?: "fotos" | "videos";
           ordem?: number;
           status?: boolean;
@@ -39,6 +43,8 @@ export interface Database {
           nome?: string;
           slug?: string;
           descricao?: string | null;
+          // ADICIONADO
+          capa_url?: string | null;
           tipo?: "fotos" | "videos";
           ordem?: number;
           status?: boolean;
@@ -261,7 +267,6 @@ export interface Database {
           validade_certificacao: string | null;
           tipo_sanguineo: string | null;
           status: boolean;
-
           unidade: string | null;
           uf: string | null;
           data_nascimento: string | null;
@@ -284,7 +289,6 @@ export interface Database {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
-
           unidade?: string | null;
           uf?: string | null;
           data_nascimento?: string | null;
@@ -307,7 +311,6 @@ export interface Database {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
-
           unidade?: string | null;
           uf?: string | null;
           data_nascimento?: string | null;
@@ -465,11 +468,15 @@ export type TablesUpdate<T extends keyof Database["public"]["Tables"]> =
 // TIPOS EXPORTADOS ESPECÍFICOS (Resolvem seus erros de import)
 // ============================================
 
+// Aqui estendemos GaleriaItem para incluir a relação inversa (opcional, mas bom se você fizer join)
 export type GaleriaItem = Tables<"galeria_itens">;
 export type GaleriaItemInsert = TablesInsert<"galeria_itens">;
 export type GaleriaItemUpdate = TablesUpdate<"galeria_itens">;
 
-export type GaleriaCategoria = Tables<"galeria_categorias">;
+// Adicionado "itens" opcional para quando fazemos o join na query
+export type GaleriaCategoria = Tables<"galeria_categorias"> & {
+  itens?: GaleriaItem[];
+};
 export type GaleriaCategoriaInsert = TablesInsert<"galeria_categorias">;
 export type GaleriaCategoriaUpdate = TablesUpdate<"galeria_categorias">;
 
