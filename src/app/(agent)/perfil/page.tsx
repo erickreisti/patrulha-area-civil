@@ -300,7 +300,7 @@ export default function AgentPerfil() {
                 Graduação
               </label>
               <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[50px] justify-center items-center flex">
-                <p className="text-lg font-roboto text-[#d32f2f] uppercase leading-none truncate">
+                <p className="text-lg font-roboto font-black text-[#d32f2f] uppercase leading-none truncate">
                   {user.graduacao || "MAJOR"}
                 </p>
               </div>
