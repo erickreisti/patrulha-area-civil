@@ -92,7 +92,7 @@ const TopBar = () => (
             width={24}
             height={16}
             className="rounded-[2px] shadow-sm w-auto h-3 lg:h-4 flex-shrink-0"
-            style={{ width: "auto", height: "auto" }}
+            style={{ width: "auto", height: "100%" }}
             priority
           />
           <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold tracking-widest uppercase opacity-90 truncate">
@@ -137,25 +137,25 @@ const Logo = () => (
     className="flex items-center gap-2 xs:gap-3 lg:gap-4 group py-1 min-w-0"
     aria-label="Ir para página inicial"
   >
-    {/* LOGO */}
-    <div className="relative h-14 xs:h-20 lg:h-28 w-auto aspect-[3/4] transition-all duration-300 group-hover:scale-105 drop-shadow-lg filter flex-shrink-0">
+    {/* LOGO BEM MAIOR NO MOBILE: h-20 (80px) */}
+    <div className="relative h-20 xs:h-24 lg:h-28 w-auto aspect-[3/4] transition-all duration-300 group-hover:scale-105 drop-shadow-lg filter flex-shrink-0">
       <Image
         src="/images/logos/logo.webp"
         alt="Brasão da Patrulha Aérea Civil"
         width={0}
         height={0}
-        sizes="(max-width: 425px) 60px, (max-width: 1024px) 100px, 120px"
+        sizes="(max-width: 425px) 100px, (max-width: 1024px) 110px, 120px"
         className="object-contain"
         style={{ width: "auto", height: "100%" }}
         priority
       />
     </div>
 
-    {/* TEXTO */}
+    {/* TEXTO ACOMPANHANDO O TAMANHO */}
     <div className="flex flex-col justify-center border-l-2 border-slate-100 pl-2 xs:pl-4 min-w-0">
       <h1
-        className="font-black text-pac-primary-light tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary-soft whitespace-nowrap
-        text-sm         /* Mobile */
+        className="font-black text-slate-800 tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary whitespace-nowrap
+        text-base       /* Mobile: Aumentado de sm para base */
         xs:text-lg      /* Tablet */
         lg:text-xl      /* Desktop */
         xl:text-2xl     /* Telas grandes */
@@ -166,12 +166,12 @@ const Logo = () => (
 
       <p
         className="font-bold text-slate-500 uppercase leading-tight mt-0.5 xs:mt-1 whitespace-nowrap
-        text-[8px] tracking-normal
+        text-[9px] tracking-normal      /* Mobile: Aumentado de 8px para 9px */
         xs:text-[10px] xs:tracking-[0.1em]
         lg:text-[11px] lg:tracking-[0.15em]
       "
       >
-        Comando Operacional no Estado do Rio de Janeiro
+        Comando Operacional no Rio de Janeiro
       </p>
     </div>
   </Link>
@@ -447,7 +447,8 @@ export function Header() {
         )}
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 xs:h-28 lg:h-32 gap-3 lg:gap-6">
+          {/* HEADER MAIS ALTO NO MOBILE: h-28 (112px) */}
+          <div className="flex items-center justify-between h-28 xs:h-28 lg:h-32 gap-3 lg:gap-6">
             {/* Logo */}
             <div className="flex-shrink-0 min-w-0">
               <Logo />
@@ -483,7 +484,7 @@ export function Header() {
                 onClick={() => setIsMenuOpen(true)}
                 className="text-slate-800 hover:bg-slate-100 rounded-full w-9 h-9 xs:w-12 xs:h-12 flex-shrink-0"
               >
-                <RiMenuLine className="w-5 h-5 xs:w-8 xs:h-8" />
+                <RiMenuLine className="w-6 h-6 xs:w-8 xs:h-8" />
               </Button>
             </div>
           </div>

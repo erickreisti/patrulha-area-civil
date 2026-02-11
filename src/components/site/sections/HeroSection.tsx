@@ -41,13 +41,9 @@ export function HeroSection() {
       className={cn(
         "relative w-full flex items-center justify-center overflow-hidden bg-slate-900",
         // AJUSTE DE ALTURA RESPONSIVA (Viewport - Header - TopBar):
-        // Mobile (< 425px): 100vh - 120px (Header h-20 + TopBar)
-        "h-[calc(100vh-120px)]",
-        // Mobile Grande (xs): 100vh - 152px (Header h-28 + TopBar)
-        "xs:h-[calc(100vh-152px)]",
-        // Desktop (lg): 100vh - 170px (Header h-32 + TopBar)
-        "lg:h-[calc(100vh-170px)]",
-        // Altura mínima de segurança para não esmagar conteúdo em telas wide mas baixas
+        "h-[calc(100vh-120px)]", // Mobile
+        "xs:h-[calc(100vh-152px)]", // Mobile Grande
+        "lg:h-[calc(100vh-170px)]", // Desktop
         "min-h-[550px] lg:min-h-[600px]",
       )}
     >
@@ -61,12 +57,8 @@ export function HeroSection() {
           className="object-cover object-center"
           quality={75}
         />
-
-        {/* Overlays */}
         <div className="absolute inset-0 bg-pac-primary/80 mix-blend-multiply" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent" />
-
-        {/* Grid CSS Puro */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] opacity-20 pointer-events-none" />
       </div>
 
@@ -83,7 +75,6 @@ export function HeroSection() {
             variants={fadeInUp}
             className={cn(
               "font-black text-white uppercase tracking-tighter leading-[1.1] mb-4 xs:mb-6 drop-shadow-2xl",
-              // Tipografia fluida ajustada para o novo espaço
               "whitespace-nowrap text-[min(10vw,3rem)] xs:text-[min(6vw,4rem)] lg:text-[min(5.5vw,5.5rem)]",
             )}
           >
@@ -107,7 +98,6 @@ export function HeroSection() {
             variants={fadeInUp}
             className="flex flex-col sm:flex-row gap-4 xs:gap-5 justify-center items-center w-full"
           >
-            {/* Botão Primário */}
             <Button
               size="lg"
               className={cn(
@@ -124,7 +114,6 @@ export function HeroSection() {
               </Link>
             </Button>
 
-            {/* Botão Secundário */}
             <Button
               variant="outline"
               size="lg"
@@ -145,39 +134,41 @@ export function HeroSection() {
         </motion.div>
       </div>
 
-      {/* 3. Indicador de Scroll Responsivo */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1.2, duration: 0.8 }}
-        className="absolute bottom-4 sm:bottom-8 lg:bottom-10 left-1/2 -translate-x-1/2 z-20 cursor-pointer group p-2 xs:p-4"
-        onClick={scrollToAbout}
-      >
-        <div className="flex flex-col items-center gap-2 transition-transform duration-300 group-hover:translate-y-1">
-          {/* Texto oculto no mobile pequeno para economizar espaço vertical */}
-          <span className="hidden xs:block text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold group-hover:text-white transition-colors">
-            Saiba Mais
-          </span>
+      {/* 3. Indicador de Scroll Responsivo & Centralizado */}
+      {/* WRAPPER DE POSICIONAMENTO ESTÁTICO (Garante o centro perfeito) */}
+      <div className="absolute bottom-4 sm:bottom-8 lg:bottom-10 left-1/2 -translate-x-1/2 z-20">
+        {/* COMPONENTE DE ANIMAÇÃO (Apenas fade e slide, sem posição) */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.2, duration: 0.8 }}
+          className="cursor-pointer group p-2 xs:p-4"
+          onClick={scrollToAbout}
+        >
+          <div className="flex flex-col items-center gap-2 transition-transform duration-300 group-hover:translate-y-1">
+            <span className="hidden xs:block text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold group-hover:text-white transition-colors text-center">
+              Saiba Mais
+            </span>
 
-          {/* Mouse responsivo */}
-          <div className="w-[20px] h-[32px] xs:w-[26px] xs:h-[44px] border-2 border-slate-400 rounded-full flex justify-center p-1 group-hover:border-white transition-colors bg-black/10 backdrop-blur-sm">
-            <motion.div
-              className="w-1 xs:w-1.5 h-1.5 xs:h-2.5 bg-white rounded-full"
-              animate={{
-                y: [0, 10, 0],
-                opacity: [1, 0.5, 1],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-            />
+            <div className="w-[20px] h-[32px] xs:w-[26px] xs:h-[44px] border-2 border-slate-400 rounded-full flex justify-center p-1 group-hover:border-white transition-colors bg-black/10 backdrop-blur-sm">
+              <motion.div
+                className="w-1 xs:w-1.5 h-1.5 xs:h-2.5 bg-white rounded-full"
+                animate={{
+                  y: [0, 10, 0],
+                  opacity: [1, 0.5, 1],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
 
-      {/* Gradiente de Fusão Inferior - Altura ajustada */}
+      {/* Gradiente de Fusão Inferior */}
       <div className="absolute bottom-0 w-full h-24 xs:h-32 bg-gradient-to-t from-white via-white/60 to-transparent z-10 pointer-events-none" />
     </section>
   );

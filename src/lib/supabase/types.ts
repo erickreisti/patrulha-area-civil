@@ -261,6 +261,8 @@ export interface Database {
           validade_certificacao: string | null;
           tipo_sanguineo: string | null;
           status: boolean;
+
+          unidade: string | null;
           uf: string | null;
           data_nascimento: string | null;
           telefone: string | null;
@@ -282,6 +284,8 @@ export interface Database {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
+
+          unidade?: string | null;
           uf?: string | null;
           data_nascimento?: string | null;
           telefone?: string | null;
@@ -303,6 +307,8 @@ export interface Database {
           validade_certificacao?: string | null;
           tipo_sanguineo?: string | null;
           status?: boolean;
+
+          unidade?: string | null;
           uf?: string | null;
           data_nascimento?: string | null;
           telefone?: string | null;
