@@ -164,7 +164,6 @@ export default function AgentPerfil() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        // Mantive a largura reduzida em 300px
         className="w-full max-w-[300px] relative z-10"
       >
         <Card className="border-none shadow-2xl bg-white overflow-hidden rounded-[12px]">
@@ -174,7 +173,7 @@ export default function AgentPerfil() {
               <Image
                 src="/images/logos/logo.webp"
                 alt="PAC Logo"
-                width={65} // Reduzi logo de 80 para 65
+                width={65}
                 height={65}
                 className="object-contain"
                 style={{ width: "auto", height: "auto" }}
@@ -210,10 +209,8 @@ export default function AgentPerfil() {
               <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3 block">
                 Nome
               </label>
-              {/* Reduzi min-h de 42px para 34px */}
-              <div className="p-1 bg-white border border-slate-200 rounded-md shadow-sm text-center min-h-[34px] justify-center items-center flex">
-                {/* Reduzi fonte para text-sm */}
-                <p className="text-sm font-roboto text-slate-800 uppercase leading-none truncate font-bold">
+              <div className="p-0.5 bg-white border border-slate-200 rounded-md shadow-sm text-center min-h-[46px] justify-center items-center flex">
+                <p className="text-sm font-roboto text-slate-800 uppercase leading-none truncate">
                   {user.full_name || "NOME DO AGENTE"}
                 </p>
               </div>
@@ -224,10 +221,8 @@ export default function AgentPerfil() {
               <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3 block mt-0.5">
                 Matrícula
               </label>
-              {/* Reduzi min-h de 42px para 34px */}
-              <div className="p-1 bg-white border border-slate-200 rounded-md shadow-sm text-center min-h-[34px] justify-center items-center flex">
-                {/* Reduzi fonte para text-base */}
-                <p className="text-base font-roboto text-slate-800 tracking-wider leading-none font-bold">
+              <div className="p-0.5 bg-white border border-slate-200 rounded-md shadow-sm text-center min-h-[46px] justify-center items-center flex">
+                <p className="text-base font-roboto text-slate-800 tracking-wider leading-none">
                   {formatMatricula(user.matricula)}
                 </p>
               </div>
@@ -242,10 +237,9 @@ export default function AgentPerfil() {
                   <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3 mt-0.5">
                     Unidade
                   </label>
-                  {/* Reduzi min-h de 42px para 34px */}
-                  <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[34px]">
+                  <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[32px]">
                     <span
-                      className={`${unidadeTextSize} font-roboto text-slate-800 uppercase text-center leading-tight font-bold`}
+                      className={`${unidadeTextSize} font-roboto text-slate-800 uppercase text-center leading-tight`}
                     >
                       {user.unidade || "SEDE DA PAC"}
                     </span>
@@ -257,8 +251,8 @@ export default function AgentPerfil() {
                   <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3">
                     Tipo Sanguíneo
                   </label>
-                  <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[34px]">
-                    <span className="text-base font-roboto text-[#d32f2f] uppercase font-black">
+                  <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[32px]">
+                    <span className="text-base font-roboto text-[#d32f2f] uppercase ">
                       {user.tipo_sanguineo || "AB+"}
                     </span>
                   </div>
@@ -269,8 +263,8 @@ export default function AgentPerfil() {
                   <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3 mt-0.5">
                     Validade
                   </label>
-                  <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[34px]">
-                    <span className="text-base font-roboto text-slate-800 font-bold">
+                  <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[32px]">
+                    <span className="text-sm font-roboto text-slate-800">
                       {formatDate(user.validade_certificacao)}
                     </span>
                   </div>
@@ -279,6 +273,7 @@ export default function AgentPerfil() {
 
               {/* Coluna Direita: Foto */}
               <div className="flex flex-col h-full">
+                {/* A margem superior (mt) ajustada para alinhar o topo da foto com o topo da unidade */}
                 <div className="mt-[10px] relative w-full aspect-[3/4] rounded-md overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
                   {user.avatar_url ? (
                     <Image
@@ -305,8 +300,8 @@ export default function AgentPerfil() {
               <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3 block">
                 Graduação
               </label>
-              {/* Reduzi min-h de 42px para 34px */}
-              <div className="p-1 bg-white border border-slate-200 rounded-md shadow-sm text-center min-h-[34px] justify-center items-center flex">
+              {/* Agora padronizado para min-h-[32px] também */}
+              <div className="p-0.5 bg-white border border-slate-200 rounded-md shadow-sm text-center min-h-[46px] justify-center items-center flex">
                 <p className="text-sm font-roboto font-black text-[#d32f2f] uppercase leading-none truncate">
                   {user.graduacao || "MAJOR"}
                 </p>
@@ -318,7 +313,6 @@ export default function AgentPerfil() {
               <span className="text-[6px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-0.5 leading-none flex justify-center">
                 Situação do Patrulheiro
               </span>
-              {/* Reduzi h-10 para h-8 */}
               <div
                 className={`w-full h-8 flex justify-center items-center py-1 rounded-md text-center shadow-sm ${
                   user.status ? "bg-[#2e7d32]" : "bg-[#c62828]"
@@ -386,11 +380,11 @@ export default function AgentPerfil() {
                 </div>
               )}
 
+              {/* Botão de Encerrar Sessão VERMELHO */}
               <Button
-                variant="ghost"
                 size="sm"
                 onClick={logout}
-                className="col-span-2 h-6 text-[8px] font-sans font-bold uppercase tracking-widest text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                className="col-span-2 m-auto h-6 w-2/3 text-[8px] font-sans font-bold uppercase tracking-widest bg-red-600 hover:bg-red-700 text-white rounded-md shadow-sm border-none"
               >
                 <RiLogoutBoxLine className="mr-1 w-2.5 h-2.5" /> Encerrar Sessão
               </Button>
