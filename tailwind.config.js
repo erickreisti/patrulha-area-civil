@@ -284,7 +284,8 @@ const config = {
       },
       fontFamily: {
         sans: ["var(--font-inter)", "system-ui", "sans-serif"],
-        // Bebas removido, agora tudo usa Inter como padrão
+        // ADICIONADO: Configuração da fonte Roboto
+        roboto: ["var(--font-roboto)", "sans-serif"],
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
