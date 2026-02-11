@@ -37,7 +37,20 @@ export function HeroSection() {
   };
 
   return (
-    <section className="relative w-full h-[calc(100vh-80px)] min-h-[600px] flex items-center justify-center overflow-hidden bg-slate-900">
+    <section
+      className={cn(
+        "relative w-full flex items-center justify-center overflow-hidden bg-slate-900",
+        // AJUSTE DE ALTURA RESPONSIVA (Viewport - Header - TopBar):
+        // Mobile (< 425px): 100vh - 120px (Header h-20 + TopBar)
+        "h-[calc(100vh-120px)]",
+        // Mobile Grande (xs): 100vh - 152px (Header h-28 + TopBar)
+        "xs:h-[calc(100vh-152px)]",
+        // Desktop (lg): 100vh - 170px (Header h-32 + TopBar)
+        "lg:h-[calc(100vh-170px)]",
+        // Altura mínima de segurança para não esmagar conteúdo em telas wide mas baixas
+        "min-h-[550px] lg:min-h-[600px]",
+      )}
+    >
       {/* 1. Imagem de Fundo */}
       <div className="absolute inset-0 z-0 select-none">
         <Image
@@ -69,8 +82,9 @@ export function HeroSection() {
           <motion.h1
             variants={fadeInUp}
             className={cn(
-              "font-black text-white uppercase tracking-tighter leading-[1.1] mb-6 drop-shadow-2xl",
-              "whitespace-nowrap text-[min(5.8vw,5.5rem)]",
+              "font-black text-white uppercase tracking-tighter leading-[1.1] mb-4 xs:mb-6 drop-shadow-2xl",
+              // Tipografia fluida ajustada para o novo espaço
+              "whitespace-nowrap text-[min(10vw,3rem)] xs:text-[min(6vw,4rem)] lg:text-[min(5.5vw,5.5rem)]",
             )}
           >
             PATRULHA{" "}
@@ -82,7 +96,7 @@ export function HeroSection() {
           {/* Descrição */}
           <motion.p
             variants={fadeInUp}
-            className="text-lg sm:text-xl md:text-2xl text-slate-200 font-medium leading-relaxed max-w-3xl mx-auto mb-10 text-shadow-sm px-4"
+            className="text-base xs:text-lg sm:text-xl md:text-2xl text-slate-200 font-medium leading-relaxed max-w-3xl mx-auto mb-8 xs:mb-10 text-shadow-sm px-2 xs:px-4"
           >
             Atuando com excelência em operações aéreas de busca, resgate e apoio
             a desastres. O braço civil voluntário da aviação brasileira.
@@ -91,7 +105,7 @@ export function HeroSection() {
           {/* Botões de Ação */}
           <motion.div
             variants={fadeInUp}
-            className="flex flex-col sm:flex-row gap-5 justify-center items-center w-full"
+            className="flex flex-col sm:flex-row gap-4 xs:gap-5 justify-center items-center w-full"
           >
             {/* Botão Primário */}
             <Button
@@ -99,14 +113,14 @@ export function HeroSection() {
               className={cn(
                 "group bg-pac-primary text-white border-0",
                 "hover:bg-pac-primary-light hover:shadow-[0_10px_20px_rgba(0,0,0,0.3)] hover:-translate-y-1",
-                "font-bold uppercase tracking-wider h-14 px-10 rounded-full",
-                "transition-all duration-300 w-full sm:w-auto text-base sm:text-lg",
+                "font-bold uppercase tracking-wider h-12 xs:h-14 px-8 xs:px-10 rounded-full",
+                "transition-all duration-300 w-full sm:w-auto text-sm xs:text-base sm:text-lg",
               )}
               asChild
             >
               <Link href="/sobre">
                 <span>Conheça Nossa Missão</span>
-                <RiArrowRightLine className="ml-2 w-5 h-5 transition-transform duration-300 group-hover:translate-x-1" />
+                <RiArrowRightLine className="ml-2 w-4 h-4 xs:w-5 xs:h-5 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>
             </Button>
 
@@ -117,13 +131,13 @@ export function HeroSection() {
               className={cn(
                 "group border-2 border-white/30 bg-transparent text-white backdrop-blur-sm",
                 "hover:bg-white hover:text-slate-900 hover:border-white hover:shadow-lg",
-                "font-bold uppercase tracking-wider h-14 px-10 rounded-full",
-                "transition-all duration-300 w-full sm:w-auto text-base sm:text-lg",
+                "font-bold uppercase tracking-wider h-12 xs:h-14 px-8 xs:px-10 rounded-full",
+                "transition-all duration-300 w-full sm:w-auto text-sm xs:text-base sm:text-lg",
               )}
               asChild
             >
               <Link href="/contato">
-                <RiAlarmWarningLine className="mr-2 w-5 h-5 text-red-500 transition-transform duration-300 group-hover:scale-110" />
+                <RiAlarmWarningLine className="mr-2 w-4 h-4 xs:w-5 xs:h-5 text-red-500 transition-transform duration-300 group-hover:scale-110" />
                 Emergência
               </Link>
             </Button>
@@ -136,21 +150,21 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1.2, duration: 0.8 }}
-        className="absolute bottom-2 sm:bottom-10  -translate-x-1/2 z-20 cursor-pointer group p-4"
+        className="absolute bottom-4 sm:bottom-8 lg:bottom-10 left-1/2 -translate-x-1/2 z-20 cursor-pointer group p-2 xs:p-4"
         onClick={scrollToAbout}
       >
-        <div className="flex flex-col items-center gap-2 sm:gap-3 transition-transform duration-300 group-hover:translate-y-1">
-          {/* Texto oculto no mobile para economizar espaço */}
-          <span className="hidden sm:block text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold group-hover:text-white transition-colors">
+        <div className="flex flex-col items-center gap-2 transition-transform duration-300 group-hover:translate-y-1">
+          {/* Texto oculto no mobile pequeno para economizar espaço vertical */}
+          <span className="hidden xs:block text-[10px] uppercase tracking-[0.2em] text-slate-400 font-bold group-hover:text-white transition-colors">
             Saiba Mais
           </span>
 
-          {/* Mouse menor no mobile (w-22px), maior no desktop (w-26px) */}
-          <div className="w-[22px] h-[36px] sm:w-[26px] sm:h-[44px] border-2 border-slate-400 rounded-full flex justify-center p-1 group-hover:border-white transition-colors bg-black/10 backdrop-blur-sm">
+          {/* Mouse responsivo */}
+          <div className="w-[20px] h-[32px] xs:w-[26px] xs:h-[44px] border-2 border-slate-400 rounded-full flex justify-center p-1 group-hover:border-white transition-colors bg-black/10 backdrop-blur-sm">
             <motion.div
-              className="w-1 sm:w-1.5 h-2 sm:h-2.5 bg-white rounded-full"
+              className="w-1 xs:w-1.5 h-1.5 xs:h-2.5 bg-white rounded-full"
               animate={{
-                y: [0, 12, 0],
+                y: [0, 10, 0],
                 opacity: [1, 0.5, 1],
               }}
               transition={{
@@ -163,8 +177,8 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      {/* Gradiente de Fusão Inferior */}
-      <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-white via-white/60 to-transparent z-10 pointer-events-none" />
+      {/* Gradiente de Fusão Inferior - Altura ajustada */}
+      <div className="absolute bottom-0 w-full h-24 xs:h-32 bg-gradient-to-t from-white via-white/60 to-transparent z-10 pointer-events-none" />
     </section>
   );
 }

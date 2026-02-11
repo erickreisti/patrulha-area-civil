@@ -77,31 +77,35 @@ interface MobileMenuProps {
 // --- SUB-COMPONENTES ---
 
 const TopBar = () => (
-  // z-index alto para garantir visibilidade, mas o header sticky terá um maior se sobrepor
   <div
-    className="bg-pac-primary w-full py-1.5 text-white relative z-40"
+    className="bg-pac-primary w-full py-2 text-white relative z-40"
     role="complementary"
     aria-label="Barra superior institucional"
   >
     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-2">
         {/* Identificação Brasil */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Image
             src="/images/logos/flag-br.webp"
             alt="Bandeira do Brasil"
-            width={22}
-            height={15}
-            className="rounded-[2px] shadow-sm w-auto h-auto"
+            width={24}
+            height={16}
+            className="rounded-[2px] shadow-sm w-auto h-3 lg:h-4 flex-shrink-0"
+            style={{ width: "auto", height: "auto" }}
             priority
           />
-          <span className="text-[10px] xs:text-xs font-semibold tracking-wider uppercase opacity-90">
+          <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold tracking-widest uppercase opacity-90 truncate">
             República Federativa do Brasil
           </span>
         </div>
 
         {/* Redes Sociais */}
-        <div className="flex gap-2" role="list" aria-label="Redes sociais">
+        <div
+          className="flex gap-2 flex-shrink-0"
+          role="list"
+          aria-label="Redes sociais"
+        >
           {SOCIAL_ICONS.map((social) => {
             const IconComponent = social.icon;
             return (
@@ -130,30 +134,44 @@ const TopBar = () => (
 const Logo = () => (
   <Link
     href="/"
-    className="flex items-center gap-4 group py-2"
+    className="flex items-center gap-2 xs:gap-3 lg:gap-4 group py-1 min-w-0"
     aria-label="Ir para página inicial"
   >
-    {/* BRASÃO MAIOR E DESTACADO */}
-    <div className="relative h-14 xs:h-16 sm:h-20 md:h-24 w-auto aspect-[3/4] transition-transform duration-300 group-hover:scale-105 drop-shadow-lg filter">
+    {/* LOGO */}
+    <div className="relative h-14 xs:h-20 lg:h-28 w-auto aspect-[3/4] transition-all duration-300 group-hover:scale-105 drop-shadow-lg filter flex-shrink-0">
       <Image
         src="/images/logos/logo.webp"
         alt="Brasão da Patrulha Aérea Civil"
         width={0}
         height={0}
-        sizes="100vw"
+        sizes="(max-width: 425px) 60px, (max-width: 1024px) 100px, 120px"
         className="object-contain"
         style={{ width: "auto", height: "100%" }}
         priority
       />
     </div>
 
-    {/* TEXTO MAIS COMPACTO E PROFISSIONAL */}
-    <div className="flex flex-col justify-center border-l-2 border-slate-100 pl-4 h-12">
-      <h1 className="font-black text-slate-800 tracking-tighter leading-none uppercase text-base xs:text-lg sm:text-xl lg:text-2xl transition-colors group-hover:text-pac-primary">
+    {/* TEXTO */}
+    <div className="flex flex-col justify-center border-l-2 border-slate-100 pl-2 xs:pl-4 min-w-0">
+      <h1
+        className="font-black text-slate-800 tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary whitespace-nowrap
+        text-sm         /* Mobile */
+        xs:text-lg      /* Tablet */
+        lg:text-xl      /* Desktop */
+        xl:text-2xl     /* Telas grandes */
+      "
+      >
         Patrulha Aérea Civil
       </h1>
-      <p className="font-bold text-slate-500 tracking-[0.2em] uppercase text-[8px] xs:text-[9px] sm:text-[10px] leading-tight mt-1">
-        Comando Operacional RJ
+
+      <p
+        className="font-bold text-slate-500 uppercase leading-tight mt-0.5 xs:mt-1 whitespace-nowrap
+        text-[8px] tracking-normal
+        xs:text-[10px] xs:tracking-[0.1em]
+        lg:text-[11px] lg:tracking-[0.15em]
+      "
+      >
+        Comando Operacional no Rio de Janeiro
       </p>
     </div>
   </Link>
@@ -173,7 +191,7 @@ const NavigationItem = ({
       href={item.href}
       onClick={onClick}
       className={cn(
-        "text-sm font-bold uppercase tracking-wider py-2 px-2 relative transition-colors duration-300",
+        "text-xs xl:text-sm font-bold uppercase tracking-wider py-2 px-2 xl:px-3 relative transition-colors duration-300",
         isActive ? "text-pac-primary" : "text-slate-600 hover:text-pac-primary",
       )}
       aria-current={isActive ? "page" : undefined}
@@ -221,9 +239,9 @@ const IdentificationButton = () => {
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
-            className="rounded-full border-slate-200 pl-1 pr-4 py-1 h-11 hover:bg-slate-50 hover:border-pac-primary/30 transition-all shadow-sm group"
+            className="rounded-full border-slate-200 pl-1 pr-4 py-1 h-10 xl:h-11 hover:bg-slate-50 hover:border-pac-primary/30 transition-all shadow-sm group"
           >
-            <Avatar className="h-8 w-8 border border-slate-200 mr-2 group-hover:scale-105 transition-transform">
+            <Avatar className="h-7 w-7 xl:h-8 xl:w-8 border border-slate-200 mr-2 group-hover:scale-105 transition-transform">
               <AvatarImage
                 src={profile.avatar_url || ""}
                 className="object-cover"
@@ -233,10 +251,10 @@ const IdentificationButton = () => {
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col items-start text-left">
-              <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-0.5">
+              <span className="text-[9px] xl:text-[10px] font-bold text-slate-400 uppercase leading-none mb-0.5">
                 Olá, Agente
               </span>
-              <span className="text-xs font-bold text-pac-primary leading-none truncate max-w-[100px]">
+              <span className="text-[11px] xl:text-xs font-bold text-pac-primary leading-none truncate max-w-[80px] xl:max-w-[100px]">
                 {profile.full_name?.split(" ")[0]}
               </span>
             </div>
@@ -289,7 +307,7 @@ const IdentificationButton = () => {
 
   return (
     <Button
-      className="rounded-full bg-pac-primary hover:bg-pac-primary-dark text-white font-bold text-xs uppercase tracking-wider px-6 h-10 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+      className="rounded-full bg-pac-primary hover:bg-pac-primary-dark text-white font-bold text-xs uppercase tracking-wider px-5 xl:px-6 h-10 shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
       asChild
     >
       <Link href="/login">Identificação</Link>
@@ -320,14 +338,14 @@ const MobileMenu = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 xl:hidden"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 min-[1400px]:hidden"
           />
           <motion.div
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 h-full w-[80%] max-w-sm bg-white z-[60] xl:hidden shadow-2xl flex flex-col"
+            className="fixed top-0 right-0 h-full w-[80%] max-w-sm bg-white z-[60] min-[1400px]:hidden shadow-2xl flex flex-col"
             id={id}
           >
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
@@ -386,7 +404,7 @@ const MobileMenu = ({
               ) : (
                 <Link href="/login" onClick={onClose}>
                   <Button className="w-full bg-pac-primary hover:bg-pac-primary-dark text-white font-bold uppercase rounded-xl h-12 shadow-md">
-                    Acesso Restrito
+                    Identificação
                   </Button>
                 </Link>
               )}
@@ -410,7 +428,6 @@ export function Header() {
     initialize();
 
     const handleScroll = () => {
-      // Pequeno offset para ativar a sombra
       setScrolled(window.scrollY > 10);
     };
 
@@ -420,29 +437,26 @@ export function Header() {
 
   return (
     <>
-      {/* TopBar estática (rola com a página) */}
       <TopBar />
 
-      {/* Header Sticky - Adicionado 'top-0' explicitamente e 'z-50' para ficar acima de tudo */}
       <header
         className={cn(
           "bg-white sticky top-0 left-0 right-0 z-50 w-full border-b border-gray-100",
-          // Adicionamos transição suave para a sombra
           "transition-shadow duration-300 ease-in-out",
           scrolled ? "shadow-md" : "shadow-sm",
         )}
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20 md:h-24">
+          <div className="flex items-center justify-between h-20 xs:h-28 lg:h-32 gap-3 lg:gap-6">
             {/* Logo */}
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 min-w-0">
               <Logo />
             </div>
 
-            {/* Desktop Nav */}
-            <div className="hidden xl:flex items-center gap-8 h-full">
+            {/* Desktop Nav - Breakpoint 1400px Arbitrário */}
+            <div className="hidden min-[1400px]:flex items-center gap-4 lg:gap-6 h-full flex-shrink-0">
               <nav className="h-full">
-                <ul className="flex gap-6 h-full items-center">
+                <ul className="flex gap-4 lg:gap-6 h-full items-center">
                   {NAVIGATION.map((item) => (
                     <NavigationItem
                       key={item.name}
@@ -452,23 +466,24 @@ export function Header() {
                   ))}
                 </ul>
               </nav>
-              <div className="pl-6 border-l border-gray-200 h-10 flex items-center">
+              <div className="pl-4 lg:pl-6 border-l border-gray-200 h-8 flex items-center">
                 <IdentificationButton />
               </div>
             </div>
 
-            {/* Mobile Toggle */}
-            <div className="xl:hidden flex items-center gap-4">
+            {/* Mobile/Tablet Toggle (Até 1400px) */}
+            <div className="min-[1400px]:hidden flex items-center gap-2 xs:gap-4 flex-shrink-0">
               <div className="hidden md:block">
                 <IdentificationButton />
               </div>
+
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsMenuOpen(true)}
-                className="text-slate-800 hover:bg-slate-100 rounded-full w-12 h-12"
+                className="text-slate-800 hover:bg-slate-100 rounded-full w-9 h-9 xs:w-12 xs:h-12 flex-shrink-0"
               >
-                <RiMenuLine className="w-6 h-6" />
+                <RiMenuLine className="w-5 h-5 xs:w-8 xs:h-8" />
               </Button>
             </div>
           </div>
