@@ -176,6 +176,7 @@ export default function AgentPerfil() {
                 width={90}
                 height={90}
                 className="object-contain"
+                style={{ width: "auto", height: "auto" }}
                 priority
               />
             </div>
@@ -196,6 +197,7 @@ export default function AgentPerfil() {
                 alt="Brasil"
                 width={24}
                 height={16}
+                style={{ width: "auto", height: "auto" }}
                 className="shadow-sm rounded-[2px]"
               />
             </div>
@@ -204,11 +206,11 @@ export default function AgentPerfil() {
           <CardContent className="pt-1 mt-[-10px] space-y-1.4">
             {/* 1. NOME */}
             <div className="space-y-[-2px]">
-              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-1 block">
+              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 block">
                 Nome
               </label>
               <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[50px] justify-center items-center flex">
-                <p className="text-lg font-roboto font-black text-slate-800 uppercase leading-none truncate">
+                <p className="text-lg font-roboto text-slate-800 uppercase leading-none truncate">
                   {user.full_name || "NOME DO AGENTE"}
                 </p>
               </div>
@@ -216,11 +218,11 @@ export default function AgentPerfil() {
 
             {/* 2. MATRÍCULA */}
             <div className="space-y-[-2px]">
-              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-1 block mt-1.5">
+              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 block mt-1.5">
                 Matrícula
               </label>
               <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[50px] justify-center items-center flex">
-                <p className="text-xl font-roboto font-black text-slate-800 tracking-wider leading-none">
+                <p className="text-xl font-roboto  text-slate-800 tracking-wider leading-none">
                   {formatMatricula(user.matricula)}
                 </p>
               </div>
@@ -232,12 +234,12 @@ export default function AgentPerfil() {
               <div className="flex flex-col gap-2 h-full">
                 {/* UNIDADE (Adaptativo) */}
                 <div className="flex-1 flex flex-col space-y-[-2px]">
-                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-1 mt-1.5">
+                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 mt-1.5">
                     Unidade
                   </label>
-                  <div className="flex-1 flex items-center justify-center p-2 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[50px]">
+                  <div className="flex-1 flex items-center justify-center p-1 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[50px]">
                     <span
-                      className={`${unidadeTextSize} font-roboto font-black text-slate-800 uppercase text-center leading-tight`}
+                      className={`${unidadeTextSize} text-[19px] font-roboto text-slate-800 uppercase text-center leading-tight`}
                     >
                       {user.unidade || "SEDE DA PAC"}
                     </span>
@@ -246,11 +248,11 @@ export default function AgentPerfil() {
 
                 {/* Tipo Sanguíneo */}
                 <div className="flex-1 flex flex-col space-y-[-2px]">
-                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-1">
+                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5">
                     Tipo Sanguíneo
                   </label>
                   <div className="flex-1 flex items-center justify-center p-2 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[50px]">
-                    <span className="text-xl font-roboto font-black text-[#d32f2f] uppercase">
+                    <span className="text-xl font-roboto text-[#d32f2f] uppercase">
                       {user.tipo_sanguineo || "AB+"}
                     </span>
                   </div>
@@ -258,11 +260,11 @@ export default function AgentPerfil() {
 
                 {/* Validade */}
                 <div className="flex-1 flex flex-col space-y-[-2px]">
-                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-1 mt-1.5">
+                  <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 mt-1.5">
                     Validade
                   </label>
                   <div className="flex-1 flex items-center justify-center p-2 bg-white border border-slate-200 rounded-lg shadow-sm min-h-[50px]">
-                    <span className="text-xl font-roboto font-black text-slate-800">
+                    <span className="text-xl font-roboto  text-slate-800">
                       {formatDate(user.validade_certificacao)}
                     </span>
                   </div>
@@ -294,11 +296,11 @@ export default function AgentPerfil() {
 
             {/* 4. GRADUAÇÃO (Antiga Unidade) */}
             <div className="space-y-[-2px] pt-2">
-              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-1 block">
+              <label className="text-[8px] font-sans font-bold text-slate-400 uppercase ml-5 block">
                 Graduação
               </label>
               <div className="p-2 bg-white border border-slate-200 rounded-lg shadow-sm text-center min-h-[50px] justify-center items-center flex">
-                <p className="text-lg font-roboto font-black text-[#d32f2f] uppercase leading-none truncate">
+                <p className="text-lg font-roboto text-[#d32f2f] uppercase leading-none truncate">
                   {user.graduacao || "MAJOR"}
                 </p>
               </div>
