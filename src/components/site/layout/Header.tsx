@@ -154,7 +154,7 @@ const Logo = () => (
     {/* TEXTO */}
     <div className="flex flex-col justify-center border-l-2 border-slate-100 pl-2 xs:pl-4 min-w-0">
       <h1
-        className="font-black text-slate-800 tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary whitespace-nowrap
+        className="font-black text-pac-primary-light tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary-soft whitespace-nowrap
         text-sm         /* Mobile */
         xs:text-lg      /* Tablet */
         lg:text-xl      /* Desktop */
