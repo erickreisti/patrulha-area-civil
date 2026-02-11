@@ -18,29 +18,44 @@ const roboto = Roboto({
   adjustFontFallback: true,
 });
 
+// Configurações de exibição mobile
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
   userScalable: true,
   interactiveWidget: "resizes-visual",
-  themeColor: "#1e3a8a",
+  themeColor: "#0f172a", // Azul escuro para combinar com o fundo do seu manifest
 };
 
 export const metadata: Metadata = {
   title: {
-    default: "Patrulha Aérea Civil - Excelência em Serviço Humanitário",
+    default: "Patrulha Aérea Civil - Sistema",
     template: "%s | Patrulha Aérea Civil",
   },
   description:
-    "Organização civil especializada em operações aéreas de resgate, busca e proteção civil.",
+    "Sistema de gerenciamento da Patrulha Aérea Civil - Comando Operacional RJ.",
+
+  // Configurações para Web App (PWA) no iOS
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "PAC Sistema",
+  },
+
+  // Ícones para diferentes plataformas
   icons: {
     icon: [
       { url: "/icon.png", sizes: "32x32", type: "image/png" },
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
-    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/icon-192.png",
+
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
+
   manifest: "/manifest.json",
 };
 
