@@ -171,7 +171,7 @@ const Logo = () => (
         lg:text-[11px] lg:tracking-[0.15em]
       "
       >
-        Comando Operacional no Rio de Janeiro
+        Comando Operacional no Estado do Rio de Janeiro
       </p>
     </div>
   </Link>
