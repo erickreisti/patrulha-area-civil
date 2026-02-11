@@ -2,7 +2,7 @@
   "name": "Patrulha Aérea Civil - Sistema",
   "short_name": "PAC Sistema",
   "description": "Sistema de Gerenciamento da Patrulha Aérea Civil - Comando Operacional RJ",
-  "start_url": "/",
+  "start_url": "/login",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#1e293b",
@@ -16,7 +16,6 @@
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     },
-
     {
       "src": "/apple-icon.png",
       "sizes": "192x192",
@@ -30,14 +29,24 @@
       "short_name": "Login",
       "description": "Acesso ao sistema para agentes",
       "url": "/login",
-      "icons": [{ "src": "/icons/login-icon.png", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "/icons/login-icon.png",
+          "sizes": "96x96"
+        }
+      ]
     },
     {
       "name": "Perfil",
       "short_name": "Perfil",
       "description": "Acessar perfil do agente",
       "url": "/perfil",
-      "icons": [{ "src": "/icons/profile-icon.png", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "/icons/profile-icon.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ],
   "screenshots": [
