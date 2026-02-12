@@ -71,7 +71,14 @@ const getImageUrl = (url: string | null | undefined) => {
   if (!url) return null;
   if (url.startsWith("http")) return url;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  // Bucket correto para notícias:
   return `${supabaseUrl}/storage/v1/object/public/imagens-noticias/${url}`;
+};
+
+// Verifica se a URL aponta para um vídeo (para não tentar renderizar em <Image>)
+const isVideoFile = (url: string | null | undefined) => {
+  if (!url) return false;
+  return /\.(mp4|webm|ogg|mov)$/i.test(url);
 };
 
 // --- COMPONENTES ---
@@ -83,9 +90,20 @@ function NewsCard({
   noticia: NoticiaLista;
   index: number;
 }) {
-  const imageUrl = getImageUrl(noticia.thumbnail_url || noticia.media_url);
-  const hasImage = !!imageUrl;
-  const isVideo = noticia.tipo_media === "video";
+  // Lógica de Capa:
+  // 1. Tenta thumbnail específica.
+  // 2. Se não tiver, tenta a media_url (se for imagem).
+  let displayUrl = null;
+
+  if (noticia.thumbnail_url) {
+    displayUrl = getImageUrl(noticia.thumbnail_url);
+  } else if (noticia.media_url && !isVideoFile(noticia.media_url)) {
+    displayUrl = getImageUrl(noticia.media_url);
+  }
+
+  const hasImage = !!displayUrl;
+  const isVideo =
+    noticia.tipo_media === "video" || isVideoFile(noticia.media_url);
 
   return (
     <motion.div
@@ -94,89 +112,92 @@ function NewsCard({
       transition={{ delay: index * 0.05 }}
       className="h-full"
     >
-      <Card className="group h-full flex flex-col border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden bg-white hover:-translate-y-1">
-        {/* Imagem de Capa */}
-        <div className="relative h-52 bg-slate-100 overflow-hidden">
-          {hasImage ? (
-            <Image
-              src={imageUrl!}
-              alt={noticia.titulo}
-              fill
-              className="object-cover transition-transform duration-700 group-hover:scale-110"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-slate-300 bg-slate-50">
-              <RiNewspaperLine className="h-12 w-12 opacity-50" />
-            </div>
-          )}
+      {/* LINK ENVOLVENDO O CARD INTEIRO */}
+      <Link href={`/noticias/${noticia.slug}`} className="block h-full group">
+        <Card className="h-full flex flex-col border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden bg-white hover:-translate-y-1">
+          {/* --- CAPA / MÍDIA --- */}
+          <div className="relative h-52 bg-slate-100 overflow-hidden">
+            {hasImage ? (
+              <Image
+                src={displayUrl!}
+                alt={noticia.titulo}
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-110"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              />
+            ) : (
+              <div className="absolute inset-0 flex flex-col gap-2 items-center justify-center text-slate-300 bg-slate-50">
+                {isVideo ? (
+                  <RiVideoLine className="h-12 w-12 opacity-50" />
+                ) : (
+                  <RiNewspaperLine className="h-12 w-12 opacity-50" />
+                )}
+                {isVideo && (
+                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-60">
+                    Vídeo
+                  </span>
+                )}
+              </div>
+            )}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
-          <div className="absolute top-3 left-3 flex gap-2 z-10">
-            <Badge
-              variant="secondary"
-              className="bg-white/90 text-slate-800 hover:bg-white backdrop-blur-md shadow-sm border-0 font-bold px-2.5 uppercase tracking-wider text-[10px]"
-            >
-              {noticia.categoria || "Geral"}
-            </Badge>
-            {isVideo && (
-              <Badge className="bg-red-600 text-white border-0 shadow-sm flex items-center gap-1 uppercase tracking-wider text-[10px]">
-                <RiVideoLine className="w-3 h-3" /> Vídeo
+            <div className="absolute top-3 left-3 flex gap-2 z-10">
+              <Badge
+                variant="secondary"
+                className="bg-white/90 text-slate-800 backdrop-blur-md shadow-sm border-0 font-bold px-2.5 uppercase tracking-wider text-[10px]"
+              >
+                {noticia.categoria || "Geral"}
               </Badge>
+              {isVideo && (
+                <Badge className="bg-red-600 text-white border-0 shadow-sm flex items-center gap-1 uppercase tracking-wider text-[10px]">
+                  <RiVideoLine className="w-3 h-3" /> Vídeo
+                </Badge>
+              )}
+            </div>
+
+            {noticia.destaque && (
+              <div className="absolute top-3 right-3 z-10">
+                <Badge className="bg-amber-500 text-white border-0 shadow-md flex items-center gap-1 uppercase tracking-wider text-[10px]">
+                  <RiStarFill className="w-3 h-3" /> Destaque
+                </Badge>
+              </div>
             )}
           </div>
 
-          {noticia.destaque && (
-            <div className="absolute top-3 right-3 z-10">
-              <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-md flex items-center gap-1 uppercase tracking-wider text-[10px]">
-                <RiStarFill className="w-3 h-3" /> Destaque
-              </Badge>
+          {/* --- CONTEÚDO --- */}
+          <CardContent className="flex-1 flex flex-col p-6">
+            <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-3">
+              <div className="flex items-center gap-1.5 text-pac-primary">
+                <RiCalendarLine className="w-3.5 h-3.5" />
+                {formatDate(noticia.data_publicacao)}
+              </div>
+              <div className="flex items-center gap-1">
+                <RiTimeLine className="w-3.5 h-3.5" />
+                {Math.ceil((noticia.resumo?.length || 0) / 200)} min leitura
+              </div>
             </div>
-          )}
-        </div>
 
-        <CardContent className="flex-1 flex flex-col p-6">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-3">
-            <div className="flex items-center gap-1.5 text-pac-primary">
-              <RiCalendarLine className="w-3.5 h-3.5" />
-              {formatDate(noticia.data_publicacao)}
-            </div>
-            <div className="flex items-center gap-1">
-              <RiTimeLine className="w-3.5 h-3.5" />
-              {Math.ceil((noticia.resumo?.length || 0) / 200)} min leitura
-            </div>
-          </div>
-
-          <Link
-            href={`/noticias/${noticia.slug}`}
-            className="block group/link mb-3"
-          >
-            <h3 className="text-lg font-bold text-slate-900 leading-tight line-clamp-2 group-hover/link:text-pac-primary transition-colors">
+            <h3 className="text-lg font-bold text-slate-900 leading-tight line-clamp-2 group-hover:text-pac-primary transition-colors mb-3">
               {noticia.titulo}
             </h3>
-          </Link>
 
-          <p className="text-slate-600 text-sm line-clamp-3 mb-6 flex-grow leading-relaxed">
-            {noticia.resumo || "Clique para ler a matéria completa."}
-          </p>
+            <p className="text-slate-600 text-sm line-clamp-3 mb-6 flex-grow leading-relaxed">
+              {noticia.resumo || "Clique para ler a matéria completa."}
+            </p>
 
-          <div className="pt-4 border-t border-slate-100 mt-auto">
-            <Button
-              asChild
-              variant="link"
-              className="text-pac-primary hover:text-pac-primary-dark p-0 h-auto font-bold text-sm w-full justify-between group/btn no-underline hover:no-underline"
-            >
-              <Link href={`/noticias/${noticia.slug}`}>
-                Ler Completo
-                <span className="bg-pac-primary/10 text-pac-primary p-1.5 rounded-full group-hover/btn:bg-pac-primary group-hover/btn:text-white transition-all duration-300">
-                  <RiArrowRightLine className="w-4 h-4 transition-transform group-hover/btn:-rotate-45" />
+            <div className="pt-4 border-t border-slate-100 mt-auto">
+              {/* Fake Button visualmente identico ao anterior, mas sem ser um button real para validar HTML dentro do Link */}
+              <div className="flex items-center justify-between w-full text-pac-primary font-bold text-sm group/btn">
+                <span>Ler Completo</span>
+                <span className="bg-pac-primary/10 text-pac-primary p-1.5 rounded-full group-hover:bg-pac-primary group-hover:text-white transition-all duration-300">
+                  <RiArrowRightLine className="w-4 h-4 transition-transform group-hover:-rotate-45" />
                 </span>
-              </Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
     </motion.div>
   );
 }
@@ -274,8 +295,6 @@ export default function NoticiasPage() {
   };
 
   // --- LÓGICA DE VALUE DO SELECT DE PAGINAÇÃO ---
-  // Verifica se o valor atual da store existe nas opções.
-  // Se não existir (ex: store tem 10, opções são 6,12,24), usa "6" como fallback visual.
   const currentLimitStr = String(pagination.limit);
   const isValidLimit = ITEMS_PER_PAGE_OPTIONS.some(
     (opt) => opt.value === currentLimitStr,
@@ -376,7 +395,7 @@ export default function NoticiasPage() {
                 </SelectContent>
               </Select>
 
-              {/* QUANTIDADE (CORRIGIDO) */}
+              {/* QUANTIDADE */}
               <Select
                 value={selectValue}
                 onValueChange={handleItemsPerPageChange}

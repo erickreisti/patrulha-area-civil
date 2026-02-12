@@ -23,15 +23,11 @@ import {
 } from "react-icons/ri";
 import { cn } from "@/lib/utils/cn";
 
-// --- CONSTANTES ---
-
 const TIPO_OPTIONS = [
   { value: "all", label: "Todos os Tipos", icon: RiStackLine },
   { value: "fotos", label: "Apenas Fotos", icon: RiImageLine },
   { value: "videos", label: "Apenas Vídeos", icon: RiVideoLine },
 ] as const;
-
-// --- TIPOS ---
 
 interface SearchAndFilterProps {
   initialSearch?: string;
@@ -58,10 +54,9 @@ export function SearchAndFilter({
   const [selectedType, setSelectedType] = useState(initialTipo);
   const [isDebouncing, setIsDebouncing] = useState(false);
 
-  // Refs para controle de timer
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Sincronizar URL -> Estado Local (Deep linking / Back button)
+  // 1. Sincronizar URL -> Estado Local
   useEffect(() => {
     const urlSearch = searchParams.get("search") || "";
     const urlTipo = searchParams.get("tipo") || "all";
@@ -71,29 +66,19 @@ export function SearchAndFilter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // 2. Função Core de Atualização da URL
+  // 2. Atualizar URL
   const updateQueryParams = useCallback(
     (newSearch: string, newType: string) => {
       const params = new URLSearchParams(searchParams.toString());
 
-      // Lógica de Busca
-      if (newSearch.trim()) {
-        params.set("search", newSearch.trim());
-      } else {
-        params.delete("search");
-      }
+      if (newSearch.trim()) params.set("search", newSearch.trim());
+      else params.delete("search");
 
-      // Lógica de Tipo
-      if (newType && newType !== "all") {
-        params.set("tipo", newType);
-      } else {
-        params.delete("tipo");
-      }
+      if (newType && newType !== "all") params.set("tipo", newType);
+      else params.delete("tipo");
 
-      // Reseta paginação ao filtrar
-      params.delete("page");
+      params.delete("page"); // Reseta paginação
 
-      // Atualiza Rota
       const queryString = params.toString();
       const newUrl = queryString ? `?${queryString}` : window.location.pathname;
 
@@ -103,29 +88,21 @@ export function SearchAndFilter({
     [router, searchParams],
   );
 
-  // 3. Handler de Busca (com Debounce)
+  // 3. Handlers
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
     setIsDebouncing(true);
-
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-
     debounceTimerRef.current = setTimeout(() => {
       updateQueryParams(value, selectedType);
     }, debounceDelay);
   };
 
-  // 4. Handler de Tipo (Imediato)
   const handleTypeChange = (value: string) => {
     setSelectedType(value);
-    // Cancela debounce pendente de texto para evitar sobrescrita
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     updateQueryParams(searchTerm, value);
   };
-
-  // 5. Handlers de Limpeza
-  const clearSearch = () => handleSearchChange("");
-  const clearType = () => handleTypeChange("all");
 
   const clearAll = () => {
     setSearchTerm("");
@@ -134,7 +111,6 @@ export function SearchAndFilter({
     updateQueryParams("", "all");
   };
 
-  // Cleanup no unmount
   useEffect(() => {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -146,7 +122,6 @@ export function SearchAndFilter({
   return (
     <section
       className={cn(
-        // Design Sticky e Blur consistente com outras páginas
         "sticky top-[80px] z-30 py-4 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm transition-all",
         className,
       )}
@@ -163,16 +138,13 @@ export function SearchAndFilter({
               onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 pr-10 h-11 rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:border-pac-primary focus:ring-2 focus:ring-pac-primary/20 shadow-sm transition-all placeholder:text-slate-400"
             />
-
-            {/* Ícone de Loading ou Botão Limpar */}
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center">
               {isDebouncing ? (
                 <RiLoader4Line className="w-4 h-4 animate-spin text-pac-primary" />
               ) : searchTerm ? (
                 <button
-                  onClick={clearSearch}
+                  onClick={() => handleSearchChange("")}
                   className="text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full p-1 transition-all"
-                  aria-label="Limpar busca"
                 >
                   <RiCloseLine className="w-4 h-4" />
                 </button>
@@ -180,14 +152,14 @@ export function SearchAndFilter({
             </div>
           </div>
 
-          {/* FILTROS E AÇÕES */}
+          {/* FILTROS */}
           <div className="flex flex-wrap gap-3 w-full lg:w-auto items-center">
-            {/* SELECT TIPO: Largura Fixa para caber texto */}
+            {/* SELECT TIPO - Estilo igual NoticiasPage */}
             <Select value={selectedType} onValueChange={handleTypeChange}>
-              <SelectTrigger className="w-full sm:w-[200px] h-11 rounded-xl border-slate-200 bg-white shadow-sm hover:border-pac-primary/50 transition-colors focus:ring-pac-primary/20">
+              <SelectTrigger className="w-full sm:w-[220px] h-11 bg-white border-slate-200 rounded-xl hover:border-pac-primary/50 transition-colors focus:ring-pac-primary/20">
                 <div className="flex items-center gap-2 text-slate-600 truncate">
-                  <RiFilterLine className="w-4 h-4 shrink-0 text-slate-400" />
-                  <SelectValue placeholder="Filtrar por Tipo" />
+                  <RiFilterLine className="w-4 h-4 shrink-0" />
+                  <SelectValue placeholder="Categoria" />
                 </div>
               </SelectTrigger>
               <SelectContent>
@@ -206,14 +178,14 @@ export function SearchAndFilter({
               </SelectContent>
             </Select>
 
-            {/* BOTÃO LIMPAR TUDO */}
+            {/* LIMPAR */}
             {hasActiveFilters && (
               <Button
                 variant="ghost"
-                onClick={clearAll}
                 size="icon"
+                onClick={clearAll}
                 className="h-11 w-11 rounded-xl border border-transparent text-slate-400 hover:text-red-500 hover:bg-red-50 hover:border-red-100 transition-all flex-shrink-0"
-                title="Limpar todos os filtros"
+                title="Limpar filtros"
               >
                 <RiCloseLine className="w-5 h-5" />
               </Button>
@@ -221,38 +193,35 @@ export function SearchAndFilter({
           </div>
         </div>
 
-        {/* BADGES DE FILTROS ATIVOS */}
+        {/* BADGES ATIVOS */}
         {showActiveFilters && hasActiveFilters && (
           <div className="flex flex-wrap gap-2 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
             {searchTerm && (
               <Badge
                 variant="secondary"
-                className="pl-3 pr-1 py-1.5 gap-2 bg-pac-primary/10 text-pac-primary border border-pac-primary/20 hover:bg-pac-primary/20 transition-colors rounded-lg font-medium"
+                className="pl-3 pr-1 py-1.5 gap-2 bg-pac-primary/10 text-pac-primary border border-pac-primary/20 rounded-lg"
               >
                 Busca: &quot;{searchTerm}&quot;
                 <button
-                  onClick={clearSearch}
-                  className="hover:bg-white/50 rounded-md p-0.5 transition-colors text-pac-primary"
-                  aria-label="Remover filtro de busca"
+                  onClick={() => handleSearchChange("")}
+                  className="hover:bg-white/50 rounded-md p-0.5"
                 >
                   <RiCloseLine className="w-4 h-4" />
                 </button>
               </Badge>
             )}
-
             {selectedType !== "all" && (
               <Badge
                 variant="secondary"
-                className="pl-3 pr-1 py-1.5 gap-2 bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200 transition-colors rounded-lg font-medium"
+                className="pl-3 pr-1 py-1.5 gap-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg"
               >
                 <span className="flex items-center gap-1.5">
                   <RiFilterLine className="w-3.5 h-3.5 opacity-50" />
                   {TIPO_OPTIONS.find((t) => t.value === selectedType)?.label}
                 </span>
                 <button
-                  onClick={clearType}
-                  className="hover:bg-white/50 rounded-md p-0.5 transition-colors text-slate-500 hover:text-red-500"
-                  aria-label="Remover filtro de tipo"
+                  onClick={() => handleTypeChange("all")}
+                  className="hover:bg-white/50 rounded-md p-0.5 hover:text-red-500"
                 >
                   <RiCloseLine className="w-4 h-4" />
                 </button>

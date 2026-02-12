@@ -1,19 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useGaleriaPublica, Categoria } from "@/lib/stores/useGaleriaStore";
 import { GaleriaCard } from "./GaleriaCard";
+import { SearchAndFilter } from "./SearchAndFilter"; // <--- IMPORTANTE
 import { motion, AnimatePresence } from "framer-motion";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Pagination,
   PaginationContent,
@@ -24,28 +18,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils/cn";
-import {
-  RiSearchLine,
-  RiFilterLine,
-  RiSortAsc,
-  RiGalleryLine,
-  RiCloseLine,
-  RiImageLine,
-  RiVideoLine,
-} from "react-icons/ri";
-
-const SORT_OPTIONS = [
-  { value: "recent", label: "Mais Recentes" },
-  { value: "oldest", label: "Mais Antigas" },
-  { value: "name_asc", label: "A-Z" },
-  { value: "name_desc", label: "Z-A" },
-];
-
-const TYPE_OPTIONS = [
-  { value: "all", label: "Todos os Tipos", icon: RiGalleryLine },
-  { value: "fotos", label: "Fotos", icon: RiImageLine },
-  { value: "videos", label: "Vídeos", icon: RiVideoLine },
-];
+import { RiGalleryLine } from "react-icons/ri";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -61,145 +34,58 @@ export function GaleriaContent() {
     fetchCategorias,
     setPagination,
   } = useGaleriaPublica();
-  const [localSearch, setLocalSearch] = useState("");
-  const [selectedTipo, setSelectedTipo] = useState("all");
-  const [selectedSort, setSelectedSort] = useState("recent");
-  const debounceTimer = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {}, 500);
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [localSearch]);
+  // LER FILTROS DA URL (Gerenciados pelo SearchAndFilter)
+  const searchParams = useSearchParams();
+  const search = searchParams.get("search") || "";
+  const tipo = searchParams.get("tipo") || "all";
 
+  // Buscar dados iniciais (Store)
   useEffect(() => {
     fetchCategorias();
   }, [fetchCategorias]);
 
+  // Filtragem no Cliente (baseada na URL)
   const filteredCategorias = categorias.filter((cat: Categoria) => {
-    const matchesSearch = localSearch
-      ? cat.nome.toLowerCase().includes(localSearch.toLowerCase())
+    const matchesSearch = search
+      ? cat.nome.toLowerCase().includes(search.toLowerCase())
       : true;
-    const matchesTipo =
-      selectedTipo !== "all" ? cat.tipo === selectedTipo : true;
+    const matchesTipo = tipo !== "all" ? cat.tipo === tipo : true;
     return matchesSearch && matchesTipo;
   });
 
+  // Ordenação (Padrão: Mais recente)
   const sortedCategorias = [...filteredCategorias].sort((a, b) => {
-    if (selectedSort === "recent")
-      return (
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-    if (selectedSort === "oldest")
-      return (
-        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
-    if (selectedSort === "name_asc") return a.nome.localeCompare(b.nome);
-    if (selectedSort === "name_desc") return b.nome.localeCompare(a.nome);
-    return 0;
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
+  // Paginação Lógica
   const itemsPerPage = 12;
   const totalPages = Math.ceil(sortedCategorias.length / itemsPerPage);
+
+  // Ajuste de segurança: se a página na URL/Store for maior que o total, volta pra 1
+  useEffect(() => {
+    if (pagination.page > totalPages && totalPages > 0) {
+      setPagination({ page: 1 });
+    }
+  }, [totalPages, pagination.page, setPagination]);
+
   const currentData = sortedCategorias.slice(
     (pagination.page - 1) * itemsPerPage,
     pagination.page * itemsPerPage,
   );
 
-  const handlePageChange = useCallback(
-    (page: number) => {
-      setPagination({ page });
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    },
-    [setPagination],
-  );
-
-  const clearFilters = () => {
-    setLocalSearch("");
-    setSelectedTipo("all");
-    setSelectedSort("recent");
-    setPagination({ page: 1 });
+  const handlePageChange = (page: number) => {
+    setPagination({ page });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
     <>
-      <div className="sticky top-[80px] z-30 bg-white/90 backdrop-blur-xl border-b border-slate-200 shadow-sm transition-all py-4">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-            <div className="relative w-full lg:max-w-md group">
-              <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-pac-primary transition-colors" />
-              <Input
-                placeholder="Buscar por nome ou descrição..."
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                className="pl-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-pac-primary focus:ring-pac-primary/20 h-11 rounded-xl transition-all placeholder:text-slate-400"
-              />
-              {localSearch && (
-                <button
-                  onClick={() => setLocalSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-1 transition-colors"
-                >
-                  <RiCloseLine className="w-5 h-5" />
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-              <Select
-                value={selectedTipo}
-                onValueChange={(val) => {
-                  setSelectedTipo(val);
-                  setPagination({ page: 1 });
-                }}
-              >
-                <SelectTrigger className="w-full sm:w-[180px] h-11 bg-white border-slate-200 rounded-xl hover:border-pac-primary/50 transition-colors">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <RiFilterLine className="w-4 h-4 shrink-0" />
-                    <SelectValue />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {TYPE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <div className="flex items-center gap-2">
-                        <opt.icon className="w-4 h-4 text-slate-400" />{" "}
-                        {opt.label}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedSort} onValueChange={setSelectedSort}>
-                <SelectTrigger className="w-full sm:w-[180px] h-11 bg-white border-slate-200 rounded-xl hover:border-pac-primary/50 transition-colors">
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <RiSortAsc className="w-4 h-4 shrink-0" />
-                    <SelectValue />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(localSearch ||
-                selectedTipo !== "all" ||
-                selectedSort !== "recent") && (
-                <Button
-                  variant="ghost"
-                  onClick={clearFilters}
-                  className="text-slate-500 hover:text-red-600 hover:bg-red-50 h-11 px-4 rounded-xl transition-colors font-medium"
-                >
-                  Limpar
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* AQUI ESTÁ A MUDANÇA PRINCIPAL:
+          Usamos o componente SearchAndFilter isolado, que tem o estilo correto
+      */}
+      <SearchAndFilter initialSearch={search} initialTipo={tipo} />
 
       <section className="py-12 container mx-auto px-4 min-h-[600px]">
         {loading ? (
@@ -238,7 +124,7 @@ export function GaleriaContent() {
           <>
             <AnimatePresence mode="wait">
               <motion.div
-                key={`${selectedTipo}-${selectedSort}-${pagination.page}`}
+                key={`${tipo}-${search}-${pagination.page}`}
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
@@ -250,6 +136,7 @@ export function GaleriaContent() {
                 ))}
               </motion.div>
             </AnimatePresence>
+
             {totalPages > 1 && (
               <Pagination className="justify-center">
                 <PaginationContent>
@@ -258,15 +145,17 @@ export function GaleriaContent() {
                       onClick={() =>
                         handlePageChange(Math.max(1, pagination.page - 1))
                       }
-                      className={
+                      className={cn(
                         pagination.page === 1
                           ? "pointer-events-none opacity-50"
-                          : "cursor-pointer hover:bg-slate-100 hover:text-pac-primary"
-                      }
+                          : "cursor-pointer hover:bg-slate-100 hover:text-pac-primary",
+                      )}
                     />
                   </PaginationItem>
+
                   {Array.from({ length: totalPages }).map((_, i) => {
                     const page = i + 1;
+                    // Lógica simples de paginação para exibir
                     if (
                       page === 1 ||
                       page === totalPages ||
@@ -289,14 +178,16 @@ export function GaleriaContent() {
                         </PaginationItem>
                       );
                     }
-                    if (Math.abs(page - pagination.page) === 2)
+                    if (Math.abs(page - pagination.page) === 2) {
                       return (
                         <PaginationItem key={page}>
                           <PaginationEllipsis />
                         </PaginationItem>
                       );
+                    }
                     return null;
                   })}
+
                   <PaginationItem>
                     <PaginationNext
                       onClick={() =>
@@ -304,11 +195,11 @@ export function GaleriaContent() {
                           Math.min(totalPages, pagination.page + 1),
                         )
                       }
-                      className={
+                      className={cn(
                         pagination.page === totalPages
                           ? "pointer-events-none opacity-50"
-                          : "cursor-pointer hover:bg-slate-100 hover:text-pac-primary"
-                      }
+                          : "cursor-pointer hover:bg-slate-100 hover:text-pac-primary",
+                      )}
                     />
                   </PaginationItem>
                 </PaginationContent>
@@ -318,21 +209,14 @@ export function GaleriaContent() {
         ) : (
           <div className="flex flex-col items-center justify-center py-32 text-center">
             <div className="bg-white p-8 rounded-full shadow-sm mb-6 border border-slate-100">
-              <RiSearchLine className="w-16 h-16 text-slate-300" />
+              <RiGalleryLine className="w-16 h-16 text-slate-300" />
             </div>
             <h3 className="text-2xl font-bold text-slate-800 mb-2">
-              Nenhum resultado encontrado
+              Nenhum álbum encontrado
             </h3>
             <p className="text-slate-500 max-w-md mx-auto mb-8">
-              Não encontramos álbuns com os termos pesquisados.
+              Não encontramos galerias com os termos pesquisados.
             </p>
-            <Button
-              variant="outline"
-              onClick={clearFilters}
-              className="border-pac-primary text-pac-primary hover:bg-pac-primary/5"
-            >
-              Limpar Filtros
-            </Button>
           </div>
         )}
       </section>

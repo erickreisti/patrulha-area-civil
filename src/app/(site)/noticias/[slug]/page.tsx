@@ -12,6 +12,7 @@ import {
   RiErrorWarningLine,
   RiArrowRightLine,
   RiUser3Line,
+  // RiYoutubeFill removido pois não estava em uso
 } from "react-icons/ri";
 
 // Components
@@ -30,12 +31,35 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+// Interface para substituir o 'any' no HeroMedia
+interface HeroMediaProps {
+  noticia: {
+    titulo: string;
+    media_url?: string | null;
+    video_url?: string | null;
+    thumbnail_url?: string | null;
+    tipo_media?: string;
+  };
+}
+
 // --- HELPERS ---
 const getImageUrl = (url: string | null | undefined) => {
   if (!url) return null;
   if (url.startsWith("http")) return url;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   return `${supabaseUrl}/storage/v1/object/public/imagens-noticias/${url}`;
+};
+
+const getYouTubeId = (url: string | null | undefined) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
+};
+
+const isVideoFile = (url: string | null | undefined) => {
+  if (!url) return false;
+  return /\.(mp4|webm|ogg|mov)$/i.test(url);
 };
 
 // --- COMPONENTES AUXILIARES ---
@@ -99,11 +123,80 @@ function ErrorState({
   );
 }
 
+// --- SUB-COMPONENTE: RENDERIZADOR DE MÍDIA (HERO) ---
+function HeroMedia({ noticia }: HeroMediaProps) {
+  const [imgError, setImgError] = useState(false);
+
+  // 1. YouTube
+  const youtubeId = getYouTubeId(noticia.video_url || noticia.media_url);
+  if (youtubeId) {
+    return (
+      <div className="relative aspect-video w-full rounded-2xl overflow-hidden mb-12 shadow-lg ring-1 ring-slate-200 bg-black">
+        <iframe
+          width="100%"
+          height="100%"
+          src={`https://www.youtube.com/embed/${youtubeId}`}
+          title={noticia.titulo}
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="absolute inset-0"
+        />
+      </div>
+    );
+  }
+
+  // 2. Vídeo Direto (MP4)
+  const isVideo =
+    noticia.tipo_media === "video" || isVideoFile(noticia.media_url);
+
+  if (isVideo && noticia.media_url) {
+    const videoUrl = getImageUrl(noticia.media_url);
+    if (videoUrl) {
+      return (
+        <div className="relative aspect-video w-full rounded-2xl overflow-hidden mb-12 shadow-lg ring-1 ring-slate-200 bg-black">
+          <video
+            src={videoUrl}
+            controls
+            className="w-full h-full object-contain"
+            poster={getImageUrl(noticia.thumbnail_url) || undefined}
+          />
+        </div>
+      );
+    }
+  }
+
+  // 3. Imagem (Padrão)
+  const imageUrl =
+    getImageUrl(noticia.media_url) || getImageUrl(noticia.thumbnail_url);
+
+  if (imageUrl && !imgError) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="relative aspect-video w-full rounded-2xl overflow-hidden mb-12 shadow-lg ring-1 ring-slate-200 bg-slate-100"
+      >
+        <Image
+          src={imageUrl}
+          alt={noticia.titulo}
+          fill
+          className="object-cover"
+          priority
+          onError={() => setImgError(true)}
+        />
+      </motion.div>
+    );
+  }
+
+  return null; // Sem mídia
+}
+
 // --- PÁGINA PRINCIPAL ---
 
 export default function NoticiaPage({ params }: PageProps) {
   const [slug, setSlug] = useState<string>("");
-  const [imageError, setImageError] = useState(false);
 
   const {
     noticiaDetalhe,
@@ -126,7 +219,7 @@ export default function NoticiaPage({ params }: PageProps) {
     }
   }, [slug, fetchNoticiaDetalhe]);
 
-  // 3. Buscar Relacionadas (AGORA COM SERVER ACTION)
+  // 3. Buscar Relacionadas
   const loadRelacionadas = useCallback(async () => {
     if (!noticiaDetalhe?.categoria || !noticiaDetalhe?.id) return;
 
@@ -167,7 +260,7 @@ export default function NoticiaPage({ params }: PageProps) {
           url,
         });
       } catch {
-        // Ignora erro de compartilhamento
+        // Ignora erro
       }
     } else {
       navigator.clipboard.writeText(url);
@@ -185,19 +278,16 @@ export default function NoticiaPage({ params }: PageProps) {
     );
   if (!noticiaDetalhe) return null;
 
-  const imageUrl = getImageUrl(noticiaDetalhe.media_url);
   const readingTime = Math.ceil((noticiaDetalhe.conteudo?.length || 0) / 1000);
 
   return (
     <div className="min-h-screen bg-white">
-      {/* --- HEADER CLEAN --- */}
+      {/* --- HEADER --- */}
       <section className="relative pt-32 pb-16 lg:pt-40 lg:pb-20 border-b border-slate-100 overflow-hidden">
-        {/* Background Sutil */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-pac-primary/5 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none" />
 
         <div className="container mx-auto px-4 relative z-10 max-w-4xl">
-          {/* Botão Voltar */}
           <Link
             href="/noticias"
             className="inline-flex items-center text-sm font-bold text-slate-500 hover:text-pac-primary transition-colors mb-8 group"
@@ -206,7 +296,6 @@ export default function NoticiaPage({ params }: PageProps) {
             Voltar para Notícias
           </Link>
 
-          {/* Badge de Categoria */}
           <div className="flex items-center gap-4 mb-6">
             <Badge
               variant="outline"
@@ -226,12 +315,10 @@ export default function NoticiaPage({ params }: PageProps) {
             </span>
           </div>
 
-          {/* Título Principal */}
           <h1 className="text-3xl md:text-5xl font-black text-slate-900 mb-8 tracking-tight leading-tight">
             {noticiaDetalhe.titulo}
           </h1>
 
-          {/* Metadados Autor/Tempo */}
           <div className="flex flex-wrap items-center gap-6 py-6 border-t border-slate-100 text-sm font-medium text-slate-500">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 border border-slate-200">
@@ -260,27 +347,10 @@ export default function NoticiaPage({ params }: PageProps) {
       {/* --- CONTEÚDO PRINCIPAL --- */}
       <section className="py-16">
         <div className="container mx-auto px-4 max-w-4xl">
-          {/* Imagem de Destaque */}
-          {imageUrl && !imageError && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="relative aspect-video w-full rounded-2xl overflow-hidden mb-12 shadow-lg ring-1 ring-slate-200"
-            >
-              <Image
-                src={imageUrl}
-                alt={noticiaDetalhe.titulo}
-                fill
-                className="object-cover"
-                priority
-                onError={() => setImageError(true)}
-              />
-            </motion.div>
-          )}
+          {/* MÍDIA (IMAGEM OU VÍDEO) */}
+          <HeroMedia noticia={noticiaDetalhe} />
 
           <div className="relative z-10">
-            {/* Resumo / Lead */}
             {noticiaDetalhe.resumo && (
               <div className="mb-10 p-8 bg-slate-50 border-l-4 border-pac-primary rounded-r-xl">
                 <p className="text-xl text-slate-700 font-medium leading-relaxed italic">
@@ -289,7 +359,6 @@ export default function NoticiaPage({ params }: PageProps) {
               </div>
             )}
 
-            {/* Corpo do Texto (Tipografia Ajustada) */}
             <div
               className="prose prose-lg prose-slate max-w-none 
               prose-headings:font-black prose-headings:text-slate-900 prose-headings:tracking-tight
@@ -306,7 +375,6 @@ export default function NoticiaPage({ params }: PageProps) {
             </div>
           </div>
 
-          {/* Rodapé do Artigo */}
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-16 pt-8 border-t border-slate-200">
             <Link
               href="/noticias"
