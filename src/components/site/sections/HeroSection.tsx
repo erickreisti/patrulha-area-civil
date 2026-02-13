@@ -40,7 +40,7 @@ export function HeroSection() {
     <section
       className={cn(
         "relative w-full flex items-center justify-center overflow-hidden bg-slate-900",
-        // AJUSTE DE ALTURA RESPONSIVA (Viewport - Header - TopBar):
+        // Altura Responsiva
         "h-[calc(100vh-120px)]", // Mobile
         "xs:h-[calc(100vh-152px)]", // Mobile Grande
         "lg:h-[calc(100vh-170px)]", // Desktop
@@ -65,29 +65,38 @@ export function HeroSection() {
       {/* 2. Conteúdo Central */}
       <div className="container relative z-10 px-4 sm:px-6 lg:px-8 mx-auto h-full flex flex-col justify-center">
         <motion.div
-          className="w-full max-w-[95vw] xl:max-w-7xl mx-auto text-center"
+          className="w-full max-w-[100vw] xl:max-w-7xl mx-auto text-center"
           variants={containerVariants}
           initial="hidden"
           animate="visible"
         >
-          {/* TÍTULO PRINCIPAL */}
+          {/* TÍTULO PRINCIPAL (Linha Única Fluida) */}
           <motion.h1
             variants={fadeInUp}
             className={cn(
-              "font-black text-white uppercase tracking-tighter leading-[1.1] mb-4 xs:mb-6 drop-shadow-2xl",
-              "whitespace-nowrap text-[min(10vw,3rem)] xs:text-[min(6vw,4rem)] lg:text-[min(5.5vw,5.5rem)]",
+              "flex flex-row items-center justify-center gap-[0.3em]",
+              "font-black text-white uppercase tracking-tighter drop-shadow-2xl mb-4 xs:mb-6",
+              "whitespace-nowrap",
+              // Tamanho fluido para caber na tela
+              "text-[5.2vw] md:text-[5.5vw] xl:text-[5.5rem]",
             )}
           >
-            PATRULHA{" "}
+            <span>PATRULHA</span>
             <span className="text-transparent bg-clip-text bg-gradient-to-b from-white to-slate-400">
               AÉREA CIVIL
             </span>
           </motion.h1>
 
-          {/* Descrição */}
+          {/* --- DESCRIÇÃO (SUBTÍTULO) CORRIGIDA --- */}
           <motion.p
             variants={fadeInUp}
-            className="text-base xs:text-lg sm:text-xl md:text-2xl text-slate-200 font-medium leading-relaxed max-w-3xl mx-auto mb-8 xs:mb-10 text-shadow-sm px-2 xs:px-4"
+            className={cn(
+              // Reduzi os tamanhos base para manter a hierarquia visual
+              // text-base virou text-sm
+              // text-lg virou text-base, etc.
+              "text-sm xs:text-base sm:text-lg md:text-xl",
+              "text-slate-200 font-medium leading-relaxed max-w-3xl mx-auto mb-8 xs:mb-10 text-shadow-sm px-2 xs:px-4",
+            )}
           >
             Atuando com excelência em operações aéreas de busca, resgate e apoio
             a desastres. O braço civil voluntário da aviação brasileira.
@@ -103,8 +112,9 @@ export function HeroSection() {
               className={cn(
                 "group bg-pac-primary text-white border-0",
                 "hover:bg-pac-primary-light hover:shadow-[0_10px_20px_rgba(0,0,0,0.3)] hover:-translate-y-1",
+                // Ajustei levemente o tamanho da fonte do botão mobile também
                 "font-bold uppercase tracking-wider h-12 xs:h-14 px-8 xs:px-10 rounded-full",
-                "transition-all duration-300 w-full sm:w-auto text-sm xs:text-base sm:text-lg",
+                "transition-all duration-300 w-full sm:w-auto text-xs xs:text-sm sm:text-base",
               )}
               asChild
             >
@@ -120,8 +130,9 @@ export function HeroSection() {
               className={cn(
                 "group border-2 border-white/30 bg-transparent text-white backdrop-blur-sm",
                 "hover:bg-white hover:text-slate-900 hover:border-white hover:shadow-lg",
+                // Ajustei levemente o tamanho da fonte do botão mobile também
                 "font-bold uppercase tracking-wider h-12 xs:h-14 px-8 xs:px-10 rounded-full",
-                "transition-all duration-300 w-full sm:w-auto text-sm xs:text-base sm:text-lg",
+                "transition-all duration-300 w-full sm:w-auto text-xs xs:text-sm sm:text-base",
               )}
               asChild
             >
@@ -135,9 +146,7 @@ export function HeroSection() {
       </div>
 
       {/* 3. Indicador de Scroll Responsivo & Centralizado */}
-      {/* WRAPPER DE POSICIONAMENTO ESTÁTICO (Garante o centro perfeito) */}
       <div className="absolute bottom-4 sm:bottom-8 lg:bottom-10 left-1/2 -translate-x-1/2 z-20">
-        {/* COMPONENTE DE ANIMAÇÃO (Apenas fade e slide, sem posição) */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}

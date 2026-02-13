@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation"; // Adicionado useRouter
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -137,7 +137,6 @@ const Logo = () => (
     className="flex items-center gap-2 xs:gap-3 lg:gap-4 group py-1 min-w-0"
     aria-label="Ir para página inicial"
   >
-    {/* LOGO BEM MAIOR NO MOBILE: h-20 (80px) */}
     <div className="relative h-20 xs:h-24 lg:h-28 w-auto aspect-[3/4] transition-all duration-300 group-hover:scale-105 drop-shadow-lg filter flex-shrink-0">
       <Image
         src="/images/logos/logo.webp"
@@ -151,25 +150,17 @@ const Logo = () => (
       />
     </div>
 
-    {/* TEXTO ACOMPANHANDO O TAMANHO */}
     <div className="flex flex-col justify-center border-l-2 border-slate-100 pl-2 xs:pl-4 min-w-0">
       <h1
         className="font-black text-slate-800 tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary whitespace-nowrap
-        text-base       /* Mobile: Aumentado de sm para base */
-        xs:text-lg      /* Tablet */
-        lg:text-xl      /* Desktop */
-        xl:text-2xl     /* Telas grandes */
-      "
+        text-base xs:text-lg lg:text-xl xl:text-2xl"
       >
         Patrulha Aérea Civil
       </h1>
 
       <p
         className="font-bold text-slate-500 uppercase leading-tight mt-0.5 xs:mt-1 whitespace-nowrap
-        text-[9px] tracking-normal      /* Mobile: Aumentado de 8px para 9px */
-        xs:text-[10px] xs:tracking-[0.1em]
-        lg:text-[11px] lg:tracking-[0.15em]
-      "
+        text-[9px] tracking-normal xs:text-[10px] xs:tracking-[0.1em] lg:text-[11px] lg:tracking-[0.15em]"
       >
         Comando Operacional no Rio de Janeiro
       </p>
@@ -217,19 +208,21 @@ const LoadingButton = () => (
   </Button>
 );
 
+// --- COMPONENTE CORRIGIDO: IdentificationButton ---
 const IdentificationButton = () => {
   const { user, profile, isAdmin, isLoading, logout } = useAuthStore();
   const pathname = usePathname();
+  const router = useRouter(); // Hook para navegação client-side
   const isOnProfilePage = pathname === "/perfil";
 
   const handleSignOut = useCallback(async () => {
     try {
       await logout();
-      window.location.href = "/";
+      router.push("/"); // Redirecionamento suave
     } catch (error) {
       console.error("Erro logout:", error);
     }
-  }, [logout]);
+  }, [logout, router]);
 
   if (isLoading) return <LoadingButton />;
 
@@ -276,7 +269,8 @@ const IdentificationButton = () => {
           <DropdownMenuGroup>
             {!isOnProfilePage && (
               <DropdownMenuItem
-                onClick={() => (window.location.href = "/perfil")}
+                // CORREÇÃO: Usar router.push
+                onClick={() => router.push("/perfil")}
                 className="cursor-pointer font-medium text-slate-600"
               >
                 <RiUserLine className="mr-2 h-4 w-4" /> Meu Perfil
@@ -284,7 +278,8 @@ const IdentificationButton = () => {
             )}
             {isAdmin && (
               <DropdownMenuItem
-                onClick={() => (window.location.href = "/admin/dashboard")}
+                // CORREÇÃO: Usar router.push
+                onClick={() => router.push("/admin/dashboard")}
                 className="cursor-pointer font-medium text-purple-600 focus:text-purple-700 focus:bg-purple-50"
               >
                 <RiBarChartLine className="mr-2 h-4 w-4" /> Dashboard
@@ -315,6 +310,7 @@ const IdentificationButton = () => {
   );
 };
 
+// --- COMPONENTE CORRIGIDO: MobileMenu ---
 const MobileMenu = ({
   isOpen,
   onClose,
@@ -322,11 +318,12 @@ const MobileMenu = ({
   id = "mobile-menu",
 }: MobileMenuProps) => {
   const { user, logout } = useAuthStore();
+  const router = useRouter();
 
   const handleSignOut = async () => {
     await logout();
     onClose();
-    window.location.href = "/";
+    router.push("/"); // Redirecionamento suave
   };
 
   return (
@@ -447,14 +444,11 @@ export function Header() {
         )}
       >
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          {/* HEADER MAIS ALTO NO MOBILE: h-28 (112px) */}
           <div className="flex items-center justify-between h-28 xs:h-28 lg:h-32 gap-3 lg:gap-6">
-            {/* Logo */}
             <div className="flex-shrink-0 min-w-0">
               <Logo />
             </div>
 
-            {/* Desktop Nav - Breakpoint 1400px Arbitrário */}
             <div className="hidden min-[1400px]:flex items-center gap-4 lg:gap-6 h-full flex-shrink-0">
               <nav className="h-full">
                 <ul className="flex gap-4 lg:gap-6 h-full items-center">
@@ -472,7 +466,6 @@ export function Header() {
               </div>
             </div>
 
-            {/* Mobile/Tablet Toggle (Até 1400px) */}
             <div className="min-[1400px]:hidden flex items-center gap-2 xs:gap-4 flex-shrink-0">
               <div className="hidden md:block">
                 <IdentificationButton />

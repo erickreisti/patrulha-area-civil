@@ -5,15 +5,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, Variants } from "framer-motion";
 import {
-  RiCalendarLine,
   RiArrowRightLine,
-  RiTimeLine,
   RiNewspaperLine,
-  RiEyeLine,
-  RiUser3Line,
   RiVideoLine,
   RiPlayCircleLine,
   RiYoutubeLine,
+  RiImageLine,
 } from "react-icons/ri";
 
 // UI Components
@@ -28,11 +25,6 @@ import type { NoticiaLista } from "@/app/actions/news/noticias";
 
 // --- TIPOS ---
 
-interface AutorComGraduacao {
-  full_name?: string | null;
-  graduacao?: string | null;
-}
-
 interface NewsCardProps {
   noticia: NoticiaLista;
   index: number;
@@ -44,7 +36,7 @@ const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.15 },
+    transition: { staggerChildren: 0.1 },
   },
 };
 
@@ -67,7 +59,6 @@ const getYouTubeId = (url: string) => {
 
 // --- SUB-COMPONENTES ---
 
-// 1. Header da Seção
 const SectionHeader = () => (
   <div className="text-center mb-16 space-y-4">
     <div className="flex items-center justify-center gap-4 mb-2">
@@ -89,33 +80,26 @@ const SectionHeader = () => (
   </div>
 );
 
-// 2. Skeleton
+// SKELETON (Estilo Gallery)
 function SkeletonCard() {
   return (
     <Card className="border-0 bg-white rounded-2xl overflow-hidden h-full flex flex-col shadow-sm">
-      <div className="h-56 bg-slate-200 animate-pulse" />
-      <div className="p-6 space-y-4 flex-1">
-        <div className="flex justify-between items-center">
-          <div className="h-4 bg-slate-200 rounded-full w-24 animate-pulse" />
-          <div className="h-4 bg-slate-200 rounded-full w-16 animate-pulse" />
-        </div>
-        <div className="space-y-2">
-          <div className="h-6 bg-slate-200 rounded w-full animate-pulse" />
-          <div className="h-6 bg-slate-200 rounded w-2/3 animate-pulse" />
-        </div>
-        <div className="h-20 bg-slate-100 rounded-xl w-full animate-pulse" />
-        <div className="pt-4 mt-auto border-t border-slate-100">
-          <div className="h-4 bg-slate-200 rounded w-32 animate-pulse" />
+      <div className="h-56 bg-slate-100 animate-pulse" />
+      <div className="p-5 space-y-3 flex-1">
+        <div className="h-6 bg-slate-100 rounded w-3/4 animate-pulse" />
+        <div className="h-4 bg-slate-100 rounded w-full animate-pulse" />
+        <div className="h-4 bg-slate-100 rounded w-1/2 animate-pulse" />
+        <div className="pt-4 mt-auto">
+          <div className="h-9 bg-slate-100 rounded-lg w-full animate-pulse" />
         </div>
       </div>
     </Card>
   );
 }
 
-// 3. Card de Notícia Premium (Atualizado com Hover Play)
+// NEWS CARD (Design estilo Gallery + Lógica de Vídeo News)
 function NewsCard({ noticia }: NewsCardProps) {
   const [imgError, setImgError] = useState(false);
-  // Ref para controlar o vídeo
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const formatDate = (dateString: string) => {
@@ -139,8 +123,6 @@ function NewsCard({ noticia }: NewsCardProps) {
       return `${supabaseUrl}/storage/v1/object/public/${url}`;
     return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
   };
-
-  const autor = noticia.autor as AutorComGraduacao;
 
   // --- LÓGICA DE DETECÇÃO DE MÍDIA ---
   const isVideo = noticia.tipo_media === "video";
@@ -170,14 +152,12 @@ function NewsCard({ noticia }: NewsCardProps) {
 
   const shouldShowMedia = mediaType !== "none" && !imgError;
 
-  // --- HANDLERS DE VÍDEO ---
+  // --- HANDLERS ---
   const handleMouseEnter = () => {
     if (mediaType === "video_internal" && videoRef.current) {
       const playPromise = videoRef.current.play();
       if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // Captura erro se o usuário sair do mouse muito rápido antes de carregar
-        });
+        playPromise.catch(() => {});
       }
     }
   };
@@ -185,7 +165,7 @@ function NewsCard({ noticia }: NewsCardProps) {
   const handleMouseLeave = () => {
     if (mediaType === "video_internal" && videoRef.current) {
       videoRef.current.pause();
-      videoRef.current.currentTime = 0; // Opcional: Reseta para o início
+      videoRef.current.currentTime = 0;
     }
   };
 
@@ -197,27 +177,23 @@ function NewsCard({ noticia }: NewsCardProps) {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <Card className="h-full flex flex-col border-0 bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-          {/* --- ÁREA DE CAPA / MÍDIA --- */}
-          <div className="relative h-56 w-full overflow-hidden bg-slate-100">
+        <Card className="border-0 bg-white overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 h-full flex flex-col hover:-translate-y-1 rounded-2xl">
+          {/* --- CAPA --- */}
+          <div className="h-56 relative overflow-hidden bg-slate-100">
             {shouldShowMedia ? (
               <>
                 {mediaType === "video_internal" ? (
-                  // CAPA DE VÍDEO INTERNO (Controlada por Ref)
                   <div className="w-full h-full relative bg-black">
                     <video
                       ref={videoRef}
                       src={displayUrl!}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
                       muted
                       loop
                       playsInline
                       preload="metadata"
-                      // REMOVIDO AUTOPLAY: Agora toca no hover
                     />
                     <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
-
-                    {/* Ícone Play Central (Desaparece no Hover quando toca) */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
                       <div className="bg-white/30 backdrop-blur-sm p-3 rounded-full border border-white/50 shadow-lg">
                         <RiPlayCircleLine className="w-8 h-8 text-white drop-shadow-md" />
@@ -225,18 +201,15 @@ function NewsCard({ noticia }: NewsCardProps) {
                     </div>
                   </div>
                 ) : (
-                  // CAPA DE IMAGEM OU YOUTUBE
-                  <div className="relative w-full h-full">
+                  <>
                     <Image
                       src={displayUrl!}
                       alt={noticia.titulo}
                       fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
                       onError={() => setImgError(true)}
                       sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     />
-
-                    {/* Overlay YouTube */}
                     {mediaType === "youtube" && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
                         <div className="bg-red-600/90 p-3 rounded-full shadow-lg backdrop-blur-sm group-hover:scale-110 transition-transform">
@@ -244,44 +217,50 @@ function NewsCard({ noticia }: NewsCardProps) {
                         </div>
                       </div>
                     )}
-
-                    {/* Gradiente apenas para imagens estáticas */}
                     {mediaType !== "youtube" && (
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
                     )}
-                  </div>
+                  </>
                 )}
               </>
             ) : (
-              // FALLBACK (Sem Capa)
               <div className="h-full w-full flex flex-col items-center justify-center bg-slate-50 text-slate-300">
-                {isVideo ? (
-                  <RiVideoLine className="w-12 h-12 opacity-50" />
-                ) : (
-                  <RiNewspaperLine className="w-12 h-12 opacity-50" />
-                )}
+                <RiNewspaperLine className="w-12 h-12 opacity-50" />
                 <span className="text-[10px] font-bold uppercase tracking-widest mt-2">
-                  {isVideo ? "Vídeo" : "Sem Imagem"}
+                  Sem Imagem
                 </span>
               </div>
             )}
 
-            {/* Badges Flutuantes */}
-            <div className="absolute top-4 left-4 z-10 flex gap-2">
-              <Badge className="bg-white/90 text-slate-800 hover:bg-white backdrop-blur-sm border-0 text-[10px] font-bold uppercase tracking-wider shadow-sm">
+            {/* --- BADGES (Posicionamento igual ao Gallery) --- */}
+
+            {/* Badge Categoria (Top Right) */}
+            <div className="absolute top-4 right-4 z-10">
+              <Badge className="bg-white/90 text-slate-900 backdrop-blur-md border-0 shadow-sm font-bold uppercase tracking-wider text-[10px] hover:bg-white">
                 {noticia.categoria || "Geral"}
               </Badge>
-              {noticia.destaque && (
+            </div>
+
+            {/* Badge Destaque (Top Left) */}
+            {noticia.destaque && (
+              <div className="absolute top-4 left-4 z-10">
                 <Badge className="bg-amber-500 text-white border-0 text-[10px] font-bold shadow-sm uppercase tracking-wider">
                   Destaque
                 </Badge>
-              )}
+              </div>
+            )}
+
+            {/* Badge Data (Bottom Left) */}
+            <div className="absolute bottom-4 left-4 z-10">
+              <span className="text-white text-xs font-bold bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20">
+                {formatDate(noticia.data_publicacao)}
+              </span>
             </div>
 
-            {/* Badge de tipo de mídia (canto inferior direito) */}
+            {/* Badge Tipo Mídia (Bottom Right) */}
             {isVideo && (
-              <div className="absolute bottom-3 right-3 z-10">
-                <div className="bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-white">
+              <div className="absolute bottom-4 right-4 z-10">
+                <div className="bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-white shadow-sm">
                   {mediaType === "youtube" ? (
                     <RiYoutubeLine size={16} />
                   ) : (
@@ -292,45 +271,26 @@ function NewsCard({ noticia }: NewsCardProps) {
             )}
           </div>
 
-          {/* Conteúdo */}
-          <div className="flex flex-col flex-1 p-6">
-            {/* Metadados */}
-            <div className="flex items-center justify-between mb-4 text-xs font-medium text-slate-400">
-              <div className="flex items-center gap-1.5 text-pac-primary">
-                <RiCalendarLine className="w-4 h-4" />
-                <span>{formatDate(noticia.data_publicacao)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <RiEyeLine className="w-4 h-4" />
-                <span>{noticia.views || 0}</span>
-              </div>
+          {/* --- CONTEÚDO --- */}
+          <div className="p-6 flex-1 flex flex-col bg-white">
+            <div className="flex-1 mb-4">
+              <h3 className="font-bold text-lg text-slate-800 leading-snug mb-2 group-hover:text-pac-primary transition-colors line-clamp-2">
+                {noticia.titulo}
+              </h3>
+              <p className="text-sm text-slate-500 leading-relaxed line-clamp-2">
+                {noticia.resumo ||
+                  "Clique para conferir os detalhes completos desta notícia."}
+              </p>
             </div>
-
-            {/* Título */}
-            <h3 className="font-bold text-lg leading-snug text-slate-800 mb-3 group-hover:text-pac-primary transition-colors line-clamp-2">
-              {noticia.titulo}
-            </h3>
-
-            {/* Resumo */}
-            <p className="text-sm text-slate-500 leading-relaxed line-clamp-3 mb-6 flex-1">
-              {noticia.resumo ||
-                "Confira os detalhes completos desta notícia clicando aqui."}
-            </p>
 
             {/* Footer do Card */}
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                  <RiUser3Line className="w-3 h-3" />
-                </div>
-                <span className="text-xs font-semibold text-slate-600 truncate max-w-[120px]">
-                  {autor?.full_name || "Ascom PAC"}
-                </span>
-              </div>
-
-              <span className="text-xs font-bold text-pac-primary flex items-center gap-1 group-hover:translate-x-1 transition-transform">
-                Ler Mais <RiArrowRightLine className="w-3 h-3" />
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-pac-primary transition-colors">
+                Ler Matéria
               </span>
+              <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-pac-primary group-hover:text-white transition-all">
+                <RiArrowRightLine className="w-4 h-4" />
+              </div>
             </div>
           </div>
         </Card>
@@ -346,7 +306,6 @@ export function NewsSection() {
     useNoticiasBasico();
 
   useEffect(() => {
-    // Resetar filtros para mostrar apenas as mais recentes na Home
     setFilters({
       search: "",
       categoria: "all",
@@ -373,21 +332,15 @@ export function NewsSection() {
   const latestNews = noticias ? noticias.slice(0, 3) : [];
 
   return (
-    <section className="w-full bg-slate-50 py-20 lg:py-32 relative overflow-hidden">
-      {/* Background Decorativo (Pattern) */}
+    <section className="w-full bg-white py-20 lg:py-32 relative overflow-hidden border-t border-slate-100">
+      {/* Background Decorativo */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <SectionHeader />
 
         {/* Grid de Notícias */}
-        <motion.div
-          className="min-h-[400px]"
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-        >
+        <div className="min-h-[400px]">
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {[1, 2, 3].map((i) => (
@@ -395,34 +348,37 @@ export function NewsSection() {
               ))}
             </div>
           ) : latestNews.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            // Conteúdo Real (Anima quando entra)
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.1 }}
+            >
               {latestNews.map((noticia: NoticiaLista, index: number) => (
                 <NewsCard key={noticia.id} noticia={noticia} index={index} />
               ))}
-            </div>
+            </motion.div>
           ) : (
             <motion.div
-              className="text-center py-16"
+              className="text-center py-16 bg-slate-50 rounded-3xl border border-dashed border-slate-200 max-w-2xl mx-auto"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
-              <div className="bg-white border border-slate-200 rounded-3xl p-12 max-w-lg mx-auto shadow-sm">
-                <div className="bg-slate-50 p-6 rounded-full w-fit mx-auto mb-6">
-                  <RiNewspaperLine className="w-12 h-12 text-slate-300" />
-                </div>
-                <h3 className="text-slate-800 font-bold text-xl mb-2">
-                  Sem Atualizações
-                </h3>
-                <p className="text-slate-500 text-sm">
-                  Não há notícias publicadas no momento.
-                </p>
-              </div>
+              <RiNewspaperLine className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-slate-800 font-bold text-xl mb-2">
+                Sem Atualizações
+              </h3>
+              <p className="text-slate-500 text-sm">
+                Não há notícias publicadas no momento.
+              </p>
             </motion.div>
           )}
-        </motion.div>
+        </div>
 
         {/* Botão Ver Todas */}
-        {latestNews.length > 0 && (
+        {latestNews.length > 0 && !loading && (
           <motion.div
             className="text-center mt-16"
             initial={{ opacity: 0, y: 20 }}
@@ -442,7 +398,7 @@ export function NewsSection() {
                 href="/noticias"
                 className="flex items-center justify-center gap-3"
               >
-                <RiTimeLine className="w-5 h-5" />
+                <RiImageLine className="w-5 h-5" />
                 Portal de Notícias
                 <RiArrowRightLine className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
               </Link>

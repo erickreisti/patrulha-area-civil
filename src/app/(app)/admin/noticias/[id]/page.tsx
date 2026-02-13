@@ -11,7 +11,7 @@ import {
   RiDeleteBinLine,
   RiSettings3Line,
   RiAlertLine,
-  RiImageLine,
+  RiLayoutMasonryLine,
 } from "react-icons/ri";
 
 // Components
@@ -42,9 +42,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Hooks
+// Hooks & Actions
 import { useNoticiaEdit, useNoticias } from "@/lib/stores/useNoticiasStore";
-import { MediaUpload } from "@/app/(app)/admin/noticias/components/MediaUpload";
+import {
+  MediaUpload,
+  MediaTypeOptions,
+} from "@/app/(app)/admin/noticias/components/MediaUpload";
 import {
   deletarNoticia,
   type UpdateNoticiaInput,
@@ -93,7 +96,8 @@ export default function EditarNoticiaPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Handlers Simplificados (setFormData já ativa hasUnsavedChanges no store)
+  // --- HANDLERS ---
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -101,22 +105,29 @@ export default function EditarNoticiaPage() {
     setFormData({ [name]: value });
   };
 
-  const handleUploadComplete = (url: string, tipo: "imagem" | "video") => {
-    if (tipo === "imagem") {
-      setFormData({ media_url: url, tipo_media: "imagem" });
-    } else {
-      setFormData({ video_url: url, tipo_media: "video" });
+  // Lógica Centralizada de Mídia (Corrige o erro do MediaUpload)
+  const handleMediaChange = (type: MediaTypeOptions, url: string | null) => {
+    if (type === "imagem") {
+      setFormData({
+        tipo_media: "imagem",
+        media_url: url,
+        video_url: null, // Limpa vídeo
+      });
+    } else if (type === "video_interno") {
+      setFormData({
+        tipo_media: "video",
+        media_url: url, // Vídeo interno vai no media_url
+        video_url: null,
+      });
+    } else if (type === "video_externo") {
+      setFormData({
+        tipo_media: "video",
+        media_url: null,
+        video_url: url, // YouTube vai no video_url
+      });
     }
-    toast.success("Upload concluído!");
-  };
-
-  const handleMediaRemove = () => {
-    if (formData.tipo_media === "imagem") {
-      setFormData({ media_url: "" });
-    } else {
-      setFormData({ video_url: "" });
-    }
-    toast.info("Mídia removida");
+    // Opcional: Feedback visual
+    if (url) toast.success("Mídia atualizada no formulário");
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -269,32 +280,34 @@ export default function EditarNoticiaPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
-                    {/* Mídia */}
+                    {/* --- MÍDIA DE CAPA (Atualizado) --- */}
                     <div className="space-y-3">
                       <Label className="text-slate-700 font-semibold flex items-center gap-2">
-                        <RiImageLine /> Mídia de Capa
+                        <RiLayoutMasonryLine className="text-pac-primary" />
+                        Mídia de Destaque
                       </Label>
+
+                      <div className="bg-slate-50 border border-slate-100 rounded-lg p-4 mb-4 text-sm text-slate-600">
+                        Gerencie a imagem ou vídeo de capa desta notícia.
+                      </div>
+
                       <MediaUpload
                         slug={formData.slug || noticia.slug}
-                        tipo={
-                          formData.tipo_media === "video" ? "video" : "imagem"
-                        }
-                        onFileSelect={() => {}}
-                        onUploadComplete={(url) =>
-                          handleUploadComplete(
-                            url,
-                            formData.tipo_media === "video"
-                              ? "video"
-                              : "imagem",
-                          )
-                        }
-                        onRemove={handleMediaRemove}
-                        currentMedia={
+                        // Define o tipo atual baseado no formData
+                        currentType={
                           formData.tipo_media === "video"
                             ? formData.video_url
-                            : formData.media_url
+                              ? "video_externo"
+                              : "video_interno"
+                            : "imagem"
                         }
-                        uploadImmediately
+                        // Define a URL atual
+                        currentUrl={
+                          formData.tipo_media === "video"
+                            ? formData.video_url || formData.media_url || null
+                            : formData.media_url || null
+                        }
+                        onMediaChange={handleMediaChange}
                         disabled={saving}
                       />
                     </div>
