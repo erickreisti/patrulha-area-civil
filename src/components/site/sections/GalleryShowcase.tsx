@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, Variants } from "framer-motion";
@@ -19,6 +19,8 @@ import {
   RiImageLine,
   RiFolderLine,
   RiImage2Line,
+  RiPlayCircleLine,
+  RiYoutubeLine,
 } from "react-icons/ri";
 
 // Action & Types
@@ -62,11 +64,16 @@ const getImageUrl = (url: string | null | undefined): string | null => {
   }
 };
 
+const getYouTubeId = (url: string) => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
+};
+
 // --- SUB-COMPONENTES ---
 
 const SectionHeader = () => (
   <div className="text-center mb-16 space-y-4">
-    {/* Badge Estático */}
     <div className="flex items-center justify-center gap-4 mb-2">
       <div className="w-8 sm:w-12 h-[2px] bg-pac-primary/30" />
       <span className="text-pac-primary font-bold uppercase tracking-[0.2em] text-xs sm:text-sm">
@@ -108,30 +115,122 @@ const GalleryCard = ({
   index: number;
 }) => {
   const [hasError, setHasError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const IconTipo = categoria.tipo === "fotos" ? RiImageLine : RiVideoLine;
-  const imageUrl = getImageUrl(categoria.capa_url);
-  const shouldShowImage = !!imageUrl && !hasError;
+
+  const rawUrl = categoria.capa_url;
+
+  const isYouTube = rawUrl?.includes("youtube") || rawUrl?.includes("youtu.be");
+
+  const isVideoFile =
+    rawUrl?.endsWith(".mp4") ||
+    rawUrl?.endsWith(".webm") ||
+    (categoria.tipo === "videos" && !isYouTube && !!rawUrl);
+
+  let displayUrl: string | null = null;
+  let mediaType: "image" | "youtube" | "video_internal" | "none" = "image";
+
+  if (isYouTube && rawUrl) {
+    const ytId = getYouTubeId(rawUrl);
+    if (ytId) {
+      displayUrl = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
+      mediaType = "youtube";
+    }
+  } else if (isVideoFile && rawUrl) {
+    if (rawUrl.startsWith("http")) {
+      displayUrl = rawUrl;
+    } else {
+      displayUrl = getImageUrl(rawUrl);
+    }
+    mediaType = displayUrl ? "video_internal" : "none";
+  } else {
+    if (rawUrl?.startsWith("http")) {
+      displayUrl = rawUrl;
+    } else {
+      displayUrl = getImageUrl(rawUrl);
+    }
+    mediaType = displayUrl ? "image" : "none";
+  }
+
+  const shouldShowMedia = mediaType !== "none" && !hasError;
+
+  // --- HANDLERS DE VÍDEO (Hover Play) ---
+  const handleMouseEnter = () => {
+    if (mediaType === "video_internal" && videoRef.current) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {});
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (mediaType === "video_internal" && videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0; // Reset para o início
+    }
+  };
 
   return (
     <motion.div variants={cardVariants} className="h-full">
-      <Link href={`/galeria/${categoria.slug}`} className="group h-full block">
+      <Link
+        href={`/galeria/${categoria.slug}`}
+        className="group h-full block"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <Card className="border-0 bg-white overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 h-full flex flex-col hover:-translate-y-1 rounded-2xl">
-          {/* Área da Imagem */}
+          {/* Área da Mídia */}
           <div className="h-56 relative overflow-hidden bg-slate-100">
-            {shouldShowImage ? (
+            {shouldShowMedia ? (
               <>
-                <Image
-                  src={imageUrl}
-                  alt={categoria.nome || "Galeria"}
-                  fill
-                  className="object-cover transition-transform duration-700 group-hover:scale-110"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  onError={() => setHasError(true)}
-                  priority={index < 2}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                {mediaType === "video_internal" ? (
+                  // CAPA DE VÍDEO INTERNO (Controlada por Ref)
+                  <div className="w-full h-full relative bg-black">
+                    <video
+                      ref={videoRef}
+                      src={displayUrl!}
+                      className="w-full h-full object-cover opacity-90 transition-transform duration-700 group-hover:scale-105"
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      // REMOVIDO AUTOPLAY: Agora toca no hover
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+
+                    {/* Ícone Play Central (Desaparece no Hover quando toca) */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
+                      <div className="bg-white/30 backdrop-blur-sm p-3 rounded-full border border-white/50 shadow-lg">
+                        <RiPlayCircleLine className="w-8 h-8 text-white drop-shadow-md" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // CAPA DE IMAGEM OU YOUTUBE
+                  <>
+                    <Image
+                      src={displayUrl!}
+                      alt={categoria.nome || "Galeria"}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      onError={() => setHasError(true)}
+                      priority={index < 2}
+                    />
+                    {mediaType === "youtube" && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                        <div className="bg-red-600/90 p-3 rounded-full shadow-lg backdrop-blur-sm group-hover:scale-110 transition-transform">
+                          <RiPlayCircleLine className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity" />
+                  </>
+                )}
               </>
             ) : (
+              // FALLBACK (Sem Capa)
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-slate-300">
                 <RiImage2Line className="w-12 h-12 mb-2 opacity-50" />
                 <span className="text-xs uppercase font-bold tracking-widest">
@@ -148,6 +247,15 @@ const GalleryCard = ({
               </Badge>
             </div>
 
+            {/* Badge YouTube */}
+            {mediaType === "youtube" && (
+              <div className="absolute bottom-4 right-4 z-10">
+                <div className="bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-white">
+                  <RiYoutubeLine size={16} />
+                </div>
+              </div>
+            )}
+
             {/* Contador */}
             {categoria.itens_count > 0 && (
               <div className="absolute bottom-4 left-4 z-10">
@@ -158,7 +266,7 @@ const GalleryCard = ({
             )}
           </div>
 
-          {/* Conteúdo */}
+          {/* Conteúdo Textual */}
           <div className="p-6 flex-1 flex flex-col bg-white">
             <div className="flex-1 mb-4">
               <h3 className="font-bold text-lg text-slate-800 leading-snug mb-2 group-hover:text-pac-primary transition-colors line-clamp-1">
@@ -171,7 +279,6 @@ const GalleryCard = ({
               )}
             </div>
 
-            {/* Footer do Card */}
             <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider group-hover:text-pac-primary transition-colors">
                 Ver Detalhes
@@ -218,7 +325,6 @@ export function GalleryShowcase() {
 
   return (
     <section className="w-full bg-white py-20 lg:py-32 relative overflow-hidden border-t border-slate-100">
-      {/* Background Pattern Sutil */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">

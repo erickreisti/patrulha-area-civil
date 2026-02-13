@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, Variants } from "framer-motion";
@@ -11,6 +11,9 @@ import {
   RiNewspaperLine,
   RiEyeLine,
   RiUser3Line,
+  RiVideoLine,
+  RiPlayCircleLine,
+  RiYoutubeLine,
 } from "react-icons/ri";
 
 // UI Components
@@ -54,12 +57,19 @@ const cardVariants: Variants = {
   },
 };
 
+// --- HELPERS ---
+
+const getYouTubeId = (url: string) => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
+};
+
 // --- SUB-COMPONENTES ---
 
-// 1. Header da Seção (Estilo Padronizado)
+// 1. Header da Seção
 const SectionHeader = () => (
   <div className="text-center mb-16 space-y-4">
-    {/* Badge Estático */}
     <div className="flex items-center justify-center gap-4 mb-2">
       <div className="w-8 sm:w-12 h-[2px] bg-pac-primary/30" />
       <span className="text-pac-primary font-bold uppercase tracking-[0.2em] text-xs sm:text-sm">
@@ -79,7 +89,7 @@ const SectionHeader = () => (
   </div>
 );
 
-// 2. Skeleton de Carregamento Refinado
+// 2. Skeleton
 function SkeletonCard() {
   return (
     <Card className="border-0 bg-white rounded-2xl overflow-hidden h-full flex flex-col shadow-sm">
@@ -102,8 +112,12 @@ function SkeletonCard() {
   );
 }
 
-// 3. Card de Notícia Premium
+// 3. Card de Notícia Premium (Atualizado com Hover Play)
 function NewsCard({ noticia }: NewsCardProps) {
+  const [imgError, setImgError] = useState(false);
+  // Ref para controlar o vídeo
+  const videoRef = useRef<HTMLVideoElement>(null);
+
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString("pt-BR", {
@@ -126,31 +140,131 @@ function NewsCard({ noticia }: NewsCardProps) {
     return `${supabaseUrl}/storage/v1/object/public/${bucket}/${url}`;
   };
 
-  const imageUrl = getImageUrl(noticia.thumbnail_url || noticia.media_url);
   const autor = noticia.autor as AutorComGraduacao;
+
+  // --- LÓGICA DE DETECÇÃO DE MÍDIA ---
+  const isVideo = noticia.tipo_media === "video";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const videoUrlExternal = (noticia as any).video_url as string | null;
+  const isYouTube = isVideo && !!videoUrlExternal;
+  const isInternalVideo = isVideo && !videoUrlExternal && !!noticia.media_url;
+
+  let displayUrl: string | null = null;
+  let mediaType: "image" | "youtube" | "video_internal" | "none" = "image";
+
+  if (isYouTube && videoUrlExternal) {
+    const ytId = getYouTubeId(videoUrlExternal);
+    if (ytId) {
+      displayUrl = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
+      mediaType = "youtube";
+    }
+  } else if (isInternalVideo && noticia.media_url) {
+    displayUrl = getImageUrl(noticia.media_url);
+    mediaType = "video_internal";
+  } else if (noticia.media_url || noticia.thumbnail_url) {
+    displayUrl = getImageUrl(noticia.thumbnail_url || noticia.media_url);
+    mediaType = "image";
+  } else {
+    mediaType = "none";
+  }
+
+  const shouldShowMedia = mediaType !== "none" && !imgError;
+
+  // --- HANDLERS DE VÍDEO ---
+  const handleMouseEnter = () => {
+    if (mediaType === "video_internal" && videoRef.current) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Captura erro se o usuário sair do mouse muito rápido antes de carregar
+        });
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (mediaType === "video_internal" && videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0; // Opcional: Reseta para o início
+    }
+  };
 
   return (
     <motion.div variants={cardVariants} className="h-full">
-      <Link href={`/noticias/${noticia.slug}`} className="block h-full group">
+      <Link
+        href={`/noticias/${noticia.slug}`}
+        className="block h-full group"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         <Card className="h-full flex flex-col border-0 bg-white rounded-2xl overflow-hidden shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
-          {/* Imagem Cover */}
+          {/* --- ÁREA DE CAPA / MÍDIA --- */}
           <div className="relative h-56 w-full overflow-hidden bg-slate-100">
-            {imageUrl ? (
-              <Image
-                src={imageUrl}
-                alt={noticia.titulo}
-                fill
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
+            {shouldShowMedia ? (
+              <>
+                {mediaType === "video_internal" ? (
+                  // CAPA DE VÍDEO INTERNO (Controlada por Ref)
+                  <div className="w-full h-full relative bg-black">
+                    <video
+                      ref={videoRef}
+                      src={displayUrl!}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                      // REMOVIDO AUTOPLAY: Agora toca no hover
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+
+                    {/* Ícone Play Central (Desaparece no Hover quando toca) */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
+                      <div className="bg-white/30 backdrop-blur-sm p-3 rounded-full border border-white/50 shadow-lg">
+                        <RiPlayCircleLine className="w-8 h-8 text-white drop-shadow-md" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // CAPA DE IMAGEM OU YOUTUBE
+                  <div className="relative w-full h-full">
+                    <Image
+                      src={displayUrl!}
+                      alt={noticia.titulo}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      onError={() => setImgError(true)}
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+
+                    {/* Overlay YouTube */}
+                    {mediaType === "youtube" && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                        <div className="bg-red-600/90 p-3 rounded-full shadow-lg backdrop-blur-sm group-hover:scale-110 transition-transform">
+                          <RiPlayCircleLine className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gradiente apenas para imagens estáticas */}
+                    {mediaType !== "youtube" && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    )}
+                  </div>
+                )}
+              </>
             ) : (
+              // FALLBACK (Sem Capa)
               <div className="h-full w-full flex flex-col items-center justify-center bg-slate-50 text-slate-300">
-                <RiNewspaperLine className="w-12 h-12 opacity-50" />
+                {isVideo ? (
+                  <RiVideoLine className="w-12 h-12 opacity-50" />
+                ) : (
+                  <RiNewspaperLine className="w-12 h-12 opacity-50" />
+                )}
+                <span className="text-[10px] font-bold uppercase tracking-widest mt-2">
+                  {isVideo ? "Vídeo" : "Sem Imagem"}
+                </span>
               </div>
             )}
-
-            {/* Overlay Gradiente */}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
             {/* Badges Flutuantes */}
             <div className="absolute top-4 left-4 z-10 flex gap-2">
@@ -163,6 +277,19 @@ function NewsCard({ noticia }: NewsCardProps) {
                 </Badge>
               )}
             </div>
+
+            {/* Badge de tipo de mídia (canto inferior direito) */}
+            {isVideo && (
+              <div className="absolute bottom-3 right-3 z-10">
+                <div className="bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-white">
+                  {mediaType === "youtube" ? (
+                    <RiYoutubeLine size={16} />
+                  ) : (
+                    <RiVideoLine size={16} />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Conteúdo */}

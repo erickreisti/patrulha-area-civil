@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -31,6 +31,8 @@ import {
   RiVideoLine,
   RiCloseLine,
   RiLayoutGridLine,
+  RiPlayCircleLine,
+  RiYoutubeLine,
 } from "react-icons/ri";
 
 // Utils & Store
@@ -71,14 +73,13 @@ const getImageUrl = (url: string | null | undefined) => {
   if (!url) return null;
   if (url.startsWith("http")) return url;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  // Bucket correto para notícias:
   return `${supabaseUrl}/storage/v1/object/public/imagens-noticias/${url}`;
 };
 
-// Verifica se a URL aponta para um vídeo (para não tentar renderizar em <Image>)
-const isVideoFile = (url: string | null | undefined) => {
-  if (!url) return false;
-  return /\.(mp4|webm|ogg|mov)$/i.test(url);
+const getYouTubeId = (url: string) => {
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+  const match = url.match(regExp);
+  return match && match[2].length === 11 ? match[2] : null;
 };
 
 // --- COMPONENTES ---
@@ -90,20 +91,53 @@ function NewsCard({
   noticia: NoticiaLista;
   index: number;
 }) {
-  // Lógica de Capa:
-  // 1. Tenta thumbnail específica.
-  // 2. Se não tiver, tenta a media_url (se for imagem).
-  let displayUrl = null;
+  const [imgError, setImgError] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  if (noticia.thumbnail_url) {
-    displayUrl = getImageUrl(noticia.thumbnail_url);
-  } else if (noticia.media_url && !isVideoFile(noticia.media_url)) {
+  // --- LÓGICA DE DETECÇÃO DE MÍDIA ---
+  const isVideo = noticia.tipo_media === "video";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const videoUrlExternal = (noticia as any).video_url as string | null;
+  const isYouTube = isVideo && !!videoUrlExternal;
+  const isInternalVideo = isVideo && !videoUrlExternal && !!noticia.media_url;
+
+  let displayUrl: string | null = null;
+  let mediaType: "image" | "youtube" | "video_internal" | "none" = "image";
+
+  if (isYouTube && videoUrlExternal) {
+    const ytId = getYouTubeId(videoUrlExternal);
+    if (ytId) {
+      displayUrl = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
+      mediaType = "youtube";
+    }
+  } else if (isInternalVideo && noticia.media_url) {
     displayUrl = getImageUrl(noticia.media_url);
+    mediaType = "video_internal";
+  } else if (noticia.thumbnail_url || noticia.media_url) {
+    displayUrl = getImageUrl(noticia.thumbnail_url || noticia.media_url);
+    mediaType = "image";
+  } else {
+    mediaType = "none";
   }
 
-  const hasImage = !!displayUrl;
-  const isVideo =
-    noticia.tipo_media === "video" || isVideoFile(noticia.media_url);
+  const shouldShowMedia = mediaType !== "none" && !imgError;
+
+  // --- HANDLERS DE VÍDEO (Hover Play) ---
+  const handleMouseEnter = () => {
+    if (mediaType === "video_internal" && videoRef.current) {
+      const playPromise = videoRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {});
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (mediaType === "video_internal" && videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+  };
 
   return (
     <motion.div
@@ -112,36 +146,81 @@ function NewsCard({
       transition={{ delay: index * 0.05 }}
       className="h-full"
     >
-      {/* LINK ENVOLVENDO O CARD INTEIRO */}
-      <Link href={`/noticias/${noticia.slug}`} className="block h-full group">
-        <Card className="h-full flex flex-col border border-slate-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden bg-white hover:-translate-y-1">
+      <Link
+        href={`/noticias/${noticia.slug}`}
+        className="block h-full group"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        <Card className="h-full flex flex-col border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden bg-white hover:-translate-y-1 rounded-2xl">
           {/* --- CAPA / MÍDIA --- */}
           <div className="relative h-52 bg-slate-100 overflow-hidden">
-            {hasImage ? (
-              <Image
-                src={displayUrl!}
-                alt={noticia.titulo}
-                fill
-                className="object-cover transition-transform duration-700 group-hover:scale-110"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              />
+            {shouldShowMedia ? (
+              <>
+                {mediaType === "video_internal" ? (
+                  // VÍDEO INTERNO
+                  <div className="w-full h-full relative bg-black">
+                    <video
+                      ref={videoRef}
+                      src={displayUrl!}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      muted
+                      loop
+                      playsInline
+                      preload="metadata"
+                    />
+                    <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors" />
+
+                    {/* Ícone Play Central */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none group-hover:opacity-0 transition-opacity duration-300">
+                      <div className="bg-white/30 backdrop-blur-sm p-3 rounded-full border border-white/50 shadow-lg">
+                        <RiPlayCircleLine className="w-8 h-8 text-white drop-shadow-md" />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // IMAGEM OU YOUTUBE THUMBNAIL
+                  <div className="relative w-full h-full">
+                    <Image
+                      src={displayUrl!}
+                      alt={noticia.titulo}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      onError={() => setImgError(true)}
+                    />
+
+                    {/* Overlay YouTube */}
+                    {mediaType === "youtube" && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/10 transition-colors">
+                        <div className="bg-red-600/90 p-3 rounded-full shadow-lg backdrop-blur-sm group-hover:scale-110 transition-transform">
+                          <RiPlayCircleLine className="w-8 h-8 text-white" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Gradiente apenas para imagens estáticas */}
+                    {mediaType !== "youtube" && (
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    )}
+                  </div>
+                )}
+              </>
             ) : (
+              // FALLBACK (SEM CAPA)
               <div className="absolute inset-0 flex flex-col gap-2 items-center justify-center text-slate-300 bg-slate-50">
                 {isVideo ? (
                   <RiVideoLine className="h-12 w-12 opacity-50" />
                 ) : (
                   <RiNewspaperLine className="h-12 w-12 opacity-50" />
                 )}
-                {isVideo && (
-                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-60">
-                    Vídeo
-                  </span>
-                )}
+                <span className="text-[10px] uppercase font-bold tracking-widest opacity-60">
+                  {isVideo ? "Vídeo" : "Sem Imagem"}
+                </span>
               </div>
             )}
 
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-
+            {/* Badges */}
             <div className="absolute top-3 left-3 flex gap-2 z-10">
               <Badge
                 variant="secondary"
@@ -149,11 +228,6 @@ function NewsCard({
               >
                 {noticia.categoria || "Geral"}
               </Badge>
-              {isVideo && (
-                <Badge className="bg-red-600 text-white border-0 shadow-sm flex items-center gap-1 uppercase tracking-wider text-[10px]">
-                  <RiVideoLine className="w-3 h-3" /> Vídeo
-                </Badge>
-              )}
             </div>
 
             {noticia.destaque && (
@@ -161,6 +235,19 @@ function NewsCard({
                 <Badge className="bg-amber-500 text-white border-0 shadow-md flex items-center gap-1 uppercase tracking-wider text-[10px]">
                   <RiStarFill className="w-3 h-3" /> Destaque
                 </Badge>
+              </div>
+            )}
+
+            {/* Indicador de Tipo de Mídia (Canto Inferior Direito) */}
+            {isVideo && (
+              <div className="absolute bottom-3 right-3 z-10">
+                <div className="bg-black/60 backdrop-blur-md p-1.5 rounded-lg text-white shadow-sm">
+                  {mediaType === "youtube" ? (
+                    <RiYoutubeLine size={16} />
+                  ) : (
+                    <RiVideoLine size={16} />
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -174,7 +261,7 @@ function NewsCard({
               </div>
               <div className="flex items-center gap-1">
                 <RiTimeLine className="w-3.5 h-3.5" />
-                {Math.ceil((noticia.resumo?.length || 0) / 200)} min leitura
+                {Math.ceil((noticia.resumo?.length || 0) / 200)} min
               </div>
             </div>
 
@@ -187,7 +274,6 @@ function NewsCard({
             </p>
 
             <div className="pt-4 border-t border-slate-100 mt-auto">
-              {/* Fake Button visualmente identico ao anterior, mas sem ser um button real para validar HTML dentro do Link */}
               <div className="flex items-center justify-between w-full text-pac-primary font-bold text-sm group/btn">
                 <span>Ler Completo</span>
                 <span className="bg-pac-primary/10 text-pac-primary p-1.5 rounded-full group-hover:bg-pac-primary group-hover:text-white transition-all duration-300">

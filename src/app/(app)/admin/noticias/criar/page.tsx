@@ -11,10 +11,8 @@ import {
   RiLoader3Line,
   RiLayoutMasonryLine,
   RiSettings3Line,
-  RiUploadCloud2Line,
   RiArticleLine,
-  RiLinkM,
-  RiVideoLine,
+  RiImageAddLine,
 } from "react-icons/ri";
 
 // Components
@@ -36,7 +34,10 @@ import { Separator } from "@/components/ui/separator";
 
 // Hooks & Actions
 import { useNoticiaCreate, useNoticias } from "@/lib/stores/useNoticiasStore";
-import { MediaUpload } from "@/app/(app)/admin/noticias/components/MediaUpload";
+import {
+  MediaUpload,
+  MediaTypeOptions,
+} from "@/app/(app)/admin/noticias/components/MediaUpload";
 import type { CreateNoticiaInput } from "@/app/actions/news/noticias";
 
 const fadeInUp = {
@@ -60,12 +61,23 @@ export default function CriarNoticiaPage() {
 
   const [activeTab, setActiveTab] = useState("conteudo");
 
-  // Carregar categorias
+  // 1. Carregar categorias ao montar
   useEffect(() => {
     if (categories.length === 0) fetchCategories();
   }, [categories.length, fetchCategories]);
 
-  // Cleanup
+  // 2. Definir categoria padrão assim que a lista carregar
+  useEffect(() => {
+    if (categories.length > 0 && !formData.categoria) {
+      // Tenta achar "Operações" ou usa a primeira da lista
+      const defaultCat =
+        categories.find((c) => c.label === "Operações")?.value ||
+        categories[0].value;
+      setFormData({ categoria: defaultCat });
+    }
+  }, [categories, formData.categoria, setFormData]);
+
+  // Cleanup ao sair da página
   useEffect(() => {
     return () => {
       resetFormData();
@@ -84,22 +96,27 @@ export default function CriarNoticiaPage() {
     }
   };
 
-  // Upload unificado
-  const handleUploadComplete = (
-    url: string,
-    detectedType: "imagem" | "video",
-  ) => {
-    if (detectedType === "imagem") {
-      setFormData({ media_url: url, tipo_media: "imagem", video_url: null });
-    } else {
-      setFormData({ video_url: url, tipo_media: "video", media_url: null });
+  // --- LÓGICA CENTRALIZADA DE MÍDIA ---
+  const handleMediaChange = (type: MediaTypeOptions, url: string | null) => {
+    if (type === "imagem") {
+      setFormData({
+        tipo_media: "imagem",
+        media_url: url,
+        video_url: null,
+      });
+    } else if (type === "video_interno") {
+      setFormData({
+        tipo_media: "video",
+        media_url: url,
+        video_url: null,
+      });
+    } else if (type === "video_externo") {
+      setFormData({
+        tipo_media: "video",
+        video_url: url,
+        media_url: null,
+      });
     }
-    toast.success(`Mídia (${detectedType}) adicionada com sucesso!`);
-  };
-
-  const handleRemoveMedia = () => {
-    setFormData({ media_url: null, video_url: null, tipo_media: "imagem" });
-    toast.info("Mídia removida.");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,14 +124,11 @@ export default function CriarNoticiaPage() {
 
     const errors = validateForm();
     if (errors.length > 0) {
-      toast.error("Atenção", {
-        description: errors[0],
-      });
+      toast.error("Atenção", { description: errors[0] });
       return;
     }
 
     const toastId = toast.loading("Publicando notícia...");
-
     const result = await createNoticia(formData as CreateNoticiaInput);
 
     if (result.success) {
@@ -188,8 +202,7 @@ export default function CriarNoticiaPage() {
                         value="midia"
                         className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:text-pac-primary data-[state=active]:shadow-sm data-[state=active]:font-bold text-slate-500 transition-all duration-300 py-2.5"
                       >
-                        <RiUploadCloud2Line className="mr-2 w-4 h-4" /> Mídia e
-                        Capa
+                        <RiImageAddLine className="mr-2 w-4 h-4" /> Mídia e Capa
                       </TabsTrigger>
                     </TabsList>
                   </CardHeader>
@@ -199,7 +212,6 @@ export default function CriarNoticiaPage() {
                       value="conteudo"
                       className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300"
                     >
-                      {/* Título */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="titulo"
@@ -218,7 +230,6 @@ export default function CriarNoticiaPage() {
                         />
                       </div>
 
-                      {/* Slug */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="slug"
@@ -240,7 +251,6 @@ export default function CriarNoticiaPage() {
                         </div>
                       </div>
 
-                      {/* Resumo */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="resumo"
@@ -260,7 +270,6 @@ export default function CriarNoticiaPage() {
 
                       <Separator className="bg-slate-100" />
 
-                      {/* Conteúdo Principal */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="conteudo"
@@ -282,96 +291,43 @@ export default function CriarNoticiaPage() {
 
                     <TabsContent
                       value="midia"
-                      className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                      className="mt-0 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300"
                     >
                       <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-blue-800 text-sm flex items-start gap-3">
                         <RiLayoutMasonryLine className="w-5 h-5 mt-0.5 flex-shrink-0" />
                         <div>
-                          <p className="font-bold mb-1">
-                            Gerenciamento de Mídia
-                          </p>
+                          <p className="font-bold mb-1">Mídia de Destaque</p>
                           <p className="opacity-90">
-                            Você pode enviar imagens (JPG, PNG) ou vídeos (MP4).
-                            O sistema detectará automaticamente o formato e
-                            ajustará a exibição.
+                            Escolha entre enviar uma Imagem, um Vídeo (Upload)
+                            ou usar um link do YouTube.
                           </p>
                         </div>
                       </div>
 
-                      <div className="space-y-4">
-                        <Label className="text-slate-700 font-bold text-lg flex items-center gap-2">
-                          Arquivo de Capa
-                        </Label>
+                      <MediaUpload
+                        slug={formData.slug || "temp"}
+                        currentType={
+                          formData.tipo_media === "video"
+                            ? formData.video_url
+                              ? "video_externo"
+                              : "video_interno"
+                            : "imagem"
+                        }
+                        currentUrl={
+                          formData.tipo_media === "video"
+                            ? formData.video_url || formData.media_url || null
+                            : formData.media_url || null
+                        }
+                        onMediaChange={handleMediaChange}
+                        disabled={!formData.slug}
+                      />
 
-                        {/* Componente de Upload Unificado */}
-                        <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                          <MediaUpload
-                            slug={formData.slug || "temp"}
-                            tipo="imagem"
-                            onFileSelect={() => {}}
-                            onUploadComplete={(url, type) =>
-                              handleUploadComplete(
-                                url,
-                                type as "imagem" | "video",
-                              )
-                            }
-                            onRemove={handleRemoveMedia}
-                            currentMedia={
-                              formData.media_url || formData.video_url
-                            }
-                            disabled={!formData.slug}
-                          />
-                        </div>
-
-                        {!formData.slug && (
-                          <p className="text-sm text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 inline-block">
-                            ⚠️ Preencha o título na aba &quot;Conteúdo&quot;
-                            para habilitar o upload.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="relative py-2">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t border-slate-200" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-white px-2 text-slate-400 font-medium tracking-wider">
-                            Ou use um link externo
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="video_url"
-                          className="text-slate-700 font-semibold flex items-center gap-2"
-                        >
-                          <RiLinkM className="text-pac-primary" /> URL de Vídeo
-                          (YouTube/Vimeo)
-                        </Label>
-                        <div className="relative">
-                          <RiVideoLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                          <Input
-                            id="video_url"
-                            name="video_url"
-                            placeholder="Ex: https://www.youtube.com/watch?v=..."
-                            value={formData.video_url || ""}
-                            onChange={(e) => {
-                              setFormData({
-                                video_url: e.target.value,
-                                tipo_media: "video",
-                                media_url: null,
-                              });
-                            }}
-                            className="pl-10 border-slate-200 h-12 rounded-xl focus:border-pac-primary focus:ring-pac-primary/20"
-                          />
-                        </div>
-                        <p className="text-xs text-slate-500">
-                          Cole o link direto do vídeo caso não queira fazer
-                          upload.
+                      {!formData.slug && (
+                        <p className="text-center text-sm text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
+                          ⚠️ Digite o título na aba &quot;Conteúdo&quot; para
+                          liberar o upload.
                         </p>
-                      </div>
+                      )}
                     </TabsContent>
                   </CardContent>
                 </Tabs>
@@ -391,7 +347,7 @@ export default function CriarNoticiaPage() {
                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
                   <CardTitle className="text-base text-slate-800 flex items-center gap-2 font-bold">
                     <RiSettings3Line className="text-pac-primary" />{" "}
-                    Configuração da Publicação
+                    Configuração
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
@@ -419,17 +375,26 @@ export default function CriarNoticiaPage() {
                     </Select>
                   </div>
 
-                  {/* Categoria */}
+                  {/* Categoria - CORREÇÃO PRINCIPAL AQUI */}
                   <div className="space-y-3">
                     <Label className="text-slate-700 font-semibold text-xs uppercase tracking-wide">
                       Categoria
                     </Label>
                     <Select
-                      value={formData.categoria || "Operações"}
+                      // Usar `key` força a re-renderização quando as categorias carregam
+                      key={categories.length}
+                      value={formData.categoria || undefined}
                       onValueChange={(v) => setFormData({ categoria: v })}
+                      disabled={categories.length === 0}
                     >
                       <SelectTrigger className="w-full border-slate-200 h-11 rounded-lg focus:ring-pac-primary">
-                        <SelectValue placeholder="Selecione a categoria..." />
+                        <SelectValue
+                          placeholder={
+                            categories.length === 0
+                              ? "Carregando..."
+                              : "Selecione..."
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((cat) => (
