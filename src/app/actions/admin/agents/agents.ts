@@ -22,6 +22,7 @@ const CreateAgentSchema = z.object({
   uf: z.string().nullable().optional(),
   data_nascimento: z.string().nullable().optional(),
   telefone: z.string().nullable().optional(),
+  unidade: z.string().nullable().optional(), // <--- ADICIONADO
 });
 
 const UpdateAgentSchema = z.object({
@@ -45,6 +46,7 @@ const UpdateAgentSchema = z.object({
   uf: z.string().nullable().optional(),
   data_nascimento: z.string().nullable().optional(),
   telefone: z.string().nullable().optional(),
+  unidade: z.string().nullable().optional(), // <--- ADICIONADO
 });
 
 // ==================== TYPES (EXPORTADOS) ====================
@@ -62,6 +64,7 @@ export interface CreateAgentInput {
   uf?: string | null;
   data_nascimento?: string | null;
   telefone?: string | null;
+  unidade?: string | null; // <--- ADICIONADO
 }
 
 export interface UpdateAgentInput {
@@ -78,6 +81,7 @@ export interface UpdateAgentInput {
   uf?: string | null;
   data_nascimento?: string | null;
   telefone?: string | null;
+  unidade?: string | null; // <--- ADICIONADO
 }
 
 export interface Agent {
@@ -96,6 +100,7 @@ export interface Agent {
   uf: string | null;
   data_nascimento: string | null;
   telefone: string | null;
+  unidade: string | null; // <--- ADICIONADO
   admin_secret_hash?: string | null;
   admin_secret_salt?: string | null;
   admin_2fa_enabled?: boolean;
@@ -215,6 +220,7 @@ export async function createAgent(input: CreateAgentInput) {
         uf: validated.uf,
         data_nascimento: validated.data_nascimento,
         telefone: validated.telefone,
+        unidade: validated.unidade, // <--- ADICIONADO AQUI
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })

@@ -3,19 +3,24 @@
 import { create } from "zustand";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useEffect, useState } from "react"; // <--- Importante para o hook useAgentEdit
 import {
   createAgent,
   getAgents,
+  getAgent, // <--- Agora será usado no hook lá embaixo
   deleteAgent,
   getAgentsStats,
   toggleAgentStatus,
-  updateAgent, // Importante: Action de update
+  updateAgent,
   type CreateAgentInput,
-  type UpdateAgentInput, // Importante: Tipo de update
+  type UpdateAgentInput,
   type Agent as ApiAgentType,
 } from "@/app/actions/admin/agents/agents";
 
-// ==================== CONSTANTES (EXPORTADAS) ====================
+// ==================== RE-EXPORTAÇÃO DE TIPOS ====================
+export type { CreateAgentInput, UpdateAgentInput, ApiAgentType };
+
+// ==================== CONSTANTES ====================
 
 export const GRADUACOES = [
   "Soldado",
@@ -114,12 +119,15 @@ export function getCertificationStatus(certDate?: string | null): {
 
 // ==================== TIPOS DAS STORES ====================
 
+// Estendemos o input para aceitar 'unidade' no frontend antes de enviar
+export type AgentFormData = Partial<CreateAgentInput> & { unidade?: string };
+
 interface AgentCreateStore {
-  formData: Partial<CreateAgentInput>;
+  formData: AgentFormData;
   saving: boolean;
   error: string | null;
   hasUnsavedChanges: boolean;
-  setFormData: (data: Partial<CreateAgentInput>) => void;
+  setFormData: (data: AgentFormData) => void;
   resetFormData: () => void;
   createAgent: (
     data: CreateAgentInput,
@@ -238,7 +246,7 @@ export const useAgentCreateStore = create<AgentCreateStore>((set, get) => ({
   },
 }));
 
-// ==================== STORE: EDIT (FALTAVA ISSO) ====================
+// ==================== STORE: EDIT ====================
 
 export const useAgentEditStore = create<AgentEditStore>((set, get) => ({
   agent: null,
@@ -372,8 +380,6 @@ export const useAgentsStore = create<AgentsStore>((set, get) => ({
 }));
 
 // ==================== HOOKS PÚBLICOS ====================
-import { useEffect, useState } from "react";
-import { getAgent } from "@/app/actions/admin/agents/agents";
 
 // Hook personalizado para conectar a store de edição com o carregamento inicial
 export function useAgentEdit(agentId: string) {
@@ -384,7 +390,7 @@ export function useAgentEdit(agentId: string) {
     async function loadAgent() {
       if (initialized) return;
       try {
-        // Carrega dados iniciais
+        // Carrega dados iniciais usando a função getAgent
         const result = await getAgent(agentId);
         if (result.success && result.data) {
           store.setAgent(result.data);

@@ -4,10 +4,18 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format, isValid } from "date-fns";
 import { toast } from "sonner";
 
+// --- IMPORTAÇÕES DO REACT DATEPICKER ---
+import DatePicker, { registerLocale } from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { ptBR } from "date-fns/locale/pt-BR";
+
+// Registra o locale para o calendário ficar em português
+registerLocale("pt-BR", ptBR);
+
+// Componentes UI
 import {
   Card,
   CardContent,
@@ -20,13 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar } from "@/components/ui/calendar";
 import { Separator } from "@/components/ui/separator";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -36,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 
+// Ícones
 import {
   RiUserLine,
   RiArrowLeftLine,
@@ -49,10 +52,18 @@ import {
   RiErrorWarningLine,
   RiCheckLine,
   RiUploadCloud2Line,
+  RiBuildingLine,
 } from "react-icons/ri";
 
-import { useAgentCreate } from "@/lib/stores/useAgentesStore";
+// Store e Actions
+import { useAgentCreate, CreateAgentInput } from "@/lib/stores/useAgentesStore";
 import { uploadAgentAvatar } from "@/app/actions/upload/avatar";
+import { cn } from "@/lib/utils/cn";
+
+// --- TIPOS E CONSTANTES ---
+type AgentFormWithUnidade = Partial<CreateAgentInput> & {
+  unidade?: string;
+};
 
 const UFS_BRASIL = [
   "AC",
@@ -83,6 +94,7 @@ const UFS_BRASIL = [
   "SE",
   "TO",
 ];
+
 const GRADUACOES = [
   "Soldado",
   "Cabo",
@@ -102,6 +114,7 @@ const GRADUACOES = [
   "General de Divisão",
   "General de Exército",
 ];
+
 const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const NOT_SELECTED_VALUE = "not-selected";
 
@@ -121,15 +134,7 @@ interface AvatarData {
   isTempFile: boolean;
 }
 
-const formatDateLocal = (dateString?: string | null): string => {
-  if (!dateString) return "Selecionar data";
-  try {
-    return format(new Date(dateString), "dd/MM/yyyy", { locale: ptBR });
-  } catch {
-    return "Data inválida";
-  }
-};
-
+// --- FUNÇÕES UTILITÁRIAS ---
 const formatPhoneNumber = (phone: string): string => {
   const numbers = phone.replace(/\D/g, "");
   if (numbers.length === 10)
@@ -139,18 +144,25 @@ const formatPhoneNumber = (phone: string): string => {
   return phone;
 };
 
+const dateToString = (date: Date | undefined): string | null => {
+  if (!date || !isValid(date)) return null;
+  return format(date, "yyyy-MM-dd");
+};
+
 const validateMatricula = (m: string) =>
   !m
     ? { valid: false, error: "Obrigatório" }
     : m.length !== 11
       ? { valid: false, error: "Deve ter 11 dígitos" }
       : { valid: true };
+
 const validateEmail = (e: string) =>
   !e
     ? { valid: false, error: "Obrigatório" }
     : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
       ? { valid: false, error: "Inválido" }
       : { valid: true };
+
 const validateFullName = (n: string) =>
   !n
     ? { valid: false, error: "Obrigatório" }
@@ -158,7 +170,7 @@ const validateFullName = (n: string) =>
       ? { valid: false, error: "Muito curto" }
       : { valid: true };
 
-// ==================== COMPONENTE AVATAR UPLOAD CORRIGIDO ====================
+// --- COMPONENTE AVATAR ---
 function AvatarUpload({
   currentAvatar,
   onAvatarChange,
@@ -195,7 +207,6 @@ function AvatarUpload({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 2 * 1024 * 1024)
       return toast.error("Arquivo deve ter no máximo 2MB");
 
@@ -213,7 +224,6 @@ function AvatarUpload({
       const tempUserId = `temp_${Date.now()}`;
       const uploadMatricula =
         matricula || `temp_${Date.now().toString().substring(8)}`;
-
       const formData = new FormData();
       formData.append("file", file);
       formData.append("userId", tempUserId);
@@ -237,14 +247,12 @@ function AvatarUpload({
           uploadProgress: 100,
           uploadedUrl: result.data!.url,
         }));
-
         onAvatarChange({
           url: result.data.url ?? "",
           path: result.data.path ?? "",
           fileName: result.data.fileName ?? "",
           isTempFile: true,
         });
-
         toast.success("Foto carregada com sucesso");
       } else {
         throw new Error(result.error);
@@ -281,11 +289,7 @@ function AvatarUpload({
   return (
     <div className="flex flex-col items-center gap-4">
       <div
-        className={`relative w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 group cursor-pointer ${
-          displayUrl
-            ? "border-pac-primary shadow-lg shadow-pac-primary/20"
-            : "border-slate-200 border-dashed bg-slate-50 hover:border-pac-primary/50"
-        }`}
+        className={`relative w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 group cursor-pointer ${displayUrl ? "border-primary shadow-lg shadow-primary/20" : "border-slate-200 border-dashed bg-slate-50 hover:border-primary/50"}`}
         onClick={() =>
           !uploadState.isUploading &&
           !isLoading &&
@@ -308,7 +312,7 @@ function AvatarUpload({
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             {uploadState.isUploading ? (
-              <Spinner className="w-8 h-8 text-pac-primary" />
+              <Spinner className="w-8 h-8 text-primary" />
             ) : (
               <RiUploadCloud2Line className="w-8 h-8 mb-1" />
             )}
@@ -319,18 +323,16 @@ function AvatarUpload({
             </span>
           </div>
         )}
-
         {uploadState.isUploading && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-200">
             <motion.div
-              className="h-full bg-pac-primary"
+              className="h-full bg-primary"
               initial={{ width: 0 }}
               animate={{ width: `${uploadState.uploadProgress}%` }}
             />
           </div>
         )}
       </div>
-
       <input
         type="file"
         ref={fileInputRef}
@@ -339,7 +341,6 @@ function AvatarUpload({
         className="hidden"
         disabled={isLoading || uploadState.isUploading}
       />
-
       {displayUrl && (
         <Button
           variant="ghost"
@@ -354,12 +355,275 @@ function AvatarUpload({
   );
 }
 
+// ==================== DATE PICKER COM DESIGN MELHORADO ====================
+interface SmartDatePickerProps {
+  date: string | null | undefined;
+  onSelect: (date: Date | undefined) => void;
+  disabled?: boolean;
+}
+
+function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
+  const selectedDate = date ? new Date(`${date}T12:00:00`) : null;
+
+  return (
+    <div className="relative w-full">
+      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none">
+        <RiCalendarLine className="w-4 h-4" />
+      </div>
+      <DatePicker
+        selected={selectedDate}
+        onChange={(date: Date | null) => onSelect(date || undefined)}
+        dateFormat="dd/MM/yyyy"
+        locale="pt-BR"
+        disabled={disabled}
+        placeholderText="DD/MM/AAAA"
+        showYearDropdown
+        scrollableYearDropdown
+        yearDropdownItemNumber={100}
+        dropdownMode="select"
+        className="flex h-11 w-full rounded-lg border border-input bg-background px-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
+        wrapperClassName="w-full"
+        popperClassName="react-datepicker-popper"
+        popperPlacement="bottom-start"
+        withPortal
+        portalId="datepicker-portal"
+        calendarClassName="shadow-lg border-border"
+        dayClassName={(date) => {
+          const isSelected =
+            selectedDate &&
+            format(date, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
+          return cn(
+            "hover:bg-accent hover:text-accent-foreground rounded-md transition-colors",
+            isSelected &&
+              "bg-primary text-primary-foreground hover:bg-primary/90",
+          );
+        }}
+        weekDayClassName={() => "text-muted-foreground font-medium text-xs"}
+        monthClassName={() => "text-foreground"}
+      />
+
+      <style jsx global>{`
+        .react-datepicker-wrapper {
+          width: 100%;
+        }
+
+        /* Portal Styles */
+        #datepicker-portal {
+          position: relative;
+          z-index: 999999;
+        }
+
+        /* Container Principal */
+        .react-datepicker {
+          font-family: inherit;
+          background-color: hsl(var(--background));
+          border: 1px solid hsl(var(--border));
+          border-radius: calc(var(--radius) - 2px);
+          box-shadow:
+            0 10px 15px -3px rgb(0 0 0 / 0.1),
+            0 4px 6px -4px rgb(0 0 0 / 0.1);
+          color: hsl(var(--foreground));
+          padding: 0.75rem;
+        }
+
+        /* Header */
+        .react-datepicker__header {
+          background-color: transparent;
+          border-bottom: 1px solid hsl(var(--border));
+          padding: 0 0 0.75rem 0;
+          margin-bottom: 0.5rem;
+          border-top-left-radius: 0;
+          border-top-right-radius: 0;
+        }
+
+        /* Mês/Ano */
+        .react-datepicker__current-month {
+          color: hsl(var(--foreground));
+          font-weight: 600;
+          font-size: 0.875rem;
+          padding: 0.5rem 0;
+          text-transform: capitalize;
+        }
+
+        /* Dias da Semana */
+        .react-datepicker__day-names {
+          display: flex;
+          justify-content: space-around;
+          margin-top: 0.5rem;
+        }
+
+        .react-datepicker__day-name {
+          color: hsl(var(--muted-foreground));
+          font-weight: 500;
+          font-size: 0.75rem;
+          width: 2rem;
+          line-height: 2rem;
+          text-transform: uppercase;
+        }
+
+        /* Dias */
+        .react-datepicker__week {
+          display: flex;
+          justify-content: space-around;
+        }
+
+        .react-datepicker__day {
+          color: hsl(var(--foreground));
+          font-size: 0.875rem;
+          width: 2rem;
+          line-height: 2rem;
+          margin: 0.125rem;
+          border-radius: calc(var(--radius) - 2px);
+          transition: all 0.2s;
+        }
+
+        .react-datepicker__day:hover {
+          background-color: hsl(var(--accent));
+          color: hsl(var(--accent-foreground));
+        }
+
+        .react-datepicker__day--selected,
+        .react-datepicker__day--keyboard-selected {
+          background-color: hsl(var(--primary)) !important;
+          color: hsl(var(--primary-foreground)) !important;
+          font-weight: 500;
+        }
+
+        .react-datepicker__day--outside-month {
+          color: hsl(var(--muted-foreground));
+          opacity: 0.5;
+        }
+
+        .react-datepicker__day--disabled {
+          color: hsl(var(--muted-foreground));
+          opacity: 0.3;
+          cursor: not-allowed;
+        }
+
+        .react-datepicker__day--disabled:hover {
+          background-color: transparent;
+        }
+
+        .react-datepicker__day--today {
+          font-weight: 600;
+          background-color: hsl(var(--accent) / 0.5);
+        }
+
+        /* Navegação */
+        .react-datepicker__navigation {
+          top: 1rem;
+        }
+
+        .react-datepicker__navigation--previous {
+          left: 0.5rem;
+        }
+
+        .react-datepicker__navigation--next {
+          right: 0.5rem;
+        }
+
+        .react-datepicker__navigation-icon::before {
+          border-color: hsl(var(--muted-foreground));
+          border-width: 2px 2px 0 0;
+          height: 0.5rem;
+          width: 0.5rem;
+        }
+
+        .react-datepicker__navigation:hover
+          .react-datepicker__navigation-icon::before {
+          border-color: hsl(var(--foreground));
+        }
+
+        /* Dropdowns */
+        .react-datepicker__year-dropdown-container,
+        .react-datepicker__month-dropdown-container {
+          margin: 0 0.25rem;
+        }
+
+        .react-datepicker__year-read-view,
+        .react-datepicker__month-read-view {
+          color: hsl(var(--foreground));
+          font-weight: 500;
+        }
+
+        .react-datepicker__year-read-view--down-arrow,
+        .react-datepicker__month-read-view--down-arrow {
+          border-color: hsl(var(--muted-foreground));
+          top: 0.25rem;
+        }
+
+        .react-datepicker__year-dropdown,
+        .react-datepicker__month-dropdown {
+          background-color: hsl(var(--background));
+          border: 1px solid hsl(var(--border));
+          border-radius: calc(var(--radius) - 2px);
+          box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+          padding: 0.5rem;
+          z-index: 1000000 !important;
+        }
+
+        .react-datepicker__year-option,
+        .react-datepicker__month-option {
+          color: hsl(var(--foreground));
+          border-radius: calc(var(--radius) - 4px);
+          padding: 0.25rem 0.75rem;
+          transition: all 0.2s;
+          cursor: pointer;
+        }
+
+        .react-datepicker__year-option:hover,
+        .react-datepicker__month-option:hover {
+          background-color: hsl(var(--accent));
+          color: hsl(var(--accent-foreground));
+        }
+
+        .react-datepicker__year-option--selected,
+        .react-datepicker__month-option--selected {
+          background-color: hsl(var(--primary)) !important;
+          color: hsl(var(--primary-foreground)) !important;
+          font-weight: 500;
+        }
+
+        .react-datepicker__year-option--selected:hover,
+        .react-datepicker__month-option--selected:hover {
+          background-color: hsl(var(--primary)) !important;
+          color: hsl(var(--primary-foreground)) !important;
+        }
+
+        /* Triângulo */
+        .react-datepicker__triangle {
+          display: none;
+        }
+
+        /* Popper */
+        .react-datepicker-popper {
+          z-index: 999999 !important;
+        }
+
+        /* Animações */
+        .react-datepicker {
+          animation: scaleIn 0.2s ease-out;
+        }
+
+        @keyframes scaleIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+// ==================== PÁGINA PRINCIPAL ====================
+
 export default function CriarAgentePage() {
   const router = useRouter();
-  const [dateOpen, setDateOpen] = useState(false);
-  const [birthDateOpen, setBirthDateOpen] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
   const [avatarData, setAvatarData] = useState<AvatarData | null>(null);
   const [isAvatarUploading, setIsAvatarUploading] = useState(false);
 
@@ -374,6 +638,8 @@ export default function CriarAgentePage() {
     generateMatricula,
   } = useAgentCreate();
 
+  const formDataWithUnidade = formData as AgentFormWithUnidade;
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
@@ -387,9 +653,10 @@ export default function CriarAgentePage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
+
     setFormData({
       [name]: name === "telefone" ? formatPhoneNumber(value) : value,
-    });
+    } as Partial<AgentFormWithUnidade>);
 
     let validation: { valid: boolean; error?: string } = { valid: true };
     if (name === "matricula") validation = validateMatricula(value);
@@ -411,9 +678,7 @@ export default function CriarAgentePage() {
     date: Date | undefined,
     field: "validade_certificacao" | "data_nascimento",
   ) => {
-    setFormData({ [field]: date ? format(date, "yyyy-MM-dd") : null });
-    if (field === "validade_certificacao") setDateOpen(false);
-    else setBirthDateOpen(false);
+    setFormData({ [field]: dateToString(date) });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -442,7 +707,7 @@ export default function CriarAgentePage() {
     }
 
     try {
-      const result = await createAgentInStore({
+      const payload: AgentFormWithUnidade = {
         ...formData,
         matricula: formData.matricula!,
         email: formData.email!,
@@ -456,7 +721,10 @@ export default function CriarAgentePage() {
           formData.tipo_sanguineo === NOT_SELECTED_VALUE
             ? null
             : formData.tipo_sanguineo,
-      });
+        unidade: formDataWithUnidade.unidade,
+      };
+
+      const result = await createAgentInStore(payload as CreateAgentInput);
 
       if (result.success) {
         toast.success("Agente criado com sucesso!");
@@ -473,8 +741,6 @@ export default function CriarAgentePage() {
   };
 
   const isSaveDisabled = saving || isAvatarUploading;
-
-  // Garante que matricula passada para o componente é sempre string
   const safeMatricula = formData.matricula ?? "";
 
   return (
@@ -486,7 +752,7 @@ export default function CriarAgentePage() {
               variant="ghost"
               size="icon"
               onClick={() => router.back()}
-              className="text-slate-500 hover:text-pac-primary"
+              className="text-slate-500 hover:text-primary"
             >
               <RiArrowLeftLine className="w-5 h-5" />
             </Button>
@@ -510,7 +776,7 @@ export default function CriarAgentePage() {
             <Button
               onClick={handleSubmit}
               disabled={isSaveDisabled}
-              className="bg-pac-primary hover:bg-pac-primary-dark text-white font-bold shadow-md shadow-pac-primary/20"
+              className="bg-primary hover:bg-primary/90 text-white font-bold shadow-md shadow-primary/20"
             >
               {saving ? (
                 <Spinner className="w-4 h-4 mr-2" />
@@ -580,7 +846,6 @@ export default function CriarAgentePage() {
                       </p>
                     )}
                   </div>
-
                   <div className="space-y-2">
                     <Label
                       htmlFor="email"
@@ -632,37 +897,12 @@ export default function CriarAgentePage() {
                     <Label className="text-slate-700 font-semibold">
                       Data de Nascimento
                     </Label>
-                    <Popover
-                      open={birthDateOpen}
-                      onOpenChange={setBirthDateOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={`w-full h-11 justify-start text-left font-normal ${!formData.data_nascimento && "text-slate-400"}`}
-                        >
-                          <RiCalendarLine className="mr-2 h-4 w-4" />
-                          {formData.data_nascimento
-                            ? formatDateLocal(formData.data_nascimento)
-                            : "Selecione a data"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={
-                            formData.data_nascimento
-                              ? new Date(formData.data_nascimento)
-                              : undefined
-                          }
-                          onSelect={(date) =>
-                            handleDateSelect(date, "data_nascimento")
-                          }
-                          locale={ptBR}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <SmartDatePicker
+                      date={formData.data_nascimento}
+                      onSelect={(date) =>
+                        handleDateSelect(date, "data_nascimento")
+                      }
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -685,41 +925,41 @@ export default function CriarAgentePage() {
                 </div>
               </CardHeader>
               <CardContent className="p-6 grid gap-6">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="matricula"
-                    className="text-slate-700 font-semibold"
-                  >
-                    Matrícula (11 Dígitos){" "}
-                    <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="matricula"
-                      name="matricula"
-                      value={formData.matricula || ""}
-                      onChange={handleInputChange}
-                      className={`h-11 font-mono tracking-wide ${fieldErrors.matricula ? "border-red-500" : ""}`}
-                      placeholder="00000000000"
-                      maxLength={11}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={generateMatricula}
-                      className="h-11 px-4 border-slate-200 text-pac-primary hover:bg-pac-primary/5 hover:border-pac-primary"
-                    >
-                      <RiRefreshLine className="w-4 h-4 mr-2" /> Gerar
-                    </Button>
-                  </div>
-                  {fieldErrors.matricula && (
-                    <p className="text-xs text-red-500 font-medium">
-                      {fieldErrors.matricula}
-                    </p>
-                  )}
-                </div>
-
                 <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="matricula"
+                      className="text-slate-700 font-semibold"
+                    >
+                      Matrícula (11 Dígitos){" "}
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="matricula"
+                        name="matricula"
+                        value={formData.matricula || ""}
+                        onChange={handleInputChange}
+                        className={`h-11 font-mono tracking-wide ${fieldErrors.matricula ? "border-red-500" : ""}`}
+                        placeholder="00000000000"
+                        maxLength={11}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={generateMatricula}
+                        className="h-11 px-4 border-slate-200 text-primary hover:bg-primary/5 hover:border-primary"
+                      >
+                        <RiRefreshLine className="w-4 h-4 mr-2" /> Gerar
+                      </Button>
+                    </div>
+                    {fieldErrors.matricula && (
+                      <p className="text-xs text-red-500 font-medium">
+                        {fieldErrors.matricula}
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-2">
                     <Label className="text-slate-700 font-semibold">
                       Graduação
@@ -746,6 +986,28 @@ export default function CriarAgentePage() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="unidade"
+                      className="text-slate-700 font-semibold"
+                    >
+                      Unidade / Lotação
+                    </Label>
+                    <div className="relative">
+                      <RiBuildingLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                      <Input
+                        id="unidade"
+                        name="unidade"
+                        value={formDataWithUnidade.unidade || ""}
+                        onChange={handleInputChange}
+                        className="pl-10 h-11"
+                        placeholder="Ex: Unidade Alpha"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -808,34 +1070,12 @@ export default function CriarAgentePage() {
                     <Label className="text-slate-700 font-semibold">
                       Validade Certificação
                     </Label>
-                    <Popover open={dateOpen} onOpenChange={setDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={`w-full h-11 justify-start text-left font-normal ${!formData.validade_certificacao && "text-slate-400"}`}
-                        >
-                          <RiCalendarLine className="mr-2 h-4 w-4" />
-                          {formData.validade_certificacao
-                            ? formatDateLocal(formData.validade_certificacao)
-                            : "Indefinida"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={
-                            formData.validade_certificacao
-                              ? new Date(formData.validade_certificacao)
-                              : undefined
-                          }
-                          onSelect={(date) =>
-                            handleDateSelect(date, "validade_certificacao")
-                          }
-                          locale={ptBR}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <SmartDatePicker
+                      date={formData.validade_certificacao}
+                      onSelect={(date) =>
+                        handleDateSelect(date, "validade_certificacao")
+                      }
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -852,9 +1092,7 @@ export default function CriarAgentePage() {
                   matricula={safeMatricula}
                   isLoading={saving}
                 />
-
                 <Separator className="my-6" />
-
                 <div className="w-full space-y-4">
                   <div className="flex items-center justify-between">
                     <Label
@@ -872,7 +1110,6 @@ export default function CriarAgentePage() {
                   <p className="text-xs text-slate-500">
                     Desative para impedir o acesso deste agente ao sistema.
                   </p>
-
                   <div className="space-y-2">
                     <Label className="font-semibold text-slate-700">
                       Nível de Acesso
@@ -896,9 +1133,9 @@ export default function CriarAgentePage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-pac-primary/5 border-pac-primary/20 shadow-none">
+            <Card className="bg-primary/5 border-primary/20 shadow-none">
               <CardContent className="p-5">
-                <h4 className="text-pac-primary font-bold text-sm uppercase mb-3 flex items-center">
+                <h4 className="text-primary font-bold text-sm uppercase mb-3 flex items-center">
                   <RiCheckLine className="mr-1" /> Resumo do Cadastro
                 </h4>
                 <ul className="text-xs text-slate-600 space-y-2">
@@ -920,6 +1157,14 @@ export default function CriarAgentePage() {
                       {formData.role === "admin" ? "Admin" : "Agente"}
                     </span>
                   </li>
+                  {formDataWithUnidade.unidade && (
+                    <li className="flex justify-between">
+                      <span>Unidade:</span>
+                      <span className="font-medium text-slate-800">
+                        {formDataWithUnidade.unidade}
+                      </span>
+                    </li>
+                  )}
                 </ul>
               </CardContent>
             </Card>
