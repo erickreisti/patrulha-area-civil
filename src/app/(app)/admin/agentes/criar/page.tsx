@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+// 1. CORREÇÃO: Adicionados 'useRef' e 'forwardRef' aos imports
+import { useState, useEffect, useRef, forwardRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -12,7 +13,7 @@ import DatePicker, { registerLocale } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { ptBR } from "date-fns/locale/pt-BR";
 
-// Registra o locale para o calendário ficar em português
+// Registra o locale
 registerLocale("pt-BR", ptBR);
 
 // Componentes UI
@@ -58,7 +59,6 @@ import {
 // Store e Actions
 import { useAgentCreate, CreateAgentInput } from "@/lib/stores/useAgentesStore";
 import { uploadAgentAvatar } from "@/app/actions/upload/avatar";
-import { cn } from "@/lib/utils/cn";
 
 // --- TIPOS E CONSTANTES ---
 type AgentFormWithUnidade = Partial<CreateAgentInput> & {
@@ -289,7 +289,7 @@ function AvatarUpload({
   return (
     <div className="flex flex-col items-center gap-4">
       <div
-        className={`relative w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 group cursor-pointer ${displayUrl ? "border-primary shadow-lg shadow-primary/20" : "border-slate-200 border-dashed bg-slate-50 hover:border-primary/50"}`}
+        className={`relative w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 group cursor-pointer ${displayUrl ? "border-pac-primary shadow-lg shadow-pac-primary/20" : "border-slate-200 border-dashed bg-slate-50 hover:border-pac-primary/50"}`}
         onClick={() =>
           !uploadState.isUploading &&
           !isLoading &&
@@ -312,7 +312,7 @@ function AvatarUpload({
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-slate-400">
             {uploadState.isUploading ? (
-              <Spinner className="w-8 h-8 text-primary" />
+              <Spinner className="w-8 h-8 text-pac-primary" />
             ) : (
               <RiUploadCloud2Line className="w-8 h-8 mb-1" />
             )}
@@ -326,7 +326,7 @@ function AvatarUpload({
         {uploadState.isUploading && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-200">
             <motion.div
-              className="h-full bg-primary"
+              className="h-full bg-pac-primary"
               initial={{ width: 0 }}
               animate={{ width: `${uploadState.uploadProgress}%` }}
             />
@@ -355,7 +355,28 @@ function AvatarUpload({
   );
 }
 
-// ==================== DATE PICKER COM DESIGN MELHORADO ====================
+// ==================== DATE PICKER HÍBRIDO DEFINITIVO ====================
+
+// 2. CORREÇÃO: Interface para tipar corretamente o botão customizado
+interface CustomInputButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  onClick?: () => void;
+}
+
+// Componente "botão" personalizado para o React Datepicker
+const CustomInputButton = forwardRef<HTMLButtonElement, CustomInputButtonProps>(
+  ({ onClick }, ref) => (
+    <button
+      type="button"
+      onClick={onClick}
+      ref={ref}
+      className="absolute right-0 top-0 bottom-0 px-3 text-slate-400 hover:text-pac-primary transition-colors flex items-center justify-center outline-none z-10"
+    >
+      <RiCalendarLine className="w-5 h-5" />
+    </button>
+  ),
+);
+CustomInputButton.displayName = "CustomInputButton";
+
 interface SmartDatePickerProps {
   date: string | null | undefined;
   onSelect: (date: Date | undefined) => void;
@@ -363,262 +384,133 @@ interface SmartDatePickerProps {
 }
 
 function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
+  const [inputValue, setInputValue] = useState("");
+
+  useEffect(() => {
+    let newVal = "";
+    if (date) {
+      const [year, month, day] = date.split("-");
+      if (year && month && day) {
+        newVal = `${day}/${month}/${year}`;
+      }
+    }
+    if (newVal !== inputValue) {
+      setInputValue(newVal);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  const handleRawChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, "");
+
+    if (value.length > 8) value = value.slice(0, 8);
+
+    if (value.length >= 5) {
+      value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
+    } else if (value.length >= 3) {
+      value = `${value.slice(0, 2)}/${value.slice(2)}`;
+    }
+
+    setInputValue(value);
+
+    if (value.length === 10) {
+      const day = parseInt(value.slice(0, 2), 10);
+      const month = parseInt(value.slice(3, 5), 10) - 1;
+      const year = parseInt(value.slice(6), 10);
+
+      const parsedDate = new Date(year, month, day);
+
+      if (
+        isValid(parsedDate) &&
+        parsedDate.getDate() === day &&
+        parsedDate.getMonth() === month &&
+        year > 1900 &&
+        year < 2100
+      ) {
+        onSelect(parsedDate);
+      }
+    } else if (value === "") {
+      onSelect(undefined);
+    }
+  };
+
   const selectedDate = date ? new Date(`${date}T12:00:00`) : null;
 
   return (
-    <div className="relative w-full">
-      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 z-10 pointer-events-none">
-        <RiCalendarLine className="w-4 h-4" />
-      </div>
-      <DatePicker
-        selected={selectedDate}
-        onChange={(date: Date | null) => onSelect(date || undefined)}
-        dateFormat="dd/MM/yyyy"
-        locale="pt-BR"
+    <div className="relative w-full group">
+      {/* INPUT DE TEXTO INDEPENDENTE - Clicar aqui NÃO abre o calendário */}
+      <Input
+        value={inputValue}
+        onChange={handleRawChange}
         disabled={disabled}
-        placeholderText="DD/MM/AAAA"
-        showYearDropdown
-        scrollableYearDropdown
-        yearDropdownItemNumber={100}
-        dropdownMode="select"
-        className="flex h-11 w-full rounded-lg border border-input bg-background px-10 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-all"
-        wrapperClassName="w-full"
-        popperClassName="react-datepicker-popper"
-        popperPlacement="bottom-start"
-        withPortal
-        portalId="datepicker-portal"
-        calendarClassName="shadow-lg border-border"
-        dayClassName={(date) => {
-          const isSelected =
-            selectedDate &&
-            format(date, "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd");
-          return cn(
-            "hover:bg-accent hover:text-accent-foreground rounded-md transition-colors",
-            isSelected &&
-              "bg-primary text-primary-foreground hover:bg-primary/90",
-          );
-        }}
-        weekDayClassName={() => "text-muted-foreground font-medium text-xs"}
-        monthClassName={() => "text-foreground"}
+        placeholder="DD/MM/AAAA"
+        className="pl-3 pr-10"
       />
 
+      {/* DATEPICKER ACOPLADO AO ÍCONE - Apenas o ícone abre o calendário */}
+      <div className="absolute top-0 right-0">
+        <DatePicker
+          selected={selectedDate}
+          onChange={(date: Date | null) => onSelect(date || undefined)}
+          customInput={<CustomInputButton />} // O "Input" do Datepicker é o botão de ícone
+          dateFormat="dd/MM/yyyy"
+          locale="pt-BR"
+          disabled={disabled}
+          showYearDropdown
+          scrollableYearDropdown
+          yearDropdownItemNumber={100}
+          popperClassName="fixed-datepicker-popper"
+          popperPlacement="bottom-end"
+          withPortal
+          portalId="root-portal"
+        />
+      </div>
+
       <style jsx global>{`
-        .react-datepicker-wrapper {
-          width: 100%;
+        .fixed-datepicker-popper {
+          z-index: 99999 !important;
         }
-
-        /* Portal Styles */
-        #datepicker-portal {
-          position: relative;
-          z-index: 999999;
-        }
-
-        /* Container Principal */
         .react-datepicker {
           font-family: inherit;
-          background-color: hsl(var(--background));
-          border: 1px solid hsl(var(--border));
-          border-radius: calc(var(--radius) - 2px);
-          box-shadow:
-            0 10px 15px -3px rgb(0 0 0 / 0.1),
-            0 4px 6px -4px rgb(0 0 0 / 0.1);
-          color: hsl(var(--foreground));
-          padding: 0.75rem;
+          border-color: #e2e8f0;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+          border-radius: 0.5rem;
+          overflow: hidden;
         }
-
-        /* Header */
         .react-datepicker__header {
-          background-color: transparent;
-          border-bottom: 1px solid hsl(var(--border));
-          padding: 0 0 0.75rem 0;
-          margin-bottom: 0.5rem;
-          border-top-left-radius: 0;
-          border-top-right-radius: 0;
+          background-color: #f8fafc;
+          border-bottom: 1px solid #e2e8f0;
+          padding-top: 0.5rem;
         }
-
-        /* Mês/Ano */
         .react-datepicker__current-month {
-          color: hsl(var(--foreground));
-          font-weight: 600;
-          font-size: 0.875rem;
-          padding: 0.5rem 0;
+          color: #1e293b;
+          font-weight: 700;
           text-transform: capitalize;
         }
-
-        /* Dias da Semana */
-        .react-datepicker__day-names {
-          display: flex;
-          justify-content: space-around;
-          margin-top: 0.5rem;
-        }
-
         .react-datepicker__day-name {
-          color: hsl(var(--muted-foreground));
-          font-weight: 500;
-          font-size: 0.75rem;
-          width: 2rem;
-          line-height: 2rem;
+          color: #64748b;
           text-transform: uppercase;
+          font-size: 0.7rem;
         }
-
-        /* Dias */
-        .react-datepicker__week {
-          display: flex;
-          justify-content: space-around;
-        }
-
-        .react-datepicker__day {
-          color: hsl(var(--foreground));
-          font-size: 0.875rem;
-          width: 2rem;
-          line-height: 2rem;
-          margin: 0.125rem;
-          border-radius: calc(var(--radius) - 2px);
-          transition: all 0.2s;
-        }
-
-        .react-datepicker__day:hover {
-          background-color: hsl(var(--accent));
-          color: hsl(var(--accent-foreground));
-        }
-
         .react-datepicker__day--selected,
         .react-datepicker__day--keyboard-selected {
-          background-color: hsl(var(--primary)) !important;
-          color: hsl(var(--primary-foreground)) !important;
-          font-weight: 500;
+          background-color: #1a2873 !important;
+          color: white !important;
         }
-
-        .react-datepicker__day--outside-month {
-          color: hsl(var(--muted-foreground));
-          opacity: 0.5;
+        .react-datepicker__day:hover {
+          background-color: #e2e8f0;
         }
-
-        .react-datepicker__day--disabled {
-          color: hsl(var(--muted-foreground));
-          opacity: 0.3;
-          cursor: not-allowed;
-        }
-
-        .react-datepicker__day--disabled:hover {
-          background-color: transparent;
-        }
-
-        .react-datepicker__day--today {
-          font-weight: 600;
-          background-color: hsl(var(--accent) / 0.5);
-        }
-
-        /* Navegação */
         .react-datepicker__navigation {
-          top: 1rem;
+          top: 8px;
         }
-
-        .react-datepicker__navigation--previous {
-          left: 0.5rem;
-        }
-
-        .react-datepicker__navigation--next {
-          right: 0.5rem;
-        }
-
-        .react-datepicker__navigation-icon::before {
-          border-color: hsl(var(--muted-foreground));
-          border-width: 2px 2px 0 0;
-          height: 0.5rem;
-          width: 0.5rem;
-        }
-
-        .react-datepicker__navigation:hover
-          .react-datepicker__navigation-icon::before {
-          border-color: hsl(var(--foreground));
-        }
-
-        /* Dropdowns */
-        .react-datepicker__year-dropdown-container,
-        .react-datepicker__month-dropdown-container {
-          margin: 0 0.25rem;
-        }
-
-        .react-datepicker__year-read-view,
-        .react-datepicker__month-read-view {
-          color: hsl(var(--foreground));
-          font-weight: 500;
-        }
-
-        .react-datepicker__year-read-view--down-arrow,
-        .react-datepicker__month-read-view--down-arrow {
-          border-color: hsl(var(--muted-foreground));
-          top: 0.25rem;
-        }
-
-        .react-datepicker__year-dropdown,
-        .react-datepicker__month-dropdown {
-          background-color: hsl(var(--background));
-          border: 1px solid hsl(var(--border));
-          border-radius: calc(var(--radius) - 2px);
-          box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-          padding: 0.5rem;
-          z-index: 1000000 !important;
-        }
-
-        .react-datepicker__year-option,
-        .react-datepicker__month-option {
-          color: hsl(var(--foreground));
-          border-radius: calc(var(--radius) - 4px);
-          padding: 0.25rem 0.75rem;
-          transition: all 0.2s;
-          cursor: pointer;
-        }
-
-        .react-datepicker__year-option:hover,
-        .react-datepicker__month-option:hover {
-          background-color: hsl(var(--accent));
-          color: hsl(var(--accent-foreground));
-        }
-
-        .react-datepicker__year-option--selected,
-        .react-datepicker__month-option--selected {
-          background-color: hsl(var(--primary)) !important;
-          color: hsl(var(--primary-foreground)) !important;
-          font-weight: 500;
-        }
-
-        .react-datepicker__year-option--selected:hover,
-        .react-datepicker__month-option--selected:hover {
-          background-color: hsl(var(--primary)) !important;
-          color: hsl(var(--primary-foreground)) !important;
-        }
-
-        /* Triângulo */
         .react-datepicker__triangle {
           display: none;
-        }
-
-        /* Popper */
-        .react-datepicker-popper {
-          z-index: 999999 !important;
-        }
-
-        /* Animações */
-        .react-datepicker {
-          animation: scaleIn 0.2s ease-out;
-        }
-
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
         }
       `}</style>
     </div>
   );
 }
+
 // ==================== PÁGINA PRINCIPAL ====================
 
 export default function CriarAgentePage() {
@@ -752,7 +644,7 @@ export default function CriarAgentePage() {
               variant="ghost"
               size="icon"
               onClick={() => router.back()}
-              className="text-slate-500 hover:text-primary"
+              className="text-slate-500 hover:text-pac-primary"
             >
               <RiArrowLeftLine className="w-5 h-5" />
             </Button>
@@ -776,7 +668,7 @@ export default function CriarAgentePage() {
             <Button
               onClick={handleSubmit}
               disabled={isSaveDisabled}
-              className="bg-primary hover:bg-primary/90 text-white font-bold shadow-md shadow-primary/20"
+              className="bg-pac-primary hover:bg-pac-primary-dark text-white font-bold shadow-md shadow-pac-primary/20"
             >
               {saving ? (
                 <Spinner className="w-4 h-4 mr-2" />
@@ -807,6 +699,7 @@ export default function CriarAgentePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-8 space-y-6">
+            {/* --- DADOS PESSOAIS --- */}
             <Card className="border-slate-200 shadow-sm overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-2">
@@ -908,6 +801,7 @@ export default function CriarAgentePage() {
               </CardContent>
             </Card>
 
+            {/* --- DADOS OPERACIONAIS --- */}
             <Card className="border-slate-200 shadow-sm overflow-hidden">
               <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-2">
@@ -948,7 +842,7 @@ export default function CriarAgentePage() {
                         type="button"
                         variant="outline"
                         onClick={generateMatricula}
-                        className="h-11 px-4 border-slate-200 text-primary hover:bg-primary/5 hover:border-primary"
+                        className="h-11 px-4 border-slate-200 text-pac-primary hover:bg-pac-primary/5 hover:border-pac-primary"
                       >
                         <RiRefreshLine className="w-4 h-4 mr-2" /> Gerar
                       </Button>
@@ -1017,7 +911,9 @@ export default function CriarAgentePage() {
                     <Select
                       value={formData.uf || NOT_SELECTED_VALUE}
                       onValueChange={(v) =>
-                        setFormData({ uf: v === NOT_SELECTED_VALUE ? null : v })
+                        setFormData({
+                          uf: v === NOT_SELECTED_VALUE ? null : v,
+                        })
                       }
                     >
                       <SelectTrigger className="h-11">
@@ -1133,9 +1029,9 @@ export default function CriarAgentePage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-primary/5 border-primary/20 shadow-none">
+            <Card className="bg-pac-primary/5 border-pac-primary/20 shadow-none">
               <CardContent className="p-5">
-                <h4 className="text-primary font-bold text-sm uppercase mb-3 flex items-center">
+                <h4 className="text-pac-primary font-bold text-sm uppercase mb-3 flex items-center">
                   <RiCheckLine className="mr-1" /> Resumo do Cadastro
                 </h4>
                 <ul className="text-xs text-slate-600 space-y-2">

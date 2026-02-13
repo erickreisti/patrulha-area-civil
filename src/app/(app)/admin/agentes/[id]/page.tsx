@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { format, isValid } from "date-fns";
 import { toast } from "sonner";
+
+// --- IMPORTAÇÕES DO REACT DATEPICKER ---
+import DatePicker, { registerLocale } from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import { ptBR } from "date-fns/locale/pt-BR";
+
+// Registra o locale
+registerLocale("pt-BR", ptBR);
 
 // Components UI
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,11 +34,6 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -39,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
-import { Calendar } from "@/components/ui/calendar";
 
 // Icons
 import {
@@ -51,8 +52,7 @@ import {
   RiShieldKeyholeLine,
   RiShieldUserLine,
   RiUploadLine,
-  RiCalendarEventLine,
-  RiCalendar2Line,
+  RiCalendarLine, // Ícone do calendário
 } from "react-icons/ri";
 
 // Store e Constantes
@@ -67,20 +67,178 @@ import { deleteAgent } from "@/app/actions/admin/agents/agents";
 
 // ==================== FUNÇÕES UTILITÁRIAS ====================
 
-const formatDateLocal = (dateString?: string | null): string => {
-  if (!dateString) return "Não informada";
-  try {
-    const date = new Date(dateString);
-    return format(date, "dd/MM/yyyy", { locale: ptBR });
-  } catch {
-    return "Data inválida";
-  }
+const dateToString = (date: Date | undefined): string | null => {
+  if (!date || !isValid(date)) return null;
+  return format(date, "yyyy-MM-dd");
 };
 
 const fadeInUp = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 };
+
+// ==================== COMPONENTE DATEPICKER HÍBRIDO (IGUAL AO DE CRIAÇÃO) ====================
+
+// Interface para o botão customizado
+interface CustomInputButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  onClick?: () => void;
+}
+
+// Botão que serve como "gatilho" para o calendário
+const CustomInputButton = forwardRef<HTMLButtonElement, CustomInputButtonProps>(
+  ({ onClick }, ref) => (
+    <button
+      type="button"
+      onClick={onClick}
+      ref={ref}
+      className="absolute right-0 top-0 bottom-0 px-3 text-slate-400 hover:text-pac-primary transition-colors flex items-center justify-center outline-none z-10"
+    >
+      <RiCalendarLine className="w-5 h-5" />
+    </button>
+  ),
+);
+CustomInputButton.displayName = "CustomInputButton";
+
+interface SmartDatePickerProps {
+  date: string | null | undefined;
+  onSelect: (date: Date | undefined) => void;
+  disabled?: boolean;
+}
+
+function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
+  const [inputValue, setInputValue] = useState("");
+
+  // Sincroniza o input quando a prop 'date' muda (carregamento inicial ou update)
+  useEffect(() => {
+    let newVal = "";
+    if (date) {
+      // date vem no formato YYYY-MM-DD
+      const [year, month, day] = date.split("-");
+      if (year && month && day) {
+        newVal = `${day}/${month}/${year}`;
+      }
+    }
+    if (newVal !== inputValue) {
+      setInputValue(newVal);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  // Lógica de máscara e digitação
+  const handleRawChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, ""); // Apenas números
+
+    if (value.length > 8) value = value.slice(0, 8); // Max 8 chars
+
+    // Máscara DD/MM/AAAA
+    if (value.length >= 5) {
+      value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
+    } else if (value.length >= 3) {
+      value = `${value.slice(0, 2)}/${value.slice(2)}`;
+    }
+
+    setInputValue(value);
+
+    // Validação ao completar a digitação
+    if (value.length === 10) {
+      const day = parseInt(value.slice(0, 2), 10);
+      const month = parseInt(value.slice(3, 5), 10) - 1;
+      const year = parseInt(value.slice(6), 10);
+
+      const parsedDate = new Date(year, month, day);
+
+      if (
+        isValid(parsedDate) &&
+        parsedDate.getDate() === day &&
+        parsedDate.getMonth() === month &&
+        year > 1900 &&
+        year < 2100
+      ) {
+        onSelect(parsedDate);
+      }
+    } else if (value === "") {
+      onSelect(undefined);
+    }
+  };
+
+  // Objeto Date para o DatePicker
+  const selectedDate = date ? new Date(`${date}T12:00:00`) : null;
+
+  return (
+    <div className="relative w-full group">
+      {/* Input de Texto Independente */}
+      <Input
+        value={inputValue}
+        onChange={handleRawChange}
+        disabled={disabled}
+        placeholder="DD/MM/AAAA"
+        className="pl-3 pr-10" // Espaço para o ícone
+      />
+
+      {/* DatePicker Ancorado no Ícone */}
+      <div className="absolute top-0 right-0">
+        <DatePicker
+          selected={selectedDate}
+          onChange={(date: Date | null) => onSelect(date || undefined)}
+          customInput={<CustomInputButton />}
+          dateFormat="dd/MM/yyyy"
+          locale="pt-BR"
+          disabled={disabled}
+          showYearDropdown
+          scrollableYearDropdown
+          yearDropdownItemNumber={100}
+          popperClassName="fixed-datepicker-popper"
+          popperPlacement="bottom-end"
+          withPortal
+          portalId="root-portal"
+        />
+      </div>
+
+      {/* Estilos Globais do DatePicker */}
+      <style jsx global>{`
+        .fixed-datepicker-popper {
+          z-index: 99999 !important;
+        }
+        .react-datepicker {
+          font-family: inherit;
+          border-color: #e2e8f0;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+          border-radius: 0.5rem;
+          overflow: hidden;
+        }
+        .react-datepicker__header {
+          background-color: #f8fafc;
+          border-bottom: 1px solid #e2e8f0;
+          padding-top: 0.5rem;
+        }
+        .react-datepicker__current-month {
+          color: #1e293b;
+          font-weight: 700;
+          text-transform: capitalize;
+        }
+        .react-datepicker__day-name {
+          color: #64748b;
+          text-transform: uppercase;
+          font-size: 0.7rem;
+        }
+        .react-datepicker__day--selected,
+        .react-datepicker__day--keyboard-selected {
+          background-color: #1a2873 !important;
+          color: white !important;
+        }
+        .react-datepicker__day:hover {
+          background-color: #e2e8f0;
+        }
+        .react-datepicker__navigation {
+          top: 8px;
+        }
+        .react-datepicker__triangle {
+          display: none;
+        }
+      `}</style>
+    </div>
+  );
+}
 
 // ==================== COMPONENTE AVATAR UPLOAD ====================
 
@@ -244,8 +402,6 @@ export default function EditarAgentePage() {
   const router = useRouter();
   const agentId = params.id as string;
 
-  const [nascimentoOpen, setNascimentoOpen] = useState(false);
-  const [certOpen, setCertOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -277,11 +433,10 @@ export default function EditarAgentePage() {
     setFormData({ [name]: value });
   };
 
+  // Função para lidar com o datepicker customizado
   const handleDateSelect = (date: Date | undefined, field: string) => {
-    const dateString = date ? format(date, "yyyy-MM-dd") : null;
-    setFormData({ [field]: dateString });
-    if (field === "validade_certificacao") setCertOpen(false);
-    if (field === "data_nascimento") setNascimentoOpen(false);
+    const dateStr = dateToString(date);
+    setFormData({ [field]: dateStr });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -294,10 +449,8 @@ export default function EditarAgentePage() {
 
     const toastId = toast.loading("Salvando alterações...");
 
-    // CORREÇÃO: Criamos um payload sanitizado para remover 'null' de campos obrigatórios
     const payload = {
       ...formData,
-      // Campos que não aceitam 'null' na interface de update devem ser convertidos para 'undefined'
       full_name: formData.full_name ?? undefined,
       matricula: formData.matricula ?? undefined,
       email: formData.email ?? undefined,
@@ -438,36 +591,13 @@ export default function EditarAgentePage() {
                     <Label className="text-xs font-bold uppercase text-slate-500">
                       Data de Nascimento
                     </Label>
-                    <Popover
-                      open={nascimentoOpen}
-                      onOpenChange={setNascimentoOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full h-11 justify-start font-normal border-slate-200"
-                        >
-                          <RiCalendarEventLine className="mr-2 h-4 w-4 text-slate-400" />
-                          {formData.data_nascimento
-                            ? formatDateLocal(formData.data_nascimento)
-                            : "Selecionar"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          locale={ptBR}
-                          selected={
-                            formData.data_nascimento
-                              ? new Date(formData.data_nascimento)
-                              : undefined
-                          }
-                          onSelect={(d) =>
-                            handleDateSelect(d, "data_nascimento")
-                          }
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    {/* AQUI ESTÁ O NOVO DATEPICKER HÍBRIDO */}
+                    <SmartDatePicker
+                      date={formData.data_nascimento}
+                      onSelect={(date) =>
+                        handleDateSelect(date, "data_nascimento")
+                      }
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -539,33 +669,13 @@ export default function EditarAgentePage() {
                     <Label className="text-xs font-bold uppercase text-slate-500">
                       Validade Certificação
                     </Label>
-                    <Popover open={certOpen} onOpenChange={setCertOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full h-11 justify-start font-normal border-slate-200"
-                        >
-                          <RiCalendar2Line className="mr-2 h-4 w-4 text-slate-400" />
-                          {formData.validade_certificacao
-                            ? formatDateLocal(formData.validade_certificacao)
-                            : "Indefinida"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          locale={ptBR}
-                          selected={
-                            formData.validade_certificacao
-                              ? new Date(formData.validade_certificacao)
-                              : undefined
-                          }
-                          onSelect={(d) =>
-                            handleDateSelect(d, "validade_certificacao")
-                          }
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    {/* AQUI ESTÁ O NOVO DATEPICKER HÍBRIDO */}
+                    <SmartDatePicker
+                      date={formData.validade_certificacao}
+                      onSelect={(date) =>
+                        handleDateSelect(date, "validade_certificacao")
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-slate-500">
@@ -674,35 +784,35 @@ export default function EditarAgentePage() {
             </Card>
 
             {/* Resumo Dinâmico */}
-            <Card className="bg-slate-900 text-white border-0 overflow-hidden relative shadow-lg">
+            <Card className="bg-pac-primary-light text-white border-0 overflow-hidden relative shadow-lg">
               <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                 <RiShieldUserLine size={120} />
               </div>
               <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] uppercase tracking-[0.2em] text-slate-400 font-black">
+                <CardTitle className="text-[10px] uppercase tracking-[0.2em] text-slate-200 font-black">
                   Ficha Operacional
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-5 relative z-10">
                 <div className="flex flex-col">
-                  <span className="text-[9px] uppercase text-slate-500 font-bold">
+                  <span className="text-[9px] uppercase text-slate-200 font-bold">
                     Identificação
                   </span>
-                  <span className="font-bold text-lg leading-tight uppercase italic truncate">
+                  <span className="font-bold text-lg leading-tight uppercase text-slate-300 italic truncate">
                     {formData.full_name || "-"}
                   </span>
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[9px] uppercase text-slate-500 font-bold">
+                  <span className="text-[9px] uppercase text-slate-200 font-bold">
                     Matrícula
                   </span>
-                  <span className="font-mono text-xl tracking-wider text-pac-primary">
+                  <span className="font-mono text-xl tracking-wider text-slate-300">
                     {formData.matricula}
                   </span>
                 </div>
                 <div className="pt-2">
                   <div
-                    className={`w-fit px-3 py-1 rounded-md text-[10px] font-black uppercase ${formData.role === "admin" ? "bg-purple-500" : "bg-pac-primary"} text-white`}
+                    className={`w-fit px-3 py-1 rounded-md text-[10px] font-black uppercase ${formData.role === "admin" ? "bg-purple-500" : "bg-pac-primary-muted"} text-white`}
                   >
                     {formData.role === "admin" ? "Administrador" : "Agente PAC"}
                   </div>

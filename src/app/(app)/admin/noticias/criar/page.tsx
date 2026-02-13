@@ -12,6 +12,9 @@ import {
   RiLayoutMasonryLine,
   RiSettings3Line,
   RiUploadCloud2Line,
+  RiArticleLine,
+  RiLinkM,
+  RiVideoLine,
 } from "react-icons/ri";
 
 // Components
@@ -20,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -29,6 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 
 // Hooks & Actions
 import { useNoticiaCreate, useNoticias } from "@/lib/stores/useNoticiasStore";
@@ -36,8 +40,8 @@ import { MediaUpload } from "@/app/(app)/admin/noticias/components/MediaUpload";
 import type { CreateNoticiaInput } from "@/app/actions/news/noticias";
 
 const fadeInUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
 
 export default function CriarNoticiaPage() {
@@ -61,7 +65,7 @@ export default function CriarNoticiaPage() {
     if (categories.length === 0) fetchCategories();
   }, [categories.length, fetchCategories]);
 
-  // ✅ Cleanup CORRIGIDO: Só reseta quando o componente desmontar (sair da tela)
+  // Cleanup
   useEffect(() => {
     return () => {
       resetFormData();
@@ -80,7 +84,7 @@ export default function CriarNoticiaPage() {
     }
   };
 
-  // Upload unificado (detecta tipo automaticamente)
+  // Upload unificado
   const handleUploadComplete = (
     url: string,
     detectedType: "imagem" | "video",
@@ -103,7 +107,7 @@ export default function CriarNoticiaPage() {
 
     const errors = validateForm();
     if (errors.length > 0) {
-      toast.error("Preencha os campos obrigatórios", {
+      toast.error("Atenção", {
         description: errors[0],
       });
       return;
@@ -122,27 +126,27 @@ export default function CriarNoticiaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20 py-8">
-      <div className="container mx-auto px-4 max-w-6xl">
+    <div className="min-h-screen bg-slate-50/50 py-8 font-sans">
+      <div className="container mx-auto px-4 max-w-7xl">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+          className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-4"
         >
           <div>
-            <h1 className="text-3xl font-bold text-slate-900 font-bebas tracking-wide">
+            <h1 className="text-3xl font-bold text-slate-800 font-bebas tracking-wide mb-1">
               NOVA NOTÍCIA
             </h1>
-            <p className="text-slate-600">
+            <p className="text-slate-500 text-sm">
               Crie conteúdo informativo para o portal da PAC.
             </p>
           </div>
-          <div className="flex gap-3">
-            <Link href="/admin/noticias">
+          <div className="flex gap-3 w-full md:w-auto">
+            <Link href="/admin/noticias" className="flex-1 md:flex-none">
               <Button
                 variant="outline"
-                className="border-slate-300 text-slate-700 bg-white hover:bg-slate-50 shadow-sm"
+                className="w-full border-slate-200 text-slate-700 bg-white hover:bg-slate-50 shadow-sm"
               >
                 <RiArrowLeftLine className="mr-2" /> Cancelar
               </Button>
@@ -150,52 +154,52 @@ export default function CriarNoticiaPage() {
             <Button
               onClick={handleSubmit}
               disabled={saving}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-200 transition-all hover:-translate-y-0.5"
+              className="flex-1 md:flex-none bg-pac-primary hover:bg-pac-primary-dark text-white font-bold shadow-md shadow-pac-primary/20 transition-all"
             >
               {saving ? (
                 <RiLoader3Line className="animate-spin mr-2" />
               ) : (
                 <RiSaveLine className="mr-2" />
               )}
-              Publicar Notícia
+              {saving ? "Salvando..." : "Publicar Notícia"}
             </Button>
           </div>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Coluna Principal */}
+          {/* Coluna Principal (Esquerda) */}
           <div className="lg:col-span-2 space-y-6">
             <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
-              <Card className="border-none shadow-xl overflow-hidden bg-white/80 backdrop-blur-sm">
-                <CardHeader className="border-b border-slate-100 pb-0 pt-6 px-6">
-                  {/* Tabs Modernizadas */}
-                  <Tabs
-                    value={activeTab}
-                    onValueChange={setActiveTab}
-                    className="w-full"
-                  >
-                    <TabsList className="bg-slate-100/50 p-1 rounded-xl w-full flex gap-1 border border-slate-200/50">
+              <Card className="border-none shadow-sm bg-white overflow-hidden">
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full"
+                >
+                  <CardHeader className="border-b border-slate-50 pb-0 pt-6 px-6">
+                    <TabsList className="bg-slate-50 p-1 rounded-xl w-full flex gap-1 border border-slate-100">
                       <TabsTrigger
                         value="conteudo"
-                        className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm data-[state=active]:font-bold text-slate-500 transition-all duration-300 py-2.5"
+                        className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:text-pac-primary data-[state=active]:shadow-sm data-[state=active]:font-bold text-slate-500 transition-all duration-300 py-2.5"
                       >
-                        <RiLayoutMasonryLine className="mr-2 w-4 h-4" />{" "}
-                        Conteúdo
+                        <RiArticleLine className="mr-2 w-4 h-4" /> Conteúdo
                       </TabsTrigger>
                       <TabsTrigger
                         value="midia"
-                        className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-sm data-[state=active]:font-bold text-slate-500 transition-all duration-300 py-2.5"
+                        className="flex-1 rounded-lg data-[state=active]:bg-white data-[state=active]:text-pac-primary data-[state=active]:shadow-sm data-[state=active]:font-bold text-slate-500 transition-all duration-300 py-2.5"
                       >
                         <RiUploadCloud2Line className="mr-2 w-4 h-4" /> Mídia e
                         Capa
                       </TabsTrigger>
                     </TabsList>
-                  </Tabs>
-                </CardHeader>
+                  </CardHeader>
 
-                <CardContent className="p-8">
-                  {activeTab === "conteudo" ? (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <CardContent className="p-8">
+                    <TabsContent
+                      value="conteudo"
+                      className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                    >
+                      {/* Título */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="titulo"
@@ -207,23 +211,23 @@ export default function CriarNoticiaPage() {
                         <Input
                           id="titulo"
                           name="titulo"
-                          // ✅ GARANTE STRING VAZIA SE UNDEFINED
                           value={formData.titulo || ""}
                           onChange={handleInputChange}
                           placeholder="Ex: Operação Verão inicia com sucesso..."
-                          className="text-lg py-6 border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-xl shadow-sm"
+                          className="text-lg py-6 border-slate-200 focus:border-pac-primary focus:ring-pac-primary/20 rounded-xl shadow-sm font-medium"
                         />
                       </div>
 
+                      {/* Slug */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="slug"
-                          className="text-slate-700 font-semibold"
+                          className="text-slate-700 font-semibold text-sm"
                         >
                           Slug (URL Amigável)
                         </Label>
                         <div className="flex rounded-xl shadow-sm overflow-hidden">
-                          <span className="inline-flex items-center px-4 border border-r-0 border-slate-200 bg-slate-50 text-gray-500 text-sm font-medium">
+                          <span className="inline-flex items-center px-4 border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm font-medium">
                             /noticias/
                           </span>
                           <Input
@@ -231,15 +235,16 @@ export default function CriarNoticiaPage() {
                             name="slug"
                             value={formData.slug || ""}
                             onChange={handleInputChange}
-                            className="rounded-l-none border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20"
+                            className="rounded-l-none border-slate-200 focus:border-pac-primary focus:ring-pac-primary/20"
                           />
                         </div>
                       </div>
 
+                      {/* Resumo */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="resumo"
-                          className="text-slate-700 font-semibold"
+                          className="text-slate-700 font-semibold text-sm"
                         >
                           Resumo <span className="text-red-500">*</span>
                         </Label>
@@ -249,14 +254,17 @@ export default function CriarNoticiaPage() {
                           value={formData.resumo || ""}
                           onChange={handleInputChange}
                           placeholder="Uma breve descrição que aparecerá nos cards de listagem..."
-                          className="h-28 resize-none border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 rounded-xl shadow-sm"
+                          className="h-24 resize-none border-slate-200 focus:border-pac-primary focus:ring-pac-primary/20 rounded-xl shadow-sm"
                         />
                       </div>
 
+                      <Separator className="bg-slate-100" />
+
+                      {/* Conteúdo Principal */}
                       <div className="space-y-2">
                         <Label
                           htmlFor="conteudo"
-                          className="text-slate-700 font-semibold"
+                          className="text-slate-700 font-semibold text-sm"
                         >
                           Conteúdo Completo{" "}
                           <span className="text-red-500">*</span>
@@ -267,43 +275,53 @@ export default function CriarNoticiaPage() {
                           value={formData.conteudo || ""}
                           onChange={handleInputChange}
                           placeholder="Escreva os detalhes da notícia aqui..."
-                          className="min-h-[350px] border-slate-200 focus:border-emerald-500 focus:ring-emerald-500/20 leading-relaxed rounded-xl shadow-sm p-4"
+                          className="min-h-[400px] border-slate-200 focus:border-pac-primary focus:ring-pac-primary/20 leading-relaxed rounded-xl shadow-sm p-4 font-sans text-base"
                         />
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-blue-800 text-sm">
-                        <p className="flex items-center font-medium mb-1">
-                          <RiUploadCloud2Line className="mr-2" /> Upload de
-                          Mídia
-                        </p>
-                        Você pode enviar imagens (JPG, PNG) ou vídeos (MP4). O
-                        sistema detectará automaticamente o formato.
+                    </TabsContent>
+
+                    <TabsContent
+                      value="midia"
+                      className="mt-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300"
+                    >
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-blue-800 text-sm flex items-start gap-3">
+                        <RiLayoutMasonryLine className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="font-bold mb-1">
+                            Gerenciamento de Mídia
+                          </p>
+                          <p className="opacity-90">
+                            Você pode enviar imagens (JPG, PNG) ou vídeos (MP4).
+                            O sistema detectará automaticamente o formato e
+                            ajustará a exibição.
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="space-y-3">
-                        <Label className="text-slate-700 font-semibold text-lg">
+                      <div className="space-y-4">
+                        <Label className="text-slate-700 font-bold text-lg flex items-center gap-2">
                           Arquivo de Capa
                         </Label>
 
                         {/* Componente de Upload Unificado */}
-                        <MediaUpload
-                          slug={formData.slug || "temp"}
-                          tipo="imagem"
-                          onFileSelect={() => {}}
-                          onUploadComplete={(url, type) =>
-                            handleUploadComplete(
-                              url,
-                              type as "imagem" | "video",
-                            )
-                          }
-                          onRemove={handleRemoveMedia}
-                          currentMedia={
-                            formData.media_url || formData.video_url
-                          }
-                          disabled={!formData.slug}
-                        />
+                        <div className="border-2 border-dashed border-slate-200 rounded-2xl p-6 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                          <MediaUpload
+                            slug={formData.slug || "temp"}
+                            tipo="imagem"
+                            onFileSelect={() => {}}
+                            onUploadComplete={(url, type) =>
+                              handleUploadComplete(
+                                url,
+                                type as "imagem" | "video",
+                              )
+                            }
+                            onRemove={handleRemoveMedia}
+                            currentMedia={
+                              formData.media_url || formData.video_url
+                            }
+                            disabled={!formData.slug}
+                          />
+                        </div>
 
                         {!formData.slug && (
                           <p className="text-sm text-amber-600 font-medium bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 inline-block">
@@ -313,12 +331,12 @@ export default function CriarNoticiaPage() {
                         )}
                       </div>
 
-                      <div className="relative py-4">
+                      <div className="relative py-2">
                         <div className="absolute inset-0 flex items-center">
                           <span className="w-full border-t border-slate-200" />
                         </div>
                         <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-white px-2 text-gray-500 font-medium tracking-wider">
+                          <span className="bg-white px-2 text-slate-400 font-medium tracking-wider">
                             Ou use um link externo
                           </span>
                         </div>
@@ -327,37 +345,41 @@ export default function CriarNoticiaPage() {
                       <div className="space-y-2">
                         <Label
                           htmlFor="video_url"
-                          className="text-slate-700 font-semibold"
+                          className="text-slate-700 font-semibold flex items-center gap-2"
                         >
-                          URL de Vídeo (YouTube/Vimeo)
+                          <RiLinkM className="text-pac-primary" /> URL de Vídeo
+                          (YouTube/Vimeo)
                         </Label>
-                        <Input
-                          id="video_url"
-                          name="video_url"
-                          placeholder="Ex: https://www.youtube.com/watch?v=..."
-                          value={formData.video_url || ""}
-                          onChange={(e) => {
-                            setFormData({
-                              video_url: e.target.value,
-                              tipo_media: "video",
-                              media_url: null,
-                            });
-                          }}
-                          className="border-slate-200 h-12 rounded-xl focus:border-emerald-500 focus:ring-emerald-500/20"
-                        />
-                        <p className="text-xs text-slate-500 ml-1">
+                        <div className="relative">
+                          <RiVideoLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <Input
+                            id="video_url"
+                            name="video_url"
+                            placeholder="Ex: https://www.youtube.com/watch?v=..."
+                            value={formData.video_url || ""}
+                            onChange={(e) => {
+                              setFormData({
+                                video_url: e.target.value,
+                                tipo_media: "video",
+                                media_url: null,
+                              });
+                            }}
+                            className="pl-10 border-slate-200 h-12 rounded-xl focus:border-pac-primary focus:ring-pac-primary/20"
+                          />
+                        </div>
+                        <p className="text-xs text-slate-500">
                           Cole o link direto do vídeo caso não queira fazer
                           upload.
                         </p>
                       </div>
-                    </div>
-                  )}
-                </CardContent>
+                    </TabsContent>
+                  </CardContent>
+                </Tabs>
               </Card>
             </motion.div>
           </div>
 
-          {/* Sidebar */}
+          {/* Sidebar (Direita) */}
           <div className="space-y-6">
             <motion.div
               initial="hidden"
@@ -365,15 +387,17 @@ export default function CriarNoticiaPage() {
               variants={fadeInUp}
               transition={{ delay: 0.1 }}
             >
-              <Card className="border-none shadow-xl sticky top-6">
+              <Card className="border-none shadow-sm sticky top-6 bg-white">
                 <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
-                  <CardTitle className="text-lg text-slate-800 flex items-center gap-2 font-bold">
-                    <RiSettings3Line className="text-slate-500" /> Publicação
+                  <CardTitle className="text-base text-slate-800 flex items-center gap-2 font-bold">
+                    <RiSettings3Line className="text-pac-primary" />{" "}
+                    Configuração da Publicação
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6 space-y-6">
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 font-semibold text-sm uppercase tracking-wide">
+                  {/* Status */}
+                  <div className="space-y-3">
+                    <Label className="text-slate-700 font-semibold text-xs uppercase tracking-wide">
                       Status
                     </Label>
                     <Select
@@ -384,7 +408,7 @@ export default function CriarNoticiaPage() {
                         })
                       }
                     >
-                      <SelectTrigger className="w-full border-slate-200 h-11 rounded-lg">
+                      <SelectTrigger className="w-full border-slate-200 h-11 rounded-lg focus:ring-pac-primary">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -395,15 +419,16 @@ export default function CriarNoticiaPage() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-slate-700 font-semibold text-sm uppercase tracking-wide">
+                  {/* Categoria */}
+                  <div className="space-y-3">
+                    <Label className="text-slate-700 font-semibold text-xs uppercase tracking-wide">
                       Categoria
                     </Label>
                     <Select
                       value={formData.categoria || "Operações"}
                       onValueChange={(v) => setFormData({ categoria: v })}
                     >
-                      <SelectTrigger className="w-full border-slate-200 h-11 rounded-lg">
+                      <SelectTrigger className="w-full border-slate-200 h-11 rounded-lg focus:ring-pac-primary">
                         <SelectValue placeholder="Selecione a categoria..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -416,10 +441,11 @@ export default function CriarNoticiaPage() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
+                  {/* Data */}
+                  <div className="space-y-3">
                     <Label
                       htmlFor="data_publicacao"
-                      className="text-slate-700 font-semibold text-sm uppercase tracking-wide"
+                      className="text-slate-700 font-semibold text-xs uppercase tracking-wide"
                     >
                       Data de Publicação
                     </Label>
@@ -429,20 +455,23 @@ export default function CriarNoticiaPage() {
                       name="data_publicacao"
                       value={formData.data_publicacao || ""}
                       onChange={handleInputChange}
-                      className="border-slate-200 h-11 rounded-lg"
+                      className="border-slate-200 h-11 rounded-lg focus:ring-pac-primary"
                     />
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-200/60 transition-colors hover:border-emerald-200/60">
+                  <Separator className="bg-slate-100" />
+
+                  {/* Destaque Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
                     <div className="flex flex-col">
                       <Label
                         htmlFor="destaque"
-                        className="cursor-pointer font-bold text-slate-700"
+                        className="cursor-pointer font-bold text-slate-700 text-sm"
                       >
                         Destaque
                       </Label>
-                      <span className="text-xs text-slate-500">
-                        Exibir no carrossel da home
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">
+                        Exibir no carrossel
                       </span>
                     </div>
                     <Switch
@@ -451,7 +480,7 @@ export default function CriarNoticiaPage() {
                       onCheckedChange={(checked) =>
                         setFormData({ destaque: checked })
                       }
-                      className="data-[state=checked]:bg-emerald-500"
+                      className="data-[state=checked]:bg-pac-accent-amber"
                     />
                   </div>
                 </CardContent>
