@@ -166,15 +166,15 @@ export default function AgentPerfil() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-[300px] relative z-10"
       >
-        <Card className="border-none shadow-2xl bg-white overflow-hidden rounded-[12px]">
+        <Card className="border-none py-1 px-0 shadow-2xl bg-white overflow-hidden rounded-[12px]">
           {/* --- HEADER COMPACTO --- */}
           <div className="bg-white px-4 pb-1 flex flex-col items-center text-center">
             <div className="mb-0.5">
               <Image
                 src="/images/logos/logo.webp"
                 alt="PAC Logo"
-                width={64}
-                height={64}
+                width={65}
+                height={65}
                 className="object-contain"
                 style={{ width: "auto", height: "auto" }}
                 priority
@@ -184,7 +184,7 @@ export default function AgentPerfil() {
             <h1 className="text-pac-primary font-roboto font-bold text-base uppercase leading-none tracking-wide mb-0.5">
               Patrulha Aérea Civil
             </h1>
-            <span className="text-[6px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-1 block leading-none">
+            <span className="text-[8px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-1 block leading-none">
               Comando Operacional no Estado do Rio de Janeiro
             </span>
 
@@ -203,7 +203,7 @@ export default function AgentPerfil() {
             </div>
           </div>
 
-          <CardContent className="space-y-0.5">
+          <CardContent className="space-y-0.5 px-1">
             {/* 1. NOME */}
             <div className="space-y-[-2px]">
               <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3 block">
