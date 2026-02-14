@@ -720,7 +720,7 @@ export default function EditarAgentePage() {
                   <div className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <Label className="text-xs font-bold uppercase text-slate-500">
-                        Unidade de Lotação
+                        Unidade
                       </Label>
                       <Input
                         name="unidade"
