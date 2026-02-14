@@ -71,28 +71,30 @@ export function Paginacao({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.3 }}
-      className="mt-8 pt-6 border-t border-gray-200"
+      transition={{ duration: 0.4, delay: 0.1 }}
+      className="p-4 border-t border-slate-100 bg-slate-50/50"
     >
       <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
-        <div className="text-sm text-gray-600">
-          Mostrando <span className="font-bold">{startItem}</span> -{" "}
-          <span className="font-bold">{endItem}</span> de{" "}
-          <span className="font-bold">{totalItems}</span> resultados
+        <div className="text-xs font-medium text-slate-500">
+          Mostrando{" "}
+          <span className="font-bold text-slate-800">{startItem}</span> -{" "}
+          <span className="font-bold text-slate-800">{endItem}</span> de{" "}
+          <span className="font-bold text-slate-800">{totalItems}</span>{" "}
+          resultados
         </div>
 
         <div className="flex items-center gap-4">
           <Pagination>
-            <PaginationContent>
+            <PaginationContent className="gap-1">
               <PaginationItem>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => onPageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="gap-2 pl-2.5"
+                  className="gap-1 pl-2.5 bg-white border-slate-200 text-slate-600 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50 h-8 text-xs font-medium shadow-sm"
                 >
-                  <RiArrowLeftLine className="w-4 h-4" />
+                  <RiArrowLeftLine className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Anterior</span>
                 </Button>
               </PaginationItem>
@@ -100,17 +102,17 @@ export function Paginacao({
               {getVisiblePages().map((page, index) => (
                 <PaginationItem key={index}>
                   {page === "..." ? (
-                    <span className="flex h-9 w-9 items-center justify-center">
-                      <RiMoreFill className="w-4 h-4 text-gray-400" />
+                    <span className="flex h-8 w-8 items-center justify-center">
+                      <RiMoreFill className="w-4 h-4 text-slate-400" />
                     </span>
                   ) : (
                     <Button
                       variant={currentPage === page ? "default" : "outline"}
                       size="sm"
-                      className={`w-9 h-9 p-0 ${
+                      className={`w-8 h-8 p-0 text-xs font-bold transition-all ${
                         currentPage === page
-                          ? "bg-navy-600 hover:bg-navy-700 text-white"
-                          : ""
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-100"
+                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                       onClick={() => onPageChange(page as number)}
                     >
@@ -126,28 +128,32 @@ export function Paginacao({
                   size="sm"
                   onClick={() => onPageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="gap-2 pr-2.5"
+                  className="gap-1 pr-2.5 bg-white border-slate-200 text-slate-600 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50 h-8 text-xs font-medium shadow-sm"
                 >
                   <span className="hidden sm:inline">Próximo</span>
-                  <RiArrowRightLine className="w-4 h-4" />
+                  <RiArrowRightLine className="w-3.5 h-3.5" />
                 </Button>
               </PaginationItem>
             </PaginationContent>
           </Pagination>
 
-          <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
+          <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-slate-500">
             <span>Ir para:</span>
             <Select
               value={currentPage.toString()}
               onValueChange={(val) => onPageChange(Number(val))}
             >
-              <SelectTrigger className="w-[70px] h-9">
+              <SelectTrigger className="w-[60px] h-8 text-xs border-slate-200 bg-white focus:ring-emerald-500/20">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(
                   (p) => (
-                    <SelectItem key={p} value={p.toString()}>
+                    <SelectItem
+                      key={p}
+                      value={p.toString()}
+                      className="text-xs"
+                    >
                       {p}
                     </SelectItem>
                   ),

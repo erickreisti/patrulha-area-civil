@@ -139,16 +139,16 @@ const StatCard = ({
   const colorClass = variants[variant] || variants.default;
 
   return (
-    <Card className="border-none shadow-sm transition-all hover:shadow-md bg-white">
+    <Card className="border-none shadow-sm transition-all hover:shadow-md bg-white h-full">
       <CardContent className="p-6 flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 opacity-90">
             {title}
           </p>
           {loading ? (
             <Skeleton className="h-8 w-16 mt-1 bg-slate-100" />
           ) : (
-            <h3 className="text-2xl font-bold text-slate-800 mt-1">{value}</h3>
+            <h3 className="text-2xl font-black text-slate-800 mt-1">{value}</h3>
           )}
         </div>
         <div className={`p-3 rounded-xl ${colorClass}`}>
@@ -159,7 +159,7 @@ const StatCard = ({
   );
 };
 
-// Linha da Notícia
+// Linha da Notícia (Refatorada com Botões Quadrados)
 const NoticiaRow = ({
   noticia,
   onDelete,
@@ -203,11 +203,10 @@ const NoticiaRow = ({
   }
 
   return (
-    <div className="group flex flex-col sm:flex-row gap-5 p-4 bg-white border border-slate-100 rounded-xl hover:border-pac-primary/30 hover:shadow-md transition-all duration-300">
+    <div className="group flex flex-col sm:flex-row gap-5 p-4 bg-white border border-slate-100 rounded-xl hover:border-emerald-200 hover:shadow-md transition-all duration-300">
       {/* --- MÍDIA / CAPA --- */}
-      <div className="relative w-full sm:w-48 h-48 sm:h-32 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden border border-slate-200 group-hover:border-pac-primary/20 transition-colors">
+      <div className="relative w-full sm:w-48 h-48 sm:h-32 flex-shrink-0 bg-slate-50 rounded-lg overflow-hidden border border-slate-200 group-hover:border-emerald-100 transition-colors">
         {mediaType === "none" || imgError ? (
-          // Estado: Sem Mídia ou Erro
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-slate-50">
             {isVideo ? <RiFilmLine size={32} /> : <RiImageLine size={32} />}
             <span className="text-[10px] font-bold uppercase tracking-widest mt-2">
@@ -215,10 +214,9 @@ const NoticiaRow = ({
             </span>
           </div>
         ) : mediaType === "video_internal" && displayUrl ? (
-          // Estado: Vídeo Interno (Renderiza tag video para capa)
           <div className="w-full h-full relative bg-black">
             <video
-              src={`${displayUrl}#t=0.1`} // Tenta pegar o frame 0.1s
+              src={`${displayUrl}#t=0.1`}
               className="w-full h-full object-cover opacity-80"
               muted
               preload="metadata"
@@ -229,7 +227,6 @@ const NoticiaRow = ({
             </div>
           </div>
         ) : (
-          // Estado: Imagem ou YouTube (Renderiza Imagem)
           <Image
             src={displayUrl!}
             alt={noticia.titulo}
@@ -240,7 +237,7 @@ const NoticiaRow = ({
           />
         )}
 
-        {/* Badge de categoria sobre a mídia */}
+        {/* Badge de categoria */}
         <div className="absolute top-2 left-2 flex flex-col gap-1 z-10">
           {noticia.categoria && (
             <Badge
@@ -252,7 +249,7 @@ const NoticiaRow = ({
           )}
         </div>
 
-        {/* Ícone Indicador de Tipo de Mídia */}
+        {/* Ícone YouTube */}
         {mediaType === "youtube" && (
           <div className="absolute bottom-2 right-2 bg-red-600 text-white p-1 rounded-full shadow-sm z-10">
             <RiYoutubeLine className="w-3.5 h-3.5" />
@@ -287,7 +284,7 @@ const NoticiaRow = ({
 
           <Link href={`/admin/noticias/${noticia.id}`} className="block">
             <h3
-              className="text-lg font-bold text-slate-800 leading-tight group-hover:text-pac-primary transition-colors line-clamp-1"
+              className="text-lg font-bold text-slate-800 leading-tight group-hover:text-emerald-700 transition-colors line-clamp-1"
               title={noticia.titulo}
             >
               {noticia.titulo}
@@ -302,82 +299,81 @@ const NoticiaRow = ({
         {/* Rodapé do Card */}
         <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400 mt-3 pt-3 border-t border-slate-100">
           <div className="flex items-center gap-1.5 font-medium text-slate-500">
-            <RiUserLine className="text-pac-primary/70 w-3.5 h-3.5" />
+            <RiUserLine className="text-emerald-600/70 w-3.5 h-3.5" />
             <span className="truncate max-w-[150px]">
               {noticia.autor?.full_name || "Sistema"}
             </span>
           </div>
           <div className="flex items-center gap-1.5 font-medium text-slate-500">
-            <RiCalendarLine className="text-pac-primary/70 w-3.5 h-3.5" />
+            <RiCalendarLine className="text-emerald-600/70 w-3.5 h-3.5" />
             {formatDate(noticia.data_publicacao)}
           </div>
         </div>
       </div>
 
-      {/* --- AÇÕES --- */}
-      <div className="flex sm:flex-col items-center justify-between sm:justify-center gap-2 pt-2 sm:pt-0 sm:pl-4 sm:border-l border-slate-100 sm:w-auto w-full min-w-[120px]">
-        {/* Toggle Actions */}
-        <div className="flex gap-1 w-full justify-end sm:justify-center">
-          <Button
-            size="icon"
-            variant="ghost"
-            className={`h-8 w-8 rounded-full transition-all ${
-              noticia.destaque
-                ? "text-amber-500 bg-amber-50 hover:bg-amber-100"
-                : "text-slate-300 hover:text-amber-500 hover:bg-amber-50"
-            }`}
-            onClick={() => onToggleDestaque(noticia.id, noticia.destaque)}
-            title={noticia.destaque ? "Remover Destaque" : "Destacar"}
-          >
-            <RiStarFill className="w-4 h-4" />
-          </Button>
+      {/* --- AÇÕES (BOTOES QUADRADOS) --- */}
+      <div className="flex flex-row sm:flex-col items-center justify-end sm:justify-center gap-2 pt-2 sm:pt-0 sm:pl-4 sm:border-l border-slate-100 sm:w-auto w-full min-w-[40px]">
+        {/* Toggle Status */}
+        <Button
+          size="icon"
+          variant="ghost"
+          className={`h-9 w-9 rounded-lg transition-all ${
+            noticia.status === NOTICIA_STATUS.PUBLICADO
+              ? "text-slate-400 hover:text-emerald-600 hover:bg-slate-100"
+              : "text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
+          }`}
+          onClick={() => onToggleStatus(noticia.id, noticia.status)}
+          title={
+            noticia.status === NOTICIA_STATUS.PUBLICADO
+              ? "Arquivar Notícia"
+              : "Publicar Notícia"
+          }
+        >
+          {noticia.status === NOTICIA_STATUS.PUBLICADO ? (
+            <RiArchiveLine className="w-5 h-5" />
+          ) : (
+            <RiCheckLine className="w-5 h-5" />
+          )}
+        </Button>
 
-          <Button
-            size="icon"
-            variant="ghost"
-            className={`h-8 w-8 rounded-full transition-all ${
-              noticia.status === NOTICIA_STATUS.PUBLICADO
-                ? "text-slate-400 hover:text-pac-primary hover:bg-slate-100"
-                : "text-emerald-600 bg-emerald-50 hover:bg-emerald-100"
-            }`}
-            onClick={() => onToggleStatus(noticia.id, noticia.status)}
-            title={
-              noticia.status === NOTICIA_STATUS.PUBLICADO
-                ? "Arquivar"
-                : "Publicar"
-            }
-          >
-            {noticia.status === NOTICIA_STATUS.PUBLICADO ? (
-              <RiArchiveLine className="w-4 h-4" />
-            ) : (
-              <RiCheckLine className="w-4 h-4" />
-            )}
-          </Button>
-        </div>
+        {/* Toggle Destaque */}
+        <Button
+          size="icon"
+          variant="ghost"
+          className={`h-9 w-9 rounded-lg transition-all ${
+            noticia.destaque
+              ? "text-amber-500 bg-amber-50 hover:bg-amber-100"
+              : "text-slate-300 hover:text-amber-500 hover:bg-amber-50"
+          }`}
+          onClick={() => onToggleDestaque(noticia.id, noticia.destaque)}
+          title={noticia.destaque ? "Remover Destaque" : "Destacar Notícia"}
+        >
+          <RiStarFill className="w-5 h-5" />
+        </Button>
 
-        {/* Main Actions */}
-        <div className="flex flex-row sm:flex-col gap-2 w-full">
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 border-slate-200 text-slate-700 hover:border-pac-primary hover:text-pac-primary hover:bg-slate-50 font-medium transition-all h-8 text-xs"
-            asChild
-          >
-            <Link href={`/admin/noticias/${noticia.id}`}>
-              <RiEditLine className="mr-1.5 w-3.5 h-3.5" /> Editar
-            </Link>
-          </Button>
+        {/* Editar */}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-9 w-9 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-all border border-transparent hover:border-blue-100"
+          asChild
+          title="Editar Notícia"
+        >
+          <Link href={`/admin/noticias/${noticia.id}`}>
+            <RiEditLine className="w-5 h-5" />
+          </Link>
+        </Button>
 
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 border-red-200/50 text-red-500 hover:bg-red-50 hover:border-red-200 hover:text-red-700 h-8 text-xs"
-            onClick={() => onDelete(noticia)}
-            title="Excluir Permanentemente"
-          >
-            <RiDeleteBinLine className="mr-1.5 w-3.5 h-3.5" /> Excluir
-          </Button>
-        </div>
+        {/* Excluir */}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="h-9 w-9 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all border border-transparent hover:border-red-100"
+          onClick={() => onDelete(noticia)}
+          title="Excluir Permanentemente"
+        >
+          <RiDeleteBinLine className="w-5 h-5" />
+        </Button>
       </div>
     </div>
   );
@@ -486,14 +482,16 @@ export default function NoticiasPage() {
                 className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm"
               >
                 <RiRefreshLine
-                  className={`mr-2 h-4 w-4 ${refreshing || loading ? "animate-spin" : ""}`}
+                  className={`mr-2 h-4 w-4 ${
+                    refreshing || loading ? "animate-spin" : ""
+                  }`}
                 />
                 Atualizar
               </Button>
 
               <Button
                 asChild
-                className="bg-pac-primary hover:bg-pac-primary-dark text-white font-bold shadow-md shadow-pac-primary/20 transition-all"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md shadow-emerald-100 transition-all"
               >
                 <Link href="/admin/noticias/criar">
                   <RiAddLine className="mr-2 h-4 w-4" /> Nova Notícia
@@ -583,7 +581,7 @@ export default function NoticiasPage() {
         <Card className="mb-8 border-none shadow-sm bg-white">
           <CardHeader className="pb-4 border-b border-slate-50">
             <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <RiFilterLine className="w-5 h-5 text-pac-primary" />
+              <RiFilterLine className="w-5 h-5 text-emerald-600" />
               Filtros de Busca
             </CardTitle>
           </CardHeader>
@@ -593,7 +591,7 @@ export default function NoticiasPage() {
                 <RiSearchLine className="absolute left-3 top-3.5 text-slate-400 w-5 h-5" />
                 <Input
                   placeholder="Buscar por título ou resumo..."
-                  className="pl-10 border-slate-200 focus:ring-pac-primary focus:border-pac-primary h-12 rounded-lg"
+                  className="pl-10 border-slate-200 bg-slate-50/50 focus:bg-white focus:ring-emerald-500/20 focus:border-emerald-500 h-12 rounded-lg transition-all"
                   value={filters.search}
                   onChange={(e) => setFilters({ search: e.target.value })}
                 />
@@ -606,7 +604,7 @@ export default function NoticiasPage() {
                   fetchNoticias();
                 }}
               >
-                <SelectTrigger className="border-slate-200 h-12 rounded-lg focus:ring-pac-primary">
+                <SelectTrigger className="border-slate-200 bg-slate-50/50 h-12 rounded-lg focus:ring-emerald-500/20">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -624,7 +622,7 @@ export default function NoticiasPage() {
                   fetchNoticias();
                 }}
               >
-                <SelectTrigger className="border-slate-200 h-12 rounded-lg focus:ring-pac-primary">
+                <SelectTrigger className="border-slate-200 bg-slate-50/50 h-12 rounded-lg focus:ring-emerald-500/20">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
@@ -645,7 +643,7 @@ export default function NoticiasPage() {
           <CardHeader className="bg-slate-50/50 border-b border-slate-100 py-4">
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <RiNewspaperLine className="text-pac-primary" />
+                <RiNewspaperLine className="text-emerald-600" />
                 Resultados
               </CardTitle>
               <Badge

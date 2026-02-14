@@ -5,33 +5,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils/cn";
 
+// Variantes de cores alinhadas com o resto do sistema
 type ColorVariant = "blue" | "green" | "purple" | "amber" | "red" | "indigo";
 
 interface StatCardProps {
   title: string;
-  value: number;
+  value: number | string; // Permitir string para casos formatados
   icon: React.ReactNode;
-  description: string;
+  description?: string; // Opcional agora
   color?: ColorVariant;
-  delay: number;
+  delay?: number; // Opcional, default 0
   loading?: boolean;
+  className?: string; // Para estilização extra se necessário
 }
 
-const colorStyles: Record<ColorVariant, { gradient: string; iconBg: string }> =
-  {
-    blue: { gradient: "from-blue-500 to-blue-600", iconBg: "bg-blue-500" },
-    green: { gradient: "from-green-500 to-green-600", iconBg: "bg-green-500" },
-    purple: {
-      gradient: "from-purple-500 to-purple-600",
-      iconBg: "bg-purple-500",
-    },
-    amber: { gradient: "from-amber-500 to-amber-600", iconBg: "bg-amber-500" },
-    red: { gradient: "from-red-500 to-red-600", iconBg: "bg-red-500" },
-    indigo: {
-      gradient: "from-indigo-500 to-indigo-600",
-      iconBg: "bg-indigo-500",
-    },
-  };
+const colorStyles: Record<ColorVariant, string> = {
+  blue: "bg-blue-50 text-blue-600",
+  green: "bg-emerald-50 text-emerald-600", // Emerald é o padrão verde do sistema
+  purple: "bg-purple-50 text-purple-600",
+  amber: "bg-amber-50 text-amber-600",
+  red: "bg-red-50 text-red-600",
+  indigo: "bg-indigo-50 text-indigo-600",
+};
 
 export function StatCard({
   title,
@@ -39,56 +34,65 @@ export function StatCard({
   icon,
   description,
   color = "blue",
-  delay,
+  delay = 0,
   loading = false,
+  className,
 }: StatCardProps) {
-  const styles = colorStyles[color];
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: delay * 0.1 }}
-      whileHover={{ scale: 1.02 }}
+      transition={{ duration: 0.4, delay: delay * 0.1 }}
       className="h-full"
     >
-      <Card className="h-full border-0 shadow-lg bg-gradient-to-br from-white to-gray-50/50 backdrop-blur-sm relative overflow-hidden group hover:shadow-xl transition-all duration-300">
-        <div
-          className={cn(
-            "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-5 transition-opacity duration-500",
-            styles.gradient,
-          )}
-        />
-        <CardContent className="p-6 relative z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-600 mb-1 transition-colors">
+      <Card
+        className={cn(
+          "h-full border-none shadow-sm bg-white hover:shadow-md transition-all duration-300 overflow-hidden",
+          className,
+        )}
+      >
+        <CardContent className="p-6 flex items-start justify-between h-full">
+          <div className="flex flex-col justify-between h-full">
+            <div>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 opacity-90">
                 {title}
               </p>
+
               {loading ? (
-                <Skeleton className="h-8 w-16 mb-1 bg-gray-200" />
+                <Skeleton className="h-8 w-24 bg-slate-100 rounded-md" />
               ) : (
-                <motion.p
-                  className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1"
-                  initial={{ scale: 0.8 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.3, delay: delay * 0.1 + 0.2 }}
+                <motion.h3
+                  className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.3 }}
                 >
                   {value}
-                </motion.p>
+                </motion.h3>
               )}
-              <p className="text-xs text-gray-500">{description}</p>
             </div>
-            <motion.div
-              className={cn(
-                "p-3 rounded-full text-white shadow-lg group-hover:shadow-xl transition-all duration-300 bg-gradient-to-br",
-                styles.gradient,
-              )}
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              {icon}
-            </motion.div>
+
+            {/* Descrição condicional */}
+            {description && !loading && (
+              <p className="text-xs text-slate-400 font-medium mt-2 leading-relaxed">
+                {description}
+              </p>
+            )}
+
+            {/* Skeleton para descrição */}
+            {loading && description && (
+              <Skeleton className="h-3 w-32 mt-3 bg-slate-100" />
+            )}
+          </div>
+
+          <div
+            className={cn(
+              "p-3 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+              colorStyles[color],
+            )}
+          >
+            {/* Clona o ícone para garantir o tamanho correto, se for um elemento React válido */}
+            {icon}
           </div>
         </CardContent>
       </Card>

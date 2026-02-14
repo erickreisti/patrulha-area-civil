@@ -14,7 +14,7 @@ function Avatar({
       data-slot="avatar"
       className={cn(
         "relative flex size-8 shrink-0 overflow-hidden rounded-full",
-        className
+        className,
       )}
       {...props}
     />
@@ -23,10 +23,14 @@ function Avatar({
 
 function AvatarImage({
   className,
+  src, // 1. Desestruturamos o src aqui para tratá-lo
   ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Image>) {
   return (
     <AvatarPrimitive.Image
+      // 2. Se src for uma string vazia (""), transformamos em undefined.
+      // Isso impede o erro do navegador e ativa o AvatarFallback corretamente.
+      src={src || undefined}
       data-slot="avatar-image"
       className={cn("aspect-square size-full", className)}
       {...props}
@@ -43,7 +47,7 @@ function AvatarFallback({
       data-slot="avatar-fallback"
       className={cn(
         "bg-muted flex size-full items-center justify-center rounded-full",
-        className
+        className,
       )}
       {...props}
     />

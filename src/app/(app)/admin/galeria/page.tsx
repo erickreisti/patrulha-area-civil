@@ -48,6 +48,7 @@ import {
   RiEditLine,
   RiEyeLine,
   RiCloseLine,
+  RiListCheck, // Ícone novo para lista
 } from "react-icons/ri";
 
 // Store & Types
@@ -62,7 +63,7 @@ import {
 
 // --- TIPOS AUXILIARES ---
 
-// ✅ CORREÇÃO TS 2430: Usando Omit para evitar conflito de tipos com GaleriaItem
+// ✅ CORREÇÃO TS: Remove a definição original conflitante antes de estender
 interface ExtendedItem extends Omit<GaleriaItem, "galeria_categorias"> {
   views?: number;
   galeria_categorias?: {
@@ -72,43 +73,48 @@ interface ExtendedItem extends Omit<GaleriaItem, "galeria_categorias"> {
 
 // --- COMPONENTES AUXILIARES ---
 
+interface StatCardProps {
+  title: string;
+  value: number;
+  icon: React.ElementType;
+  variant: "blue" | "emerald" | "purple" | "amber";
+  loading: boolean;
+}
+
 const StatCard = ({
   title,
   value,
   icon: Icon,
-  colorClass,
+  variant,
   loading,
-}: {
-  title: string;
-  value: number;
-  icon: React.ElementType;
-  colorClass: string;
-  loading: boolean;
-}) => (
-  <Card className="border-none shadow-sm bg-white overflow-hidden relative">
-    <div className={`absolute left-0 top-0 bottom-0 w-1 ${colorClass}`} />
-    <CardContent className="p-6 flex items-center justify-between">
-      <div>
-        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-          {title}
-        </p>
-        {loading ? (
-          <Skeleton className="h-8 w-16" />
-        ) : (
-          <h3 className="text-2xl font-black text-slate-800">{value}</h3>
-        )}
-      </div>
-      <div
-        className={`p-3 rounded-xl ${colorClass.replace(
-          "bg-",
-          "bg-opacity-10 text-",
-        )}`}
-      >
-        <Icon className={`w-6 h-6 ${colorClass.replace("bg-", "text-")}`} />
-      </div>
-    </CardContent>
-  </Card>
-);
+}: StatCardProps) => {
+  const variants = {
+    blue: "bg-blue-50 text-blue-600",
+    emerald: "bg-emerald-50 text-emerald-600",
+    purple: "bg-purple-50 text-purple-600",
+    amber: "bg-amber-50 text-amber-600",
+  };
+
+  return (
+    <Card className="border-none shadow-sm bg-white overflow-hidden h-full">
+      <CardContent className="p-6 flex items-center justify-between">
+        <div>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+            {title}
+          </p>
+          {loading ? (
+            <Skeleton className="h-8 w-16 bg-slate-100" />
+          ) : (
+            <h3 className="text-2xl font-black text-slate-800">{value}</h3>
+          )}
+        </div>
+        <div className={`p-3 rounded-xl ${variants[variant]}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 // --- PÁGINA PRINCIPAL ---
 
@@ -140,13 +146,14 @@ export default function GaleriaAdminPage() {
     id: null,
   });
 
-  // --- INITIAL DATA FETCH ---
+  // --- INITIAL LOAD ---
   useEffect(() => {
     const init = async () => {
       await Promise.all([fetchStats(), fetchCategorias()]);
     };
     init();
-  }, [fetchStats, fetchCategorias]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- DEBOUNCE SEARCH ---
   useEffect(() => {
@@ -209,12 +216,12 @@ export default function GaleriaAdminPage() {
               Galeria de Mídia
             </h1>
             <p className="text-slate-500 text-sm font-medium">
-              Gerencie fotos e vídeos, organize categorias e visualize
-              estatísticas.
+              Gerencie o acervo de fotos e vídeos da instituição.
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
+            {/* Botão Lista de Categorias */}
             <Button
               asChild
               variant="outline"
@@ -224,6 +231,19 @@ export default function GaleriaAdminPage() {
                 <RiFolderLine className="mr-2 w-4 h-4" /> Categorias
               </Link>
             </Button>
+
+            {/* Botão Lista de Itens */}
+            <Button
+              asChild
+              variant="outline"
+              className="bg-white border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm"
+            >
+              <Link href="/admin/galeria/itens">
+                <RiListCheck className="mr-2 w-4 h-4" /> Gerenciar Itens
+              </Link>
+            </Button>
+
+            {/* Botão Novo Item */}
             <Button
               asChild
               className="bg-pac-primary hover:bg-pac-primary-dark text-white font-bold shadow-md shadow-pac-primary/20"
@@ -244,28 +264,28 @@ export default function GaleriaAdminPage() {
               (stats?.categoriasPorTipo.videos || 0)
             }
             icon={RiImageLine}
-            colorClass="bg-blue-500"
+            variant="blue"
             loading={loadingStats}
           />
           <StatCard
             title="Fotos"
             value={stats?.categoriasPorTipo.fotos || 0}
             icon={RiImageLine}
-            colorClass="bg-emerald-500"
+            variant="emerald"
             loading={loadingStats}
           />
           <StatCard
             title="Vídeos"
             value={stats?.categoriasPorTipo.videos || 0}
             icon={RiVideoLine}
-            colorClass="bg-purple-500"
+            variant="purple"
             loading={loadingStats}
           />
           <StatCard
-            title="Categorias Ativas"
+            title="Categorias"
             value={stats?.totalCategorias || 0}
             icon={RiFolderLine}
-            colorClass="bg-amber-500"
+            variant="amber"
             loading={loadingStats}
           />
         </div>
@@ -274,22 +294,24 @@ export default function GaleriaAdminPage() {
         <Card className="border-none shadow-sm bg-white">
           <CardContent className="p-5">
             <div className="flex flex-col lg:flex-row gap-4">
+              {/* Search */}
               <div className="relative flex-1">
                 <RiSearchLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <Input
                   placeholder="Buscar por título..."
-                  className="pl-10 border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10"
+                  className="pl-10 border-slate-200 bg-slate-50/50 focus:bg-white transition-all h-10 rounded-lg focus:ring-pac-primary"
                   value={localSearch}
                   onChange={(e) => setLocalSearch(e.target.value)}
                 />
               </div>
 
+              {/* Filtros Dropdown */}
               <div className="flex flex-wrap gap-3">
                 <Select
                   value={filtros.categoria_id || "all"}
                   onValueChange={(v) => setFiltros({ categoria_id: v })}
                 >
-                  <SelectTrigger className="w-[180px] h-10 border-slate-200">
+                  <SelectTrigger className="w-[180px] h-10 border-slate-200 rounded-lg">
                     <SelectValue placeholder="Categoria" />
                   </SelectTrigger>
                   <SelectContent>
@@ -308,7 +330,7 @@ export default function GaleriaAdminPage() {
                     setFiltros({ tipo: v as TipoItemFilter })
                   }
                 >
-                  <SelectTrigger className="w-[130px] h-10 border-slate-200">
+                  <SelectTrigger className="w-[130px] h-10 border-slate-200 rounded-lg">
                     <div className="flex items-center gap-2">
                       <RiFilterLine className="w-4 h-4 text-slate-400" />
                       <SelectValue placeholder="Tipo" />
@@ -327,7 +349,7 @@ export default function GaleriaAdminPage() {
                     setFiltros({ status: v as StatusFilter })
                   }
                 >
-                  <SelectTrigger className="w-[130px] h-10 border-slate-200">
+                  <SelectTrigger className="w-[130px] h-10 border-slate-200 rounded-lg">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -345,7 +367,7 @@ export default function GaleriaAdminPage() {
                       setLocalSearch("");
                       resetFiltros();
                     }}
-                    className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50"
+                    className="h-10 w-10 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
                     title="Limpar filtros"
                   >
                     <RiCloseLine className="w-5 h-5" />
@@ -362,7 +384,7 @@ export default function GaleriaAdminPage() {
             <div className="flex justify-between items-center">
               <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <RiImageLine className="text-pac-primary" />
-                Itens da Galeria
+                Itens Recentes
               </CardTitle>
               <Badge
                 variant="outline"
@@ -378,9 +400,9 @@ export default function GaleriaAdminPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                   <div key={i} className="space-y-3">
-                    <Skeleton className="h-48 w-full rounded-xl" />
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-48 w-full rounded-xl bg-slate-100" />
+                    <Skeleton className="h-4 w-3/4 bg-slate-100" />
+                    <Skeleton className="h-3 w-1/2 bg-slate-100" />
                   </div>
                 ))}
               </div>
@@ -418,6 +440,7 @@ export default function GaleriaAdminPage() {
                         transition={{ duration: 0.2 }}
                         className="group relative bg-white border border-slate-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-pac-primary/30 transition-all duration-300"
                       >
+                        {/* Thumbnail Area */}
                         <div className="relative h-48 bg-slate-100 overflow-hidden">
                           {extItem.tipo === "foto" ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -432,8 +455,10 @@ export default function GaleriaAdminPage() {
                             </div>
                           )}
 
+                          {/* Overlay Gradiente */}
                           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
+                          {/* Badges Flutuantes */}
                           <div className="absolute top-2 left-2 flex flex-col gap-1">
                             <Badge
                               className={
@@ -446,6 +471,7 @@ export default function GaleriaAdminPage() {
                             </Badge>
                           </div>
 
+                          {/* Ações (Hover) */}
                           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -484,6 +510,7 @@ export default function GaleriaAdminPage() {
                           </div>
                         </div>
 
+                        {/* Content Area */}
                         <div className="p-4">
                           <div className="flex justify-between items-start mb-1">
                             <Badge
@@ -499,13 +526,14 @@ export default function GaleriaAdminPage() {
                           </div>
 
                           <h4
-                            className="font-bold text-slate-800 text-sm truncate mb-1"
+                            className="font-bold text-slate-800 text-sm truncate mb-1 group-hover:text-pac-primary transition-colors"
                             title={extItem.titulo}
                           >
                             {extItem.titulo || "Sem título"}
                           </h4>
 
-                          <p className="text-xs text-slate-500 truncate">
+                          <p className="text-xs text-slate-500 truncate flex items-center gap-1">
+                            <RiFolderLine className="w-3 h-3 text-slate-400" />
                             {extItem.galeria_categorias?.nome ||
                               "Sem Categoria"}
                           </p>
@@ -563,24 +591,31 @@ export default function GaleriaAdminPage() {
           !open && setDeleteDialog({ open: false, id: null })
         }
       >
-        <DialogContent>
+        <DialogContent className="rounded-2xl border-0 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-red-600 flex items-center gap-2">
-              <RiDeleteBinLine /> Excluir Mídia
+            <DialogTitle className="text-red-600 flex items-center gap-2 text-xl font-bold">
+              <RiDeleteBinLine className="w-6 h-6" /> Excluir Mídia
             </DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir este item permanentemente? Esta
-              ação não pode ser desfeita.
+            <DialogDescription className="pt-2 text-base text-slate-600">
+              Tem certeza que deseja excluir este item permanentemente? <br />
+              <span className="font-medium text-red-500">
+                Esta ação não pode ser desfeita.
+              </span>
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="gap-3 sm:gap-0 mt-4">
             <Button
-              variant="ghost"
+              variant="outline"
+              className="border-slate-200"
               onClick={() => setDeleteDialog({ open: false, id: null })}
             >
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700 shadow-md shadow-red-100"
+              onClick={handleDelete}
+            >
               Confirmar Exclusão
             </Button>
           </DialogFooter>

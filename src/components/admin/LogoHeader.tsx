@@ -18,13 +18,13 @@ export default function LogoHeader({ compact = false }: LogoHeaderProps) {
           width={0}
           height={0}
           sizes="100vw"
-          priority
           style={{
             width: "auto",
             height: "auto",
             maxWidth: compact ? "48px" : "64px",
           }}
           className="object-contain"
+          priority
         />
       </div>
       {!compact && (
