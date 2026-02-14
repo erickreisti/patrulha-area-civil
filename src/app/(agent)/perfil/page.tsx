@@ -239,7 +239,7 @@ export default function AgentPerfil() {
                   </label>
                   <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[32px]">
                     <span
-                      className={`${unidadeTextSize} font-roboto text-slate-800 uppercase text-center leading-tight`}
+                      className={`${unidadeTextSize}text-sm font-roboto text-slate-800 uppercase text-center leading-tight`}
                     >
                       {user.unidade || "SEDE DA PAC"}
                     </span>
@@ -252,7 +252,7 @@ export default function AgentPerfil() {
                     Tipo Sanguíneo
                   </label>
                   <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[32px]">
-                    <span className="text-base font-roboto text-[#d32f2f] uppercase ">
+                    <span className="text-xl font-roboto text-[#d32f2f] uppercase ">
                       {user.tipo_sanguineo || "AB+"}
                     </span>
                   </div>
@@ -264,7 +264,7 @@ export default function AgentPerfil() {
                     Validade
                   </label>
                   <div className="flex-1 flex items-center justify-center p-0.5 bg-white border border-slate-200 rounded-md shadow-sm min-h-[32px]">
-                    <span className="text-sm font-roboto text-slate-800">
+                    <span className="text-lg font-roboto text-slate-800">
                       {formatDate(user.validade_certificacao)}
                     </span>
                   </div>
@@ -302,8 +302,8 @@ export default function AgentPerfil() {
               </label>
               {/* Agora padronizado para min-h-[32px] também */}
               <div className="p-0.5 bg-white border border-slate-200 rounded-md shadow-sm text-center min-h-[46px] justify-center items-center flex">
-                <p className="text-sm font-roboto font-black text-[#d32f2f] uppercase leading-none truncate">
-                  {user.graduacao || "MAJOR"}
+                <p className="text-base font-roboto font-black text-[#d32f2f] uppercase leading-none truncate">
+                  {user.graduacao || "GRADUAÇÃO NÃO DEFINIDA"}
                 </p>
               </div>
             </div>
