@@ -214,8 +214,8 @@ export default function LoginPage() {
         className="w-full max-w-[440px]"
       >
         {/* Cabeçalho */}
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-6">
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-2">
             <div className="relative w-32 h-32 sm:w-40 sm:h-40 drop-shadow-xl filter hover:scale-105 transition-transform duration-300">
               <Image
                 src="/images/logos/logo.webp"
@@ -228,11 +228,11 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight mb-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-pac-primary tracking-tight mb-2">
             PATRULHA AÉREA CIVIL
           </h1>
-          <p className="text-xs sm:text-sm font-semibold text-slate-500 uppercase tracking-widest">
-            Comando Operacional Rio de Janeiro
+          <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-widest">
+            Comando Operacional no Estado do Rio de Janeiro
           </p>
         </div>
 
