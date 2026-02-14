@@ -53,7 +53,6 @@ import {
   RiErrorWarningLine,
   RiCheckLine,
   RiUploadCloud2Line,
-  RiBuildingLine,
 } from "react-icons/ri";
 
 // Store e Actions
@@ -169,6 +168,156 @@ const validateFullName = (n: string) =>
     : n.length < 2
       ? { valid: false, error: "Muito curto" }
       : { valid: true };
+
+// ==================== DATE PICKER HÍBRIDO (Igual Edit) ====================
+
+interface CustomInputButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  onClick?: () => void;
+}
+
+const CustomInputButton = forwardRef<HTMLButtonElement, CustomInputButtonProps>(
+  ({ onClick }, ref) => (
+    <button
+      type="button"
+      onClick={onClick}
+      ref={ref}
+      className="absolute right-0 top-0 bottom-0 px-3 text-slate-400 hover:text-pac-primary transition-colors flex items-center justify-center outline-none z-10"
+    >
+      <RiCalendarLine className="w-5 h-5" />
+    </button>
+  ),
+);
+CustomInputButton.displayName = "CustomInputButton";
+
+interface SmartDatePickerProps {
+  date: string | null | undefined;
+  onSelect: (date: Date | undefined) => void;
+  disabled?: boolean;
+}
+
+function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
+  const [inputValue, setInputValue] = useState("");
+
+  useEffect(() => {
+    let newVal = "";
+    if (date) {
+      const [year, month, day] = date.split("-");
+      if (year && month && day) {
+        newVal = `${day}/${month}/${year}`;
+      }
+    }
+    if (newVal !== inputValue) {
+      setInputValue(newVal);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  const handleRawChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, "");
+
+    if (value.length > 8) value = value.slice(0, 8);
+
+    if (value.length >= 5) {
+      value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
+    } else if (value.length >= 3) {
+      value = `${value.slice(0, 2)}/${value.slice(2)}`;
+    }
+
+    setInputValue(value);
+
+    if (value.length === 10) {
+      const day = parseInt(value.slice(0, 2), 10);
+      const month = parseInt(value.slice(3, 5), 10) - 1;
+      const year = parseInt(value.slice(6), 10);
+
+      const parsedDate = new Date(year, month, day);
+
+      if (
+        isValid(parsedDate) &&
+        parsedDate.getDate() === day &&
+        parsedDate.getMonth() === month &&
+        year > 1900 &&
+        year < 2100
+      ) {
+        onSelect(parsedDate);
+      }
+    } else if (value === "") {
+      onSelect(undefined);
+    }
+  };
+
+  const selectedDate = date ? new Date(`${date}T12:00:00`) : null;
+
+  return (
+    <div className="relative w-full group">
+      <Input
+        value={inputValue}
+        onChange={handleRawChange}
+        disabled={disabled}
+        placeholder="DD/MM/AAAA"
+        className="pl-3 pr-10 h-11"
+      />
+      <div className="absolute top-0 right-0">
+        <DatePicker
+          selected={selectedDate}
+          onChange={(date: Date | null) => onSelect(date || undefined)}
+          customInput={<CustomInputButton />}
+          dateFormat="dd/MM/yyyy"
+          locale="pt-BR"
+          disabled={disabled}
+          showYearDropdown
+          scrollableYearDropdown
+          yearDropdownItemNumber={100}
+          popperClassName="fixed-datepicker-popper"
+          popperPlacement="bottom-end"
+          withPortal
+          portalId="root-portal"
+        />
+      </div>
+      <style jsx global>{`
+        .fixed-datepicker-popper {
+          z-index: 99999 !important;
+        }
+        .react-datepicker {
+          font-family: inherit;
+          border-color: #e2e8f0;
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+          border-radius: 0.5rem;
+          overflow: hidden;
+        }
+        .react-datepicker__header {
+          background-color: #f8fafc;
+          border-bottom: 1px solid #e2e8f0;
+          padding-top: 0.5rem;
+        }
+        .react-datepicker__current-month {
+          color: #1e293b;
+          font-weight: 700;
+          text-transform: capitalize;
+        }
+        .react-datepicker__day-name {
+          color: #64748b;
+          text-transform: uppercase;
+          font-size: 0.7rem;
+        }
+        .react-datepicker__day--selected,
+        .react-datepicker__day--keyboard-selected {
+          background-color: #1a2873 !important;
+          color: white !important;
+        }
+        .react-datepicker__day:hover {
+          background-color: #e2e8f0;
+        }
+        .react-datepicker__navigation {
+          top: 8px;
+        }
+        .react-datepicker__triangle {
+          display: none;
+        }
+      `}</style>
+    </div>
+  );
+}
 
 // --- COMPONENTE AVATAR ---
 function AvatarUpload({
@@ -355,162 +504,6 @@ function AvatarUpload({
   );
 }
 
-// ==================== DATE PICKER HÍBRIDO DEFINITIVO ====================
-
-// 2. CORREÇÃO: Interface para tipar corretamente o botão customizado
-interface CustomInputButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  onClick?: () => void;
-}
-
-// Componente "botão" personalizado para o React Datepicker
-const CustomInputButton = forwardRef<HTMLButtonElement, CustomInputButtonProps>(
-  ({ onClick }, ref) => (
-    <button
-      type="button"
-      onClick={onClick}
-      ref={ref}
-      className="absolute right-0 top-0 bottom-0 px-3 text-slate-400 hover:text-pac-primary transition-colors flex items-center justify-center outline-none z-10"
-    >
-      <RiCalendarLine className="w-5 h-5" />
-    </button>
-  ),
-);
-CustomInputButton.displayName = "CustomInputButton";
-
-interface SmartDatePickerProps {
-  date: string | null | undefined;
-  onSelect: (date: Date | undefined) => void;
-  disabled?: boolean;
-}
-
-function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
-  const [inputValue, setInputValue] = useState("");
-
-  useEffect(() => {
-    let newVal = "";
-    if (date) {
-      const [year, month, day] = date.split("-");
-      if (year && month && day) {
-        newVal = `${day}/${month}/${year}`;
-      }
-    }
-    if (newVal !== inputValue) {
-      setInputValue(newVal);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date]);
-
-  const handleRawChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, "");
-
-    if (value.length > 8) value = value.slice(0, 8);
-
-    if (value.length >= 5) {
-      value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
-    } else if (value.length >= 3) {
-      value = `${value.slice(0, 2)}/${value.slice(2)}`;
-    }
-
-    setInputValue(value);
-
-    if (value.length === 10) {
-      const day = parseInt(value.slice(0, 2), 10);
-      const month = parseInt(value.slice(3, 5), 10) - 1;
-      const year = parseInt(value.slice(6), 10);
-
-      const parsedDate = new Date(year, month, day);
-
-      if (
-        isValid(parsedDate) &&
-        parsedDate.getDate() === day &&
-        parsedDate.getMonth() === month &&
-        year > 1900 &&
-        year < 2100
-      ) {
-        onSelect(parsedDate);
-      }
-    } else if (value === "") {
-      onSelect(undefined);
-    }
-  };
-
-  const selectedDate = date ? new Date(`${date}T12:00:00`) : null;
-
-  return (
-    <div className="relative w-full group">
-      {/* INPUT DE TEXTO INDEPENDENTE - Clicar aqui NÃO abre o calendário */}
-      <Input
-        value={inputValue}
-        onChange={handleRawChange}
-        disabled={disabled}
-        placeholder="DD/MM/AAAA"
-        className="pl-3 pr-10"
-      />
-
-      {/* DATEPICKER ACOPLADO AO ÍCONE - Apenas o ícone abre o calendário */}
-      <div className="absolute top-0 right-0">
-        <DatePicker
-          selected={selectedDate}
-          onChange={(date: Date | null) => onSelect(date || undefined)}
-          customInput={<CustomInputButton />} // O "Input" do Datepicker é o botão de ícone
-          dateFormat="dd/MM/yyyy"
-          locale="pt-BR"
-          disabled={disabled}
-          showYearDropdown
-          scrollableYearDropdown
-          yearDropdownItemNumber={100}
-          popperClassName="fixed-datepicker-popper"
-          popperPlacement="bottom-end"
-          withPortal
-          portalId="root-portal"
-        />
-      </div>
-
-      <style jsx global>{`
-        .fixed-datepicker-popper {
-          z-index: 99999 !important;
-        }
-        .react-datepicker {
-          font-family: inherit;
-          border-color: #e2e8f0;
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-          border-radius: 0.5rem;
-          overflow: hidden;
-        }
-        .react-datepicker__header {
-          background-color: #f8fafc;
-          border-bottom: 1px solid #e2e8f0;
-          padding-top: 0.5rem;
-        }
-        .react-datepicker__current-month {
-          color: #1e293b;
-          font-weight: 700;
-          text-transform: capitalize;
-        }
-        .react-datepicker__day-name {
-          color: #64748b;
-          text-transform: uppercase;
-          font-size: 0.7rem;
-        }
-        .react-datepicker__day--selected,
-        .react-datepicker__day--keyboard-selected {
-          background-color: #1a2873 !important;
-          color: white !important;
-        }
-        .react-datepicker__day:hover {
-          background-color: #e2e8f0;
-        }
-        .react-datepicker__navigation {
-          top: 8px;
-        }
-        .react-datepicker__triangle {
-          display: none;
-        }
-      `}</style>
-    </div>
-  );
-}
-
 // ==================== PÁGINA PRINCIPAL ====================
 
 export default function CriarAgentePage() {
@@ -613,6 +606,7 @@ export default function CriarAgentePage() {
           formData.tipo_sanguineo === NOT_SELECTED_VALUE
             ? null
             : formData.tipo_sanguineo,
+        // Garante que a unidade seja enviada
         unidade: formDataWithUnidade.unidade,
       };
 
@@ -856,6 +850,22 @@ export default function CriarAgentePage() {
 
                   <div className="space-y-2">
                     <Label className="text-slate-700 font-semibold">
+                      Unidade
+                    </Label>
+                    <Input
+                      id="unidade"
+                      name="unidade"
+                      value={formDataWithUnidade.unidade || ""}
+                      onChange={handleInputChange}
+                      className="h-11"
+                      placeholder="Ex: SEDE DA PAC"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-slate-700 font-semibold">
                       Graduação
                     </Label>
                     <Select
@@ -880,28 +890,6 @@ export default function CriarAgentePage() {
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="unidade"
-                      className="text-slate-700 font-semibold"
-                    >
-                      Unidade / Lotação
-                    </Label>
-                    <div className="relative">
-                      <RiBuildingLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                      <Input
-                        id="unidade"
-                        name="unidade"
-                        value={formDataWithUnidade.unidade || ""}
-                        onChange={handleInputChange}
-                        className="pl-10 h-11"
-                        placeholder="Ex: Unidade Alpha"
-                      />
-                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -931,9 +919,7 @@ export default function CriarAgentePage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="text-slate-700 font-semibold">
                       Tipo Sanguíneo

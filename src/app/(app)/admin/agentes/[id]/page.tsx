@@ -77,14 +77,12 @@ const fadeInUp = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
 };
 
-// ==================== COMPONENTE DATEPICKER HÍBRIDO (IGUAL AO DE CRIAÇÃO) ====================
+// ==================== COMPONENTE DATEPICKER HÍBRIDO ====================
 
-// Interface para o botão customizado
 interface CustomInputButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onClick?: () => void;
 }
 
-// Botão que serve como "gatilho" para o calendário
 const CustomInputButton = forwardRef<HTMLButtonElement, CustomInputButtonProps>(
   ({ onClick }, ref) => (
     <button
@@ -108,11 +106,9 @@ interface SmartDatePickerProps {
 function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
   const [inputValue, setInputValue] = useState("");
 
-  // Sincroniza o input quando a prop 'date' muda (carregamento inicial ou update)
   useEffect(() => {
     let newVal = "";
     if (date) {
-      // date vem no formato YYYY-MM-DD
       const [year, month, day] = date.split("-");
       if (year && month && day) {
         newVal = `${day}/${month}/${year}`;
@@ -124,13 +120,11 @@ function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  // Lógica de máscara e digitação
   const handleRawChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, ""); // Apenas números
+    let value = e.target.value.replace(/\D/g, "");
 
-    if (value.length > 8) value = value.slice(0, 8); // Max 8 chars
+    if (value.length > 8) value = value.slice(0, 8);
 
-    // Máscara DD/MM/AAAA
     if (value.length >= 5) {
       value = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
     } else if (value.length >= 3) {
@@ -139,7 +133,6 @@ function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
 
     setInputValue(value);
 
-    // Validação ao completar a digitação
     if (value.length === 10) {
       const day = parseInt(value.slice(0, 2), 10);
       const month = parseInt(value.slice(3, 5), 10) - 1;
@@ -161,21 +154,17 @@ function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
     }
   };
 
-  // Objeto Date para o DatePicker
   const selectedDate = date ? new Date(`${date}T12:00:00`) : null;
 
   return (
     <div className="relative w-full group">
-      {/* Input de Texto Independente */}
       <Input
         value={inputValue}
         onChange={handleRawChange}
         disabled={disabled}
         placeholder="DD/MM/AAAA"
-        className="pl-3 pr-10" // Espaço para o ícone
+        className="pl-3 pr-10"
       />
-
-      {/* DatePicker Ancorado no Ícone */}
       <div className="absolute top-0 right-0">
         <DatePicker
           selected={selectedDate}
@@ -194,7 +183,6 @@ function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
         />
       </div>
 
-      {/* Estilos Globais do DatePicker */}
       <style jsx global>{`
         .fixed-datepicker-popper {
           z-index: 99999 !important;
@@ -433,7 +421,6 @@ export default function EditarAgentePage() {
     setFormData({ [name]: value });
   };
 
-  // Função para lidar com o datepicker customizado
   const handleDateSelect = (date: Date | undefined, field: string) => {
     const dateStr = dateToString(date);
     setFormData({ [field]: dateStr });
@@ -591,7 +578,6 @@ export default function EditarAgentePage() {
                     <Label className="text-xs font-bold uppercase text-slate-500">
                       Data de Nascimento
                     </Label>
-                    {/* AQUI ESTÁ O NOVO DATEPICKER HÍBRIDO */}
                     <SmartDatePicker
                       date={formData.data_nascimento}
                       onSelect={(date) =>
@@ -613,6 +599,20 @@ export default function EditarAgentePage() {
               </CardHeader>
               <CardContent className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* --- NOVA OPÇÃO: UNIDADE --- */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase text-slate-500">
+                      Unidade
+                    </Label>
+                    <Input
+                      name="unidade"
+                      value={formData.unidade || ""}
+                      onChange={handleInputChange}
+                      placeholder="Ex: SEDE DA PAC"
+                      className="h-11 uppercase"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-slate-500">
                       Graduação
@@ -640,6 +640,7 @@ export default function EditarAgentePage() {
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-slate-500">
                       UF de Registro
@@ -665,11 +666,11 @@ export default function EditarAgentePage() {
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase text-slate-500">
                       Validade Certificação
                     </Label>
-                    {/* AQUI ESTÁ O NOVO DATEPICKER HÍBRIDO */}
                     <SmartDatePicker
                       date={formData.validade_certificacao}
                       onSelect={(date) =>
@@ -677,7 +678,8 @@ export default function EditarAgentePage() {
                       }
                     />
                   </div>
-                  <div className="space-y-2">
+
+                  <div className="space-y-2 md:col-span-2">
                     <Label className="text-xs font-bold uppercase text-slate-500">
                       Nível de Acesso
                     </Label>
