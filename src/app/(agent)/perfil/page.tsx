@@ -148,7 +148,7 @@ export default function AgentPerfil() {
         : "text-[10px]";
 
   return (
-    <div className="min-h-[100dvh] bg-[#1e3a8a] relative flex items-center justify-center p-6 font-sans overflow-hidden">
+    <div className="min-h-[100dvh] bg-pac-primary relative flex items-center justify-center p-6 font-sans overflow-hidden">
       <InactiveDialog
         isOpen={showInactive}
         onClose={() => {
@@ -168,20 +168,20 @@ export default function AgentPerfil() {
       >
         <Card className="border-none shadow-2xl bg-white overflow-hidden rounded-[12px]">
           {/* --- HEADER COMPACTO --- */}
-          <div className="bg-white px-4 pt-2 pb-1 flex flex-col items-center text-center">
+          <div className="bg-white px-4 pb-1 flex flex-col items-center text-center">
             <div className="mb-0.5">
               <Image
                 src="/images/logos/logo.webp"
                 alt="PAC Logo"
-                width={65}
-                height={65}
+                width={64}
+                height={64}
                 className="object-contain"
                 style={{ width: "auto", height: "auto" }}
                 priority
               />
             </div>
 
-            <h1 className="text-[#1a237e] font-roboto font-bold text-xs uppercase leading-none tracking-wide mb-0.5">
+            <h1 className="text-pac-primary font-roboto font-bold text-base uppercase leading-none tracking-wide mb-0.5">
               Patrulha Aérea Civil
             </h1>
             <span className="text-[6px] font-sans text-slate-500 font-semibold uppercase tracking-widest mb-1 block leading-none">
@@ -189,7 +189,7 @@ export default function AgentPerfil() {
             </span>
 
             <div className="flex flex-col items-center gap-0">
-              <span className="text-[6px] font-roboto font-bold text-black uppercase tracking-wider leading-none mb-0.5 mt-0.5">
+              <span className="text-[8px] font-roboto font-bold text-black uppercase tracking-wider leading-none mb-0.5 mt-1">
                 Identificação
               </span>
               <Image
@@ -203,7 +203,7 @@ export default function AgentPerfil() {
             </div>
           </div>
 
-          <CardContent className="pt-1 mt-[-4px] space-y-1">
+          <CardContent className="space-y-0.5">
             {/* 1. NOME */}
             <div className="space-y-[-2px]">
               <label className="text-[6px] font-sans font-bold text-slate-400 uppercase ml-3 block">
