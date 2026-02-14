@@ -16,12 +16,19 @@ import { ptBR } from "date-fns/locale/pt-BR";
 registerLocale("pt-BR", ptBR);
 
 // Components UI
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,11 +55,13 @@ import {
   RiArrowLeftLine,
   RiSaveLine,
   RiDeleteBinLine,
-  RiImageLine,
   RiShieldKeyholeLine,
   RiShieldUserLine,
-  RiUploadLine,
-  RiCalendarLine, // Ícone do calendário
+  RiCalendarLine,
+  RiErrorWarningLine,
+  RiPhoneLine,
+  RiImageAddLine,
+  RiUploadCloud2Line,
 } from "react-icons/ri";
 
 // Store e Constantes
@@ -60,12 +69,35 @@ import {
   useAgentEdit,
   GRADUACOES,
   UFS_BRASIL,
+  TIPOS_SANGUINEOS,
+  type CreateAgentInput,
 } from "@/lib/stores/useAgentesStore";
 
 // Actions
 import { deleteAgent } from "@/app/actions/admin/agents/agents";
+import {
+  uploadAgentAvatar,
+  removeAgentAvatar,
+} from "@/app/actions/upload/avatar";
+
+// ==================== TIPOS LOCAIS ====================
+type AgentFormWithUnidade = Partial<CreateAgentInput> & {
+  unidade?: string;
+};
+
+// Constante para Selects
+const NOT_SELECTED_VALUE = "not-selected";
 
 // ==================== FUNÇÕES UTILITÁRIAS ====================
+
+const formatPhoneNumber = (phone: string): string => {
+  const numbers = phone.replace(/\D/g, "");
+  if (numbers.length === 10)
+    return numbers.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  if (numbers.length === 11)
+    return numbers.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+  return phone;
+};
 
 const dateToString = (date: Date | undefined): string | null => {
   if (!date || !isValid(date)) return null;
@@ -105,17 +137,29 @@ interface SmartDatePickerProps {
 
 function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
   const [inputValue, setInputValue] = useState("");
+  // Usamos um ref para rastrear a última data recebida via prop
+  // Isso evita conflitos entre a digitação do usuário e a atualização via prop
+  const lastDateProp = useRef(date);
 
   useEffect(() => {
-    let newVal = "";
-    if (date) {
-      const [year, month, day] = date.split("-");
-      if (year && month && day) {
-        newVal = `${day}/${month}/${year}`;
+    // Só atualiza o input se a prop 'date' mudou externamente
+    if (date !== lastDateProp.current) {
+      lastDateProp.current = date;
+      if (date) {
+        const [year, month, day] = date.split("-");
+        if (year && month && day) {
+          setInputValue(`${day}/${month}/${year}`);
+        }
+      } else {
+        setInputValue("");
       }
     }
-    if (newVal !== inputValue) {
-      setInputValue(newVal);
+    // Se a data já estava carregada na montagem (caso da edição), inicializa o input
+    if (date && inputValue === "") {
+      const [year, month, day] = date.split("-");
+      if (year && month && day) {
+        setInputValue(`${day}/${month}/${year}`);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
@@ -147,6 +191,9 @@ function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
         year > 1900 &&
         year < 2100
       ) {
+        // Atualiza a ref para não sobrescrever o que o usuário acabou de digitar
+        const newDateStr = format(parsedDate, "yyyy-MM-dd");
+        lastDateProp.current = newDateStr;
         onSelect(parsedDate);
       }
     } else if (value === "") {
@@ -163,12 +210,18 @@ function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
         onChange={handleRawChange}
         disabled={disabled}
         placeholder="DD/MM/AAAA"
-        className="pl-3 pr-10"
+        className="pl-3 pr-10 h-11"
       />
       <div className="absolute top-0 right-0">
         <DatePicker
           selected={selectedDate}
-          onChange={(date: Date | null) => onSelect(date || undefined)}
+          onChange={(date: Date | null) => {
+            // Atualiza a ref para evitar ciclo
+            if (date) {
+              lastDateProp.current = format(date, "yyyy-MM-dd");
+            }
+            onSelect(date || undefined);
+          }}
           customInput={<CustomInputButton />}
           dateFormat="dd/MM/yyyy"
           locale="pt-BR"
@@ -182,7 +235,6 @@ function SmartDatePicker({ date, onSelect, disabled }: SmartDatePickerProps) {
           portalId="root-portal"
         />
       </div>
-
       <style jsx global>{`
         .fixed-datepicker-popper {
           z-index: 99999 !important;
@@ -244,6 +296,7 @@ function AvatarUpload({
   userId: string;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = () => {
@@ -262,20 +315,26 @@ function AvatarUpload({
     }
 
     setUploading(true);
+    setUploadProgress(10);
     const toastId = toast.loading("Enviando imagem...");
 
     try {
-      const { uploadAgentAvatar } = await import("@/app/actions/upload/avatar");
-
       const formData = new FormData();
       formData.append("userId", userId);
       formData.append("matricula", matricula);
       formData.append("file", file);
       formData.append("mode", "edit");
 
+      const interval = setInterval(() => {
+        setUploadProgress((p) => Math.min(p + 10, 90));
+      }, 200);
+
+      // Uso direto da Action importada
       const result = await uploadAgentAvatar(formData);
+      clearInterval(interval);
 
       if (result.success && result.data?.url) {
+        setUploadProgress(100);
         toast.success("Avatar atualizado!", { id: toastId });
         onAvatarChange(result.data.url);
       } else {
@@ -288,6 +347,7 @@ function AvatarUpload({
       toast.error("Erro ao enviar imagem", { id: toastId });
     } finally {
       setUploading(false);
+      setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
@@ -297,13 +357,13 @@ function AvatarUpload({
     const toastId = toast.loading("Removendo imagem...");
 
     try {
-      const { removeAgentAvatar } = await import("@/app/actions/upload/avatar");
       const formData = new FormData();
       formData.append("userId", userId);
       formData.append("avatarUrl", currentAvatar);
       formData.append("matricula", matricula);
       formData.append("mode", "edit");
 
+      // Uso direto da Action importada
       const result = await removeAgentAvatar(formData);
       if (result.success) {
         toast.success("Avatar removido!", { id: toastId });
@@ -319,23 +379,49 @@ function AvatarUpload({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between w-full">
-        <Label className="text-base font-semibold text-gray-700 flex items-center">
-          <RiImageLine className="w-5 h-5 mr-2 text-pac-primary" />
-          Foto do Agente
-        </Label>
-        {currentAvatar && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleRemoveAvatar}
-            disabled={uploading || isLoading}
-            className="text-red-600 h-8"
-          >
-            <RiDeleteBinLine className="w-4 h-4 mr-1" /> Remover
-          </Button>
+    <div className="flex flex-col items-center gap-4 w-full">
+      <div
+        className={`relative w-32 h-32 rounded-full overflow-hidden border-4 transition-all duration-300 group cursor-pointer ${
+          currentAvatar
+            ? "border-pac-primary shadow-lg shadow-pac-primary/20"
+            : "border-slate-200 border-dashed bg-slate-50 hover:border-pac-primary/50"
+        }`}
+        onClick={handleFileSelect}
+      >
+        {currentAvatar ? (
+          <>
+            <Image
+              src={currentAvatar}
+              alt="Avatar"
+              fill
+              className="object-cover"
+              sizes="128px"
+            />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <RiImageAddLine className="text-white w-8 h-8" />
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            {uploading ? (
+              <Spinner className="w-8 h-8 text-pac-primary" />
+            ) : (
+              <RiUploadCloud2Line className="w-8 h-8 mb-1" />
+            )}
+            <span className="text-[10px] font-bold uppercase">
+              {uploading ? `${uploadProgress}%` : "Enviar Foto"}
+            </span>
+          </div>
+        )}
+
+        {uploading && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-200">
+            <motion.div
+              className="h-full bg-pac-primary"
+              initial={{ width: 0 }}
+              animate={{ width: `${uploadProgress}%` }}
+            />
+          </div>
         )}
       </div>
 
@@ -343,42 +429,22 @@ function AvatarUpload({
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept=".jpg,.jpeg,.png,.webp"
+        accept="image/*"
         className="hidden"
+        disabled={isLoading || uploading}
       />
 
-      <div
-        className={`relative p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all flex flex-col items-center justify-center ${
-          currentAvatar
-            ? "border-blue-500 bg-blue-50"
-            : "border-gray-300 hover:border-blue-500 bg-white"
-        }`}
-        onClick={handleFileSelect}
-      >
-        {uploading ? (
-          <Spinner className="w-8 h-8 text-pac-primary" />
-        ) : currentAvatar ? (
-          <div className="flex flex-col items-center space-y-2">
-            <div className="relative w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
-              <Image
-                src={currentAvatar}
-                alt="Avatar"
-                fill
-                className="object-cover"
-                sizes="96px"
-              />
-            </div>
-            <p className="text-[10px] uppercase font-bold text-gray-400">
-              Clique para alterar
-            </p>
-          </div>
-        ) : (
-          <div className="text-center">
-            <RiUploadLine className="w-8 h-8 mx-auto text-blue-600 mb-2" />
-            <p className="text-sm font-medium text-gray-700">Fazer Upload</p>
-          </div>
-        )}
-      </div>
+      {currentAvatar && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleRemoveAvatar}
+          disabled={uploading || isLoading}
+          className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 px-2 text-xs"
+        >
+          <RiDeleteBinLine className="w-3.5 h-3.5 mr-1.5" /> Remover
+        </Button>
+      )}
     </div>
   );
 }
@@ -405,6 +471,8 @@ export default function EditarAgentePage() {
     validateForm,
   } = useAgentEdit(agentId);
 
+  const formDataWithUnidade = formData as AgentFormWithUnidade;
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
@@ -418,7 +486,9 @@ export default function EditarAgentePage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({ [name]: value });
+    // Formata telefone se for o campo telefone
+    const newValue = name === "telefone" ? formatPhoneNumber(value) : value;
+    setFormData({ [name]: newValue });
   };
 
   const handleDateSelect = (date: Date | undefined, field: string) => {
@@ -441,6 +511,7 @@ export default function EditarAgentePage() {
       full_name: formData.full_name ?? undefined,
       matricula: formData.matricula ?? undefined,
       email: formData.email ?? undefined,
+      unidade: formDataWithUnidade.unidade ?? undefined,
     };
 
     try {
@@ -488,36 +559,40 @@ export default function EditarAgentePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8">
-      <div className="container mx-auto px-4 max-w-7xl">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={fadeInUp}
-          className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4"
-        >
-          <div>
-            <h1 className="text-3xl font-black text-slate-800 uppercase tracking-tight">
-              Ficha do Agente
-            </h1>
-            <p className="text-slate-500 font-medium">
-              {agent.full_name} •{" "}
-              <span className="font-mono">{agent.matricula}</span>
-            </p>
-          </div>
-          <div className="flex gap-3">
+    <div className="min-h-screen bg-slate-50 pb-20">
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <Button
-              variant="outline"
+              variant="ghost"
+              size="icon"
               onClick={() => router.back()}
-              disabled={saving}
-              className="border-slate-300"
+              className="text-slate-500 hover:text-pac-primary"
             >
-              <RiArrowLeftLine className="mr-2" /> Voltar
+              <RiArrowLeftLine className="w-5 h-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+                Editar Agente
+              </h1>
+              <p className="text-xs text-slate-500 font-medium">
+                {agent.full_name} •{" "}
+                <span className="font-mono">{agent.matricula}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/admin/agentes")}
+              className="text-slate-600 hidden sm:flex"
+            >
+              Cancelar
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={saving || !hasUnsavedChanges}
-              className="bg-pac-primary hover:bg-pac-primary-dark shadow-md shadow-pac-primary/20 font-bold"
+              className="bg-pac-primary hover:bg-pac-primary-dark text-white font-bold shadow-md shadow-pac-primary/20"
             >
               {saving ? (
                 <Spinner className="w-4 h-4 mr-2" />
@@ -527,302 +602,380 @@ export default function EditarAgentePage() {
               Salvar Alterações
             </Button>
           </div>
-        </motion.div>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Informações Pessoais */}
-            <Card className="border-slate-200 shadow-sm overflow-hidden">
-              <CardHeader className="border-b bg-slate-50/50 py-4">
-                <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800">
-                  <RiUserLine className="text-pac-primary" /> Informações
-                  Pessoais
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      Nome Completo
-                    </Label>
-                    <Input
-                      name="full_name"
-                      value={formData.full_name || ""}
-                      onChange={handleInputChange}
-                      className="h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      E-mail Institucional
-                    </Label>
-                    <Input
-                      name="email"
-                      value={formData.email || ""}
-                      onChange={handleInputChange}
-                      className="h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      Telefone
-                    </Label>
-                    <Input
-                      name="telefone"
-                      value={formData.telefone || ""}
-                      onChange={handleInputChange}
-                      className="h-11"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      Data de Nascimento
-                    </Label>
-                    <SmartDatePicker
-                      date={formData.data_nascimento}
-                      onSelect={(date) =>
-                        handleDateSelect(date, "data_nascimento")
-                      }
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        <motion.div initial="hidden" animate="visible" variants={fadeInUp}>
+          {hasUnsavedChanges && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <Alert className="bg-amber-50 border-amber-200 text-amber-800 flex items-center">
+                <RiErrorWarningLine className="w-5 h-5 mr-3" />
+                <AlertDescription>
+                  Você tem alterações não salvas neste formulário.
+                </AlertDescription>
+              </Alert>
+            </motion.div>
+          )}
 
-            {/* Dados Operacionais */}
-            <Card className="border-slate-200 shadow-sm overflow-hidden">
-              <CardHeader className="border-b bg-slate-50/50 py-4">
-                <CardTitle className="text-base font-bold flex items-center gap-2 text-slate-800">
-                  <RiShieldKeyholeLine className="text-pac-primary" /> Dados
-                  Operacionais
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* --- NOVA OPÇÃO: UNIDADE --- */}
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      Unidade
-                    </Label>
-                    <Input
-                      name="unidade"
-                      value={formData.unidade || ""}
-                      onChange={handleInputChange}
-                      placeholder="Ex: SEDE DA PAC"
-                      className="h-11 uppercase"
-                    />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8 space-y-6">
+              {/* --- DADOS PESSOAIS --- */}
+              <Card className="border-slate-200 shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                      <RiUserLine className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-bold text-slate-800">
+                        Dados Pessoais
+                      </CardTitle>
+                      <CardDescription>
+                        Informações básicas de identificação
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6 grid gap-6">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Nome Completo
+                      </Label>
+                      <Input
+                        name="full_name"
+                        value={formData.full_name || ""}
+                        onChange={handleInputChange}
+                        className="h-11"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        E-mail Institucional
+                      </Label>
+                      <Input
+                        name="email"
+                        value={formData.email || ""}
+                        onChange={handleInputChange}
+                        className="h-11"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      Graduação
-                    </Label>
-                    <Select
-                      value={formData.graduacao || "not_informed"}
-                      onValueChange={(v) =>
-                        setFormData({
-                          graduacao: v === "not_informed" ? null : v,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-11">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not_informed">
-                          Não informada
-                        </SelectItem>
-                        {GRADUACOES.map((g: string) => (
-                          <SelectItem key={g} value={g}>
-                            {g}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Telefone
+                      </Label>
+                      <div className="relative">
+                        <RiPhoneLine className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                        <Input
+                          name="telefone"
+                          value={formData.telefone || ""}
+                          onChange={handleInputChange}
+                          className="pl-10 h-11"
+                          placeholder="(00) 00000-0000"
+                          maxLength={15}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Data de Nascimento
+                      </Label>
+                      <SmartDatePicker
+                        date={formData.data_nascimento}
+                        onSelect={(date) =>
+                          handleDateSelect(date, "data_nascimento")
+                        }
+                      />
+                    </div>
                   </div>
+                </CardContent>
+              </Card>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      UF de Registro
-                    </Label>
-                    <Select
-                      value={formData.uf || "not_informed"}
-                      onValueChange={(v) =>
-                        setFormData({ uf: v === "not_informed" ? null : v })
-                      }
-                    >
-                      <SelectTrigger className="h-11">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="not_informed">
-                          Não informada
-                        </SelectItem>
-                        {UFS_BRASIL.map((uf: string) => (
-                          <SelectItem key={uf} value={uf}>
-                            {uf}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              {/* Dados Operacionais */}
+              <Card className="border-slate-200 shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50/50 border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600">
+                      <RiShieldKeyholeLine className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-bold text-slate-800">
+                        Dados Operacionais
+                      </CardTitle>
+                      <CardDescription>
+                        Informações de registro e patente
+                      </CardDescription>
+                    </div>
                   </div>
+                </CardHeader>
+                <CardContent className="p-6 grid gap-6">
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Unidade de Lotação
+                      </Label>
+                      <Input
+                        name="unidade"
+                        value={formDataWithUnidade.unidade || ""}
+                        onChange={handleInputChange}
+                        className="h-11"
+                        placeholder="Ex: SEDE DA PAC"
+                      />
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      Validade Certificação
-                    </Label>
-                    <SmartDatePicker
-                      date={formData.validade_certificacao}
-                      onSelect={(date) =>
-                        handleDateSelect(date, "validade_certificacao")
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="text-xs font-bold uppercase text-slate-500">
-                      Nível de Acesso
-                    </Label>
-                    <Select
-                      value={formData.role || "agent"}
-                      onValueChange={(v: "admin" | "agent") =>
-                        setFormData({ role: v })
-                      }
-                    >
-                      <SelectTrigger className="h-11">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="agent">Agente (Padrão)</SelectItem>
-                        <SelectItem value="admin">Administrador</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Zona de Perigo */}
-            <Card className="border-red-100 bg-red-50/30">
-              <CardContent className="p-6 flex items-center justify-between">
-                <div>
-                  <h3 className="text-red-800 font-bold text-sm uppercase tracking-wider">
-                    Excluir Agente
-                  </h3>
-                  <p className="text-xs text-red-600">
-                    Esta ação é irreversível e remove todos os dados do
-                    servidor.
-                  </p>
-                </div>
-                <AlertDialog
-                  open={deleteDialogOpen}
-                  onOpenChange={setDeleteDialogOpen}
-                >
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" className="font-bold">
-                      <RiDeleteBinLine className="mr-2" /> Excluir Registro
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent className="rounded-2xl">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="font-black uppercase">
-                        Confirmar Exclusão?
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta ação não pode ser desfeita. O perfil do agente e
-                        sua foto serão removidos permanentemente.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel
-                        disabled={isDeleting}
-                        className="rounded-xl"
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Graduação
+                      </Label>
+                      <Select
+                        value={formData.graduacao || NOT_SELECTED_VALUE}
+                        onValueChange={(v) =>
+                          setFormData({
+                            graduacao: v === NOT_SELECTED_VALUE ? null : v,
+                          })
+                        }
                       >
-                        Cancelar
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleHardDelete}
-                        disabled={isDeleting}
-                        className="bg-red-600 rounded-xl font-bold"
+                        <SelectTrigger className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NOT_SELECTED_VALUE}>
+                            Não informada
+                          </SelectItem>
+                          {GRADUACOES.map((g: string) => (
+                            <SelectItem key={g} value={g}>
+                              {g}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        UF de Registro
+                      </Label>
+                      <Select
+                        value={formData.uf || NOT_SELECTED_VALUE}
+                        onValueChange={(v) =>
+                          setFormData({
+                            uf: v === NOT_SELECTED_VALUE ? null : v,
+                          })
+                        }
                       >
-                        {isDeleting ? "Excluindo..." : "Sim, Confirmar"}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </CardContent>
-            </Card>
-          </div>
+                        <SelectTrigger className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NOT_SELECTED_VALUE}>
+                            Não informada
+                          </SelectItem>
+                          {UFS_BRASIL.map((uf: string) => (
+                            <SelectItem key={uf} value={uf}>
+                              {uf}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-          <div className="space-y-6">
-            {/* Foto e Status Card */}
-            <Card className="border-slate-200 shadow-sm">
-              <CardContent className="p-6 flex flex-col items-center">
-                <AvatarUpload
-                  currentAvatar={formData.avatar_url || ""}
-                  onAvatarChange={(url) => setFormData({ avatar_url: url })}
-                  matricula={agent.matricula}
-                  userId={agent.id}
-                  isLoading={saving}
-                />
+                    {/* TIPO SANGUÍNEO */}
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Tipo Sanguíneo
+                      </Label>
+                      <Select
+                        value={formData.tipo_sanguineo || NOT_SELECTED_VALUE}
+                        onValueChange={(v) =>
+                          setFormData({
+                            tipo_sanguineo: v === NOT_SELECTED_VALUE ? null : v,
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NOT_SELECTED_VALUE}>
+                            Não informado
+                          </SelectItem>
+                          {TIPOS_SANGUINEOS.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <Separator className="my-6" />
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Validade Certificação
+                      </Label>
+                      <SmartDatePicker
+                        date={formData.validade_certificacao}
+                        onSelect={(date) =>
+                          handleDateSelect(date, "validade_certificacao")
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase text-slate-500">
+                        Nível de Acesso
+                      </Label>
+                      <Select
+                        value={formData.role || "agent"}
+                        onValueChange={(v: "admin" | "agent") =>
+                          setFormData({ role: v })
+                        }
+                      >
+                        <SelectTrigger className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="agent">Agente (Padrão)</SelectItem>
+                          <SelectItem value="admin">Administrador</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-                <div className="w-full flex items-center justify-between">
+              {/* Zona de Perigo */}
+              <Card className="border-red-100 bg-red-50/30">
+                <CardContent className="p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-red-800 font-bold text-sm uppercase tracking-wider">
+                      Excluir Agente
+                    </h3>
+                    <p className="text-xs text-red-600">
+                      Esta ação é irreversível e remove todos os dados do
+                      servidor.
+                    </p>
+                  </div>
+                  <AlertDialog
+                    open={deleteDialogOpen}
+                    onOpenChange={setDeleteDialogOpen}
+                  >
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="font-bold">
+                        <RiDeleteBinLine className="mr-2" /> Excluir Registro
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="rounded-2xl">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle className="font-black uppercase">
+                          Confirmar Exclusão?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita. O perfil do agente e
+                          sua foto serão removidos permanentemente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel
+                          disabled={isDeleting}
+                          className="rounded-xl"
+                        >
+                          Cancelar
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleHardDelete}
+                          disabled={isDeleting}
+                          className="bg-red-600 rounded-xl font-bold"
+                        >
+                          {isDeleting ? "Excluindo..." : "Sim, Confirmar"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="lg:col-span-4 space-y-6">
+              {/* Foto e Status Card */}
+              <Card className="border-slate-200 shadow-sm overflow-hidden">
+                <CardContent className="p-6 pt-8 flex flex-col items-center">
+                  <AvatarUpload
+                    currentAvatar={formData.avatar_url || ""}
+                    onAvatarChange={(url) => setFormData({ avatar_url: url })}
+                    matricula={agent.matricula}
+                    userId={agent.id}
+                    isLoading={saving}
+                  />
+
+                  <Separator className="my-6" />
+
+                  <div className="w-full flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <Label className="font-bold text-slate-700">
+                        Status Ativo
+                      </Label>
+                      <span className="text-[10px] text-slate-400 uppercase font-bold">
+                        {formData.status
+                          ? "Agente em Serviço"
+                          : "Agente Inativo"}
+                      </span>
+                    </div>
+                    <Switch
+                      checked={formData.status ?? true}
+                      onCheckedChange={(v) => setFormData({ status: v })}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Resumo Dinâmico */}
+              <Card className="bg-pac-primary-light text-white border-0 overflow-hidden relative shadow-lg">
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                  <RiShieldUserLine size={120} />
+                </div>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-[10px] uppercase tracking-[0.2em] text-slate-200 font-black">
+                    Ficha Operacional
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5 relative z-10">
                   <div className="flex flex-col">
-                    <Label className="font-bold text-slate-700">
-                      Status Ativo
-                    </Label>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">
-                      {formData.status ? "Agente em Serviço" : "Agente Inativo"}
+                    <span className="text-[9px] uppercase text-slate-200 font-bold">
+                      Identificação
+                    </span>
+                    <span className="font-bold text-lg leading-tight uppercase text-slate-300 italic truncate">
+                      {formData.full_name || "-"}
                     </span>
                   </div>
-                  <Switch
-                    checked={formData.status ?? true}
-                    onCheckedChange={(v) => setFormData({ status: v })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Resumo Dinâmico */}
-            <Card className="bg-pac-primary-light text-white border-0 overflow-hidden relative shadow-lg">
-              <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
-                <RiShieldUserLine size={120} />
-              </div>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] uppercase tracking-[0.2em] text-slate-200 font-black">
-                  Ficha Operacional
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5 relative z-10">
-                <div className="flex flex-col">
-                  <span className="text-[9px] uppercase text-slate-200 font-bold">
-                    Identificação
-                  </span>
-                  <span className="font-bold text-lg leading-tight uppercase text-slate-300 italic truncate">
-                    {formData.full_name || "-"}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[9px] uppercase text-slate-200 font-bold">
-                    Matrícula
-                  </span>
-                  <span className="font-mono text-xl tracking-wider text-slate-300">
-                    {formData.matricula}
-                  </span>
-                </div>
-                <div className="pt-2">
-                  <div
-                    className={`w-fit px-3 py-1 rounded-md text-[10px] font-black uppercase ${formData.role === "admin" ? "bg-purple-500" : "bg-pac-primary-muted"} text-white`}
-                  >
-                    {formData.role === "admin" ? "Administrador" : "Agente PAC"}
+                  <div className="flex flex-col">
+                    <span className="text-[9px] uppercase text-slate-200 font-bold">
+                      Matrícula
+                    </span>
+                    <span className="font-mono text-xl tracking-wider text-slate-300">
+                      {formData.matricula}
+                    </span>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="pt-2">
+                    <div
+                      className={`w-fit px-3 py-1 rounded-md text-[10px] font-black uppercase ${formData.role === "admin" ? "bg-purple-500" : "bg-pac-primary-muted"} text-white`}
+                    >
+                      {formData.role === "admin"
+                        ? "Administrador"
+                        : "Agente PAC"}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

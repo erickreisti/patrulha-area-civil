@@ -3,11 +3,11 @@
 import { create } from "zustand";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useEffect, useState } from "react"; // <--- Importante para o hook useAgentEdit
+import { useEffect, useState } from "react";
 import {
   createAgent,
   getAgents,
-  getAgent, // <--- Agora será usado no hook lá embaixo
+  getAgent,
   deleteAgent,
   getAgentsStats,
   toggleAgentStatus,
@@ -23,6 +23,7 @@ export type { CreateAgentInput, UpdateAgentInput, ApiAgentType };
 // ==================== CONSTANTES ====================
 
 export const GRADUACOES = [
+  "AGENTE - PAC",
   "PATRULHEIRO",
   "PATRULHEIRA",
   "CABO - PAC",
@@ -71,6 +72,18 @@ export const UFS_BRASIL = [
   "SP",
   "SE",
   "TO",
+];
+
+// 🆕 ADICIONADO AQUI
+export const TIPOS_SANGUINEOS = [
+  "A+",
+  "A-",
+  "B+",
+  "B-",
+  "AB+",
+  "AB-",
+  "O+",
+  "O-",
 ];
 
 // ==================== FUNÇÕES UTILITÁRIAS ====================

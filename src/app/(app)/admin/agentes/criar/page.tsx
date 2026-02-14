@@ -1,6 +1,5 @@
 "use client";
 
-// 1. CORREÇÃO: Adicionados 'useRef' e 'forwardRef' aos imports
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -56,66 +55,20 @@ import {
 } from "react-icons/ri";
 
 // Store e Actions
-import { useAgentCreate, CreateAgentInput } from "@/lib/stores/useAgentesStore";
+import {
+  useAgentCreate,
+  CreateAgentInput,
+  GRADUACOES,
+  UFS_BRASIL,
+  TIPOS_SANGUINEOS,
+} from "@/lib/stores/useAgentesStore";
 import { uploadAgentAvatar } from "@/app/actions/upload/avatar";
 
-// --- TIPOS E CONSTANTES ---
+// --- TIPOS E CONSTANTES LOCAIS ---
 type AgentFormWithUnidade = Partial<CreateAgentInput> & {
   unidade?: string;
 };
 
-const UFS_BRASIL = [
-  "AC",
-  "AL",
-  "AP",
-  "AM",
-  "BA",
-  "CE",
-  "DF",
-  "ES",
-  "GO",
-  "MA",
-  "MT",
-  "MS",
-  "MG",
-  "PA",
-  "PB",
-  "PR",
-  "PE",
-  "PI",
-  "RJ",
-  "RN",
-  "RS",
-  "RO",
-  "RR",
-  "SC",
-  "SP",
-  "SE",
-  "TO",
-];
-
-const GRADUACOES = [
-  "PATRULHEIRO",
-  "PATRULHEIRA",
-  "CABO - PAC",
-  "3° SARGENTO - PAC",
-  "2° SARGENTO - PAC",
-  "1° SARGENTO - PAC",
-  "SUBOFICIAL - PAC",
-  "ASPIRANTE-a-OFICIAL - PAC",
-  "2° TENENTE - PAC",
-  "1° TENENTE - PAC",
-  "CAPITÃO - PAC",
-  "CAPITÃ - PAC",
-  "MAJOR - PAC",
-  "TENENTE CORONEL - PAC",
-  "CORONEL - PAC",
-  "VICE COMODORO - PAC",
-  "COMODORO - PAC",
-  "COMODORO DE BRIGADA - PAC",
-];
-
-const TIPOS_SANGUINEOS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const NOT_SELECTED_VALUE = "not-selected";
 
 interface AvatarUploadState {
@@ -170,7 +123,7 @@ const validateFullName = (n: string) =>
       ? { valid: false, error: "Muito curto" }
       : { valid: true };
 
-// ==================== DATE PICKER HÍBRIDO (Igual Edit) ====================
+// ==================== DATE PICKER HÍBRIDO ====================
 
 interface CustomInputButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   onClick?: () => void;
