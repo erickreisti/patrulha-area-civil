@@ -28,10 +28,9 @@ import {
 
 // Stores & Actions
 import { useAuthStore } from "@/lib/stores/useAuthStore";
-
 import { getDashboardStats } from "@/app/actions/admin/dashboard/dashboard";
 
-// Componentes Locais
+// Components
 import { StatCard } from "@/components/admin/StatCard";
 import {
   RecentActivities,
@@ -40,7 +39,7 @@ import {
 import { LoadingSkeleton } from "./components/dashboard/LoadingSkeleton";
 import { AdminAuthModal } from "@/components/admin/AdminAuthModal";
 
-// === TIPOS LOCAIS ===
+// === TYPES ===
 interface AgentsStats {
   total: number;
   active: number;
@@ -61,7 +60,7 @@ interface DashboardData {
   recentActivities: DashboardActivity[];
 }
 
-// === SUB-COMPONENTES ===
+// === SUB-COMPONENTS ===
 
 const ActionButtons = ({
   refreshing,
@@ -110,9 +109,7 @@ const ActionButtons = ({
         />
         {refreshing ? "Atualizando..." : "Atualizar"}
       </Button>
-
       <div className="w-px h-8 bg-slate-200 mx-2 hidden sm:block" />
-
       {actions.map((action) => (
         <Link key={action.href} href={action.href}>
           <Button
@@ -183,7 +180,7 @@ const SystemSummary = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-      {/* Agentes */}
+      {/* Card Agentes */}
       <Card className="border-none shadow-sm h-full">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -197,7 +194,6 @@ const SystemSummary = ({
               {agents.total} total
             </Badge>
           </div>
-
           <div className="space-y-3">
             <div className="flex justify-between items-center text-sm">
               <span className="text-slate-500 flex items-center gap-2">
@@ -223,7 +219,7 @@ const SystemSummary = ({
         </CardContent>
       </Card>
 
-      {/* Conteúdo */}
+      {/* Card Conteúdo */}
       <Card className="border-none shadow-sm h-full">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -255,14 +251,13 @@ const SystemSummary = ({
         </CardContent>
       </Card>
 
-      {/* Status */}
+      {/* Card Saúde */}
       <Card className="border-none shadow-sm h-full bg-gradient-to-br from-sky-50 to-white">
         <CardContent className="p-6 flex flex-col justify-center h-full">
           <h3 className="font-bold text-sky-900 mb-1 flex items-center gap-2">
             <RiBarChart2Line /> Saúde do Sistema
           </h3>
           <p className="text-sm text-sky-700/80 mb-4">Métricas gerais de uso</p>
-
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-sky-800">
               Taxa de Atividade
@@ -271,7 +266,6 @@ const SystemSummary = ({
               {activeRate}%
             </span>
           </div>
-
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-sky-800">
               Admin Ratio
@@ -289,11 +283,10 @@ const SystemSummary = ({
   );
 };
 
-// === PÁGINA PRINCIPAL ===
+// === MAIN PAGE ===
 
 export default function DashboardPage() {
   const { profile } = useAuthStore();
-
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -305,8 +298,8 @@ export default function DashboardPage() {
   });
 
   const loadDashboard = useCallback(async () => {
-    setRefreshing(true);
     try {
+      setRefreshing(true);
       const result = await getDashboardStats();
 
       if (result.success && result.data) {
@@ -326,36 +319,30 @@ export default function DashboardPage() {
           },
           recentActivities: result.data.recentActivities || [],
         });
-        if (!loading) toast.success("Dashboard atualizado");
       } else {
-        // Tratamento de sessão
-        if (
-          result.error === "AUTH_REQUIRED" ||
-          result.error === "AUTH_EXPIRED" ||
-          result.error === "AUTH_INVALID"
-        ) {
+        // Tratamento silencioso de Auth
+        if (result.error === "admin_session_required") {
           setShowAuthModal(true);
-        } else {
-          throw new Error(result.error || "Erro desconhecido");
+          return; // Para aqui sem lançar erro
         }
+        throw new Error(result.error || "Erro desconhecido");
       }
     } catch (err) {
       console.error("Erro dashboard:", err);
-      if (!showAuthModal) toast.error("Falha ao carregar dados");
+      // Evita toast de erro se for apenas modal fechado
+      if (!showAuthModal) toast.error("Falha ao atualizar dados");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [loading, showAuthModal]);
+  }, [showAuthModal]);
 
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
 
-  // Se estiver carregando e não tiver dados, mostra o skeleton
   if (loading && !data.agents.total) return <LoadingSkeleton />;
 
-  // Se não tem dados e não está carregando (ex: erro de auth), renderiza container vazio para o modal aparecer sobre ele
   if (!data.agents.total && !loading) {
     return (
       <div className="min-h-screen bg-slate-50/50">
@@ -376,12 +363,11 @@ export default function DashboardPage() {
         isOpen={showAuthModal}
         onClose={() => {
           setShowAuthModal(false);
-          loadDashboard(); // Tenta recarregar ao fechar/sucesso
+          loadDashboard();
         }}
       />
 
       <div className="container mx-auto px-4 max-w-7xl">
-        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -400,16 +386,10 @@ export default function DashboardPage() {
           </p>
         </motion.div>
 
-        {/* Ações */}
         <ActionButtons refreshing={refreshing} onRefresh={loadDashboard} />
-
-        {/* KPIs Principais */}
         <StatsGrid data={data} loading={refreshing} />
-
-        {/* Resumo Detalhado */}
         <SystemSummary agents={data.agents} content={data.content} />
 
-        {/* Atividades Recentes */}
         <div className="grid grid-cols-1 gap-6">
           <RecentActivities
             activities={data.recentActivities}

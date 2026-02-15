@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link"; // Importe adicionado
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -156,7 +157,6 @@ export default function LoginPage() {
               fill
               className="object-contain"
               priority
-              // FIX: Sizes unificado para evitar warning de preload
               sizes="(max-width: 640px) 128px, 160px"
             />
           </div>
@@ -179,15 +179,20 @@ export default function LoginPage() {
         className="w-full max-w-[440px]"
       >
         <div className="text-center mb-6">
-          <div className="relative w-32 h-32 sm:w-40 sm:h-40 mx-auto mb-2 drop-shadow-xl hover:scale-105 transition-transform">
-            <Image
-              src="/images/logos/logo.webp"
-              alt="Logo"
-              fill
-              className="object-contain"
-              sizes="(max-width: 640px) 128px, 160px"
-            />
-          </div>
+          {/* Link envolvendo a imagem para voltar à Home */}
+          <Link href="/" title="Voltar para a página inicial">
+            <div className="relative w-32 h-32 sm:w-40 sm:h-40 mx-auto mb-2 drop-shadow-xl hover:scale-105 transition-transform cursor-pointer">
+              <Image
+                src="/images/logos/logo.webp"
+                alt="Logo"
+                fill
+                className="object-contain"
+                priority
+                sizes="(max-width: 640px) 128px, 160px"
+              />
+            </div>
+          </Link>
+
           <h1 className="text-2xl sm:text-3xl font-black text-pac-primary tracking-tight mb-2">
             PATRULHA AÉREA CIVIL
           </h1>

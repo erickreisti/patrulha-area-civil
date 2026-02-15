@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { useRouter } from "next/navigation";
+import Link from "next/link"; // Importe o Link
 import { toast } from "sonner";
 import {
   Dialog,
@@ -19,6 +20,7 @@ import {
   RiTimerLine,
   RiEyeLine,
   RiEyeOffLine,
+  RiArrowLeftLine, // Ícone para voltar
 } from "react-icons/ri";
 import { Loader2 } from "lucide-react";
 
@@ -80,7 +82,6 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
       const result = await verifyAdminAccess(password);
 
       if (result.success) {
-        // Toast removido para redirecionamento silencioso
         onClose();
         router.push("/admin/dashboard");
       } else {
@@ -160,7 +161,6 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
                   disabled={isLoading}
                 />
 
-                {/* Botão de Toggle Senha */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
@@ -197,6 +197,18 @@ export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
                   "Entrar"
                 )}
               </Button>
+            </div>
+
+            {/* Link para voltar ao site público */}
+            <div className="text-center pt-2 border-t border-slate-100 mt-4">
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-pac-primary transition-colors group"
+                onClick={onClose} // Fecha o modal ao clicar
+              >
+                <RiArrowLeftLine className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" />
+                Voltar para o site público
+              </Link>
             </div>
           </form>
         )}
