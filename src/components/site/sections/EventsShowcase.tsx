@@ -18,7 +18,8 @@ import {
 
 // --- DADOS ---
 
-const ACTIVITIES = [
+const EVENTS = [
+  // Renomeado de ACTIVITIES para EVENTS
   {
     title: "Operações Realizadas",
     count: "50+",
@@ -81,7 +82,7 @@ const SectionHeader = () => (
     </div>
 
     <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 uppercase tracking-tight">
-      Impacto & <span className="text-pac-primary">Atividades</span>
+      Impacto & <span className="text-pac-primary">Eventos</span>
     </h2>
 
     <p className="max-w-2xl mx-auto text-slate-600 text-base sm:text-lg leading-relaxed">
@@ -91,8 +92,9 @@ const SectionHeader = () => (
   </div>
 );
 
-const ActivityCard = ({ activity }: { activity: (typeof ACTIVITIES)[0] }) => {
-  const Icon = activity.icon;
+const EventCard = ({ event }: { event: (typeof EVENTS)[0] }) => {
+  // Renomeado de ActivityCard para EventCard
+  const Icon = event.icon;
 
   return (
     <motion.div
@@ -110,17 +112,17 @@ const ActivityCard = ({ activity }: { activity: (typeof ACTIVITIES)[0] }) => {
 
       {/* Number (Big Impact) */}
       <div className="font-black text-4xl sm:text-5xl text-slate-900 mb-2 group-hover:text-pac-primary transition-colors">
-        {activity.count}
+        {event.count}
       </div>
 
       {/* Title */}
       <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-4">
-        {activity.title}
+        {event.title}
       </h3>
 
       {/* Description */}
       <p className="text-slate-600 text-sm leading-relaxed">
-        {activity.description}
+        {event.description}
       </p>
     </motion.div>
   );
@@ -145,13 +147,14 @@ const StatItem = ({ stat }: { stat: (typeof STATS)[0] }) => {
 
 // --- COMPONENTE PRINCIPAL ---
 
-export function ActivitiesShowcase() {
+export function EventsShowcase() {
+  // Renomeado de ActivitiesShowcase para EventsShowcase
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
     <section
-      id="activities-section"
+      id="events-section" // Alterado ID
       className="w-full bg-white py-20 sm:py-24 lg:py-32 relative overflow-hidden"
       ref={ref}
     >
@@ -161,15 +164,15 @@ export function ActivitiesShowcase() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <SectionHeader />
 
-        {/* Grid de Atividades Principais */}
+        {/* Grid de Eventos Principais */}
         <motion.div
           className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-16"
           variants={containerVariants}
           initial="hidden"
           animate={isInView ? "visible" : "hidden"}
         >
-          {ACTIVITIES.map((activity, index) => (
-            <ActivityCard key={index} activity={activity} />
+          {EVENTS.map((event, index) => (
+            <EventCard key={index} event={event} />
           ))}
         </motion.div>
 
@@ -201,7 +204,9 @@ export function ActivitiesShowcase() {
                 )}
                 asChild
               >
-                <Link href="/atividades" className="flex items-center gap-2">
+                <Link href="/eventos" className="flex items-center gap-2">
+                  {" "}
+                  {/* Link atualizado */}
                   <RiCalendarCheckLine className="w-5 h-5" />
                   Ver Todas as Operações
                   <RiArrowRightLine className="w-4 h-4 group-hover:translate-x-1 transition-transform" />

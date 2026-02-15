@@ -1,35 +1,41 @@
 import {
   RiDashboardLine,
-  RiGroupLine,
-  RiTimeLine,
-  RiArticleLine,
+  RiUserStarLine,
+  RiNewspaperLine,
   RiImageLine,
+  RiFileListLine,
+  RiCalendarEventLine,
 } from "react-icons/ri";
-
+import { ROUTES } from "@/lib/constants/routes";
 export const adminNavigation = [
   {
-    name: "Dashboard",
-    href: "/admin/dashboard",
+    title: "Dashboard",
+    href: ROUTES.ADMIN.DASHBOARD,
     icon: RiDashboardLine,
   },
   {
-    name: "Agentes",
-    href: "/admin/agentes",
-    icon: RiGroupLine,
+    title: "Agentes",
+    href: ROUTES.ADMIN.AGENTS,
+    icon: RiUserStarLine,
   },
   {
-    name: "Atividades",
-    href: "/admin/atividades",
-    icon: RiTimeLine,
+    title: "Eventos",
+    href: ROUTES.ADMIN.EVENTS,
+    icon: RiCalendarEventLine,
   },
   {
-    name: "Notícias",
-    href: "/admin/noticias",
-    icon: RiArticleLine,
+    title: "Notícias",
+    href: ROUTES.ADMIN.NEWS,
+    icon: RiNewspaperLine,
   },
   {
-    name: "Galeria",
-    href: "/admin/galeria",
+    title: "Galeria",
+    href: ROUTES.ADMIN.GALLERY,
     icon: RiImageLine,
+  },
+  {
+    title: "Atividades",
+    href: ROUTES.ADMIN.ACTIVITIES,
+    icon: RiFileListLine,
   },
 ];

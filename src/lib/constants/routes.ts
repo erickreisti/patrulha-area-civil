@@ -17,17 +17,21 @@ export const ROUTES = {
     AGENTS: "/admin/agentes",
     AGENTS_CREATE: "/admin/agentes/criar",
     AGENTS_EDIT: "/admin/agentes/:id",
+    EVENTS: "/admin/eventos",
+    EVENTS_CREATE: "/admin/eventos/novo",
+    EVENTS_EDIT: "/admin/eventos/:id",
     NEWS: "/admin/noticias",
     GALLERY: "/admin/galeria",
     ACTIVITIES: "/admin/atividades",
     SETUP_PASSWORD: "/admin/setup-password",
   } as const,
 
-  // Rotas que requerem sessão admin ativa (2ª camada)
   ADMIN_SESSION_REQUIRED: [
     "/admin/dashboard",
     "/admin/agentes",
     "/admin/agentes/*",
+    "/admin/eventos",
+    "/admin/eventos/*",
     "/admin/noticias",
     "/admin/noticias/*",
     "/admin/galeria",
@@ -49,12 +53,10 @@ export const ROUTES = {
   } as const,
 } as const;
 
-// Helper para verificar se uma rota é admin
 export const isAdminRoute = (pathname: string): boolean => {
   return pathname.startsWith("/admin");
 };
 
-// Helper para verificar se uma rota requer sessão admin
 export const requiresAdminSession = (pathname: string): boolean => {
   return ROUTES.ADMIN_SESSION_REQUIRED.some((route) => {
     if (route.endsWith("/*")) {
@@ -65,9 +67,8 @@ export const requiresAdminSession = (pathname: string): boolean => {
   });
 };
 
-// Helper para verificar se uma rota é pública
 export const isPublicRoute = (pathname: string): boolean => {
   return ROUTES.PUBLIC.some(
-    (route) => pathname === route || pathname.startsWith(`${route}/`)
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 };

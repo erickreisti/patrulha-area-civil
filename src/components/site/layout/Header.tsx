@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation"; // Adicionado useRouter
+import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -34,7 +34,7 @@ import { useAuthStore } from "@/lib/stores/useAuthStore";
 const NAVIGATION = [
   { name: "MISSÃO", href: "/sobre" },
   { name: "SERVIÇOS", href: "/servicos" },
-  { name: "ATIVIDADES", href: "/atividades" },
+  { name: "EVENTOS", href: "/eventos" }, // Alterado de ATIVIDADES para EVENTOS
   { name: "NOTÍCIAS", href: "/noticias" },
   { name: "GALERIA", href: "/galeria" },
   { name: "CONTATO", href: "/contato" },
@@ -152,7 +152,7 @@ const Logo = () => (
 
     <div className="flex flex-col justify-center border-l-2 border-slate-100 pl-2 xs:pl-4 min-w-0">
       <h1
-        className="font-black text-slate-800 tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary whitespace-nowrap
+        className="font-black text-pac-primary tracking-tighter leading-none uppercase transition-colors group-hover:text-pac-primary whitespace-nowrap
         text-base xs:text-lg lg:text-xl xl:text-2xl"
       >
         Patrulha Aérea Civil
@@ -160,9 +160,9 @@ const Logo = () => (
 
       <p
         className="font-bold text-slate-500 uppercase leading-tight mt-0.5 xs:mt-1 whitespace-nowrap
-        text-[9px] tracking-normal xs:text-[10px] xs:tracking-[0.1em] lg:text-[11px] lg:tracking-[0.15em]"
+        text-[7px] tracking-normal xs:text-[8px] xs:tracking-[0.1em] lg:text-[9px] lg:tracking-[0.15em]"
       >
-        Comando Operacional no Rio de Janeiro
+        Comando Operacional no Estado do Rio de Janeiro
       </p>
     </div>
   </Link>
@@ -208,17 +208,16 @@ const LoadingButton = () => (
   </Button>
 );
 
-// --- COMPONENTE CORRIGIDO: IdentificationButton ---
 const IdentificationButton = () => {
   const { user, profile, isAdmin, isLoading, logout } = useAuthStore();
   const pathname = usePathname();
-  const router = useRouter(); // Hook para navegação client-side
+  const router = useRouter();
   const isOnProfilePage = pathname === "/perfil";
 
   const handleSignOut = useCallback(async () => {
     try {
       await logout();
-      router.push("/"); // Redirecionamento suave
+      router.push("/");
     } catch (error) {
       console.error("Erro logout:", error);
     }
@@ -269,7 +268,6 @@ const IdentificationButton = () => {
           <DropdownMenuGroup>
             {!isOnProfilePage && (
               <DropdownMenuItem
-                // CORREÇÃO: Usar router.push
                 onClick={() => router.push("/perfil")}
                 className="cursor-pointer font-medium text-slate-600"
               >
@@ -278,7 +276,6 @@ const IdentificationButton = () => {
             )}
             {isAdmin && (
               <DropdownMenuItem
-                // CORREÇÃO: Usar router.push
                 onClick={() => router.push("/admin/dashboard")}
                 className="cursor-pointer font-medium text-purple-600 focus:text-purple-700 focus:bg-purple-50"
               >
@@ -323,7 +320,7 @@ const MobileMenu = ({
   const handleSignOut = async () => {
     await logout();
     onClose();
-    router.push("/"); // Redirecionamento suave
+    router.push("/");
   };
 
   return (
