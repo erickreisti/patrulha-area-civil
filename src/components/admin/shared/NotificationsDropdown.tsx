@@ -21,6 +21,7 @@ import {
   RiAlertLine,
   RiInformationLine,
   RiSettings3Line,
+  RiLoader4Line,
 } from "react-icons/ri";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -30,7 +31,7 @@ import {
   markAsRead,
   markAllAsRead,
   type Notification,
-} from "@/app/actions/notifications/notifications";
+} from "@/app/actions/notifications/notifications"; // Importando do arquivo unificado
 
 const getNotificationStyles = (type: string) => {
   switch (type) {
@@ -55,7 +56,6 @@ export function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // useCallback estabiliza a função para não recriá-la em cada render
   const loadNotifications = useCallback(async () => {
     try {
       setLoading(true);
@@ -71,15 +71,12 @@ export function NotificationsDropdown() {
     }
   }, []);
 
-  // ✅ CORREÇÃO: Padrão robusto para evitar o erro de setState no Effect
+  // Polling a cada 60 segundos
   useEffect(() => {
     let isMounted = true;
 
     const initializeNotifications = async () => {
-      // Só executa se o componente ainda estiver montado
-      if (isMounted) {
-        await loadNotifications();
-      }
+      if (isMounted) await loadNotifications();
     };
 
     initializeNotifications();
@@ -97,7 +94,7 @@ export function NotificationsDropdown() {
   const handleMarkRead = async (id: string, isRead: boolean) => {
     if (isRead) return;
 
-    // Update Otimista
+    // Atualização Otimista (UI primeiro)
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
     );
@@ -107,9 +104,13 @@ export function NotificationsDropdown() {
   };
 
   const handleMarkAllRead = async () => {
+    if (unreadCount === 0) return;
+
+    // Atualização Otimista
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
     toast.success("Todas as notificações marcadas como lidas");
+
     await markAllAsRead();
   };
 
@@ -125,7 +126,7 @@ export function NotificationsDropdown() {
         <Button
           variant="ghost"
           size="icon"
-          className="text-slate-500 hover:text-sky-700 hover:bg-sky-50 relative transition-colors"
+          className="text-slate-500 hover:text-sky-700 hover:bg-sky-50 relative transition-colors h-9 w-9 rounded-full"
         >
           <RiNotification3Line className="h-5 w-5" />
           {unreadCount > 0 && (
@@ -136,15 +137,15 @@ export function NotificationsDropdown() {
 
       <DropdownMenuContent
         align="end"
-        className="w-80 sm:w-96 p-0 bg-white shadow-xl border-slate-200"
+        className="w-80 sm:w-96 p-0 bg-white shadow-xl border-slate-200 rounded-xl"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/50">
-          <DropdownMenuLabel className="p-0 text-slate-700 font-bold">
+          <DropdownMenuLabel className="p-0 text-slate-800 font-bold text-sm flex items-center">
             Notificações
             {unreadCount > 0 && (
               <Badge
                 variant="secondary"
-                className="ml-2 bg-red-100 text-red-600 hover:bg-red-200 border-0 h-5 px-1.5"
+                className="ml-2 bg-red-100 text-red-600 hover:bg-red-200 border-0 h-5 px-1.5 font-bold"
               >
                 {unreadCount}
               </Badge>
@@ -155,7 +156,7 @@ export function NotificationsDropdown() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-6 text-xs text-sky-600 hover:text-sky-700 hover:bg-sky-50 px-2"
+              className="h-6 text-[10px] sm:text-xs text-sky-600 hover:text-sky-700 hover:bg-sky-50 px-2 font-medium"
               onClick={handleMarkAllRead}
             >
               <RiCheckDoubleLine className="mr-1" /> Ler todas
@@ -165,16 +166,19 @@ export function NotificationsDropdown() {
 
         <ScrollArea className="h-[350px]">
           {loading && notifications.length === 0 ? (
-            <div className="p-4 text-center text-slate-400 text-sm">
-              Carregando...
+            <div className="flex flex-col items-center justify-center h-40 text-slate-400 gap-2">
+              <RiLoader4Line className="h-6 w-6 animate-spin" />
+              <span className="text-xs">Atualizando...</span>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-2">
-              <RiNotification3Line className="h-10 w-10 opacity-20" />
-              <p className="text-sm">Nenhuma notificação recente</p>
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+              <div className="p-3 bg-slate-50 rounded-full">
+                <RiNotification3Line className="h-8 w-8 opacity-40" />
+              </div>
+              <p className="text-sm font-medium">Tudo limpo por aqui!</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-50">
               {notifications.map((notif) => {
                 const style = getNotificationStyles(notif.type);
                 const Icon = style.icon;
@@ -182,28 +186,32 @@ export function NotificationsDropdown() {
                 return (
                   <DropdownMenuItem
                     key={notif.id}
-                    className={`flex items-start gap-3 p-4 cursor-pointer focus:bg-slate-50 ${
-                      !notif.is_read ? "bg-sky-50/40" : ""
+                    className={`flex items-start gap-3 p-4 cursor-pointer transition-colors ${
+                      !notif.is_read
+                        ? "bg-sky-50/30 hover:bg-sky-50"
+                        : "hover:bg-slate-50"
                     }`}
                     onClick={() => handleMarkRead(notif.id, notif.is_read)}
                   >
-                    <div className={`p-2 rounded-full shrink-0 ${style.color}`}>
+                    <div
+                      className={`p-2 rounded-full shrink-0 mt-0.5 ${style.color}`}
+                    >
                       <Icon className="h-4 w-4" />
                     </div>
 
-                    <div className="flex-1 space-y-1">
-                      <div className="flex justify-between items-start">
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <div className="flex justify-between items-start gap-2">
                         <p
-                          className={`text-sm leading-none ${
+                          className={`text-sm leading-snug truncate pr-2 ${
                             !notif.is_read
                               ? "font-bold text-slate-800"
-                              : "font-medium text-slate-600"
+                              : "font-medium text-slate-700"
                           }`}
                         >
                           {notif.title}
                         </p>
                         {!notif.is_read && (
-                          <span className="h-2 w-2 rounded-full bg-sky-500 block mt-1" />
+                          <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0 mt-1.5" />
                         )}
                       </div>
 
@@ -211,7 +219,7 @@ export function NotificationsDropdown() {
                         {notif.message}
                       </p>
 
-                      <p className="text-[10px] text-slate-400 pt-1">
+                      <p className="text-[10px] text-slate-400 font-medium pt-1">
                         {formatDistanceToNow(new Date(notif.created_at), {
                           addSuffix: true,
                           locale: ptBR,
@@ -226,15 +234,14 @@ export function NotificationsDropdown() {
         </ScrollArea>
 
         <DropdownMenuSeparator className="m-0" />
-        <div className="p-2 bg-slate-50">
-          <Button
-            variant="outline"
-            className="w-full h-8 text-xs border-slate-200 text-slate-600 hover:bg-white"
-            disabled
-          >
-            Ver Histórico Completo
-          </Button>
-        </div>
+        {/* Futuro: Link para página completa de notificações */}
+        {notifications.length > 0 && (
+          <div className="p-2 bg-slate-50 text-center">
+            <span className="text-[10px] text-slate-400">
+              Exibindo as últimas 20
+            </span>
+          </div>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

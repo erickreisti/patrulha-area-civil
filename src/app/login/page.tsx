@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image"; // ✅ Import obrigatório
-import Link from "next/link";
+import Image from "next/image";
 import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Timer } from "lucide-react";
 import {
   formatMatricula,
   validateMatricula,
@@ -18,21 +17,32 @@ export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, loginWithServerAction, initialize } = useAuthStore();
 
-  // Estados
   const [matricula, setMatricula] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Estados de controle de fluxo
   const [isInitialized, setIsInitialized] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
-  // 1. Inicialização do Auth Store
+  // 1. Inicialização + Verificação de Cooldown
   useEffect(() => {
     let mounted = true;
     const init = async () => {
       await initialize();
+
+      const storedCooldown = localStorage.getItem("login_cooldown");
+      if (storedCooldown) {
+        const releaseTime = parseInt(storedCooldown, 10);
+        const now = Date.now();
+        if (releaseTime > now) {
+          setCooldown(Math.ceil((releaseTime - now) / 1000));
+        } else {
+          localStorage.removeItem("login_cooldown");
+        }
+      }
+
       setTimeout(() => {
         if (mounted) setIsInitialized(true);
       }, 0);
@@ -43,191 +53,141 @@ export default function LoginPage() {
     };
   }, [initialize]);
 
-  // 2. Carregar Matrícula Salva
+  // 2. Timer Regressivo
   useEffect(() => {
-    const loadSavedData = () => {
-      if (typeof window !== "undefined") {
-        try {
-          const savedMatricula = localStorage.getItem("saved_matricula");
-          if (savedMatricula) {
-            setMatricula(savedMatricula);
-            setRememberMe(true);
-          }
-        } catch (e) {
-          console.error("Erro ao ler localStorage:", e);
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          localStorage.removeItem("login_cooldown");
+          return 0;
         }
-      }
-    };
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
 
-    const timeoutId = setTimeout(loadSavedData, 0);
-    return () => clearTimeout(timeoutId);
+  // 3. Carregar Matrícula Salva
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("saved_matricula");
+      if (saved) {
+        setTimeout(() => {
+          setMatricula(saved);
+          setRememberMe(true);
+        }, 0);
+      }
+    }
   }, []);
 
-  // 3. Redirecionamento se já autenticado
+  // 4. Redirecionamento Automático
   useEffect(() => {
     if (isInitialized && isAuthenticated && !isRedirecting) {
-      const handleRedirect = () => {
+      setTimeout(() => {
         setIsRedirecting(true);
-        toast.success("Sessão restaurada com sucesso!");
         router.replace("/perfil");
-      };
-
-      const timeoutId = setTimeout(handleRedirect, 0);
-      return () => clearTimeout(timeoutId);
+      }, 0);
     }
   }, [isInitialized, isAuthenticated, router, isRedirecting]);
 
-  // Handlers
   const handleMatriculaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    const numericValue = inputValue.replace(/\D/g, "");
-
-    // Limite de 11 dígitos
-    if (numericValue.length > 11) return;
-
+    const val = e.target.value.replace(/\D/g, "");
+    if (val.length > 11) return;
     if (error) setError(null);
-    setMatricula(formatMatricula(inputValue));
+    setMatricula(formatMatricula(e.target.value));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    if (cooldown > 0) return;
 
-    const matriculaNumerica = extractMatriculaNumbers(matricula);
-
-    if (!validateMatricula(matriculaNumerica)) {
-      setError("A matrícula deve conter 11 dígitos numéricos.");
-      toast.error("Formato inválido", {
-        description: "Verifique se digitou todos os números corretamente.",
-      });
+    const nums = extractMatriculaNumbers(matricula);
+    if (!validateMatricula(nums)) {
+      setError("A matrícula deve conter 11 dígitos.");
       return;
     }
 
     setIsLoading(true);
+    setError(null);
 
     try {
-      if (typeof window !== "undefined") {
-        if (rememberMe) {
-          localStorage.setItem("saved_matricula", matricula);
-        } else {
-          localStorage.removeItem("saved_matricula");
-        }
-      }
+      if (rememberMe) localStorage.setItem("saved_matricula", matricula);
+      else localStorage.removeItem("saved_matricula");
 
-      const result = await loginWithServerAction(matriculaNumerica);
+      const res = await loginWithServerAction(nums);
 
-      if (result?.success) {
-        const isInactive = result.data?.user && !result.data.user.status;
-
-        if (isInactive) {
-          toast.warning("Atenção: Conta Inativa", {
-            description: "Entre em contato com o comando para regularizar.",
-            duration: 5000,
-          });
-        } else {
-          toast.success("Bem-vindo de volta!", {
-            icon: <CheckCircle2 className="h-5 w-5 text-green-600" />,
-          });
-        }
-
+      if (res?.success) {
+        toast.success("Bem-vindo de volta!", {
+          icon: <CheckCircle2 className="text-green-600" />,
+        });
         setIsRedirecting(true);
         router.replace("/perfil");
       } else {
-        const errorMessage = result?.error?.toLowerCase() || "";
-        let finalMessage = "Não foi possível realizar o login.";
+        const msg = res?.error?.toLowerCase() || "";
+        let finalMsg = "Erro no login.";
+        if (msg.includes("não encontrada"))
+          finalMsg = "Matrícula não encontrada.";
+        else if (msg.includes("inativa")) finalMsg = "Conta inativa.";
 
-        if (
-          errorMessage.includes("não encontrada") ||
-          errorMessage.includes("não existe")
-        ) {
-          finalMessage = "Matrícula não encontrada no sistema.";
-        } else if (errorMessage.includes("inativa")) {
-          finalMessage = "Sua conta está inativa/bloqueada.";
-        }
-
-        setError(finalMessage);
-        toast.error("Falha na autenticação", { description: finalMessage });
+        setError(finalMsg);
+        toast.error(finalMsg);
         setIsLoading(false);
       }
     } catch (err) {
-      console.error("Erro crítico no login:", err);
-      setError("Ocorreu um erro inesperado no servidor.");
-      toast.error("Erro de conexão", {
-        description: "Tente novamente em instantes.",
-      });
+      console.error(err);
+      setError("Erro de conexão.");
       setIsLoading(false);
     }
   };
 
-  // ---------------------------------------------------------
-  // TELA DE LOADING (CORRIGIDA E MELHORADA)
-  // ---------------------------------------------------------
   if (!isInitialized || isRedirecting) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           className="flex flex-col items-center"
         >
-          {/* ✅ CORREÇÃO ESLINT: Trocado <img> por <Image />
-             ✅ MELHORIA: Aumentado para w-32 (128px), adicionado drop-shadow
-             ✅ ANIMAÇÃO: Adicionado efeito de "respiração" (scale)
-          */}
-          <motion.div
-            animate={{ scale: [1, 1.05, 1] }}
-            transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-            className="relative w-32 h-32 mb-8 filter drop-shadow-xl"
-          >
+          <div className="relative w-32 h-32 mb-8 animate-pulse">
             <Image
               src="/images/logos/logo.webp"
-              alt="Brasão Patrulha Aérea Civil"
+              alt="Logo"
               fill
               className="object-contain"
-              priority // Garante carregamento imediato
-              sizes="(max-width: 768px) 128px, 128px"
+              priority
+              // FIX: Sizes unificado para evitar warning de preload
+              sizes="(max-width: 640px) 128px, 160px"
             />
-          </motion.div>
-
+          </div>
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-3" />
-
-          <p className="text-sm font-semibold text-slate-500 tracking-wide uppercase">
-            {isRedirecting ? "Autenticando..." : "Carregando Sistema..."}
+          <p className="text-sm font-semibold text-slate-500 uppercase">
+            {isRedirecting ? "Autenticando..." : "Carregando..."}
           </p>
         </motion.div>
       </div>
     );
   }
 
-  const matriculaNumerica = extractMatriculaNumbers(matricula);
-  const isFormValid = matriculaNumerica.length === 11;
+  const isFormValid = extractMatriculaNumbers(matricula).length === 11;
 
-  // ---------------------------------------------------------
-  // TELA DE LOGIN (Principal)
-  // ---------------------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
         className="w-full max-w-[440px]"
       >
-        {/* Cabeçalho */}
         <div className="text-center mb-6">
-          <div className="flex justify-center mb-2">
-            <div className="relative w-32 h-32 sm:w-40 sm:h-40 drop-shadow-xl filter hover:scale-105 transition-transform duration-300">
-              <Image
-                src="/images/logos/logo.webp"
-                alt="Brasão Patrulha Aérea Civil"
-                fill
-                className="object-contain"
-                sizes="(max-width: 640px) 128px, 160px"
-                priority
-              />
-            </div>
+          <div className="relative w-32 h-32 sm:w-40 sm:h-40 mx-auto mb-2 drop-shadow-xl hover:scale-105 transition-transform">
+            <Image
+              src="/images/logos/logo.webp"
+              alt="Logo"
+              fill
+              className="object-contain"
+              sizes="(max-width: 640px) 128px, 160px"
+            />
           </div>
-
           <h1 className="text-2xl sm:text-3xl font-black text-pac-primary tracking-tight mb-2">
             PATRULHA AÉREA CIVIL
           </h1>
@@ -236,135 +196,109 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Card de Login */}
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden">
-          <div className="p-8">
-            <div className="mb-6">
-              <h2 className="text-xl font-bold text-slate-800">
-                Portal do Agente
-              </h2>
-              <p className="text-slate-500 text-sm mt-1">
-                Identifique-se para acessar o sistema.
-              </p>
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-hidden p-8">
+          <div className="mb-6">
+            <h2 className="text-xl font-bold text-slate-800">
+              Portal do Agente
+            </h2>
+            <p className="text-slate-500 text-sm mt-1">
+              Identifique-se para acessar o sistema.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <label
+                htmlFor="matricula"
+                className="block text-sm font-semibold text-slate-700"
+              >
+                Matrícula
+              </label>
+              <div className="relative">
+                <input
+                  id="matricula"
+                  type="text"
+                  inputMode="numeric"
+                  value={matricula}
+                  onChange={handleMatriculaChange}
+                  disabled={isLoading || cooldown > 0}
+                  placeholder="000.000.000-00"
+                  className={`w-full px-4 py-3.5 bg-slate-50 border rounded-xl text-lg font-medium outline-none transition-all
+                    ${
+                      error
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-slate-200 focus:ring-blue-600"
+                    }
+                    disabled:opacity-60 disabled:cursor-not-allowed`}
+                />
+              </div>
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: "auto" }}
+                    exit={{ height: 0 }}
+                    className="flex items-center gap-2 text-red-600 text-sm mt-2 font-medium"
+                  >
+                    <AlertCircle className="h-4 w-4" /> {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <label
-                  htmlFor="matricula"
-                  className="block text-sm font-semibold text-slate-700"
-                >
-                  Matrícula
-                </label>
-                <div className="relative group">
-                  <input
-                    id="matricula"
-                    name="matricula"
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="username"
-                    required
-                    disabled={isLoading}
-                    value={matricula}
-                    onChange={handleMatriculaChange}
-                    maxLength={14}
-                    placeholder="000.000.000-00"
-                    className={`
-                      w-full px-4 py-3.5 bg-slate-50 border rounded-xl text-slate-900 text-lg font-medium tracking-wide
-                      transition-all duration-200 ease-in-out
-                      placeholder:text-slate-400
-                      focus:outline-none focus:bg-white focus:ring-2 focus:ring-offset-1
-                      disabled:opacity-60 disabled:cursor-not-allowed
-                      ${
-                        error
-                          ? "border-red-300 focus:ring-red-500 focus:border-red-500"
-                          : "border-slate-200 focus:ring-blue-600 focus:border-blue-600 group-hover:border-blue-300"
-                      }
-                    `}
-                  />
-                  {isLoading && (
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
-                    </div>
-                  )}
-                </div>
-
-                <AnimatePresence>
-                  {error && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="flex items-center gap-2 text-red-600 text-sm mt-2 font-medium"
-                    >
-                      <AlertCircle className="h-4 w-4" />
-                      {error}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <div className="flex items-center">
-                <div className="flex items-center h-5">
-                  <input
-                    id="remember-me"
-                    name="remember-me"
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    disabled={isLoading}
-                    className="h-5 w-5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer transition duration-150 ease-in-out"
-                  />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label
-                    htmlFor="remember-me"
-                    className="font-medium text-slate-600 cursor-pointer select-none"
-                  >
-                    Lembrar minha matrícula
-                  </label>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading || !isFormValid}
-                className={`
-                  w-full py-4 px-6 rounded-xl text-white font-bold text-base shadow-lg shadow-blue-500/20
-                  transition-all duration-200 transform
-                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600
-                  flex items-center justify-center gap-2
-                  ${
-                    isLoading || !isFormValid
-                      ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
-                      : "bg-blue-700 hover:bg-blue-800 hover:-translate-y-0.5 active:translate-y-0"
-                  }
-                `}
+            <div className="flex items-center gap-2">
+              <input
+                id="remember"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                disabled={isLoading || cooldown > 0}
+                className="h-4 w-4 text-blue-600 rounded border-slate-300"
+              />
+              <label
+                htmlFor="remember"
+                className="text-sm font-medium text-slate-600 cursor-pointer"
               >
-                {isLoading ? "Validando..." : "Acessar Portal"}
-              </button>
-            </form>
-          </div>
+                Lembrar matrícula
+              </label>
+            </div>
 
-          <div className="px-8 py-4 bg-slate-50 border-t border-slate-100 text-center">
-            <Link
-              href="/"
-              className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors inline-flex items-center gap-1 group"
+            <button
+              type="submit"
+              disabled={isLoading || !isFormValid || cooldown > 0}
+              className={`w-full py-4 px-6 rounded-xl text-white font-bold text-base shadow-lg transition-all flex items-center justify-center gap-2
+                ${
+                  isLoading || !isFormValid || cooldown > 0
+                    ? "bg-slate-300 text-slate-500 cursor-not-allowed shadow-none"
+                    : "bg-blue-700 hover:bg-blue-800 hover:-translate-y-0.5"
+                }`}
             >
-              <span>←</span>
-              <span className="group-hover:underline">
-                Voltar ao site principal
-              </span>
-            </Link>
-          </div>
+              {cooldown > 0 ? (
+                <>
+                  <Timer className="h-5 w-5 animate-pulse" />
+                  Aguarde {cooldown}s...
+                </>
+              ) : isLoading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" /> Validando...
+                </>
+              ) : (
+                "Acessar Portal"
+              )}
+            </button>
+          </form>
+
+          {cooldown > 0 && (
+            <p className="text-xs text-center text-orange-500 mt-3 font-medium bg-orange-50 p-2 rounded-lg">
+              Por segurança, aguarde o tempo para novo login.
+            </p>
+          )}
         </div>
 
-        <p className="mt-8 text-center text-xs font-medium text-slate-400">
+        <div className="mt-8 text-center text-xs font-medium text-slate-400">
           &copy; {new Date().getFullYear()} Patrulha Aérea Civil - Todos os
           direitos reservados.
-          <br />
-          Sistema de uso exclusivo interno.
-        </p>
+        </div>
       </motion.div>
     </div>
   );

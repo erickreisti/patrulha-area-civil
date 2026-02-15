@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuthStore } from "@/lib/stores/useAuthStore";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-
-// UI Components
 import {
   Dialog,
   DialogContent,
@@ -12,169 +11,161 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-
-// Icons
+import { Button } from "@/components/ui/button";
 import {
-  RiLockPasswordLine,
-  RiLoader4Line,
   RiShieldKeyholeLine,
-  RiFingerprintLine,
+  RiLockPasswordLine,
+  RiTimerLine,
   RiEyeLine,
   RiEyeOffLine,
 } from "react-icons/ri";
-
-// Store & Actions
-import { useAuthStore } from "@/lib/stores/useAuthStore";
-import { loginAdmin } from "@/app/actions/auth/login";
+import { Loader2 } from "lucide-react";
 
 interface AdminAuthModalProps {
-  isOpen?: boolean;
-  onClose?: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export function AdminAuthModal({
-  isOpen = false,
-  onClose,
-}: AdminAuthModalProps) {
-  const router = useRouter();
-  const { profile, initialize } = useAuthStore();
-
+export function AdminAuthModal({ isOpen, onClose }: AdminAuthModalProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(isOpen);
+  const [isLoading, setIsLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
+  const { verifyAdminAccess } = useAuthStore();
+  const router = useRouter();
+
+  // 1. Ao abrir, verifica se existe cooldown ativo
   useEffect(() => {
-    setShowModal(isOpen);
-    if (isOpen) setShowPassword(false);
+    if (isOpen) {
+      setPassword("");
+      setShowPassword(false);
+      const stored = localStorage.getItem("admin_cooldown");
+      if (stored) {
+        const releaseTime = parseInt(stored, 10);
+        const now = Date.now();
+        if (releaseTime > now) {
+          setCooldown(Math.ceil((releaseTime - now) / 1000));
+        } else {
+          localStorage.removeItem("admin_cooldown");
+          setCooldown(0);
+        }
+      }
+    }
   }, [isOpen]);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  // 2. Timer regressivo
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown((prev) => {
+        if (prev <= 1) {
+          localStorage.removeItem("admin_cooldown");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cooldown > 0) return;
 
-    if (!password) {
-      toast.error("Digite sua senha de administrador");
-      return;
-    }
-
-    if (!profile?.email) {
-      toast.error("Erro de perfil. Tente recarregar a página.");
-      return;
-    }
-
-    setLoading(true);
+    setIsLoading(true);
 
     try {
-      const result = await loginAdmin({
-        email: profile.email,
-        password,
-      });
+      const result = await verifyAdminAccess(password);
 
       if (result.success) {
-        toast.success("Identidade confirmada com sucesso!");
-
-        // Atualiza o estado global para garantir que as permissões de admin estejam ativas
-        await initialize();
-
-        if (onClose) onClose();
-        setShowModal(false);
-        setPassword("");
-
-        // Redireciona direto para o dashboard
+        // Toast removido para redirecionamento silencioso
+        onClose();
         router.push("/admin/dashboard");
       } else {
-        toast.error(result.error || "Senha incorreta");
+        toast.error("Senha incorreta");
+        setPassword("");
       }
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao validar credenciais");
+      toast.error("Erro ao verificar credenciais");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <Dialog
-      open={showModal}
-      onOpenChange={(open) => {
-        if (!open && onClose) onClose();
-        if (!open) setShowModal(false);
-      }}
-    >
-      <DialogContent className="sm:max-w-md border-0 p-0 overflow-hidden bg-white/80 backdrop-blur-2xl shadow-2xl shadow-slate-900/20 ring-1 ring-white/60">
-        {/* Decorative Gradient Background */}
-        <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-slate-100/50 to-transparent pointer-events-none" />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[400px] bg-white rounded-2xl border border-slate-100 shadow-2xl p-6">
+        <DialogHeader className="items-center text-center space-y-4">
+          <div
+            className={`p-4 rounded-full transition-colors duration-300 ${cooldown > 0 ? "bg-orange-50" : "bg-pac-primary/5"}`}
+          >
+            {cooldown > 0 ? (
+              <RiTimerLine className="w-8 h-8 text-orange-500 animate-pulse" />
+            ) : (
+              <RiShieldKeyholeLine className="w-8 h-8 text-pac-primary" />
+            )}
+          </div>
+          <div className="space-y-1">
+            <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
+              {cooldown > 0 ? "Aguarde um momento" : "Área Restrita"}
+            </DialogTitle>
+            <DialogDescription className="text-slate-500 text-sm">
+              {cooldown > 0
+                ? "Muitas tentativas. Por segurança, aguarde o tempo acabar."
+                : "Esta área exige privilégios de administrador."}
+            </DialogDescription>
+          </div>
+        </DialogHeader>
 
-        <div className="p-8 relative z-10">
-          <DialogHeader className="flex flex-col items-center space-y-4">
-            {/* Ícone com efeito Glass e Glow */}
-            <div className="relative group">
-              <div className="absolute -inset-1 bg-gradient-to-r from-sky-400 to-blue-500 rounded-full blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
-              <div className="relative bg-white/80 backdrop-blur-md p-4 rounded-full shadow-lg ring-1 ring-white">
-                <RiShieldKeyholeLine className="w-8 h-8 text-slate-700" />
-              </div>
+        {cooldown > 0 ? (
+          // --- ESTADO DE BLOQUEIO ---
+          <div className="py-8 flex flex-col items-center justify-center space-y-4 animate-in fade-in zoom-in-95 duration-300">
+            <div className="text-5xl font-black text-slate-900 tabular-nums tracking-tighter">
+              00:{cooldown.toString().padStart(2, "0")}
             </div>
-
-            <div className="text-center space-y-1.5">
-              <DialogTitle className="text-xl font-bold text-slate-800 tracking-tight">
-                Acesso Restrito
-              </DialogTitle>
-              <DialogDescription className="text-slate-500 text-sm max-w-xs mx-auto">
-                Esta área requer privilégios elevados. Confirme sua identidade
-                para continuar.
-              </DialogDescription>
-            </div>
-          </DialogHeader>
-
-          <form onSubmit={handleLogin} className="space-y-6 mt-8">
-            {/* Card do Usuário (Glassmorphism) */}
-            <div className="flex items-center gap-3 p-3 bg-slate-50/50 border border-slate-200/60 rounded-xl backdrop-blur-sm">
-              <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-slate-200 to-white flex items-center justify-center shadow-sm border border-white">
-                <RiFingerprintLine className="w-5 h-5 text-slate-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-                  Conta Vinculada
-                </p>
-                <p className="text-sm font-semibold text-slate-700 truncate">
-                  {profile?.email}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label
-                htmlFor="modal-password"
-                className="text-slate-700 font-medium ml-1"
-              >
-                Senha Administrativa
-              </Label>
-
+            <p className="text-xs text-orange-600 font-bold uppercase tracking-widest bg-orange-50 px-3 py-1 rounded-full">
+              Bloqueio de Segurança
+            </p>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="w-full mt-4 rounded-xl h-11 border-slate-200"
+            >
+              Fechar Janela
+            </Button>
+          </div>
+        ) : (
+          // --- ESTADO DE FORMULÁRIO ---
+          <form
+            onSubmit={handleVerify}
+            className="space-y-5 mt-2 animate-in slide-in-from-bottom-2 duration-300"
+          >
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 ml-1 uppercase tracking-wide">
+                Senha de Acesso
+              </label>
               <div className="relative group">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-sky-600 transition-colors pointer-events-none">
-                  <RiLockPasswordLine className="w-5 h-5" />
-                </div>
+                <RiLockPasswordLine className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-pac-primary transition-colors w-5 h-5" />
 
                 <Input
-                  id="modal-password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  className="pl-10 pr-10 h-12 bg-white/60 border-slate-200 hover:border-slate-300 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10 rounded-xl transition-all duration-300 shadow-sm"
+                  placeholder="Digite sua senha..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  disabled={loading}
+                  className="pl-11 pr-11 h-12 bg-slate-50 border-slate-200 focus:bg-white focus:border-pac-primary focus:ring-4 focus:ring-pac-primary/10 rounded-xl transition-all text-base"
                   autoFocus
+                  disabled={isLoading}
                 />
 
+                {/* Botão de Toggle Senha */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none transition-colors p-1"
                   tabIndex={-1}
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? (
                     <RiEyeOffLine className="w-5 h-5" />
@@ -185,37 +176,30 @@ export function AdminAuthModal({
               </div>
             </div>
 
-            <div className="pt-2 flex gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Button
                 type="button"
-                variant="ghost"
-                className="flex-1 h-12 text-slate-500 hover:text-slate-700 hover:bg-slate-100/50 rounded-xl font-medium transition-colors"
-                onClick={() => {
-                  if (onClose) onClose();
-                  setShowModal(false);
-                }}
-                disabled={loading}
+                variant="outline"
+                onClick={onClose}
+                disabled={isLoading}
+                className="h-12 rounded-xl border-slate-200 hover:bg-slate-50 text-slate-700 font-medium"
               >
                 Cancelar
               </Button>
-
               <Button
                 type="submit"
-                className="flex-[2] h-12 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30 transition-all active:scale-[0.98]"
-                disabled={loading}
+                className="bg-pac-primary hover:bg-pac-primary-dark h-12 rounded-xl font-bold text-white shadow-lg shadow-pac-primary/20 hover:shadow-xl hover:shadow-pac-primary/30 transition-all"
+                disabled={isLoading || !password}
               >
-                {loading ? (
-                  <>
-                    <RiLoader4Line className="mr-2 h-5 w-5 animate-spin" />
-                    Validando...
-                  </>
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  "Confirmar Acesso"
+                  "Entrar"
                 )}
               </Button>
             </div>
           </form>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
