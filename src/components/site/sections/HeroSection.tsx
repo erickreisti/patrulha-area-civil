@@ -54,7 +54,9 @@ export function HeroSection() {
           alt="Operação da Patrulha Aérea Civil"
           fill
           priority
-          className="object-cover object-center"
+          // ALTERADO AQUI: de 'object-center' para 'object-[center_35%]'
+          // Isso alinha o foco verticalmente mais para cima, mostrando o topo da foto
+          className="object-cover object-[center_35%]"
           quality={75}
         />
         <div className="absolute inset-0 bg-pac-primary/80 mix-blend-multiply" />
@@ -77,8 +79,7 @@ export function HeroSection() {
               "flex flex-row items-center justify-center gap-[0.3em]",
               "font-black text-white uppercase tracking-tighter drop-shadow-2xl mb-4 xs:mb-6",
               "whitespace-nowrap",
-              // Tamanho fluido para caber na tela
-              "text-[5.2vw] md:text-[5.5vw] xl:text-[5.5rem]",
+              "text-[8vw] md:text-[7vw] xl:text-[5.5rem]",
             )}
           >
             <span>PATRULHA</span>
@@ -87,13 +88,10 @@ export function HeroSection() {
             </span>
           </motion.h1>
 
-          {/* --- DESCRIÇÃO (SUBTÍTULO) CORRIGIDA --- */}
+          {/* --- DESCRIÇÃO (SUBTÍTULO) --- */}
           <motion.p
             variants={fadeInUp}
             className={cn(
-              // Reduzi os tamanhos base para manter a hierarquia visual
-              // text-base virou text-sm
-              // text-lg virou text-base, etc.
               "text-sm xs:text-base sm:text-lg md:text-xl",
               "text-slate-200 font-medium leading-relaxed max-w-3xl mx-auto mb-8 xs:mb-10 text-shadow-sm px-2 xs:px-4",
             )}
@@ -112,7 +110,6 @@ export function HeroSection() {
               className={cn(
                 "group bg-pac-primary text-white border-0",
                 "hover:bg-pac-primary-light hover:shadow-[0_10px_20px_rgba(0,0,0,0.3)] hover:-translate-y-1",
-                // Ajustei levemente o tamanho da fonte do botão mobile também
                 "font-bold uppercase tracking-wider h-12 xs:h-14 px-8 xs:px-10 rounded-full",
                 "transition-all duration-300 w-full sm:w-auto text-xs xs:text-sm sm:text-base",
               )}
@@ -130,7 +127,6 @@ export function HeroSection() {
               className={cn(
                 "group border-2 border-white/30 bg-transparent text-white backdrop-blur-sm",
                 "hover:bg-white hover:text-slate-900 hover:border-white hover:shadow-lg",
-                // Ajustei levemente o tamanho da fonte do botão mobile também
                 "font-bold uppercase tracking-wider h-12 xs:h-14 px-8 xs:px-10 rounded-full",
                 "transition-all duration-300 w-full sm:w-auto text-xs xs:text-sm sm:text-base",
               )}
