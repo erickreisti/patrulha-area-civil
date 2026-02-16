@@ -25,21 +25,25 @@ import {
   RiCloseLine,
   RiCheckboxCircleLine,
   RiTimerFlashLine,
+  RiCheckDoubleLine,
+  RiDoorOpenLine,
+  RiForbidLine,
 } from "react-icons/ri";
 
 import { useEventsStore } from "@/lib/stores/useEventsStore";
 import { ptBR } from "date-fns/locale";
-import { format, isAfter, isWithinInterval, isValid } from "date-fns";
+import {
+  format,
+  isAfter,
+  isWithinInterval,
+  isValid,
+  differenceInHours,
+} from "date-fns";
 
-// Estilos por categoria
+// --- ESTILOS VISUAIS ---
 const CATEGORY_STYLES: Record<
   string,
-  {
-    icon: React.ElementType;
-    color: string;
-    bg: string;
-    hoverBorder: string;
-  }
+  { icon: React.ElementType; color: string; bg: string; hoverBorder: string }
 > = {
   training: {
     icon: RiFirstAidKitLine,
@@ -67,77 +71,96 @@ const CATEGORY_STYLES: Record<
   },
 };
 
-// Configuração visual dos status
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; classes: string; icon: React.ElementType | null }
+> = {
   aberto: {
     label: "Aberto",
     classes: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    icon: null,
+    icon: RiDoorOpenLine,
+  },
+  confirmado: {
+    label: "Confirmado",
+    classes: "bg-blue-100 text-blue-700 border-blue-200 font-bold",
+    icon: RiCheckDoubleLine,
   },
   andamento: {
     label: "Em Andamento",
-    classes: "bg-blue-100 text-blue-700 border-blue-200 animate-pulse",
+    classes:
+      "bg-cyan-100 text-cyan-700 border-cyan-200 font-bold animate-[pulse_3s_ease-in-out_infinite]",
     icon: RiTimerFlashLine,
   },
   fechado: {
     label: "Fechado",
-    classes: "bg-slate-100 text-slate-500 border-slate-200",
+    classes: "bg-slate-900 text-slate-200 border-slate-700",
     icon: RiCheckboxCircleLine,
   },
   cancelado: {
     label: "Cancelado",
-    classes:
-      "bg-red-100 text-red-700 border-red-200 line-through decoration-red-700",
-    icon: null,
+    classes: "bg-red-100 text-red-700 border-red-200 font-medium",
+    icon: RiForbidLine,
   },
 };
 
-// Formatação segura de data
 const formatDateDisplay = (dateString: string) => {
   if (!dateString) return { day: "--", month: "---", weekday: "---" };
-
   const date = new Date(dateString);
   if (!isValid(date)) return { day: "--", month: "---", weekday: "---" };
-
   return {
     day: format(date, "dd"),
     month: format(date, "MMM", { locale: ptBR }).toUpperCase().replace(".", ""),
-    // "EEEE" garante o dia da semana completo (ex: quinta-feira)
     weekday: format(date, "EEEE", { locale: ptBR }),
   };
 };
 
-// Cálculo dinâmico do status
 const getEventStatus = (start: string, end: string, dbStatus: string) => {
-  if (dbStatus && dbStatus.toLowerCase() === "cancelado") return "cancelado";
-  if (!start || !end) return "aberto";
+  const normalizedStatus = dbStatus ? dbStatus.toLowerCase() : "aberto";
 
+  if (normalizedStatus === "cancelado") return "cancelado";
+
+  if (!start || !end) return "aberto";
   const now = new Date();
   const startDate = new Date(start);
   const endDate = new Date(end);
 
   if (!isValid(startDate) || !isValid(endDate)) return "aberto";
 
-  try {
-    if (isWithinInterval(now, { start: startDate, end: endDate })) {
-      return "andamento";
-    }
-    if (isAfter(now, endDate)) {
-      return "fechado";
-    }
-  } catch {
-    return "aberto";
-  }
+  if (isAfter(now, endDate)) return "fechado";
+  if (isWithinInterval(now, { start: startDate, end: endDate }))
+    return "andamento";
+
+  const hoursUntilStart = differenceInHours(startDate, now);
+  if (hoursUntilStart <= 24 && hoursUntilStart >= 0) return "confirmado";
+
+  if (STATUS_CONFIG[normalizedStatus]) return normalizedStatus;
+
   return "aberto";
 };
 
 export default function CalendarioEventosPage() {
-  const { events, filter, setFilter, fetchEvents, loading } = useEventsStore();
+  const { events, filter, setFilter, fetchEvents, subscribeToEvents, loading } =
+    useEventsStore();
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [, setTick] = useState(0);
 
   useEffect(() => {
     fetchEvents();
-  }, [fetchEvents]);
+    const unsubscribe = subscribeToEvents();
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchEvents, subscribeToEvents]);
+
+  // Atualização a cada 5 segundos para precisão no horário
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const displayedEvents = useMemo(() => {
     if (!events) return [];
@@ -178,50 +201,33 @@ export default function CalendarioEventosPage() {
 
       <section className="py-12">
         <div className="container mx-auto px-4 max-w-5xl">
-          {/* Controles de Filtro e Busca */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-10">
             <div className="flex flex-wrap justify-center gap-2">
               <Button
                 variant={filter === "all" ? "default" : "outline"}
                 onClick={() => setFilter("all")}
-                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${
-                  filter === "all"
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-600 border-slate-200"
-                }`}
+                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${filter === "all" ? "bg-slate-900 text-white" : "text-slate-600 border-slate-200"}`}
               >
                 Todos
               </Button>
               <Button
                 variant={filter === "training" ? "default" : "outline"}
                 onClick={() => setFilter("training")}
-                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${
-                  filter === "training"
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white border-transparent"
-                    : "text-slate-600 border-slate-200 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50"
-                }`}
+                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${filter === "training" ? "bg-emerald-600 hover:bg-emerald-700 text-white border-transparent" : "text-slate-600 border-slate-200 hover:text-emerald-700 hover:border-emerald-200 hover:bg-emerald-50"}`}
               >
                 Treinamentos
               </Button>
               <Button
                 variant={filter === "operation" ? "default" : "outline"}
                 onClick={() => setFilter("operation")}
-                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${
-                  filter === "operation"
-                    ? "bg-red-600 hover:bg-red-700 text-white border-transparent"
-                    : "text-slate-600 border-slate-200 hover:text-red-700 hover:border-red-200 hover:bg-red-50"
-                }`}
+                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${filter === "operation" ? "bg-red-600 hover:bg-red-700 text-white border-transparent" : "text-slate-600 border-slate-200 hover:text-red-700 hover:border-red-200 hover:bg-red-50"}`}
               >
                 Operações
               </Button>
               <Button
                 variant={filter === "meeting" ? "default" : "outline"}
                 onClick={() => setFilter("meeting")}
-                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${
-                  filter === "meeting"
-                    ? "bg-blue-600 hover:bg-blue-700 text-white border-transparent"
-                    : "text-slate-600 border-slate-200 hover:text-blue-700 hover:border-blue-200 hover:bg-blue-50"
-                }`}
+                className={`rounded-full h-9 px-4 text-sm font-medium transition-all ${filter === "meeting" ? "bg-blue-600 hover:bg-blue-700 text-white border-transparent" : "text-slate-600 border-slate-200 hover:text-blue-700 hover:border-blue-200 hover:bg-blue-50"}`}
               >
                 Reuniões
               </Button>
@@ -248,7 +254,6 @@ export default function CalendarioEventosPage() {
 
           <div className="space-y-4">
             {loading ? (
-              // Skeleton Loading
               <>
                 {[1, 2, 3].map((i) => (
                   <div
@@ -260,9 +265,7 @@ export default function CalendarioEventosPage() {
                       <Skeleton className="h-3 w-16" />
                     </div>
                     <div className="flex-1 p-6 space-y-4">
-                      <div className="flex gap-2">
-                        <Skeleton className="h-5 w-24 rounded-full" />
-                      </div>
+                      <Skeleton className="h-5 w-24 rounded-full" />
                       <Skeleton className="h-6 w-3/4" />
                       <Skeleton className="h-4 w-full" />
                     </div>
@@ -284,7 +287,8 @@ export default function CalendarioEventosPage() {
                     evento.end_date,
                     evento.status,
                   ) as keyof typeof STATUS_CONFIG;
-                  const currentStatus = STATUS_CONFIG[currentStatusKey];
+                  const currentStatus =
+                    STATUS_CONFIG[currentStatusKey] || STATUS_CONFIG.aberto;
 
                   return (
                     <motion.div
@@ -296,14 +300,12 @@ export default function CalendarioEventosPage() {
                       transition={{ duration: 0.3 }}
                     >
                       <Card
-                        className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 ${style.hoverBorder} ${currentStatusKey === "fechado" ? "opacity-80 grayscale-[0.5] hover:grayscale-0 hover:opacity-100" : ""}`}
+                        className={`group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 ${style.hoverBorder} ${currentStatusKey === "fechado" ? "opacity-75 grayscale-[0.8] hover:grayscale-0 hover:opacity-100" : ""}`}
                       >
                         <div className="flex flex-col md:flex-row">
-                          {/* Data */}
                           <div
                             className={`p-6 md:w-36 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-100 ${style.bg} shrink-0 transition-colors duration-300`}
                           >
-                            {/* AQUI ESTÁ A MUDANÇA: whitespace-nowrap impede quebra de linha */}
                             <span className="text-xs font-semibold uppercase tracking-wider opacity-60 mb-1 whitespace-nowrap">
                               {weekday}
                             </span>
@@ -322,7 +324,6 @@ export default function CalendarioEventosPage() {
                             </div>
                           </div>
 
-                          {/* Conteúdo */}
                           <CardContent className="flex-1 p-6 flex flex-col justify-center">
                             <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                               <div className="space-y-3 flex-1">
@@ -332,10 +333,9 @@ export default function CalendarioEventosPage() {
                                   >
                                     {evento.type}
                                   </Badge>
-
                                   <Badge
                                     variant="outline"
-                                    className={`border font-medium px-2.5 py-0.5 flex items-center gap-1 ${currentStatus.classes}`}
+                                    className={`border font-medium px-2.5 py-0.5 flex items-center gap-1 transition-colors duration-300 ${currentStatus.classes}`}
                                   >
                                     {currentStatus.icon && (
                                       <currentStatus.icon className="w-3.5 h-3.5" />
@@ -346,7 +346,7 @@ export default function CalendarioEventosPage() {
 
                                 <div>
                                   <CardTitle
-                                    className={`text-xl font-bold transition-colors ${currentStatusKey === "fechado" ? "text-slate-600" : "text-slate-900 group-hover:text-pac-primary"}`}
+                                    className={`text-xl font-bold transition-colors ${currentStatusKey === "fechado" ? "text-slate-600 line-through decoration-slate-400/50" : "text-slate-900 group-hover:text-pac-primary"}`}
                                   >
                                     {evento.title}
                                   </CardTitle>

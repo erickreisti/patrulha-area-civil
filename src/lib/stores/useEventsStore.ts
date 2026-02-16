@@ -1,72 +1,64 @@
 import { create } from "zustand";
-import { getEvents } from "@/app/actions/events/get-events";
-// Importamos o tipo EventType que é inferido do Zod no arquivo de schemas
-import { type EventType } from "@/lib/schemas/events";
+import { createBrowserClient } from "@supabase/ssr";
+import { EventType } from "@/lib/schemas/events";
 
-// Cria um tipo auxiliar para o filtro (pode ser 'all' ou uma das categorias do banco)
-export type FilterType = "all" | EventType["category"];
+// Cliente Supabase para o Browser
+const supabase = createBrowserClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+);
 
-interface EventsStore {
-  // Lista completa de eventos (cache)
+interface EventsState {
   events: EventType[];
-  // Lista filtrada que será exibida na tela
-  filteredEvents: EventType[];
-  // Filtro atual selecionado
-  filter: FilterType;
-  // Estado de carregamento
   loading: boolean;
-
-  // Actions
+  filter: string;
+  setFilter: (filter: string) => void;
   fetchEvents: () => Promise<void>;
-  setFilter: (category: FilterType) => void;
+  // Nova função para iniciar o Realtime
+  subscribeToEvents: () => () => void;
 }
 
-export const useEventsStore = create<EventsStore>((set, get) => ({
+export const useEventsStore = create<EventsState>((set, get) => ({
   events: [],
-  filteredEvents: [],
+  loading: false,
   filter: "all",
-  loading: true, // Começa como true para exibir o Skeleton na montagem inicial
+
+  setFilter: (filter) => set({ filter }),
 
   fetchEvents: async () => {
     set({ loading: true });
+    const { data, error } = await supabase
+      .from("events")
+      .select("*")
+      .order("start_date", { ascending: true });
 
-    // Chama a Server Action
-    const res = await getEvents();
-
-    if (res.success && res.data) {
-      // Pega o filtro que está ativo no momento (caso o usuário tenha mudado antes de carregar)
-      const currentFilter = get().filter;
-
-      // Aplica a lógica de filtro nos dados novos
-      const filtered =
-        currentFilter === "all"
-          ? res.data
-          : res.data.filter((e) => e.category === currentFilter);
-
-      set({
-        events: res.data,
-        filteredEvents: filtered,
-        loading: false,
-      });
-    } else {
-      // Em caso de erro, remove o loading para não travar a tela
-      set({ loading: false });
+    if (!error && data) {
+      set({ events: data as EventType[] });
     }
+    set({ loading: false });
   },
 
-  setFilter: (category: FilterType) => {
-    const { events } = get();
+  // --- LÓGICA DE TEMPO REAL ---
+  subscribeToEvents: () => {
+    console.log("🔌 Conectando ao Realtime de Eventos...");
 
-    // Atualiza o estado do filtro visual
-    set({ filter: category });
+    const channel = supabase
+      .channel("events-realtime") // Nome do canal (pode ser qualquer um)
+      .on(
+        "postgres_changes", // O tipo de evento (mudança no banco)
+        { event: "*", schema: "public", table: "events" }, // Onde ouvir
+        (payload) => {
+          console.log("⚡ Mudança detectada no banco:", payload.eventType);
+          // Se mudou algo, recarrega a lista
+          get().fetchEvents();
+        },
+      )
+      .subscribe();
 
-    // Atualiza a lista filtrada baseada na lista completa (cache)
-    if (category === "all") {
-      set({ filteredEvents: events });
-    } else {
-      set({
-        filteredEvents: events.filter((ev) => ev.category === category),
-      });
-    }
+    // Retorna a função para desligar a escuta quando sair da página
+    return () => {
+      console.log("🔌 Desconectando Realtime...");
+      supabase.removeChannel(channel);
+    };
   },
 }));

@@ -8,8 +8,7 @@ import { revalidatePath } from "next/cache";
 export async function createEvent(data: Omit<EventType, "id">) {
   const supabase = await createServerClient();
 
-  // CORREÇÃO 1: Criamos um schema temporário sem o ID para validar a criação
-  // Se usarmos eventSchema.safeParse(data) direto, vai falhar porque 'id' é obrigatório lá
+  // Validamos sem o ID, pois o banco gera automaticamente
   const createSchema = eventSchema.omit({ id: true });
 
   const validation = createSchema.safeParse(data);
@@ -20,16 +19,16 @@ export async function createEvent(data: Omit<EventType, "id">) {
   const { error } = await supabase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from("events" as any)
-    .insert(validation.data); // Usamos o dado validado
+    .insert(validation.data);
 
   if (error) {
     console.error("Erro ao criar evento:", error);
     return { success: false, error: "Erro ao salvar no banco." };
   }
 
-  // CORREÇÃO 2: Atualizar para o nome novo da rota (/eventos)
-  revalidatePath("/admin/eventos");
-  revalidatePath("/eventos");
+  // Revalida o cache para atualizar a lista imediatamente
+  revalidatePath("/admin/eventos"); // Painel Admin
+  revalidatePath("/calendario"); // Calendário Público
   return { success: true };
 }
 
@@ -40,6 +39,7 @@ export async function updateEvent(data: EventType) {
   const validation = eventSchema.safeParse(data);
   if (!validation.success) return { success: false, error: "Dados inválidos" };
 
+  // Removemos o ID do objeto de update para não tentar alterar a Primary Key (embora o Supabase ignore)
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { id, ...updateData } = validation.data;
 
@@ -50,13 +50,12 @@ export async function updateEvent(data: EventType) {
     .eq("id", data.id);
 
   if (error) {
-    console.error(error);
+    console.error("Erro ao atualizar evento:", error);
     return { success: false, error: "Erro ao atualizar." };
   }
 
-  // CORREÇÃO 2: Rotas atualizadas
   revalidatePath("/admin/eventos");
-  revalidatePath("/eventos");
+  revalidatePath("/calendario");
   return { success: true };
 }
 
@@ -71,18 +70,19 @@ export async function deleteEvent(id: string) {
     .eq("id", id);
 
   if (error) {
+    console.error("Erro ao deletar evento:", error);
     return { success: false, error: "Erro ao excluir." };
   }
 
-  // CORREÇÃO 2: Rotas atualizadas
   revalidatePath("/admin/eventos");
-  revalidatePath("/eventos");
+  revalidatePath("/calendario");
   return { success: true };
 }
 
 // --- BUSCAR UM EVENTO (Para Edição) ---
 export async function getEventById(id: string) {
   const supabase = await createServerClient();
+
   const { data, error } = await supabase
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from("events" as any)
@@ -90,7 +90,10 @@ export async function getEventById(id: string) {
     .eq("id", id)
     .single();
 
-  if (error || !data) return null;
+  if (error || !data) {
+    console.error("Erro ao buscar evento por ID:", error);
+    return null;
+  }
 
   return data as unknown as EventType;
 }
