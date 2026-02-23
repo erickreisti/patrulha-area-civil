@@ -32,7 +32,7 @@ const SERVICES_DATA = [
     title: "Solicitação de Credencial",
     description:
       "Processo para obtenção de credencial de membro da Patrulha Aérea Civil.",
-    detailsTitle: "Requisitos e Benefícios",
+    detailsTitle: "Benefícios",
     details: [
       "Cadastro Pac-Coerj ",
       "Credenciamento Rápido",
@@ -62,7 +62,7 @@ const SERVICES_DATA = [
     icon: RiTreeLine,
     title: "Operações Ambientais",
     description: "Busca, resgate e salvamento em ambientes naturais.",
-    detailsTitle: "Competências",
+    detailsTitle: "Especializações",
     details: [
       "Combate a Incêndios Florestais",
       "Resgate em Matas Fechadas",
