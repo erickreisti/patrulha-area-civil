@@ -10,10 +10,10 @@ import {
   RiMapPinLine,
   RiPlaneLine,
   RiShipLine,
-  RiHeartLine,
+  RiEmpathizeLine,
   RiTeamLine,
-  RiShieldCheckLine,
-  RiFileTextLine,
+  RiIdCardLine,
+  RiStethoscopeLine,
   RiArrowRightLine,
   RiCloseLine,
   RiCheckDoubleLine,
@@ -26,6 +26,37 @@ import Link from "next/link";
 // ============================================================================
 
 const SERVICES_DATA = [
+  {
+    id: "credencial",
+    icon: RiIdCardLine,
+    title: "Solicitação de Credencial",
+    description:
+      "Processo para obtenção de credencial de membro da Patrulha Aérea Civil.",
+    detailsTitle: "Requisitos e Benefícios",
+    details: [
+      "Cadastro Pac-Coerj ",
+      "Credenciamento Rápido",
+      "Serviço de Qualidad",
+      "Chancela Pac-Coerj",
+      "Produto Autêntico",
+      "QR code para averiguação",
+    ],
+  },
+  {
+    id: "Ambulancia",
+    icon: RiStethoscopeLine,
+    title: "Ambulância",
+    description: "Serviço de transporte e atendimento pré-hospitalar.",
+    detailsTitle: "Competências",
+    details: [
+      "Remoção/Transferência ",
+      "Equipe Treinada ",
+      "Padronização de Protocolo ",
+      "Ajudar Humanitária ",
+      "Utilidade Pública ",
+      "Serviço Gratuito",
+    ],
+  },
   {
     id: "ambientais",
     icon: RiTreeLine,
@@ -89,7 +120,7 @@ const SERVICES_DATA = [
   },
   {
     id: "capelania",
-    icon: RiHeartLine,
+    icon: RiEmpathizeLine,
     title: "Capelania",
     description: "Assistência religiosa e apoio espiritual.",
     detailsTitle: "Serviços Prestados",
@@ -115,36 +146,6 @@ const SERVICES_DATA = [
       "Preservação Ambiental",
       "Atividades Esportivas",
       "Apoio Pedagógico",
-    ],
-  },
-  {
-    id: "folared",
-    icon: RiShieldCheckLine,
-    title: "FOLARED",
-    description: "Federação Latino Americana de Resposta a Emergências.",
-    detailsTitle: "Benefícios",
-    details: [
-      "Cooperação Internacional",
-      "Intercâmbio de Experiências",
-      "Padronização de Protocolos",
-      "Treinamentos Conjuntos",
-      "Ajuda Humanitária Mútua",
-      "Certificação Regional",
-    ],
-  },
-  {
-    id: "legislacao",
-    icon: RiFileTextLine,
-    title: "Legislação",
-    description: "Base legal e normativa que rege nossas operações.",
-    detailsTitle: "Base Legal",
-    details: [
-      "Lei do Voluntariado",
-      "Constituição Federal",
-      "Normas da Defesa Civil",
-      "Regulamento Interno PAC",
-      "Código de Ética",
-      "Portarias Ministeriais",
     ],
   },
 ];
