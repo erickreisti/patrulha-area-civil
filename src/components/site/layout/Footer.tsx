@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
 import {
   RiFacebookFill,
   RiInstagramLine,
@@ -10,7 +9,6 @@ import {
   RiMailLine,
   RiPhoneLine,
   RiMapPinLine,
-  RiAlertLine,
   RiTwitterXLine,
   RiArrowRightSLine,
 } from "react-icons/ri";
@@ -41,7 +39,7 @@ const SOCIAL_LINKS = [
   },
   {
     icon: RiWhatsappLine,
-    url: "https://wa.me/5521999999999",
+    url: "https://wa.me/5521981853463",
     label: "WhatsApp",
     hoverClass: "hover:bg-[#25D366] hover:text-white hover:border-[#25D366]",
   },
@@ -50,9 +48,9 @@ const SOCIAL_LINKS = [
 const NAVIGATION_LINKS = [
   { href: "/sobre", label: "Sobre Nós" },
   { href: "/servicos", label: "Serviços Operacionais" },
-  { href: "/atividades", label: "Registro de Atividades" },
+  { href: "/eventos", label: "Eventos e Reuniões" },
   { href: "/noticias", label: "Notícias & Avisos" },
-  { href: "/galeria", label: "Galeria Multimídia" },
+  { href: "/galeria", label: "Galeria e Multimídia" },
   { href: "/contato", label: "Fale Conosco" },
 ];
 
@@ -182,23 +180,9 @@ const ContactSection = () => {
           icon={RiMailLine}
           text="contato@patrulhaaereacivil.org.br"
         />
-        <ContactItem icon={RiPhoneLine} text="(21) 99999-9999" />
+        <ContactItem icon={RiPhoneLine} text="(21) 98185-3463" />
         <ContactItem icon={RiMapPinLine} text="Rio de Janeiro, Brasil" />
       </ul>
-
-      <Button
-        asChild
-        className={cn(
-          "w-full bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700",
-          "border-2 border-red-100 hover:border-red-200",
-          "font-bold uppercase tracking-wide h-12 rounded-xl transition-all duration-300 group shadow-sm",
-        )}
-      >
-        <Link href="/contato">
-          <RiAlertLine className="mr-2 w-5 h-5 animate-pulse text-red-500" />
-          Plantão de Emergência
-        </Link>
-      </Button>
     </motion.div>
   );
 };
